@@ -1,9 +1,11 @@
 "use client";
+import { useEffect } from "react";
 
-/**
- * PWA is intentionally disabled in local development builds.
- * It will be re-enabled only in the production deployment build.
- */
 export function PWARegister() {
+  useEffect(()=>{
+    if(process.env.NODE_ENV!=="production") return;
+    if(!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").catch(()=>{});
+  },[]);
   return null;
 }
