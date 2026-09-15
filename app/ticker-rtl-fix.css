@@ -1,0 +1,21 @@
+/* Final RTL ticker fix: keep marquee geometry LTR while isolating Arabic item text. */
+.news-ticker,
+.news-ticker .ticker-track{
+  direction:ltr!important;
+}
+
+[dir="rtl"] .news-ticker .ticker-track{
+  animation-name:aquaTicker!important;
+}
+
+[dir="rtl"] .news-ticker .ticker-item{
+  direction:rtl!important;
+  unicode-bidi:isolate!important;
+  text-align:right;
+}
+
+[dir="ltr"] .news-ticker .ticker-item{
+  direction:ltr!important;
+  unicode-bidi:isolate!important;
+  text-align:left;
+}
