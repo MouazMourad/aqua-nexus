@@ -1,0 +1,61 @@
+/* =================================================================
+   v0.1.8 — Mobile usability, clear actions, reminders and Aqua AI
+   ================================================================= */
+html,body{max-width:100%;overflow-x:hidden}
+.btn{color:#ecfbff!important;font-weight:700}
+.btn.primary{
+  background:linear-gradient(135deg,#08b7cf,#20c58b)!important;
+  color:#f7ffff!important;
+  border:1px solid rgba(117,246,255,.42)!important;
+  box-shadow:0 8px 22px rgba(0,190,205,.18),inset 0 1px 0 rgba(255,255,255,.18)!important;
+  text-shadow:0 1px 1px rgba(0,0,0,.28);
+}
+.btn.primary:hover,.btn.primary:active{background:linear-gradient(135deg,#14cbe2,#2bd29a)!important;color:#fff!important}
+.btn:disabled{opacity:.38!important;filter:saturate(.45);cursor:not-allowed}
+
+.emergency-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--theme-rgb),.18)}
+
+.tank-attention-banner{position:sticky;top:6px;z-index:1600;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px;padding:10px 12px;border:1px solid rgba(255,201,99,.48);border-radius:16px;background:rgba(80,50,10,.88);backdrop-filter:blur(16px);box-shadow:0 12px 36px rgba(0,0,0,.26)}
+.tank-attention-banner>div:first-child{display:grid;gap:3px}.tank-attention-banner b{color:#fff1ca}.tank-attention-banner span{color:#f7dab0;font-size:10px}.attention-actions{display:flex;align-items:center;gap:7px}.toast-note{position:fixed;z-index:8000;left:50%;bottom:92px;transform:translateX(-50%);padding:9px 13px;border-radius:12px;background:rgba(3,25,35,.94);border:1px solid var(--glass-border);color:#effcff;box-shadow:0 16px 40px rgba(0,0,0,.35);font-size:10px}
+
+.aqua-ai-shell{position:fixed;z-index:7000;inset-inline-end:18px;bottom:20px;display:grid;justify-items:end;gap:9px;pointer-events:none}
+.aqua-ai-fab,.aqua-ai-panel{pointer-events:auto}
+.aqua-ai-fab{height:52px;min-width:68px;padding:0 16px;border-radius:18px;border:1px solid rgba(var(--theme-rgb),.52);background:linear-gradient(145deg,rgba(var(--theme-rgb),.28),rgba(5,29,42,.94));color:#fff;font-weight:900;font-size:18px;box-shadow:0 15px 38px rgba(0,0,0,.35),0 0 24px rgba(var(--theme-rgb),.22);backdrop-filter:blur(16px)}
+.aqua-ai-fab span{font-size:12px;margin-inline-start:3px}
+.aqua-ai-panel{width:min(390px,calc(100vw - 24px));border:1px solid rgba(var(--theme-rgb),.35);border-radius:20px;padding:13px;background:linear-gradient(160deg,rgba(8,42,57,.96),rgba(3,20,29,.97));box-shadow:0 24px 70px rgba(0,0,0,.48);backdrop-filter:blur(22px)}
+.theme-freshwater .aqua-ai-panel{background:linear-gradient(160deg,rgba(8,48,37,.96),rgba(3,25,19,.97))}
+.aqua-ai-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.aqua-ai-head>div{display:grid}.aqua-ai-head b{font-size:15px}.aqua-ai-head small{color:var(--muted);font-size:8px;margin-top:2px}.aqua-ai-answer{margin:11px 0;padding:11px;border-radius:14px;background:rgba(var(--theme-rgb),.07);border:1px solid rgba(var(--theme-rgb),.16);font-size:11px;line-height:1.75;color:#dff7fb}.aqua-ai-quick{display:flex;flex-wrap:wrap;gap:6px}.aqua-ai-quick button{border:1px solid rgba(var(--theme-rgb),.24);border-radius:999px;background:rgba(var(--theme-rgb),.08);color:#cfeef4;padding:6px 8px;font-size:8px}.aqua-ai-form{display:grid;grid-template-columns:1fr auto;gap:7px;margin-top:10px}.aqua-ai-form input{min-width:0;border:1px solid rgba(var(--theme-rgb),.26);background:rgba(2,17,25,.7);color:#fff;border-radius:12px;padding:10px;outline:none}.aqua-ai-form input:focus{border-color:var(--accent)}
+
+/* Force a real mobile layout on touch phones, including iOS Safari. */
+@media (max-width:900px), (pointer:coarse) and (orientation:portrait){
+  .app-shell{padding:8px!important;padding-bottom:92px!important}
+  .dashboard-health-row,.dashboard-intelligence-grid{grid-template-columns:1fr!important}
+  .dashboard-health-row .system-health-card{grid-column:auto!important}
+  .dashboard-visual-row{display:flex!important;flex-direction:column!important;gap:10px!important}
+  .dashboard-scene-card{order:1!important;width:100%!important;height:560px!important;min-height:560px!important}
+  .dashboard-scene-card canvas{min-height:560px!important}
+  .dashboard-equipment-column{order:2!important;width:100%!important}
+  .dashboard-equipment-column>.card{max-height:300px!important;overflow:auto!important}
+  .dashboard-summary-strip{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+
+  .display-layout-grid{display:flex!important;flex-direction:column!important;grid-template-columns:none!important}
+  .equipment-system-scene,.display-layout-scene{order:1!important;width:100%!important;height:580px!important;min-height:580px!important}
+  .display-layout-device-list{order:2!important;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;max-height:none!important;overflow:visible!important}
+  .layout-device-btn{min-width:0!important;padding:8px!important}.layout-device-btn b{font-size:10px}.layout-device-btn small{font-size:7px}
+
+  .scene-side-stack{top:7px!important;left:7px!important;right:7px!important;inset-inline-start:7px!important;width:auto!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:4px!important}
+  .scene-side-card{padding:5px 6px!important;border-radius:9px!important;min-width:0!important}.scene-side-card small{font-size:5px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.scene-side-main b{font-size:9px!important}.scene-side-card.volume .scene-side-main b{font-size:11px!important}.scene-side-main em{display:none!important}
+  .scene-device-tag.dom-tag{max-width:92px!important;font-size:6px!important;padding:3px 5px!important}
+
+  .page-grid{grid-template-columns:1fr!important}.page-header{align-items:center!important}.page-header>div:last-child{max-width:48%}.page-header .btn.primary{min-height:44px}
+  .form-grid{grid-template-columns:1fr!important}
+  .tank-attention-banner{position:relative;top:auto;align-items:stretch;flex-direction:column}.attention-actions{justify-content:space-between}.attention-actions .btn{flex:1}
+  .aqua-ai-shell{inset-inline-end:10px;bottom:12px}.aqua-ai-fab{height:48px;min-width:62px;border-radius:16px}.aqua-ai-panel{width:calc(100vw - 20px)}
+}
+
+@media(max-width:520px){
+  .display-layout-device-list{grid-template-columns:1fr!important}
+  .dashboard-summary-strip{grid-template-columns:1fr 1fr!important}
+  .equipment-system-scene,.display-layout-scene,.dashboard-scene-card{height:520px!important;min-height:520px!important}
+  .dashboard-scene-card canvas{min-height:520px!important}
+}
