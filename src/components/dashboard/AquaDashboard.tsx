@@ -1,13 +1,14 @@
 "use client";
-import { useMemo,useState } from "react";
+import { useEffect,useMemo,useRef,useState } from "react";
 import { useAquaStore } from "@/store/useAquaStore";
 import { MainNav,type AppPage } from "@/components/navigation/MainNav";
 import { PageRouter } from "@/components/pages/PageRouter";
 import { Modal } from "@/components/ui/Modal";
+import { AquaAIAssistant } from "@/components/AquaAIAssistant";
 import type { EquipmentKind,Tank,TankStatus,TankType } from "@/domain/types";
 import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
 import { tr,bi } from "@/i18n";
-import { uid,nowISO,today } from "@/lib/appUtils";
+import { uid,nowISO } from "@/lib/appUtils";
 
 const equipOptions: {kind:EquipmentKind;ar:string;en:string}[] = [
  {kind:"lighting",ar:"إضاءة",en:"Lighting"},
@@ -20,8 +21,42 @@ const equipOptions: {kind:EquipmentKind;ar:string;en:string}[] = [
 ];
 
 export function AquaDashboard() {
- const state=useAquaStore(),{tanks,selectedTankId,selectTank,language,setLanguage,addTank}=state,[page,setPage]=useState<AppPage>("dashboard"),[open,setOpen]=useState(false);
+ const state=useAquaStore(),{tanks,selectedTankId,selectTank,language,setLanguage,addTank}=state,[page,setPage]=useState<AppPage>("dashboard"),[open,setOpen]=useState(false),[attention,setAttention]=useState<string[]>([]),[reminderNote,setReminderNote]=useState("");
+ const reminderChecked=useRef(false);
  const tank=tanks.find(t=>t.id===selectedTankId)??tanks[0];
+
+ useEffect(()=>{
+  if(reminderChecked.current||!tank||typeof window==="undefined")return;
+  reminderChecked.current=true;
+  const now=Date.now(),week=7*86400000;
+  const stale=tanks.filter(t=>{
+   const raw=localStorage.getItem(`aqua-nexus-last-visit:${t.id}`);
+   if(!raw){localStorage.setItem(`aqua-nexus-last-visit:${t.id}`,String(now));return false;}
+   const last=Number(raw);
+   return Number.isFinite(last)&&now-last>=week;
+  });
+  setAttention(stale.map(t=>t.name));
+  if(stale.length&&"Notification" in window&&Notification.permission==="granted"){
+   const key=`${new Date().toISOString().slice(0,10)}:${stale.map(x=>x.id).join(",")}`;
+   if(localStorage.getItem("aqua-nexus-last-reminder")!==key){
+    navigator.serviceWorker?.ready.then(reg=>reg.active?.postMessage({type:"SHOW_NOTIFICATION",title:language==="ar"?"Aqua Nexus • متابعة الحوض":"Aqua Nexus • Tank follow-up",body:language==="ar"?`الحوض ${stale.map(x=>x.name).join("، ")} بحاجة متابعة بعد أكثر من أسبوع.`:`${stale.map(x=>x.name).join(", ")} needs attention after more than a week.`,tag:"aqua-weekly-followup",url:"/"})).catch(()=>{});
+    localStorage.setItem("aqua-nexus-last-reminder",key);
+   }
+  }
+  localStorage.setItem(`aqua-nexus-last-visit:${tank.id}`,String(now));
+ },[tank,tanks,language]);
+
+ async function enablePhoneReminders(){
+  if(typeof window==="undefined"||!("Notification" in window)){setReminderNote(language==="ar"?"هذا المتصفح لا يدعم تنبيهات النظام.":"System notifications are not supported here.");return;}
+  const permission=await Notification.requestPermission();
+  setReminderNote(permission==="granted"?(language==="ar"?"تم تفعيل تنبيهات الهاتف.":"Phone notifications enabled."):(language==="ar"?"لم يتم السماح بالتنبيهات.":"Notification permission was not granted."));
+  if(permission==="granted") navigator.serviceWorker?.ready.then(reg=>reg.active?.postMessage({type:"SHOW_NOTIFICATION",title:"Aqua Nexus",body:language==="ar"?"تم تفعيل تنبيهات متابعة الأحواض.":"Aquarium follow-up notifications are enabled.",tag:"aqua-notification-enabled",url:"/"})).catch(()=>{});
+ }
+
+ function handleSelectTank(id:string){
+  if(typeof window!=="undefined") localStorage.setItem(`aqua-nexus-last-visit:${id}`,String(Date.now()));
+  selectTank(id);
+ }
 
  // Full wizard state
  const [step,setStep]=useState(1),[name,setName]=useState(""),[type,setType]=useState<TankType>("marine"),[status,setStatus]=useState<TankStatus>("new"),[ageMonths,setAgeMonths]=useState(0);
@@ -59,7 +94,7 @@ export function AquaDashboard() {
    display:{length:l,width:w,height:h,displacementPercent:loss,grossLiters:preview.gross,netLiters:preview.net},
    sump:{enabled:hasSump,dimensions:{length:sl,width:sw,height:sh},operatingFillPercent:fill,chambers:hasSump?Array.from({length:count},(_,i)=>({id:uid("ch"),name:`حجرة ${i+1}`,nameEn:`Chamber ${i+1}`,x:i*each,y:0,length:each,width:sw,height:sh,waterHeight:sh*fill/100,media:[]})):[]},
    systemVolumeLiters:preview.system,
-   equipment:equipment.map((kind,i)=>({id:uid("eq"),name:equipOptions.find(x=>x.kind===kind)?.en||kind,kind,location:kind==="lighting"||kind==="waveMaker"||kind==="overflow"?"display":hasSump&&kind==="returnPump"?`sump:${count?`ch-${count}`:""}`:"external",status:"on",displayPosition:(kind==="lighting"||kind==="waveMaker"||kind==="overflow")?undefined:undefined} as any)),
+   equipment:equipment.map((kind)=>({id:uid("eq"),name:equipOptions.find(x=>x.kind===kind)?.en||kind,kind,location:kind==="lighting"||kind==="waveMaker"||kind==="overflow"?"display":hasSump&&kind==="returnPump"?`sump:${count?`ch-${count}`:""}`:"external",status:"on",displayPosition:undefined} as any)),
    chemistry:[{timestamp:nowISO(),values,usingDefaults:useDefaults}],
    maintenance:maintenanceDone?[weeklyTask,{id:uid("task"),title:"تنظيف وفحص النظام",titleEn:"Inspect and clean system",cadence:"weekly",done:false,nextDue:new Date(Date.now()+7*86400000).toISOString().slice(0,10)}]:[weeklyTask],
    livestock:[],inventory:[],timeline:[{id:uid("ev"),timestamp:nowISO(),type:"setup",textAr:"تم إنشاء الحوض عبر معالج الإعداد الذكي.",textEn:"Tank created using the Smart Setup Wizard."}],photos:[],feeding:[],dosing:[],doserChannels:[],quarantine:[],expenses:[],waterChanges:[],rodi:[],createdAt:nowISO()
@@ -71,11 +106,15 @@ export function AquaDashboard() {
 
  const themeClass=tank.type==="marine"?"theme-marine":"theme-freshwater";
  return <main className={`app-shell ${themeClass}`} dir={language==="ar"?"rtl":"ltr"}>
+  {attention.length>0&&<div className="tank-attention-banner"><div><b>🔔 {language==="ar"?"متابعة مطلوبة":"Follow-up needed"}</b><span>{language==="ar"?`مرّ أكثر من أسبوع بدون متابعة: ${attention.join("، ")}`:`More than a week without a check-in: ${attention.join(", ")}`}</span></div><div className="attention-actions"><button className="btn primary" onClick={enablePhoneReminders}>{language==="ar"?"تفعيل تنبيهات الهاتف":"Enable phone alerts"}</button><button className="icon-btn" onClick={()=>setAttention([])}>×</button></div></div>}
+  {reminderNote&&<div className="toast-note">{reminderNote}</div>}
   <header className="topbar topbar-v12 interactive-header"><div className="brand"><div className="brand-mark">AN</div><div><strong>Aqua Nexus 3D</strong><small>{tr(language,"brand")}</small></div></div>
-   <div className="top-actions"><select className="select" value={selectedTankId} onChange={e=>selectTank(e.target.value)}>{tanks.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select><button className="btn" onClick={()=>setLanguage(language==="ar"?"en":"ar")}>{language==="ar"?"EN":"AR"}</button><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(language,"addTank")}</button></div>
+   <div className="top-actions"><select className="select" value={selectedTankId} onChange={e=>handleSelectTank(e.target.value)}>{tanks.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select><button className="btn" onClick={()=>setLanguage(language==="ar"?"en":"ar")}>{language==="ar"?"EN":"AR"}</button><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(language,"addTank")}</button></div>
    <MainNav active={page} onChange={setPage} lang={language}/>
   </header>
-  <PageRouter page={page} tank={tank} tanks={tanks} selectedTankId={selectedTankId} onSelectTank={id=>{selectTank(id);setPage("dashboard")}} onNavigate={setPage}/>
+  <PageRouter page={page} tank={tank} tanks={tanks} selectedTankId={selectedTankId} onSelectTank={id=>{handleSelectTank(id);setPage("dashboard")}} onNavigate={setPage}/>
+
+  <AquaAIAssistant tank={tank} page={page}/>
 
   <Modal open={open} title={tr(language,"smartSetup")} onClose={()=>setOpen(false)}>
    <div className="wizard-step-label"><b>{step}. {wizardSteps[step-1]}</b><span>{step}/7</span></div>
