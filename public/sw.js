@@ -9,15 +9,25 @@ self.addEventListener("activate",event=>{
   })());
 });
 
-self.addEventListener("message",event=>{
-  const data=event.data||{};
-  if(data.type!=="SHOW_NOTIFICATION") return;
-  event.waitUntil(self.registration.showNotification(data.title||"Aqua Nexus",{
+function show(data={}){
+  return self.registration.showNotification(data.title||"Aqua Nexus",{
     body:data.body||"Your aquarium needs attention.",
     tag:data.tag||"aqua-nexus-reminder",
     renotify:false,
     data:{url:data.url||"/"}
-  }));
+  });
+}
+
+self.addEventListener("message",event=>{
+  const data=event.data||{};
+  if(data.type!=="SHOW_NOTIFICATION") return;
+  event.waitUntil(show(data));
+});
+
+self.addEventListener("push",event=>{
+  let data={};
+  try{data=event.data?event.data.json():{};}catch{data={body:event.data?.text?.()||"Your aquarium needs attention."};}
+  event.waitUntil(show(data));
 });
 
 self.addEventListener("notificationclick",event=>{
@@ -26,7 +36,7 @@ self.addEventListener("notificationclick",event=>{
   event.waitUntil((async()=>{
     const windows=await self.clients.matchAll({type:"window",includeUncontrolled:true});
     for(const client of windows){
-      if("focus" in client){ await client.focus(); return; }
+      if("focus" in client){await client.focus();return;}
     }
     if(self.clients.openWindow) await self.clients.openWindow(url);
   })());
