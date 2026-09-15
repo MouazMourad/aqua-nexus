@@ -1,6 +1,6 @@
 import type { Language, Tank } from "@/domain/types";
 
-const VAPID_PUBLIC_KEY="BD9A5jEWZLVFsG8PGXEIZyM4OCv1H4QHOJyXTi26-AyWb8Cm-b9q0wuQZiMG4SVAdoQYsrMGu5SBPcmsxu1_c20";
+const VAPID_PUBLIC_KEY="BPTQ9zmD1-WBygQdFzXT7t-bjH6l6iIA98Env82SJl_rSC2jUmwInsyRbOAl7YyBZWTeSNF-WGuGAlWcf0i-Uxc";
 
 function urlBase64ToUint8Array(value:string){
   const padding="=".repeat((4-value.length%4)%4);
