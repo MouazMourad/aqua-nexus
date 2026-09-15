@@ -1,0 +1,44 @@
+/* Aqua AI — electronic fish mascot and assistant identity */
+.aqua-ai-shell{--fish:#49e6ff;--fish-soft:rgba(73,230,255,.22);--fish-core:#bffbff}
+.theme-freshwater .aqua-ai-shell{--fish:#58e7aa;--fish-soft:rgba(88,231,170,.22);--fish-core:#d6ffe9}
+.aqua-ai-shell.state-alert{--fish:#ffbd58;--fish-soft:rgba(255,189,88,.24);--fish-core:#fff0c6}
+.aqua-ai-shell.state-critical{--fish:#ff6677;--fish-soft:rgba(255,102,119,.24);--fish-core:#ffd2d8}
+
+.aqua-ai-fish-button{pointer-events:auto;position:relative;width:94px;height:66px;border:1px solid color-mix(in srgb,var(--fish) 45%,transparent);border-radius:24px;background:linear-gradient(145deg,rgba(9,37,50,.78),rgba(3,19,29,.92));box-shadow:0 14px 38px rgba(0,0,0,.38),0 0 26px var(--fish-soft),inset 0 1px 0 rgba(255,255,255,.12);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);display:grid;place-items:center;color:#fff;overflow:visible}
+.aqua-ai-fish-button:active{transform:scale(.97)}
+.aqua-ai-fish-label{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:8px;font-weight:900;letter-spacing:.04em;color:#eaffff;text-shadow:0 1px 8px rgba(0,0,0,.65)}
+.aqua-ai-alert-dot{position:absolute;top:7px;right:8px;width:9px;height:9px;border-radius:50%;background:var(--fish);box-shadow:0 0 0 4px var(--fish-soft),0 0 18px var(--fish);animation:aquaAlertPulse 1.35s ease-in-out infinite}
+
+.aqua-fish{position:relative;display:inline-block;width:66px;height:36px;filter:drop-shadow(0 0 8px var(--fish-soft));animation:aquaFishFloat 3.4s ease-in-out infinite}
+.aqua-fish-body{position:absolute;left:17px;top:7px;width:42px;height:24px;border-radius:58% 48% 50% 55%;border:1px solid color-mix(in srgb,var(--fish) 70%,#fff 10%);background:linear-gradient(145deg,color-mix(in srgb,var(--fish) 24%,transparent),rgba(4,31,43,.86));box-shadow:inset 0 0 16px var(--fish-soft),0 0 13px var(--fish-soft);overflow:hidden}
+.aqua-fish-tail{position:absolute;left:2px;top:8px;width:20px;height:22px;background:linear-gradient(135deg,var(--fish-soft),color-mix(in srgb,var(--fish) 60%,transparent));clip-path:polygon(100% 50%,0 0,12% 48%,0 100%);transform-origin:100% 50%;animation:aquaTailWag 1.15s ease-in-out infinite}
+.aqua-fish-fin{position:absolute;left:31px;top:27px;width:17px;height:9px;background:linear-gradient(180deg,var(--fish-soft),transparent);clip-path:polygon(0 0,100% 0,28% 100%);transform:rotate(7deg)}
+.aqua-fish-eye{position:absolute;right:7px;top:6px;width:5px;height:5px;border-radius:50%;background:#efffff;box-shadow:0 0 8px var(--fish-core),0 0 13px var(--fish)}
+.aqua-fish-core{position:absolute;left:14px;top:7px;width:10px;height:10px;border:1px solid var(--fish);border-radius:50%;background:radial-gradient(circle,var(--fish-core) 0 16%,var(--fish) 17% 30%,transparent 31%);box-shadow:0 0 11px var(--fish);animation:aquaCorePulse 2.1s ease-in-out infinite}
+.aqua-fish-line{position:absolute;height:1px;background:linear-gradient(90deg,var(--fish),transparent);opacity:.72;transform-origin:left center}.aqua-fish-line.l1{left:23px;top:11px;width:12px;transform:rotate(-8deg)}.aqua-fish-line.l2{left:23px;top:17px;width:10px;transform:rotate(12deg)}
+.state-critical .aqua-fish{animation-duration:1.7s}.state-alert .aqua-fish{animation-duration:2.4s}
+
+.aqua-ai-greeting{pointer-events:auto;width:min(330px,calc(100vw - 32px));text-align:start;border:1px solid color-mix(in srgb,var(--fish) 38%,transparent);border-radius:17px;padding:11px 13px;background:linear-gradient(155deg,rgba(8,39,52,.95),rgba(3,21,30,.97));color:#eefeff;box-shadow:0 18px 52px rgba(0,0,0,.42),0 0 20px var(--fish-soft);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);animation:aquaGreetingIn .35s ease-out}
+.aqua-ai-greeting b{display:block;font-size:12px;margin-bottom:4px;color:var(--fish-core)}
+.aqua-ai-greeting span{display:block;font-size:9px;line-height:1.65;color:#c9e8ef}
+
+.aqua-ai-head-brand{display:flex!important;align-items:center;gap:9px}.aqua-ai-head-brand>.aqua-fish{width:52px;height:30px;transform:scale(.78);transform-origin:center}.aqua-ai-head-brand>div{display:grid}.aqua-ai-head-brand b{font-size:15px}.aqua-ai-head-brand small{color:var(--muted);font-size:8px;margin-top:2px}
+.aqua-ai-tank-status{margin-top:10px;display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:center;border:1px solid rgba(var(--theme-rgb),.16);border-radius:12px;padding:8px 9px;background:rgba(var(--theme-rgb),.055)}
+.aqua-ai-tank-status span{font-size:7px;color:var(--muted)}.aqua-ai-tank-status b{font-size:10px;color:#effcff}.aqua-ai-tank-status em{font-size:7px;font-style:normal;border-radius:999px;padding:4px 7px;background:rgba(40,180,125,.18);color:#aef1d2}.aqua-ai-tank-status.status-alert em{background:rgba(255,189,88,.18);color:#ffd99b}.aqua-ai-tank-status.status-critical em{background:rgba(255,102,119,.18);color:#ffb1ba}
+
+@keyframes aquaFishFloat{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-3px) rotate(1deg)}}
+@keyframes aquaTailWag{0%,100%{transform:scaleX(1) rotate(0)}50%{transform:scaleX(.78) rotate(-8deg)}}
+@keyframes aquaCorePulse{0%,100%{opacity:.72;transform:scale(.92)}50%{opacity:1;transform:scale(1.12)}}
+@keyframes aquaAlertPulse{0%,100%{transform:scale(.85);opacity:.7}50%{transform:scale(1.18);opacity:1}}
+@keyframes aquaGreetingIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+
+@media(max-width:700px){
+ .aqua-ai-shell{inset-inline-end:9px!important;bottom:max(10px,env(safe-area-inset-bottom))!important}
+ .aqua-ai-fish-button{width:82px;height:60px;border-radius:21px}.aqua-ai-fish-button .aqua-fish{transform:scale(.9)}
+ .aqua-ai-shell.open{inset-inline-start:9px;justify-items:stretch}
+ .aqua-ai-shell.open .aqua-ai-panel{width:calc(100vw - 18px)!important;max-height:76dvh;overflow:auto;border-radius:24px 24px 18px 18px;padding:14px}
+ .aqua-ai-shell.open .aqua-ai-fish-button{justify-self:end}
+ .aqua-ai-greeting{width:min(320px,calc(100vw - 18px))}
+}
+
+@media(prefers-reduced-motion:reduce){.aqua-fish,.aqua-fish-tail,.aqua-fish-core,.aqua-ai-alert-dot{animation:none!important}}
