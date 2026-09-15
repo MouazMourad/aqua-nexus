@@ -1,12 +1,20 @@
 import type { Language, Tank } from "@/domain/types";
 
-const VAPID_PUBLIC_KEY="BPTQ9zmD1-WBygQdFzXT7t-bjH6l6iIA98Env82SJl_rSC2jUmwInsyRbOAl7YyBZWTeSNF-WGuGAlWcf0i-Uxc";
+const VAPID_PUBLIC_KEY="BD9A5jEWZLVFsG8PGXEIZyM4OCv1H4QHOJyXTi26-AyWb8Cm-b9q0wuQZiMG4SVAdoQYsrMGu5SBPcmsxu1_c20";
 
 function urlBase64ToUint8Array(value:string){
   const padding="=".repeat((4-value.length%4)%4);
   const base64=(value+padding).replace(/-/g,"+").replace(/_/g,"/");
   const raw=window.atob(base64);
   return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+}
+
+function uint8ToBase64Url(value:ArrayBuffer|null){
+  if(!value)return "";
+  const bytes=new Uint8Array(value);
+  let binary="";
+  bytes.forEach(b=>binary+=String.fromCharCode(b));
+  return window.btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
 }
 
 function deviceId(){
@@ -22,6 +30,10 @@ export async function syncPushReminders(tanks:Tank[],language:Language,createSub
   const registration=await navigator.serviceWorker.ready;
   if(!("PushManager" in window)||!registration.pushManager) return {ok:false,reason:"push-unsupported"};
   let subscription=await registration.pushManager.getSubscription();
+  if(subscription&&uint8ToBase64Url(subscription.options.applicationServerKey)!==VAPID_PUBLIC_KEY){
+    await subscription.unsubscribe().catch(()=>false);
+    subscription=null;
+  }
   if(!subscription&&createSubscription){
     subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
   }
