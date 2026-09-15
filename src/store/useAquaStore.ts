@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { AquaState, Equipment, Language, Tank } from "@/domain/types";
+import type { AquaState, ChemistryReading, Equipment, Language, Tank } from "@/domain/types";
 import { demoMarineTank, demoFreshwaterTank } from "@/data/demoTank";
 import { liters, round1 } from "@/lib/units";
 import { defaultDisplayPosition } from "@/lib/displayLayout";
@@ -13,6 +13,7 @@ interface AquaStore extends AquaState {
   addTank: (tank: Tank) => void;
   deleteTank: (tankId: string) => void;
   patchTank: (tankId: string, updater: Partial<Tank> | ((tank: Tank) => Tank)) => void;
+  addChemistryReading: (tankId: string, reading: ChemistryReading) => void;
   replaceData: (data: Pick<AquaState, "language"|"selectedTankId"|"tanks">) => void;
   resetDemo: () => void;
 }
@@ -86,6 +87,12 @@ export const useAquaStore = create<AquaStore>()(
           const next=typeof updater==="function" ? updater(t) : {...t,...updater};
           return normalize(next);
         })
+      })),
+
+      addChemistryReading:(tankId,reading)=>set((state)=>({
+        tanks:state.tanks.map(t=>t.id===tankId
+          ? normalize({...t,chemistry:[reading,...t.chemistry]})
+          : t)
       })),
 
       replaceData:(data)=>set({

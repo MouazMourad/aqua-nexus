@@ -9,7 +9,7 @@ export function WaterTestsPage({ tank }: { tank: Tank }) {
   const addReading = useAquaStore((s) => s.addChemistryReading);
   const [open, setOpen] = useState(false);
   const latest = tank.chemistry[0]?.values ?? {};
-  const initial = tank.type === "marine"
+  const initial: Record<string, number> = tank.type === "marine"
     ? { temperature: 25, pH: 8.1, salinity: 1.025, KH: 8, Ca: 430, Mg: 1320, NO3: 10, PO4: 0.08 }
     : { temperature: 25, pH: 7.2, GH: 8, KH: 5, NO3: 15 };
   const [values, setValues] = useState<Record<string, number>>(initial);
