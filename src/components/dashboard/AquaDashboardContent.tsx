@@ -1,7 +1,7 @@
 "use client";
 import type { Tank } from "@/domain/types";
 import type { AppPage } from "@/components/navigation/MainNav";
-import { AquariumScene } from "@/components/three/AquariumScene";
+import { SafeAquariumScene } from "@/components/three/SafeAquariumScene";
 import { EquipmentPanel } from "@/components/panels/EquipmentPanel";
 import { SystemOverview } from "@/components/panels/SystemOverview";
 import { chemistryHealth,maintenanceHealth,tankHealth,bioload,tankHealthTrend,chemistryAgeDays } from "@/domain/health";
@@ -67,7 +67,7 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
         <div className="scene-badge">{tr(lang,"3dDigitalTwin")}</div>
         <div className="scene-badge">{tank.type==="marine"?tr(lang,"marine"):tr(lang,"freshwater")}</div>
       </div>
-      <AquariumScene tank={tank}/>
+      <SafeAquariumScene tank={tank}/>
     </section>
    </div>
 
