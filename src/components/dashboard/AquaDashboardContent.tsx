@@ -61,7 +61,7 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
  const summary:Record<ModuleId,{value:string;note:string;level?:string}>={
   chemistry:{value:`${ch}%`,note:lang==="ar"?`آخر فحص منذ ${Math.floor(age)} يوم`:`Last test ${Math.floor(age)}d ago`,level:age>7?"warn":"good"},
   maintenance:{value:due.length?String(due.length):"✓",note:lang==="ar"?(due.length?"مهام مستحقة":"لا مهام متأخرة"):(due.length?"due tasks":"nothing overdue"),level:due.length?"warn":"good"},
-  forecast:{value:`${forecast.projected7d}%`,note:lang==="ar"?forecast.ar:forecast.en,level:forecast.direction==="down"?"warn":"good"},
+  forecast:{value:`${forecast.projected7d}%`,note:lang==="ar"?forecast.ar:forecast.en,level:forecast.direction==="declining"?"warn":"good"},
   intelligence:{value:state.score+"%",note:insights[0]?(lang==="ar"?insights[0].ar:insights[0].en):(lang==="ar"?"لا إشارة حرجة إضافية":"No extra critical signal"),level:state.band},
   digitalTwin:{value:"3D",note:lang==="ar"?"المجسم لا يُحمّل إلا عند الطلب":"Loads only when requested"},
   equipment:{value:equipmentWarnings.length?String(equipmentWarnings.length):"✓",note:lang==="ar"?(equipmentWarnings.length?"تجهيزات تحتاج انتباه":`${tank.equipment.length} تجهيزات مسجلة`):(equipmentWarnings.length?"devices need attention":`${tank.equipment.length} devices registered`),level:equipmentWarnings.length?"warn":"good"},
@@ -72,7 +72,7 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
   share:{value:"↗",note:lang==="ar"?"بطاقة حالة مختصرة":"compact status card"}
  };
  const visibleOrder=order.filter(x=>!hidden.includes(x));
- const critical=state.drivers.filter(x=>x.level==="warn"||x.level==="bad").length+equipmentWarnings.length;
+ const critical=state.drivers.filter(x=>x.level==="warn"||x.level==="danger").length+equipmentWarnings.length;
  const sceneView: "display"|"system"=(sceneMode==="equipment"||sceneMode==="flow")?"system":"display";
 
  function detailsFor(id:ModuleId){
