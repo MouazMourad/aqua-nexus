@@ -5,6 +5,7 @@ import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { uid,nowISO } from "@/lib/appUtils";
+import { askAquaVision } from "@/lib/aquaAIClient";
 import { buildVisionTriage,captureConsistency,type VisionMetrics,type VisionSymptom } from "@/domain/visionIntelligence";
 
 type GrowthPhoto=JournalPhoto&{livestockId?:string;estimatedSizeCm?:number;colorIndex?:number;brightnessIndex?:number;captureScore?:number};
@@ -79,11 +80,25 @@ export function JournalPage({tank}:{tank:Tank}) {
   const reader=new FileReader();
   reader.onload=async()=>{
    const dataUrl=String(reader.result),metrics=await analyzeImage(dataUrl),ts=nowISO(),subject=tank.livestock.find(x=>x.id===visionLivestockId);
-   const triage=buildVisionTriage(tank,{livestockId:visionLivestockId||undefined,symptoms:visionSymptoms.length?visionSymptoms:["unknown"],notes:visionNotes,metrics});
+   const selectedSymptoms=visionSymptoms.length?visionSymptoms:["unknown" as VisionSymptom];
+   const triage=buildVisionTriage(tank,{livestockId:visionLivestockId||undefined,symptoms:selectedSymptoms,notes:visionNotes,metrics});
    const photoId=uid("ph"),assessmentId=uid("vision");
    const photo:any={id:photoId,timestamp:ts,caption:`Vision check${subject?` • ${subject.name}`:""}`,dataUrl,livestockId:visionLivestockId||undefined,...metrics};
-   const assessment={id:assessmentId,timestamp:ts,photoId,livestockId:visionLivestockId||undefined,symptoms:visionSymptoms,notes:visionNotes,metrics,triage,modelStatus:"local-preanalysis"};
+   const assessment={id:assessmentId,timestamp:ts,photoId,livestockId:visionLivestockId||undefined,symptoms:selectedSymptoms,notes:visionNotes,metrics,triage,modelStatus:"local-preanalysis"};
    patch(tank.id,t=>({...t,photos:[photo,...t.photos],visionAssessments:[assessment,...((t as any).visionAssessments??[])],timeline:[{id:uid("ev"),timestamp:ts,type:"vision-assessment",textAr:`تم تسجيل تقييم بصري${subject?` لـ ${subject.name}`:""}: ${triage.summaryAr}`,textEn:`Visual assessment logged${subject?` for ${subject.nameEn||subject.name}`:""}: ${triage.summaryEn}`},...t.timeline]} as any));
+
+   try{
+    const symptomText=selectedSymptoms.map(s=>lang==="ar"?symptomLabels[s].ar:symptomLabels[s].en).join(", ");
+    const question=lang==="ar"
+      ? `حلل الصورة بصرياً مع سياق الحوض. الكائن: ${subject?.name||"غير محدد"}. الأعراض المسجلة: ${symptomText}. ملاحظات المستخدم: ${visionNotes||"لا يوجد"}. أعط احتمالات وثقة وخطوات متابعة، بدون تشخيص قطعي.`
+      : `Analyze the image with tank context. Organism: ${subject?.nameEn||subject?.name||"unspecified"}. Logged symptoms: ${symptomText}. User notes: ${visionNotes||"none"}. Give differential possibilities, confidence and follow-up steps, not a definitive diagnosis.`;
+    const external=await askAquaVision({tank,imageDataUrl:dataUrl,question,language:lang});
+    if(external.mode==="external"){
+      const extTs=nowISO();
+      patch(tank.id,t=>({...t,visionAssessments:((t as any).visionAssessments??[]).map((x:any)=>x.id===assessmentId?{...x,modelStatus:"external",externalVision:external.answer,externalProvider:external.model||external.provider}:x),timeline:[{id:uid("ev"),timestamp:extTs,type:"vision-model",textAr:`تم تعزيز التقييم البصري${subject?` لـ ${subject.name}`:""} بواسطة نموذج Vision خارجي مع سياق الحوض.`,textEn:`Visual assessment${subject?` for ${subject.nameEn||subject.name}`:""} was enhanced by an external Vision model using tank context.`},...t.timeline]} as any));
+    }
+   }catch{}
+
    setVisionSymptoms([]);setVisionNotes("");setVisionBusy(false);
   };
   reader.onerror=()=>setVisionBusy(false);reader.readAsDataURL(file);
@@ -92,11 +107,11 @@ export function JournalPage({tank}:{tank:Tank}) {
  return <section className="page-grid"><PageHeader eyebrow="PHOTO JOURNAL • VISION • GROWTH" title={tr(lang,"journal")}/>
 
  <div className="card panel full-span">
-  <div className="module-head"><div><h3>{bi(lang,"Vision Health Intake","Vision Health Intake")}</h3><p className="note">{bi(lang,"صورة + أعراض + سياق الحوض = فرز أولي ذكي. هاد مو تشخيص طبي مؤكد؛ نموذج الرؤية الخارجي رح يركب لاحقاً على نفس السجل.","Image + symptoms + tank context = structured visual triage. This is not a confirmed diagnosis; an external vision model can later plug into the same record.")}</p></div><span className="scene-badge">{assessments.length} {bi(lang,"تقييم","checks")}</span></div>
+  <div className="module-head"><div><h3>{bi(lang,"Vision Health Intake","Vision Health Intake")}</h3><p className="note">{bi(lang,"صورة + أعراض + سياق الحوض = فرز أولي ذكي. إذا كان Vision Model مربوطاً على الخادم، نفس الفحص يتعزز تلقائياً بتحليل الصورة الحقيقي مع بقاء النتيجة احتمالية وليست تشخيصاً قطعياً.","Image + symptoms + tank context = structured visual triage. When a server Vision model is configured, the same check is automatically enhanced by true image analysis while remaining a differential assessment, not a definitive diagnosis.")}</p></div><span className="scene-badge">{assessments.length} {bi(lang,"تقييم","checks")}</span></div>
   <div className="form-grid"><label className="field"><span>{bi(lang,"الكائن","Organism")}</span><select value={visionLivestockId} onChange={e=>setVisionLivestockId(e.target.value)}><option value="">—</option>{visionLivestock.map(x=><option key={x.id} value={x.id}>{lang==="ar"?x.name:(x.nameEn||x.name)}</option>)}</select></label><label className="field full-field"><span>{bi(lang,"ملاحظات السلوك/التطور","Behavior / progression notes")}</span><input value={visionNotes} onChange={e=>setVisionNotes(e.target.value)} placeholder={bi(lang,"من إمتى بلشت؟ في شهية؟ عم تنتشر؟","When did it start? appetite? spreading?")}/></label></div>
   <div className="vision-symptoms" style={{display:"flex",flexWrap:"wrap",gap:7,margin:"12px 0"}}>{(Object.keys(symptomLabels) as VisionSymptom[]).map(s=><button type="button" key={s} className={`btn ${visionSymptoms.includes(s)?"primary":""}`} onClick={()=>toggleSymptom(s)}>{lang==="ar"?symptomLabels[s].ar:symptomLabels[s].en}</button>)}</div>
   <label className="btn primary file-button">{visionBusy?bi(lang,"عم يتم التحليل...","Analyzing..."):bi(lang,"📷 صوّر وحلل بالسياق","📷 Capture & contextualize")}<input type="file" accept="image/*" capture="environment" disabled={visionBusy} onChange={e=>runVision(e.target.files?.[0])}/></label>
-  {assessments[0]&&<div className={`inline-alert ${assessments[0].triage.level==="urgent"?"danger":assessments[0].triage.level==="attention"?"warn":"good"}`} style={{marginTop:12}}><b>{lang==="ar"?assessments[0].triage.summaryAr:assessments[0].triage.summaryEn}</b><br/>{(lang==="ar"?assessments[0].triage.nextAr:assessments[0].triage.nextEn).slice(0,2).join(" • ")}<br/><small>{bi(lang,"ثقة الفرز المحلي","Local triage confidence")}: {assessments[0].triage.confidence} • Capture {assessments[0].metrics.captureScore}/100</small></div>}
+  {assessments[0]&&<div className={`inline-alert ${assessments[0].triage.level==="urgent"?"danger":assessments[0].triage.level==="attention"?"warn":"good"}`} style={{marginTop:12}}><b>{lang==="ar"?assessments[0].triage.summaryAr:assessments[0].triage.summaryEn}</b><br/>{(lang==="ar"?assessments[0].triage.nextAr:assessments[0].triage.nextEn).slice(0,2).join(" • ")}<br/><small>{bi(lang,"ثقة الفرز المحلي","Local triage confidence")}: {assessments[0].triage.confidence} • Capture {assessments[0].metrics.captureScore}/100{assessments[0].modelStatus==="external"?` • Vision AI: ${assessments[0].externalProvider||"connected"}`:""}</small>{assessments[0].externalVision?.text&&<div style={{marginTop:8,lineHeight:1.65}}>{String(assessments[0].externalVision.text)}</div>}</div>}
  </div>
 
  <div className="card panel full-span"><div className="module-head"><div><h3>{bi(lang,"Frag / Growth Tracker","Frag / Growth Tracker")}</h3><p className="note">{bi(lang,"ثبّت الزاوية والإضاءة والمسافة قدر الإمكان حتى تكون المقارنة الزمنية أصدق.","Keep angle, lighting and distance as consistent as possible for better time-series comparison.")}</p></div></div><div className="journal-add" style={{flexWrap:"wrap"}}><label className="field grow"><span>{tr(lang,"photoCaption")}</span><input value={caption} onChange={e=>setCaption(e.target.value)}/></label><label className="field"><span>{bi(lang,"الكائن المتابع","Tracked organism")}</span><select value={livestockId} onChange={e=>setLivestockId(e.target.value)}><option value="">—</option>{trackedLivestock.map(x=><option key={x.id} value={x.id}>{lang==="ar"?x.name:(x.nameEn||x.name)}</option>)}</select></label><label className="field"><span>{bi(lang,"الحجم التقديري cm","Estimated size cm")}</span><input type="number" min="0" step=".1" value={sizeCm||""} onChange={e=>setSizeCm(Number(e.target.value))}/></label><label className="btn primary file-button">{tr(lang,"addPhoto")}<input type="file" accept="image/*" capture="environment" onChange={e=>add(e.target.files?.[0])}/></label></div><div className="inline-alert info" style={{marginTop:12}}>{bi(lang,"النمو يعتمد على قياس الحجم المدخل. اللون والسطوع وجودة الالتقاط مؤشرات مقارنة من الصورة الكاملة وليست segmentation أو قياساً مخبرياً.","Growth uses your entered size. Color, brightness and capture quality are whole-image comparison signals, not object segmentation or laboratory measurements.")}</div></div>
