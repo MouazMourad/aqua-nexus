@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { query } from "./db";
+import { ensureWorkspace } from "./workspace";
 
 export interface PushPayload { title:string; body:string; url?:string; tag?:string; data?:Record<string,unknown>; }
 
@@ -14,6 +15,7 @@ function setup(){
 export async function savePushSubscription(workspace:string,subscription:any){
   const endpoint=String(subscription?.endpoint||"");
   if(!endpoint.startsWith("https://"))throw Object.assign(new Error("Invalid push subscription endpoint."),{status:400});
+  await ensureWorkspace(workspace);
   await query(`
     INSERT INTO aqua_push_subscriptions(workspace_key,endpoint,subscription)
     VALUES($1,$2,$3::jsonb)
@@ -23,11 +25,13 @@ export async function savePushSubscription(workspace:string,subscription:any){
 }
 
 export async function removePushSubscription(workspace:string,endpoint:string){
+  await ensureWorkspace(workspace);
   await query("DELETE FROM aqua_push_subscriptions WHERE workspace_key=$1 AND endpoint=$2",[workspace,endpoint]);
 }
 
 export async function sendWorkspacePush(workspace:string,payload:PushPayload){
   if(!setup())return {configured:false,sent:0,failed:0};
+  await ensureWorkspace(workspace);
   const result=await query<{id:number;endpoint:string;subscription:any}>("SELECT id,endpoint,subscription FROM aqua_push_subscriptions WHERE workspace_key=$1",[workspace]);
   let sent=0,failed=0;
   for(const row of result.rows){
