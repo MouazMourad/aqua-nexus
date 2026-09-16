@@ -9,15 +9,12 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
 
-  // Aqua Nexus is currently a client-side/PWA preview, so export a fully static build.
-  // This makes the Netlify mobile preview reliable without requiring SSR/functions.
-  output: "export",
-
-  // Force Next.js file tracing to stay inside this Aqua Nexus project.
+  // Server mode: API routes, PostgreSQL, AI gateway and background jobs now live
+  // inside the same Next.js application. PWA/static assets continue to work.
   outputFileTracingRoot: __dirname,
+  serverExternalPackages: ["pg", "web-push"],
 
   webpack: (config) => {
-    // Prevent Watchpack from treating C:\projects or C:\ as the app context.
     config.context = __dirname;
     return config;
   },
