@@ -72,7 +72,7 @@ async function run(request:NextRequest){
         url:`/?aquaPage=${primary.page}&tankId=${encodeURIComponent(row.tank_id)}`,
         tag:`aqua-watch-${row.tank_id}`,
         renotify:true,
-        data:{tankId:row.tank_id,level:primary.level,page:primary.page,reasons:alerts.map(x=>x.key??x.page)}
+        data:{tankId:row.tank_id,level:primary.level,page:primary.page,reasons:alerts.map(x=>x.page)}
       });
       const status=push.configured&&push.sent>0?"sent":"not-delivered";
       await query("INSERT INTO aqua_job_runs(job_name,status,details) VALUES($1,$2,$3::jsonb)",[jobName,status,JSON.stringify({tankId:row.tank_id,alerts,push})]);
