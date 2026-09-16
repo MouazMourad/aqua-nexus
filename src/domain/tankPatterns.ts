@@ -1,4 +1,5 @@
 import type { Tank } from "./types";
+import { eventChemistryLinks } from "./tankLearning";
 
 const DAY=86400000;
 type Parameter="KH"|"Ca"|"Mg"|"NO3"|"PO4"|"pH"|"salinity"|"temperature";
@@ -20,6 +21,19 @@ export interface TankBaseline {
 export interface LearnedSignal {
   id:string;
   level:"good"|"info"|"warn";
+  ar:string;
+  en:string;
+}
+
+export interface RepeatedResponsePattern {
+  id:string;
+  eventType:string;
+  parameter:string;
+  count:number;
+  sameDirectionCount:number;
+  averageDelta:number;
+  direction:"up"|"down";
+  confidence:"medium"|"high";
   ar:string;
   en:string;
 }
@@ -61,6 +75,21 @@ function declineRates(tank:Tank,param:Parameter){
   }
   return rates;
 }
+function normalizedEventType(raw:string){
+  const s=raw.toLowerCase();
+  if(/water.?change|تغيير.?ماء/.test(s))return "waterchange";
+  if(/dosing|dose|جرع/.test(s))return "dosing";
+  if(/feeding|feed|تغذ/.test(s))return "feeding";
+  if(/livestock|fish|coral|سمك|مرجان|كائن/.test(s))return "livestock";
+  if(/maintenance|service|صيان/.test(s))return "maintenance";
+  if(/media|gfo|carbon|ميديا|كربون/.test(s))return "media";
+  if(/treatment|quarantine|علاج|حجر/.test(s))return "treatment";
+  return s.split(/\s+/)[0]||"event";
+}
+function eventLabel(type:string,lang:"ar"|"en"){
+  const map:Record<string,[string,string]>={waterchange:["تغيير الماء","water change"],dosing:["الجرعات","dosing"],feeding:["التغذية","feeding"],livestock:["إضافة/تغيير الكائنات","livestock changes"],maintenance:["الصيانة","maintenance"],media:["تغيير الميديا","media changes"],treatment:["العلاج/الحجر","treatment/quarantine"]};
+  return map[type]?.[lang==="ar"?0:1]??type;
+}
 
 export function tankBaselines(tank:Tank):TankBaseline[]{
   const out:TankBaseline[]=[];
@@ -90,6 +119,36 @@ export function tankBaselines(tank:Tank):TankBaseline[]{
   return out;
 }
 
+export function repeatedResponsePatterns(tank:Tank):RepeatedResponsePattern[]{
+  const links=eventChemistryLinks(tank);
+  const groups=new Map<string,{type:string;parameter:string;deltas:number[]}>();
+  for(const link of links){
+    const type=normalizedEventType(`${link.event.type} ${link.event.textEn} ${link.event.textAr}`);
+    for(const change of link.chemistryChanges){
+      const key=`${type}:${change.parameter}`;
+      const row=groups.get(key)??{type,parameter:change.parameter,deltas:[]};
+      row.deltas.push(change.delta);groups.set(key,row);
+    }
+  }
+  const out:RepeatedResponsePattern[]=[];
+  for(const [key,row] of groups){
+    if(row.deltas.length<2)continue;
+    const positive=row.deltas.filter(x=>x>0),negative=row.deltas.filter(x=>x<0);
+    const winner=positive.length>=negative.length?positive:negative;
+    if(winner.length/row.deltas.length<.67)continue;
+    const avg=winner.reduce((s,x)=>s+x,0)/winner.length;
+    const direction=avg>0?"up":"down";
+    const confidence=winner.length>=3&&winner.length/row.deltas.length>=.75?"high":"medium";
+    const arLabel=eventLabel(row.type,"ar"),enLabel=eventLabel(row.type,"en");
+    out.push({
+      id:`repeat-${key}`,eventType:row.type,parameter:row.parameter,count:row.deltas.length,sameDirectionCount:winner.length,averageDelta:avg,direction,confidence,
+      ar:`بـ ${winner.length} من أصل ${row.deltas.length} مرات بعد ${arLabel} تحرك ${row.parameter} بنفس الاتجاه (${direction==="up"?"ارتفاع":"انخفاض"}) بمتوسط ${Math.abs(avg).toFixed(row.parameter==="PO4"?3:1)}. هاد نمط متكرر بهالحوض، مو إثبات سببية.`,
+      en:`In ${winner.length} of ${row.deltas.length} observations after ${enLabel}, ${row.parameter} moved in the same direction (${direction}) by an average ${Math.abs(avg).toFixed(row.parameter==="PO4"?3:1)}. This is a repeated tank-specific association, not proof of causation.`
+    });
+  }
+  return out.sort((a,b)=>(b.confidence==="high"?2:1)-(a.confidence==="high"?2:1)||b.sameDirectionCount-a.sameDirectionCount).slice(0,5);
+}
+
 export function learnedTankSignals(tank:Tank):LearnedSignal[]{
   const baselines=tankBaselines(tank),out:LearnedSignal[]=[];
   for(const b of baselines){
@@ -102,6 +161,7 @@ export function learnedTankSignals(tank:Tank):LearnedSignal[]{
       out.push({id:`rate-${b.parameter}`,level:"warn",ar:`معدل انخفاض ${b.parameter} الأخير (${b.recentDeclinePerDay.toFixed(b.parameter==="KH"?2:1)}/يوم) أسرع من نمط الحوض المعتاد (${b.usualDeclinePerDay.toFixed(b.parameter==="KH"?2:1)}/يوم). راقب إذا استمر النمط قبل زيادة الجرعات بشكل دائم.`,en:`Recent ${b.parameter} decline (${b.recentDeclinePerDay.toFixed(b.parameter==="KH"?2:1)}/day) is faster than this tank's usual pattern (${b.usualDeclinePerDay.toFixed(b.parameter==="KH"?2:1)}/day). Confirm the pattern before permanently increasing dosing.`});
     }
   }
+  for(const pattern of repeatedResponsePatterns(tank).slice(0,2))out.push({id:pattern.id,level:"info",ar:pattern.ar,en:pattern.en});
   if(!out.length&&baselines.length>=2)out.push({id:"baseline-stable",level:"good",ar:"القراءات الحالية قريبة من السلوك المعتاد الذي تعلّمه Aqua Nexus لهذا الحوض.",en:"Current readings are close to the behavior Aqua Nexus has learned as usual for this tank."});
-  return out.slice(0,5);
+  return out.slice(0,6);
 }
