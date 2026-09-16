@@ -20,6 +20,8 @@ function latestValue(tank:Tank,param:DosingParameter){
  return typeof v==="number"&&Number.isFinite(v)?v:undefined;
 }
 
+function datePlusDays(days:number){return new Date(Date.now()+days*86400000).toISOString().slice(0,10);}
+
 export function DosingPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
  const availableParams:DosingParameter[]=tank.type==="marine"?["KH","Ca","Mg"]:["KH"];
@@ -59,14 +61,17 @@ export function DosingPage({tank}:{tank:Tank}) {
   const material=form==="product"?(lang==="ar"?"محلول تجاري":"Commercial product"):(lang==="ar"?chosen?.ar:chosen?.en)||chosen?.formula||param;
   const ts=nowISO();
   patch(tank.id,t=>{
-   const channels=calc.unit==="mL"?t.doserChannels.map(ch=>ch.material.trim().toLowerCase()===material.trim().toLowerCase()?{...ch,currentMl:Math.max(0,ch.currentMl-calc.amount)}:ch):t.doserChannels;
-   const dose:any={id:uid("dose"),timestamp:ts,parameter:param,current:cur,target,ml:calc.unit==="mL"?calc.amount:0,amount:calc.amount,unit:calc.unit,material,calculatorMode:form,steps:calc.steps};
+   const channels=calc.steps===1&&calc.unit==="mL"?t.doserChannels.map(ch=>ch.material.trim().toLowerCase()===material.trim().toLowerCase()?{...ch,currentMl:Math.max(0,ch.currentMl-calc.amount)}:ch):t.doserChannels;
+   const dose:any={id:uid("dose"),timestamp:ts,parameter:param,current:cur,target,ml:calc.unit==="mL"?calc.amount:0,amount:calc.amount,unit:calc.unit,material,calculatorMode:form,steps:calc.steps,perStep:calc.perStep,status:calc.steps>1?"planned":"logged"};
    const amountText=`${calc.amount.toFixed(calc.unit==="g"?2:1)} ${calc.unit}`;
+   const perStepText=`${calc.perStep.toFixed(calc.unit==="g"?2:1)} ${calc.unit}`;
+   const stepTasks=Array.from({length:calc.steps},(_,i)=>({id:uid("task"),title:`جرعة ${param} ${i+1}/${calc.steps}: ${perStepText}`,titleEn:`${param} dose ${i+1}/${calc.steps}: ${perStepText}`,cadence:"once" as const,done:false,nextDue:datePlusDays(i),manual:true}));
+   const retestTasks=Array.from({length:calc.steps},(_,i)=>({id:uid("task"),title:`إعادة قياس ${param} بعد الجرعة ${i+1}/${calc.steps}`,titleEn:`Retest ${param} after dose ${i+1}/${calc.steps}`,cadence:"once" as const,done:false,nextDue:datePlusDays(i+1),manual:true}));
    return {...t,
     doserChannels:channels,
     dosing:[dose,...t.dosing],
-    timeline:[{id:uid("ev"),timestamp:ts,type:"dosing",textAr:`تم تسجيل جرعة ${material}: ${amountText} لتصحيح ${param} من ${cur} إلى ${target}.`,textEn:`Logged ${material} dose: ${amountText} to correct ${param} from ${cur} to ${target}.`},...t.timeline],
-    maintenance:[...t.maintenance,{id:uid("task"),title:`إعادة قياس ${param} بعد الجرعة`,titleEn:`Retest ${param} after dosing`,cadence:"once",done:false,nextDue:new Date(Date.now()+86400000).toISOString().slice(0,10),manual:true}]
+    timeline:[{id:uid("ev"),timestamp:ts,type:"dosing",textAr:calc.steps>1?`تم إنشاء خطة تصحيح ${param} من ${cur} إلى ${target}: ${amountText} من ${material} مقسمة إلى ${calc.steps} جرعات (${perStepText} لكل جرعة).`:`تم تسجيل جرعة ${material}: ${amountText} لتصحيح ${param} من ${cur} إلى ${target}.`,textEn:calc.steps>1?`Created ${param} correction plan from ${cur} to ${target}: ${amountText} of ${material}, split into ${calc.steps} doses (${perStepText} each).`:`Logged ${material} dose: ${amountText} to correct ${param} from ${cur} to ${target}.`},...t.timeline],
+    maintenance:[...t.maintenance,...stepTasks,...retestTasks]
    };
   });
  }
@@ -77,6 +82,7 @@ export function DosingPage({tank}:{tank:Tank}) {
 
  const amountLabel=calc.valid?`${calc.amount.toFixed(calc.unit==="g"?2:1)} ${calc.unit}`:"—";
  const stepLabel=calc.valid?`${calc.perStep.toFixed(calc.unit==="g"?2:1)} ${calc.unit}`:"—";
+ const safetyLimit=param==="KH"?"1 dKH/day":param==="Mg"?"100 ppm/day":"25 ppm/day";
 
  return <section className="page-grid"><PageHeader eyebrow="DOSING & CHEMISTRY" title={tr(lang,"dosing")}/>
 
@@ -103,14 +109,15 @@ export function DosingPage({tank}:{tank:Tank}) {
   <div className="summary-strip" style={{marginTop:14}}>
    <div className="summary"><small>{lang==="ar"?"الفرق المطلوب":"Required change"}</small><b>{Math.max(0,target-cur).toFixed(2)} {param==="KH"?"dKH":"ppm"}</b></div>
    <div className="summary"><small>{lang==="ar"?"الكمية المحسوبة":"Calculated amount"}</small><b>{amountLabel}</b></div>
-   <div className="summary"><small>{lang==="ar"?"عدد الخطوات":"Suggested steps"}</small><b>{calc.valid?calc.steps:"—"}</b></div>
+   <div className="summary"><small>{lang==="ar"?"عدد الأيام/الخطوات":"Days / steps"}</small><b>{calc.valid?calc.steps:"—"}</b></div>
    <div className="summary"><small>{lang==="ar"?"الكمية بكل خطوة":"Per step"}</small><b>{stepLabel}</b></div>
+   <div className="summary"><small>{lang==="ar"?"حد الأمان اليومي":"Daily safety limit"}</small><b>{safetyLimit}</b></div>
   </div>
 
   {!calc.valid&&<div className="inline-alert warn" style={{marginTop:12}}>{form==="product"?(lang==="ar"?"أدخل قوة المنتج كما هي مكتوبة على العبوة حتى يتم الحساب.":"Enter the product strength from its label to calculate the dose."):(lang==="ar"?"تأكد أن الهدف أعلى من القراءة الحالية وأن بيانات التركيز صحيحة.":"Make sure the target is above the current reading and concentration data is valid.")}</div>}
-  {calc.largeCorrection&&<div className="inline-alert warn" style={{marginTop:12}}>{lang==="ar"?`التصحيح كبير؛ قُسّم تلقائياً إلى ${calc.steps} خطوات محافظة. أعد القياس بين الخطوات ولا تعتمد على الحساب وحده.`:`This is a large correction, automatically split into ${calc.steps} conservative steps. Retest between steps and do not rely on calculation alone.`}</div>}
+  {calc.largeCorrection&&<div className="inline-alert warn" style={{marginTop:12}}>{lang==="ar"?`التصحيح كبير؛ قُسّم تلقائياً إلى ${calc.steps} جرعات يومية محافظة، وسيتم إنشاء مهمة جرعة ومهمة إعادة قياس لكل خطوة. لا تنفذ الخطوة التالية إذا لم تؤكد القراءة الجديدة الاستجابة المتوقعة.`:`This correction is large; it is automatically split into ${calc.steps} conservative daily doses. A dose task and retest task will be created for each step. Do not continue unless the new reading confirms the expected response.`}</div>}
   {form!=="product"&&<div className="note" style={{marginTop:10}}>{lang==="ar"?"الحساب للمركب المحدد كما هو مكتوب، لذلك يجب اختيار الشكل الكيميائي الصحيح (مثلاً سداسي الماء مقابل اللامائي) وإدخال النقاوة الفعلية.":"The calculation is specific to the selected chemical form. Choose the exact hydrate/anhydrous form and enter actual purity."}</div>}
-  <div style={{marginTop:12}}><button className="btn primary" onClick={log} disabled={!calc.valid}>{lang==="ar"?"تسجيل الجرعة وإنشاء مهمة إعادة قياس":"Log dose & create retest task"}</button></div>
+  <div style={{marginTop:12}}><button className="btn primary" onClick={log} disabled={!calc.valid}>{calc.steps>1?(lang==="ar"?"إنشاء خطة الجرعات الآمنة":"Create safe dosing plan"):(lang==="ar"?"تسجيل الجرعة وإنشاء مهمة إعادة قياس":"Log dose & create retest task")}</button></div>
  </div>
 
  <div className="card panel full-span">
@@ -128,6 +135,6 @@ export function DosingPage({tank}:{tank:Tank}) {
   </article>})}</div>
  </div>
 
- <div className="card panel full-span"><h3>{tr(lang,"timeline")}</h3><div className="history-list">{tank.dosing.slice(0,20).map(x=>{const d:any=x;const amount=typeof d.amount==="number"?d.amount:x.ml;const unit=d.unit||"mL";return <div className="history-row" key={x.id}><b>{x.parameter}: {amount.toFixed(unit==="g"?2:1)} {unit}{d.material?` • ${d.material}`:""}</b><span>{new Date(x.timestamp).toLocaleString()}</span></div>})}</div></div>
+ <div className="card panel full-span"><h3>{tr(lang,"timeline")}</h3><div className="history-list">{tank.dosing.slice(0,20).map(x=>{const d:any=x;const amount=typeof d.amount==="number"?d.amount:x.ml;const unit=d.unit||"mL";return <div className="history-row" key={x.id}><b>{x.parameter}: {amount.toFixed(unit==="g"?2:1)} {unit}{d.material?` • ${d.material}`:""}{d.steps>1?` • ${d.steps} steps`:""}</b><span>{new Date(x.timestamp).toLocaleString()}</span></div>})}</div></div>
  </section>;
 }
