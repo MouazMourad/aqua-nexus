@@ -6,6 +6,7 @@ import { useAquaStore } from "@/store/useAquaStore";
 import { bioload,chemistryHealth,maintenanceHealth,tankHealth,tankHealthTrend } from "@/domain/health";
 import { aquaAIAnswer,type AquaAIAnswer,type AquaAIPage } from "@/domain/aquaAIBrain";
 import { tankMood } from "@/domain/tankLearning";
+import { learnedTankSignals } from "@/domain/tankPatterns";
 
 function FishMascot({state}:{state:"normal"|"alert"|"critical"}){
  return <span className={`aqua-fish aqua-fish-${state}`} aria-hidden="true">
@@ -29,6 +30,7 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
  const warnings=tank.equipment.some(x=>x.status==="warning"||x.status==="service");
  const state:"normal"|"alert"|"critical"=(th<60||ch<55||bio.status==="danger")?"critical":(th<80||ch<75||mh<70||trend==="declining"||warnings)?"alert":"normal";
  const welcome=useMemo(()=>aquaAIAnswer("",tank,page),[tank,page]);
+ const learned=useMemo(()=>learnedTankSignals(tank),[tank]);
  const active=history[history.length-1]?.answer??welcome;
 
  useEffect(()=>{setHistory([]);setQ("")},[tank.id]);
@@ -83,6 +85,12 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
     <div className="aqua-ai-answer-head"><div><small>{lang==="ar"?"تحليل الحوض":"TANK ANALYSIS"}</small><h3>{title}</h3></div><span className={`ai-confidence ${active.confidence}`}>{confidenceLabel(active.confidence)}</span></div>
     <p className="aqua-ai-summary">{summary}</p>
     <div className="aqua-ai-reasoning-list">{details.slice(0,6).map((x,i)=><div key={i}><i>{i+1}</i><span>{x}</span></div>)}</div>
+
+    {learned.length>0&&<div className="aqua-ai-learned-block">
+      <small>{lang==="ar"?"شو تعلّم Aqua Nexus عن هالحوض":"WHAT AQUA NEXUS LEARNED"}</small>
+      {learned.slice(0,2).map(x=><div key={x.id} className={`learned-signal ${x.level}`}>{lang==="ar"?x.ar:x.en}</div>)}
+    </div>}
+
     <div className="aqua-ai-evidence"><small>{lang==="ar"?"مبني على بيانات الحوض":"Based on tank data"}</small><div>{evidence.map((x,i)=><span key={i}>{x}</span>)}</div></div>
     <div className="aqua-ai-local-note">{lang==="ar"?"هذا التحليل حالياً من محرك Aqua Nexus المحلي القائم على بيانات الحوض وقواعد الربط والتعلّم؛ مو نموذج LLM خارجي بعد.":"This analysis currently comes from Aqua Nexus' local tank-data reasoning engine; it is not yet an external LLM."}</div>
     {active.action&&onNavigate&&<button className="btn primary aqua-ai-action" onClick={()=>go(active.action!.page)}>{actionText} →</button>}
