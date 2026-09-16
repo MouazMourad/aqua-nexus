@@ -11,6 +11,7 @@ import "./help-center.css";
 import { PWARegister } from "@/components/PWARegister";
 import { PushReminderSync } from "@/components/PushReminderSync";
 import { CloudSyncBridge } from "@/components/CloudSyncBridge";
+import { DashboardCommandCollapse } from "@/components/dashboard/DashboardCommandCollapse";
 
 export const metadata: Metadata = {
   title: "Aqua Nexus 3D",
@@ -28,7 +29,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ar" dir="rtl">
-      <body><PWARegister/><PushReminderSync/><CloudSyncBridge/>{children}</body>
+      <body><PWARegister/><PushReminderSync/><CloudSyncBridge/><DashboardCommandCollapse/>{children}</body>
     </html>
   );
 }
