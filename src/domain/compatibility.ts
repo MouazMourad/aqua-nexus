@@ -17,6 +17,7 @@ export interface CompatibilityResult {
   projectedRatio: number;
   projectedStatus: "low" | "good" | "high" | "danger";
   requiresConfirmation: boolean;
+  blocked: boolean;
 }
 
 function catalogById(id?: string) {
@@ -42,6 +43,10 @@ function isSmallPrey(entry:any) {
   return t.includes("smallFish") || t.includes("shrimp") || mappedCategory(entry?.cat)==="invert";
 }
 
+function displayName(entry:any,lang:"ar"|"en"){
+  return lang==="ar"?(entry?.ar||entry?.en||entry?.id||""):(entry?.en||entry?.ar||entry?.id||"");
+}
+
 export function compatibilityCheck(
   tank: Tank,
   candidate: any,
@@ -54,6 +59,10 @@ export function compatibilityCheck(
   const projectedLoad=current.load + loadPer*Math.max(1,quantity);
   const projectedRatio=projectedLoad/capacity;
   const projectedStatus = projectedRatio < .55 ? "low" : projectedRatio < .85 ? "good" : projectedRatio < 1.15 ? "high" : "danger";
+
+  if(candidate?.type && candidate.type!==tank.type){
+    issues.push({level:"danger",ar:"هذا الكائن غير مناسب لنوع الحوض الحالي.",en:"This organism is not suitable for the current aquarium type."});
+  }
 
   if(Number(candidate?.min||0)>tank.systemVolumeLiters){
     issues.push({
@@ -91,6 +100,7 @@ export function compatibilityCheck(
   }));
 
   const candidateTags=tags(candidate);
+  const candidateCategory=mappedCategory(candidate?.cat);
   const hasCorals=tank.livestock.some(x=>x.category==="coral");
   const hasInverts=tank.livestock.some(x=>x.category==="invert");
   const hasPlants=tank.livestock.some(x=>x.category==="plant");
@@ -119,6 +129,44 @@ export function compatibilityCheck(
     });
   }
 
+  // Reverse compatibility matters too: adding a coral/invert/plant into a tank that already
+  // contains an unsafe fish must be evaluated from the existing animal's perspective.
+  if(candidateCategory==="coral"){
+    const unsafe=currentEntries.filter(({catalog})=>catalog&&(catalog.reefSafe===false||catalog.reefSafe==="caution"||tags(catalog).includes("coralRisk")));
+    const hard=unsafe.find(({catalog})=>catalog?.reefSafe===false);
+    if(unsafe.length){
+      issues.push({
+        level:hard?"danger":"warn",
+        ar:`يوجد حالياً ${displayName((hard||unsafe[0]).catalog,"ar")} وقد لا يكون آمناً مع المرجان الجديد.`,
+        en:`${displayName((hard||unsafe[0]).catalog,"en")} is already in the tank and may not be safe with the new coral.`
+      });
+    }
+  }
+
+  if(candidateCategory==="invert"){
+    const unsafe=currentEntries.filter(({catalog})=>catalog&&(catalog.invertSafe===false||catalog.invertSafe==="caution"||tags(catalog).includes("shrimpRisk")));
+    const hard=unsafe.find(({catalog})=>catalog?.invertSafe===false);
+    if(unsafe.length){
+      issues.push({
+        level:hard?"danger":"warn",
+        ar:`يوجد حالياً ${displayName((hard||unsafe[0]).catalog,"ar")} وقد يشكل خطراً على اللافقاري الجديد.`,
+        en:`${displayName((hard||unsafe[0]).catalog,"en")} is already in the tank and may threaten the new invertebrate.`
+      });
+    }
+  }
+
+  if(tank.type==="freshwater"&&candidateCategory==="plant"){
+    const unsafe=currentEntries.filter(({catalog})=>catalog&&(catalog.plantSafe===false||catalog.plantSafe==="caution"));
+    const hard=unsafe.find(({catalog})=>catalog?.plantSafe===false);
+    if(unsafe.length){
+      issues.push({
+        level:hard?"danger":"warn",
+        ar:`يوجد حالياً ${displayName((hard||unsafe[0]).catalog,"ar")} وقد يضر بالنبات الجديد.`,
+        en:`${displayName((hard||unsafe[0]).catalog,"en")} is already in the tank and may damage the new plant.`
+      });
+    }
+  }
+
   if(candidateTags.includes("predator")){
     const prey=currentEntries.filter(({catalog,item})=>catalog ? isSmallPrey(catalog) : item.category==="invert");
     if(prey.length){
@@ -134,14 +182,27 @@ export function compatibilityCheck(
   if(existingPredator && isSmallPrey(candidate)){
     issues.push({
       level:"danger",
-      ar:"يوجد كائن مفترس حالياً قد يهدد هذا الكائن.",
-      en:"An existing predator may threaten this organism."
+      ar:`يوجد كائن مفترس حالياً (${displayName(existingPredator.catalog,"ar")}) قد يهدد هذا الكائن.`,
+      en:`An existing predator (${displayName(existingPredator.catalog,"en")}) may threaten this organism.`
     });
+  }
+
+  const incompatibleWith=new Set<string>(Array.isArray(candidate?.incompatibleWith)?candidate.incompatibleWith:[]);
+  for(const {catalog} of currentEntries){
+    if(!catalog)continue;
+    const reverse=new Set<string>(Array.isArray(catalog.incompatibleWith)?catalog.incompatibleWith:[]);
+    if(incompatibleWith.has(catalog.id)||reverse.has(candidate?.id)){
+      issues.push({
+        level:"danger",
+        ar:`تعارض مباشر معروف بين ${candidate.ar||candidate.en} و${catalog.ar||catalog.en}.`,
+        en:`A direct known incompatibility exists between ${candidate.en||candidate.ar} and ${catalog.en||catalog.ar}.`
+      });
+    }
   }
 
   const aggressiveCandidate=candidateTags.some(x=>["aggressive","semiAggressive","territorial","finNipper"].includes(x));
   const aggressiveExisting=currentEntries.some(({catalog})=>catalog && tags(catalog).some((x:string)=>["aggressive","semiAggressive","territorial","finNipper"].includes(x)));
-  if(mappedCategory(candidate?.cat)==="fish" && aggressiveCandidate && aggressiveExisting){
+  if(candidateCategory==="fish" && aggressiveCandidate && aggressiveExisting){
     issues.push({
       level:"warn",
       ar:"يوجد احتمال عدوانية أو نزاع إقليمي مع الأسماك الحالية.",
@@ -167,6 +228,7 @@ export function compatibilityCheck(
   let level:CompatibilityLevel="good";
   if(issues.some(x=>x.level==="danger")) level="danger";
   else if(issues.some(x=>x.level==="warn")) level="warn";
+  const blocked=level==="danger";
 
   return {
     level,
@@ -174,6 +236,7 @@ export function compatibilityCheck(
     currentRatio:current.ratio,
     projectedRatio,
     projectedStatus,
-    requiresConfirmation:level==="danger"
+    requiresConfirmation:level==="warn",
+    blocked
   };
 }
