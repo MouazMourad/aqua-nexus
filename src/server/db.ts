@@ -50,6 +50,12 @@ CREATE TABLE IF NOT EXISTS aqua_push_subscriptions (
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(workspace_key,endpoint)
 );
+CREATE TABLE IF NOT EXISTS aqua_push_state (
+  workspace_key text PRIMARY KEY REFERENCES aqua_workspaces(workspace_key) ON DELETE CASCADE,
+  language text NOT NULL DEFAULT 'ar',
+  tanks jsonb NOT NULL DEFAULT '[]'::jsonb,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS aqua_media_assets (
   id text PRIMARY KEY,
   workspace_key text NOT NULL REFERENCES aqua_workspaces(workspace_key) ON DELETE CASCADE,
