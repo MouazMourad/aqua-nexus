@@ -3,7 +3,7 @@
 import { useRef,useState } from "react";
 import { tr } from "@/i18n";
 import type { Language } from "@/domain/types";
-import { GlobalHelpButton } from "@/components/help/HelpCenter";
+import { GlobalHelpButton,PageHelpButton } from "@/components/help/HelpCenter";
 
 export type AppPage =
   | "dashboard" | "tanks" | "equipment" | "sump" | "livestock" | "acclimation" | "library"
@@ -51,20 +51,25 @@ export function MainNav({active,onChange,lang}:{active:AppPage;onChange:(p:AppPa
   const [hoverIndex,setHoverIndex]=useState<number|null>(null);
   const move=(dir:-1|1)=>viewport.current?.scrollBy({left:dir*420,behavior:"smooth"});
 
-  return <div className="dock-shell">
-    <GlobalHelpButton lang={lang}/>
-    <button type="button" className="dock-arrow dock-arrow-left" aria-label="Previous modules" onClick={()=>move(-1)}>‹</button>
-    <div className="dock-viewport" ref={viewport} dir="ltr">
-      <nav className="main-nav full-modules-nav mac-dock" onMouseLeave={()=>setHoverIndex(null)}>
-        {items.map((item,index)=>{
-          const scale=dockScale(index,hoverIndex);
-          return <button type="button" key={item.key} className={`nav-item dock-item ${active===item.key?"active":""}`} style={{"--dock-scale":scale,"--dock-color":item.color} as React.CSSProperties} onMouseEnter={()=>setHoverIndex(index)} onFocus={()=>setHoverIndex(index)} onBlur={()=>setHoverIndex(null)} onClick={(e)=>{e.preventDefault();e.stopPropagation();onChange(item.key)}}>
-            <span className="nav-icon">{item.icon}</span>
-            <span className="dock-label" dir={lang==="ar"?"rtl":"ltr"}>{tr(lang,item.label)}</span>
-          </button>;
-        })}
-      </nav>
+  return <div className="nav-zone">
+    <div className="nav-help-row">
+      <PageHelpButton page={active}/>
+      <GlobalHelpButton lang={lang}/>
     </div>
-    <button type="button" className="dock-arrow dock-arrow-right" aria-label="Next modules" onClick={()=>move(1)}>›</button>
+    <div className="dock-shell">
+      <button type="button" className="dock-arrow dock-arrow-left" aria-label="Previous modules" onClick={()=>move(-1)}>‹</button>
+      <div className="dock-viewport" ref={viewport} dir="ltr">
+        <nav className="main-nav full-modules-nav mac-dock" onMouseLeave={()=>setHoverIndex(null)}>
+          {items.map((item,index)=>{
+            const scale=dockScale(index,hoverIndex);
+            return <button type="button" key={item.key} className={`nav-item dock-item ${active===item.key?"active":""}`} style={{"--dock-scale":scale,"--dock-color":item.color} as React.CSSProperties} onMouseEnter={()=>setHoverIndex(index)} onFocus={()=>setHoverIndex(index)} onBlur={()=>setHoverIndex(null)} onClick={(e)=>{e.preventDefault();e.stopPropagation();onChange(item.key)}}>
+              <span className="nav-icon">{item.icon}</span>
+              <span className="dock-label" dir={lang==="ar"?"rtl":"ltr"}>{tr(lang,item.label)}</span>
+            </button>;
+          })}
+        </nav>
+      </div>
+      <button type="button" className="dock-arrow dock-arrow-right" aria-label="Next modules" onClick={()=>move(1)}>›</button>
+    </div>
   </div>;
 }
