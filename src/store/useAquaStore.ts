@@ -2,10 +2,12 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { AquaState, ChemistryReading, Equipment, Language, Tank } from "@/domain/types";
+import type { AquaState, ChemistryReading, Equipment, HealthSnapshot, Language, Tank } from "@/domain/types";
 import { demoMarineTank, demoFreshwaterTank } from "@/data/demoTank";
 import { liters, round1 } from "@/lib/units";
 import { defaultDisplayPosition } from "@/lib/displayLayout";
+import { chemistryHealth, maintenanceHealth } from "@/domain/health";
+import { stateBand, tankStateScore } from "@/domain/tankIntelligence";
 
 interface AquaStore extends AquaState {
   setLanguage: (language: Language) => void;
@@ -45,6 +47,7 @@ function normalize(tank: Tank): Tank {
     livestock:tank.livestock ?? [],
     inventory:tank.inventory ?? [],
     timeline:tank.timeline ?? [],
+    healthSnapshots:tank.healthSnapshots ?? [],
     photos:tank.photos ?? [],
     feeding:tank.feeding ?? [],
     dosing:tank.dosing ?? [],
@@ -56,6 +59,50 @@ function normalize(tank: Tank): Tank {
     acclimationSessions:tank.acclimationSessions ?? [],
     createdAt:tank.createdAt ?? new Date().toISOString()
   });
+}
+
+function fingerprint(values:any[]){
+  return JSON.stringify(values);
+}
+
+function changeReason(before:Tank,after:Tank){
+  const latest=after.timeline[0];
+  if(latest&&latest.id!==before.timeline[0]?.id){
+    return {ar:latest.textAr,en:latest.textEn,eventId:latest.id,timestamp:latest.timestamp};
+  }
+  if(after.chemistry.length!==before.chemistry.length)return {ar:"تم تسجيل فحص كيميائي جديد.",en:"A new chemistry test was logged."};
+  if(fingerprint(after.maintenance.map(x=>[x.id,x.done,x.nextDue,x.lastDone]))!==fingerprint(before.maintenance.map(x=>[x.id,x.done,x.nextDue,x.lastDone])))return {ar:"تغيرت حالة خطة الصيانة.",en:"The maintenance plan status changed."};
+  if(fingerprint(after.equipment.map(x=>[x.id,x.status,x.location]))!==fingerprint(before.equipment.map(x=>[x.id,x.status,x.location])))return {ar:"تغيرت حالة أو إعدادات المعدات.",en:"Equipment status or configuration changed."};
+  if(fingerprint(after.livestock.map(x=>[x.id,x.quantity,x.health]))!==fingerprint(before.livestock.map(x=>[x.id,x.quantity,x.health])))return {ar:"تغيرت كائنات الحوض أو حالتها.",en:"Tank livestock or livestock health changed."};
+  if(after.waterChanges.length!==before.waterChanges.length)return {ar:"تم تسجيل تغيير ماء.",en:"A water change was logged."};
+  if(after.dosing.length!==before.dosing.length)return {ar:"تم تسجيل جرعة جديدة.",en:"A dosing event was logged."};
+  if(after.feeding.length!==before.feeding.length)return {ar:"تم تسجيل تغذية.",en:"A feeding event was logged."};
+  if(fingerprint(after.quarantine.map(x=>[x.id,x.status,x.reason]))!==fingerprint(before.quarantine.map(x=>[x.id,x.status,x.reason])))return {ar:"تغيرت حالة الحجر أو العلاج.",en:"Quarantine or treatment status changed."};
+  if(fingerprint((after.acclimationSessions??[]).map(x=>[x.id,x.status,x.completedAt]))!==fingerprint((before.acclimationSessions??[]).map(x=>[x.id,x.status,x.completedAt])))return {ar:"تغيرت حالة جلسة الإقلمة.",en:"Acclimation session status changed."};
+  const beforeScore=tankStateScore(before),afterScore=tankStateScore(after);
+  if(beforeScore!==afterScore)return {ar:"تغيرت حالة الحوض المحسوبة.",en:"The calculated tank state changed."};
+  return null;
+}
+
+function withHealthSnapshot(before:Tank,after:Tank):Tank{
+  const reason=changeReason(before,after);
+  if(!reason)return after;
+  const score=tankStateScore(after);
+  const timestamp=reason.timestamp??new Date().toISOString();
+  const last=after.healthSnapshots?.[0];
+  if(last&&last.score===score&&last.reasonAr===reason.ar&&Math.abs(new Date(timestamp).getTime()-new Date(last.timestamp).getTime())<2000)return after;
+  const snapshot:HealthSnapshot={
+    id:`hs-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+    timestamp,
+    score,
+    chemistry:chemistryHealth(after),
+    maintenance:maintenanceHealth(after),
+    state:stateBand(score),
+    reasonAr:reason.ar,
+    reasonEn:reason.en,
+    relatedEventId:reason.eventId
+  };
+  return {...after,healthSnapshots:[snapshot,...(after.healthSnapshots??[])].slice(0,365)};
 }
 
 export const useAquaStore = create<AquaStore>()(
@@ -84,15 +131,18 @@ export const useAquaStore = create<AquaStore>()(
       patchTank:(tankId,updater)=>set((state)=>({
         tanks:state.tanks.map(t=>{
           if(t.id!==tankId)return t;
-          const next=typeof updater==="function" ? updater(t) : {...t,...updater};
-          return normalize(next);
+          const nextRaw=typeof updater==="function" ? updater(t) : {...t,...updater};
+          const next=normalize(nextRaw);
+          return withHealthSnapshot(t,next);
         })
       })),
 
       addChemistryReading:(tankId,reading)=>set((state)=>({
-        tanks:state.tanks.map(t=>t.id===tankId
-          ? normalize({...t,chemistry:[reading,...(t.chemistry??[])]})
-          : t)
+        tanks:state.tanks.map(t=>{
+          if(t.id!==tankId)return t;
+          const next=normalize({...t,chemistry:[reading,...(t.chemistry??[])]});
+          return withHealthSnapshot(t,next);
+        })
       })),
 
       replaceData:(data)=>set({
@@ -105,7 +155,7 @@ export const useAquaStore = create<AquaStore>()(
     }),
     {
       name:"aqua-nexus-3d-v1",
-      version:5,
+      version:6,
       migrate:(persisted:any)=>{
         const p=persisted??{};
         return {...p,tanks:(p.tanks??[]).map((t:Tank)=>normalize(t))};
