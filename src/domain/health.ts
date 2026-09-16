@@ -1,4 +1,4 @@
-import type { Tank } from "./types";
+import type { ChemistryReading, Tank } from "./types";
 import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
 
 export function parameterScore(value: number | null | undefined, meta: any) {
@@ -21,20 +21,27 @@ export function chemistryAgeDays(tank: Tank) {
   return Math.max(0, (Date.now() - latest) / 86400000);
 }
 
-export function chemistryHealth(tank: Tank) {
-  const latest = tank.chemistry[0]?.values ?? {};
-  const ranges: any = CHEMISTRY_CATALOG[tank.type];
-  let weighted = 0, totalWeight = 0;
-  Object.entries(ranges).forEach(([key, meta]: [string, any]) => {
-    const s = parameterScore(latest[key], meta);
-    if (s !== null) {
-      weighted += s * Number(meta.weight || 1);
-      totalWeight += Number(meta.weight || 1);
+export function chemistryReadingScore(tank:Tank, reading?:ChemistryReading) {
+  if(!reading)return null;
+  const ranges:any=CHEMISTRY_CATALOG[tank.type];
+  let weighted=0,totalWeight=0;
+  Object.entries(ranges).forEach(([key,meta]:[string,any])=>{
+    const s=parameterScore(reading.values[key],meta);
+    if(s!==null){
+      const weight=Number(meta.weight||1);
+      weighted+=s*weight;
+      totalWeight+=weight;
     }
   });
-  if (!totalWeight) return 50;
-  let result = Math.round(weighted / totalWeight);
-  if (tank.chemistry[0]?.usingDefaults) result = Math.min(75, result);
+  if(!totalWeight)return null;
+  let result=Math.round(weighted/totalWeight);
+  if(reading.usingDefaults)result=Math.min(75,result);
+  return result;
+}
+
+export function chemistryHealth(tank: Tank) {
+  let result=chemistryReadingScore(tank,tank.chemistry[0]);
+  if(result===null)return 50;
 
   const age = chemistryAgeDays(tank);
   // Weekly chemistry measurement is mandatory:
@@ -60,15 +67,7 @@ export function tankHealth(tank: Tank) {
 }
 
 export function chemistryHistoryScore(tank: Tank, readingIndex = 0) {
-  const reading = tank.chemistry[readingIndex];
-  if (!reading) return null;
-  const ranges:any = CHEMISTRY_CATALOG[tank.type];
-  let sum=0,count=0;
-  Object.entries(ranges).forEach(([k,m]:[string,any])=>{
-    const s=parameterScore(reading.values[k],m);
-    if(s!==null){sum+=s;count++}
-  });
-  return count?Math.round(sum/count):null;
+  return chemistryReadingScore(tank,tank.chemistry[readingIndex]);
 }
 
 export function tankHealthTrend(tank: Tank): "improving"|"stable"|"declining" {
