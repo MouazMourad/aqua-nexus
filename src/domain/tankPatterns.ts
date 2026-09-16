@@ -72,7 +72,8 @@ export function tankBaselines(tank:Tank):TankBaseline[]{
     if(values.length<3)continue;
     const center=median(values),mad=median(values.map(x=>Math.abs(x-center)));
     const low=quantile(values,.15),high=quantile(values,.85),current=values[0];
-    const naturalBand=Math.max(mad*2,Math.abs(center)*.03,parameter==="PO4"?.01:parameter==="KH"?.2:.05);
+    const fixedFloor=parameter==="PO4" ? 0.01 : parameter==="KH" ? 0.2 : 0.05;
+    const naturalBand=Math.max(mad*2,Math.abs(center)*.03,fixedFloor);
     const status:TankBaseline["status"]=current>high+naturalBand?"above-usual":current<low-naturalBand?"below-usual":"within";
     const rates=declineRates(tank,parameter);
     let usualDeclinePerDay:number|undefined,recentDeclinePerDay:number|undefined,consumptionState:TankBaseline["consumptionState"]|undefined;
