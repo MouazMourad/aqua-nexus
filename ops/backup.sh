@@ -16,7 +16,6 @@ docker compose exec -T app sh -c 'tar -czf - -C /data uploads 2>/dev/null || tru
 
 echo "[Aqua Nexus] Recording deployment metadata..."
 git rev-parse HEAD > "$TARGET/git-commit.txt" 2>/dev/null || true
-cp .env "$TARGET/env-template.txt" 2>/dev/null || true
 
 find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -mtime "+$RETENTION_DAYS" -exec rm -rf {} \;
 
