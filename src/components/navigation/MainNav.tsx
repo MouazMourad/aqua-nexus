@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef,useState } from "react";
+import { useEffect,useRef,useState } from "react";
 import { tr } from "@/i18n";
 import type { Language } from "@/domain/types";
 import { GlobalHelpButton,PageHelpButton } from "@/components/help/HelpCenter";
@@ -51,6 +51,10 @@ export function MainNav({active,onChange,lang}:{active:AppPage;onChange:(p:AppPa
   const [hoverIndex,setHoverIndex]=useState<number|null>(null);
   const move=(dir:-1|1)=>viewport.current?.scrollBy({left:dir*420,behavior:"smooth"});
 
+  useEffect(()=>{
+    if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("aqua:page",{detail:active}));
+  },[active]);
+
   return <div className="nav-zone">
     <div className="nav-help-row">
       <PageHelpButton page={active}/>
@@ -62,7 +66,7 @@ export function MainNav({active,onChange,lang}:{active:AppPage;onChange:(p:AppPa
         <nav className="main-nav full-modules-nav mac-dock" onMouseLeave={()=>setHoverIndex(null)}>
           {items.map((item,index)=>{
             const scale=dockScale(index,hoverIndex);
-            return <button type="button" key={item.key} className={`nav-item dock-item ${active===item.key?"active":""}`} style={{"--dock-scale":scale,"--dock-color":item.color} as React.CSSProperties} onMouseEnter={()=>setHoverIndex(index)} onFocus={()=>setHoverIndex(index)} onBlur={()=>setHoverIndex(null)} onClick={(e)=>{e.preventDefault();e.stopPropagation();onChange(item.key)}}>
+            return <button type="button" data-aqua-page={item.key} key={item.key} className={`nav-item dock-item ${active===item.key?"active":""}`} style={{"--dock-scale":scale,"--dock-color":item.color} as React.CSSProperties} onMouseEnter={()=>setHoverIndex(index)} onFocus={()=>setHoverIndex(index)} onBlur={()=>setHoverIndex(null)} onClick={(e)=>{e.preventDefault();e.stopPropagation();onChange(item.key)}}>
               <span className="nav-icon">{item.icon}</span>
               <span className="dock-label" dir={lang==="ar"?"rtl":"ltr"}>{tr(lang,item.label)}</span>
             </button>;
