@@ -40,6 +40,26 @@ function stabilityState(t:Tank){
   return {overall,chemistry,maintenance,trend,bioload:bio.status,equipmentWarnings,unstable:reasons.length>0,reasons};
 }
 
+function backgroundAlertState(t:Tank){
+  const activeEmergency=(t.emergencySessions??[]).find(x=>x.status==="active");
+  const activeQuarantine=t.quarantine.filter(x=>x.status==="active");
+  const nextDose=[...activeQuarantine]
+    .filter(x=>x.nextDoseAt)
+    .sort((a,b)=>new Date(a.nextDoseAt!).getTime()-new Date(b.nextDoseAt!).getTime())[0];
+  return {
+    lastChemistryAt:t.chemistry[0]?.timestamp??null,
+    maintenanceTasks:t.maintenance.filter(x=>!x.done).slice(0,30).map(x=>({id:x.id,title:x.title,titleEn:x.titleEn??x.title,nextDue:x.nextDue??null})),
+    treatmentCount:t.livestock.filter(x=>x.health==="treatment").reduce((sum,x)=>sum+Math.max(1,x.quantity),0),
+    watchCount:t.livestock.filter(x=>x.health==="watch").reduce((sum,x)=>sum+Math.max(1,x.quantity),0),
+    activeQuarantineCount:activeQuarantine.length,
+    activeEmergencyCount:(t.emergencySessions??[]).filter(x=>x.status==="active").length,
+    emergencyTitleAr:activeEmergency?.titleAr??null,
+    emergencyTitleEn:activeEmergency?.titleEn??null,
+    nextDoseAt:nextDose?.nextDoseAt??null,
+    doseOrganism:nextDose?.organism??null
+  };
+}
+
 export async function syncPushReminders(tanks:Tank[],language:Language,createSubscription=false){
   if(typeof window==="undefined"||!("serviceWorker" in navigator)||!("Notification" in window)) return {ok:false,reason:"unsupported"};
   if(Notification.permission!=="granted") return {ok:false,reason:"permission"};
@@ -60,7 +80,7 @@ export async function syncPushReminders(tanks:Tank[],language:Language,createSub
     const key=`aqua-nexus-last-visit:${t.id}`;
     let lastVisit=Number(localStorage.getItem(key));
     if(!Number.isFinite(lastVisit)||lastVisit<=0){lastVisit=now;localStorage.setItem(key,String(now));}
-    return {id:t.id,name:t.name,lastVisit,...stabilityState(t)};
+    return {id:t.id,name:t.name,lastVisit,...stabilityState(t),...backgroundAlertState(t)};
   });
   const response=await fetch("/api/push/register",{
     method:"POST",
