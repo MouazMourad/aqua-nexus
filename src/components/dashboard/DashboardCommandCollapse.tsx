@@ -89,7 +89,7 @@ export function DashboardCommandCollapse(){
         head.appendChild(close);
       }
 
-      let backdrop=document.querySelector<HTMLElement>(".aqua-sheet-backdrop");
+      let backdrop=document.querySelector<HTMLButtonElement>(".aqua-sheet-backdrop");
       if(sheets.length){
         document.body.classList.add("aqua-sheet-open");
         if(!backdrop){
