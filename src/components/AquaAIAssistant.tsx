@@ -3,25 +3,9 @@ import { FormEvent,useEffect,useMemo,useState } from "react";
 import type { Tank } from "@/domain/types";
 import type { AppPage } from "@/components/navigation/MainNav";
 import { useAquaStore } from "@/store/useAquaStore";
-import { chemistryHealth,maintenanceHealth,tankHealth,bioload,tankHealthTrend } from "@/domain/health";
-import { smartInsights } from "@/domain/smartInsights";
-
-function contextualAnswer(q:string,tank:Tank,page:AppPage,lang:"ar"|"en"){
- const query=q.toLowerCase();
- const ch=chemistryHealth(tank),mh=maintenanceHealth(tank),th=tankHealth(tank),bio=Math.round(bioload(tank).ratio*100);
- const today=new Date().toISOString().slice(0,10);
- const due=tank.maintenance.filter(x=>!x.done&&(!x.nextDue||x.nextDue<=today));
- const warnings=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
- const latest=tank.chemistry[0]?.values??{};
- const latestText=Object.entries(latest).slice(0,5).map(([k,v])=>`${k}: ${v}`).join(" • ");
- if(/كيمي|chem|salin|kh|ph|nitrate|no3|po4/.test(query)) return lang==="ar"?`صحة الكيمياء ${ch}%. آخر القراءات: ${latestText||"لا توجد قراءات"}. ${ch<80?"الأولوية الآن إعادة القياس ومراجعة أي قيمة خارج المجال.":"الوضع الكيميائي جيد إجمالاً، استمر بالقياس الأسبوعي."}`:`Chemistry health is ${ch}%. Latest: ${latestText||"No readings"}. ${ch<80?"Re-test and review out-of-range values first.":"Chemistry is generally healthy; keep the weekly measurement routine."}`;
- if(/صيان|maint|task|مهمة/.test(query)) return lang==="ar"?`صحة الصيانة ${mh}%. لديك ${due.length} مهمة مستحقة حالياً. ${due.length?`الأقرب: ${due.slice(0,3).map(x=>x.title).join("، ")}`:"لا توجد مهام متأخرة."}`:`Maintenance health is ${mh}%. ${due.length} task(s) are due. ${due.length?`Priority: ${due.slice(0,3).map(x=>x.titleEn||x.title).join(", ")}`:"No overdue tasks."}`;
- if(/جهاز|معدات|equipment|pump|light|skimmer/.test(query)) return lang==="ar"?`لديك ${tank.equipment.length} جهازاً مسجلاً، و${warnings.length} يحتاج تحذير/صيانة. ${warnings.length?`راجع: ${warnings.map(x=>x.name).slice(0,4).join("، ")}`:"لا يوجد جهاز بحالة تحذير حالياً."}`:`${tank.equipment.length} devices are registered; ${warnings.length} need warning/service attention. ${warnings.length?`Review: ${warnings.map(x=>x.name).slice(0,4).join(", ")}`:"No device is currently flagged."}`;
- if(/حمل|سمك|مرجان|livestock|fish|coral|bioload/.test(query)) return lang==="ar"?`الحمل الحيوي التقريبي ${bio}%. راقب الزيادة تدريجياً مع NO3/PO4 وقدرة الفلترة.`:`Estimated bioload is ${bio}%. Increase livestock gradually and watch NO3/PO4 and filtration capacity.`;
- if(/طوار|emerg|خطر/.test(query)) return lang==="ar"?`في صفحة الطوارئ اختر الحالة ثم نفّذ الخطوات بالترتيب، ويمكنك إنشاء مهمة صيانة عاجلة مباشرة من الحالة.`:`Choose the emergency scenario, follow the steps in order, and create an urgent maintenance task directly from the scenario.`;
- const insight=smartInsights(tank)[0];
- return lang==="ar"?`ملخص ${tank.name}: صحة الحوض ${th}%، الكيمياء ${ch}%، الصيانة ${mh}%، الحمل الحيوي ${bio}%. ${insight?.ar||"لا توجد ملاحظة حرجة حالياً."} أنت الآن في واجهة ${page}.`:`${tank.name} summary: tank health ${th}%, chemistry ${ch}%, maintenance ${mh}%, bioload ${bio}%. ${insight?.en||"No critical insight right now."} Current section: ${page}.`;
-}
+import { bioload,chemistryHealth,maintenanceHealth,tankHealth,tankHealthTrend } from "@/domain/health";
+import { aquaAIAnswer,type AquaAIAnswer,type AquaAIPage } from "@/domain/aquaAIBrain";
+import { tankMood } from "@/domain/tankLearning";
 
 function FishMascot({state}:{state:"normal"|"alert"|"critical"}){
  return <span className={`aqua-fish aqua-fish-${state}`} aria-hidden="true">
@@ -36,27 +20,48 @@ function FishMascot({state}:{state:"normal"|"alert"|"critical"}){
  </span>;
 }
 
-export function AquaAIAssistant({tank,page}:{tank:Tank;page:AppPage}){
+type Exchange={id:string;question:string;answer:AquaAIAnswer};
+
+export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;onNavigate?:(page:AppPage)=>void}){
  const lang=useAquaStore(s=>s.language);
- const [open,setOpen]=useState(false),[q,setQ]=useState(""),[answer,setAnswer]=useState(""),[greeting,setGreeting]=useState(false);
- const th=tankHealth(tank),ch=chemistryHealth(tank),mh=maintenanceHealth(tank),trend=tankHealthTrend(tank),bio=bioload(tank);
+ const [open,setOpen]=useState(false),[q,setQ]=useState(""),[history,setHistory]=useState<Exchange[]>([]),[greeting,setGreeting]=useState(false);
+ const th=tankHealth(tank),ch=chemistryHealth(tank),mh=maintenanceHealth(tank),trend=tankHealthTrend(tank),bio=bioload(tank),mood=tankMood(tank);
  const warnings=tank.equipment.some(x=>x.status==="warning"||x.status==="service");
  const state:"normal"|"alert"|"critical"=(th<60||ch<55||bio.status==="danger")?"critical":(th<80||ch<75||mh<70||trend==="declining"||warnings)?"alert":"normal";
- const welcome=useMemo(()=>contextualAnswer("",tank,page,lang),[tank,page,lang]);
+ const welcome=useMemo(()=>aquaAIAnswer("",tank,page),[tank,page]);
+ const active=history[history.length-1]?.answer??welcome;
 
+ useEffect(()=>{setHistory([]);setQ("")},[tank.id]);
  useEffect(()=>{
   if(typeof window==="undefined")return;
-  const key="aqua-ai-session-greeting";
+  const key="aqua-ai-session-greeting-v2";
   if(sessionStorage.getItem(key))return;
   const timer=window.setTimeout(()=>{setGreeting(true);sessionStorage.setItem(key,"1")},650);
-  const hide=window.setTimeout(()=>setGreeting(false),8500);
+  const hide=window.setTimeout(()=>setGreeting(false),9000);
   return()=>{window.clearTimeout(timer);window.clearTimeout(hide)};
  },[]);
 
- function ask(e?:FormEvent){e?.preventDefault();setAnswer(contextualAnswer(q||"summary",tank,page,lang));}
- const quick=lang==="ar"?["حلل حوضي","شو أهم شي هلا؟","راجع الكيمياء","اقترح إجراء"]:["Analyze my tank","What matters now?","Review chemistry","Suggest an action"];
- const statusText=lang==="ar"?(state==="critical"?"يحتاج تدخلاً سريعاً":state==="alert"?"يحتاج متابعة":"مستقر"):(state==="critical"?"Needs quick action":state==="alert"?"Needs attention":"Stable");
- const greetingText=lang==="ar"?"أنا هنا للمساعدة بعالم الأحواض. أستطيع تحليل حوضك، مراجعة الكيمياء والصيانة، ومساعدتك بأي سؤال متعلق بالأحواض.":"I’m here to help in the world of aquariums. I can analyze your tank, review chemistry and maintenance, and help with aquarium questions.";
+ function run(question:string){
+  const clean=question.trim()|| (lang==="ar"?"حلل حوضي":"Analyze my tank");
+  const answer=aquaAIAnswer(clean,tank,page);
+  setHistory(h=>[...h.slice(-4),{id:`ai-${Date.now()}`,question:clean,answer}]);
+  setQ("");
+ }
+ function ask(e?:FormEvent){e?.preventDefault();run(q);}
+ function go(pageKey:AquaAIPage){setOpen(false);onNavigate?.(pageKey as AppPage);}
+
+ const quick=lang==="ar"
+  ?["حلل حوضي","شو متوقع خلال أسبوع؟","شو تعلمت من تاريخ الحوض؟",tank.type==="marine"?"ليش KH عم ينزل؟":"حلل النترات"]
+  :["Analyze my tank","What do you expect this week?","What have you learned from this tank?",tank.type==="marine"?"Why is KH dropping?":"Analyze nitrate"];
+ const statusText=lang==="ar"?`${mood.symbol} ${mood.ar}`:`${mood.symbol} ${mood.en}`;
+ const confidenceLabel=(c:AquaAIAnswer["confidence"])=>lang==="ar"?(c==="high"?"ثقة مرتفعة":c==="medium"?"ثقة متوسطة":"ثقة أولية"):(c==="high"?"High confidence":c==="medium"?"Medium confidence":"Early confidence");
+ const greetingText=lang==="ar"?`أنا Aqua AI. عم اقرأ حالة ${tank.name} وتاريخه، مو بس أرقام منفصلة. اسألني شو عم يصير، ليش، أو لوين رايح الحوض.`:`I’m Aqua AI. I read ${tank.name} as a connected system and history, not isolated numbers. Ask what is happening, why, or where the tank is heading.`;
+
+ const title=lang==="ar"?active.titleAr:active.titleEn;
+ const summary=lang==="ar"?active.summaryAr:active.summaryEn;
+ const details=lang==="ar"?active.detailsAr:active.detailsEn;
+ const evidence=lang==="ar"?active.evidenceAr:active.evidenceEn;
+ const actionText=active.action?(lang==="ar"?active.action.ar:active.action.en):"";
 
  return <div className={`aqua-ai-shell ${open?"open":""} state-${state}`} dir={lang==="ar"?"rtl":"ltr"}>
   {greeting&&!open&&<button type="button" className="aqua-ai-greeting" onClick={()=>{setGreeting(false);setOpen(true)}}>
@@ -64,15 +69,27 @@ export function AquaAIAssistant({tank,page}:{tank:Tank;page:AppPage}){
     <span>{greetingText}</span>
   </button>}
 
-  {open&&<section className="aqua-ai-panel">
+  {open&&<section className="aqua-ai-panel aqua-ai-panel-v2">
    <div className="aqua-ai-head">
-    <div className="aqua-ai-head-brand"><FishMascot state={state}/><div><b>✦ Aqua AI</b><small>{lang==="ar"?"مساعدك الذكي في عالم الأحواض":"Your aquarium intelligence assistant"}</small></div></div>
+    <div className="aqua-ai-head-brand"><FishMascot state={state}/><div><b>✦ Aqua AI</b><small>{lang==="ar"?"عقل الحوض المحلي • Tank-aware":"Local tank intelligence • Tank-aware"}</small></div></div>
     <button className="icon-btn" onClick={()=>setOpen(false)}>×</button>
    </div>
+
    <div className={`aqua-ai-tank-status status-${state}`}><span>{lang==="ar"?"الحوض الحالي":"Current tank"}</span><b>{tank.name}</b><em>{statusText}</em></div>
-   <div className="aqua-ai-answer">{answer||welcome}</div>
-   <div className="aqua-ai-quick">{quick.map(x=><button key={x} onClick={()=>{setQ(x);setAnswer(contextualAnswer(x,tank,page,lang))}}>{x}</button>)}</div>
-   <form className="aqua-ai-form" onSubmit={ask}><input value={q} onChange={e=>setQ(e.target.value)} placeholder={lang==="ar"?"اسأل Aqua AI عن الأحواض...":"Ask Aqua AI about aquariums..."}/><button className="btn primary" type="submit">{lang==="ar"?"اسأل":"Ask"}</button></form>
+
+   {history.length>0&&<div className="aqua-ai-history-strip">{history.slice(-3).map(x=><button key={x.id} type="button" onClick={()=>setHistory(h=>{const found=h.find(y=>y.id===x.id);return found?[...h.filter(y=>y.id!==x.id),found]:h})}>{x.question}</button>)}</div>}
+
+   <div className="aqua-ai-answer aqua-ai-structured-answer">
+    <div className="aqua-ai-answer-head"><div><small>{lang==="ar"?"تحليل الحوض":"TANK ANALYSIS"}</small><h3>{title}</h3></div><span className={`ai-confidence ${active.confidence}`}>{confidenceLabel(active.confidence)}</span></div>
+    <p className="aqua-ai-summary">{summary}</p>
+    <div className="aqua-ai-reasoning-list">{details.slice(0,6).map((x,i)=><div key={i}><i>{i+1}</i><span>{x}</span></div>)}</div>
+    <div className="aqua-ai-evidence"><small>{lang==="ar"?"مبني على بيانات الحوض":"Based on tank data"}</small><div>{evidence.map((x,i)=><span key={i}>{x}</span>)}</div></div>
+    <div className="aqua-ai-local-note">{lang==="ar"?"هذا التحليل حالياً من محرك Aqua Nexus المحلي القائم على بيانات الحوض وقواعد الربط والتعلّم؛ مو نموذج LLM خارجي بعد.":"This analysis currently comes from Aqua Nexus' local tank-data reasoning engine; it is not yet an external LLM."}</div>
+    {active.action&&<button className="btn primary aqua-ai-action" onClick={()=>go(active.action!.page)}>{actionText} →</button>}
+   </div>
+
+   <div className="aqua-ai-quick">{quick.map(x=><button key={x} onClick={()=>run(x)}>{x}</button>)}</div>
+   <form className="aqua-ai-form" onSubmit={ask}><input value={q} onChange={e=>setQ(e.target.value)} placeholder={lang==="ar"?"مثلاً: ليش الكالسيوم عم ينزل بسرعة؟":"Example: why is calcium dropping faster?"}/><button className="btn primary" type="submit">{lang==="ar"?"حلّل":"Analyze"}</button></form>
   </section>}
 
   <button className="aqua-ai-fish-button" onClick={()=>{setGreeting(false);setOpen(v=>!v)}} aria-label="Aqua AI">
