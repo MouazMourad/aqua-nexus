@@ -1,6 +1,7 @@
 import type { Tank } from "./types";
 import { chemistryAgeDays, chemistryHealth, tankHealthTrend, bioload } from "./health";
 import { analyzeNutrients } from "./nutrientEngine";
+import { mediaPredictions } from "./mediaPredictor";
 
 export interface SmartInsight {
   level: "info"|"good"|"warn"|"danger";
@@ -15,6 +16,7 @@ export function smartInsights(tank: Tank): SmartInsight[] {
   const trend = tankHealthTrend(tank);
   const bio = bioload(tank);
   const nutrients = analyzeNutrients(tank);
+  const media = mediaPredictions(tank);
 
   if (age > 7) out.push({
     level:"warn",
@@ -39,7 +41,6 @@ export function smartInsights(tank: Tank): SmartInsight[] {
     en:"Biological load is high for the current system volume."
   });
 
-  // Event correlation: recent livestock add + NO3 rising.
   if (tank.chemistry.length >= 2) {
     const n0 = Number(tank.chemistry[0].values.NO3 ?? 0);
     const n1 = Number(tank.chemistry[1].values.NO3 ?? n0);
@@ -51,9 +52,35 @@ export function smartInsights(tank: Tank): SmartInsight[] {
     });
   }
 
-  // Nutrient balance engine: contextual signal, not a deterministic algae predictor.
   nutrients.signals.forEach(signal => {
     if (signal.level !== "good" || out.length === 0) out.push(signal);
+  });
+
+  media.forEach(({item,prediction})=>{
+    if(prediction.state==="replace") out.push({
+      level:"warn",
+      ar:`ميديا ${item.name} تجاوزت عمرها المتوقع (${prediction.estimatedLifeDays} يوم تقريباً). راجعها أو استبدلها.`,
+      en:`${item.name} has reached its estimated media life (~${prediction.estimatedLifeDays} days). Review or replace it.`
+    });
+    else if(prediction.state==="watch") out.push({
+      level:"info",
+      ar:`ميديا ${item.name} تقترب من نهاية عمرها المتوقع؛ المتبقي تقريباً ${prediction.remainingDays} يوم.`,
+      en:`${item.name} is approaching its estimated media-life limit; roughly ${prediction.remainingDays} days remain.`
+    });
+  });
+
+  const activeEmergency=(tank.emergencySessions??[]).find(x=>x.status==="active");
+  if(activeEmergency) out.unshift({
+    level:"danger",
+    ar:`يوجد بروتوكول طوارئ نشط: ${activeEmergency.titleAr}. أكمل الخطوات قبل اعتبار الحالة مستقرة.`,
+    en:`An emergency protocol is active: ${activeEmergency.titleEn}. Complete the response steps before considering the system stable.`
+  });
+
+  const activeTreatment=tank.quarantine.find(x=>x.status==="active"&&x.treatmentProduct);
+  if(activeTreatment) out.push({
+    level:"info",
+    ar:`يوجد علاج حجر نشط لـ ${activeTreatment.organism}${activeTreatment.nextDoseAt?`؛ الجرعة التالية ${new Date(activeTreatment.nextDoseAt).toLocaleString()}`:""}.`,
+    en:`Active quarantine treatment for ${activeTreatment.organism}${activeTreatment.nextDoseAt?`; next dose ${new Date(activeTreatment.nextDoseAt).toLocaleString()}`:""}.`
   });
 
   if (typeof latest.PO4 === "number" && latest.PO4 > .18 && tank.type==="marine") out.push({
@@ -75,17 +102,23 @@ export function forecastTank(tank: Tank) {
   const trend = tankHealthTrend(tank);
   const nutrients = analyzeNutrients(tank);
   const nutrientRisk = ["both-depleted","phosphate-depleted","nitrate-depleted","elevated"].includes(nutrients.state);
+  const mediaRisk=mediaPredictions(tank).some(x=>x.prediction.state==="replace");
+  const emergencyActive=(tank.emergencySessions??[]).some(x=>x.status==="active");
 
-  if (trend==="declining" || chem<60 || nutrientRisk) return {
-    ar:"إذا استمر الاتجاه الحالي فهناك احتمال تراجع إضافي خلال 7 أيام. ابدأ بالفحوص والمهام المتأخرة وصحح اختلال المغذيات تدريجياً دون تغييرات حادة.",
-    en:"If the current trend continues, further decline is possible within 7 days. Start with overdue tests and maintenance, then correct nutrient imbalance gradually without abrupt changes."
+  if (emergencyActive) return {
+    ar:"التوقع غير مستقر حالياً لأن بروتوكول طوارئ ما يزال نشطاً. أكمل خطوات الاستجابة ثم أعد تقييم الكيمياء والمعدات قبل الاعتماد على توقع 7 أيام.",
+    en:"Forecast is temporarily unstable because an emergency protocol is still active. Complete the response and recheck chemistry/equipment before relying on the 7-day outlook."
+  };
+  if (trend==="declining" || chem<60 || nutrientRisk || mediaRisk) return {
+    ar:"إذا استمر الاتجاه الحالي فهناك احتمال تراجع إضافي خلال 7 أيام. ابدأ بالفحوص والمهام المتأخرة، راجع ميديا الفلترة، وصحح اختلال المغذيات تدريجياً دون تغييرات حادة.",
+    en:"If the current trend continues, further decline is possible within 7 days. Start with overdue tests and maintenance, review filter media, then correct nutrient imbalance gradually without abrupt changes."
   };
   if (trend==="improving") return {
-    ar:"الاتجاه الحالي إيجابي، ومع استمرار الصيانة والفحوص الأسبوعية واستقرار NO3/PO4 يُتوقع بقاء النظام مستقراً أو تحسنه.",
-    en:"The current trend is positive. With regular maintenance, weekly testing and stable NO3/PO4, the system is expected to remain stable or improve."
+    ar:"الاتجاه الحالي إيجابي، ومع استمرار الصيانة والفحوص الأسبوعية واستقرار NO3/PO4 وميديا الفلترة يُتوقع بقاء النظام مستقراً أو تحسنه.",
+    en:"The current trend is positive. With regular maintenance, weekly testing, stable NO3/PO4 and healthy filter media, the system is expected to remain stable or improve."
   };
   return {
-    ar:"التوقع الحالي مستقر، بشرط استمرار الصيانة الأسبوعية وعدم تأخير قياسات الكيمياء أو السماح للمغذيات بالوصول إلى الصفر.",
-    en:"The current forecast is stable, provided weekly maintenance and chemistry testing stay on schedule and nutrients are not allowed to bottom out."
+    ar:"التوقع الحالي مستقر، بشرط استمرار الصيانة الأسبوعية وعدم تأخير قياسات الكيمياء أو السماح للمغذيات بالوصول إلى الصفر ومراجعة ميديا الفلترة عند اقتراب عمرها المتوقع.",
+    en:"The current forecast is stable, provided weekly maintenance and chemistry testing stay on schedule, nutrients do not bottom out, and filter media is reviewed near its estimated end of life."
   };
 }
