@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import type { Tank } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
-import { AquariumScene } from "./AquariumScene";
+import { AquariumScene,type AquariumSceneMode } from "./AquariumScene";
 
 class SceneErrorBoundary extends React.Component<
   { children: React.ReactNode; fallback: React.ReactNode },
@@ -48,7 +48,7 @@ function SceneFallback({ lang }: { lang: "ar" | "en" }) {
   );
 }
 
-export function SafeAquariumScene({ tank, view = "system" }: { tank: Tank; view?: "system" | "display" }) {
+export function SafeAquariumScene({ tank, view = "system", mode="default" }: { tank: Tank; view?: "system" | "display"; mode?:AquariumSceneMode }) {
   const lang = useAquaStore((s) => s.language);
   const [supported, setSupported] = useState<boolean | null>(null);
 
@@ -72,7 +72,7 @@ export function SafeAquariumScene({ tank, view = "system" }: { tank: Tank; view?
 
   return (
     <SceneErrorBoundary fallback={fallback}>
-      <AquariumScene tank={tank} view={view} />
+      <AquariumScene tank={tank} view={view} mode={mode} />
     </SceneErrorBoundary>
   );
 }
