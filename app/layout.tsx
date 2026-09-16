@@ -9,6 +9,7 @@ import "./tank-swipe.css";
 import "./intelligence.css";
 import { PWARegister } from "@/components/PWARegister";
 import { PushReminderSync } from "@/components/PushReminderSync";
+import { CloudSyncBridge } from "@/components/CloudSyncBridge";
 
 export const metadata: Metadata = {
   title: "Aqua Nexus 3D",
@@ -26,7 +27,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ar" dir="rtl">
-      <body><PWARegister/><PushReminderSync/>{children}</body>
+      <body><PWARegister/><PushReminderSync/><CloudSyncBridge/>{children}</body>
     </html>
   );
 }
