@@ -5,9 +5,22 @@ import { useEffect } from "react";
 /**
  * Keeps the daily command center glanceable on the dashboard.
  * The emergency console remains outside this behavior and is always visible.
+ * Share/customization panels stay directly below their toolbar controls and
+ * above the smart command cards, so opening them does not feel disconnected.
  */
 export function DashboardCommandCollapse(){
   useEffect(()=>{
+    const placeCommandLayer=()=>{
+      const dashboard=document.querySelector<HTMLElement>(".progressive-dashboard");
+      const mount=document.getElementById("aqua-command-layer-mount");
+      const moduleGrid=dashboard?.querySelector<HTMLElement>(".pd-module-grid");
+      if(!dashboard||!mount||!moduleGrid)return;
+      // React may insert Share/Customize after the portal mount. Keep the
+      // command layer immediately before the normal module grid so those
+      // temporary panels always remain above Emergency/Today.
+      if(mount.nextElementSibling!==moduleGrid)dashboard.insertBefore(mount,moduleGrid);
+    };
+
     const bind=(panel:HTMLElement)=>{
       if(panel.dataset.aquaCollapsible==="1")return;
       const head=panel.querySelector<HTMLElement>(".command-head");
@@ -34,7 +47,10 @@ export function DashboardCommandCollapse(){
       head.addEventListener("keydown",onKey);
     };
 
-    const scan=()=>document.querySelectorAll<HTMLElement>(".aqua-command-center").forEach(bind);
+    const scan=()=>{
+      placeCommandLayer();
+      document.querySelectorAll<HTMLElement>(".aqua-command-center").forEach(bind);
+    };
     scan();
     const observer=new MutationObserver(scan);
     observer.observe(document.body,{childList:true,subtree:true});
