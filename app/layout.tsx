@@ -4,6 +4,7 @@ import "./mobile-hotfix.css";
 import "./aqua-ai.css";
 import "./ticker-rtl-fix.css";
 import "./tank-swipe.css";
+import "./intelligence.css";
 import { PWARegister } from "@/components/PWARegister";
 import { PushReminderSync } from "@/components/PushReminderSync";
 
