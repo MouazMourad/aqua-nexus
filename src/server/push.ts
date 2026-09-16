@@ -2,7 +2,7 @@ import webpush from "web-push";
 import { query } from "./db";
 import { ensureWorkspace } from "./workspace";
 
-export interface PushPayload { title:string; body:string; url?:string; tag?:string; data?:Record<string,unknown>; }
+export interface PushPayload { title:string; body:string; url?:string; tag?:string; renotify?:boolean; data?:Record<string,unknown>; }
 
 function configured(){return Boolean(process.env.VAPID_PUBLIC_KEY&&process.env.VAPID_PRIVATE_KEY&&process.env.VAPID_SUBJECT);}
 
