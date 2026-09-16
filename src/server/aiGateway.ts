@@ -2,6 +2,7 @@ import type { Tank } from "@/domain/types";
 import { aquaAIAnswer } from "@/domain/aquaAIBrain";
 import { aquaAISystemPrompt,buildTankAIContext } from "@/domain/aiContext";
 import { query } from "./db";
+import { ensureWorkspace } from "./workspace";
 
 export interface GatewayResult {
   mode:"local"|"external";
@@ -19,6 +20,7 @@ function providerConfig(){
 
 async function audit(workspace:string,tankId:string|undefined,mode:string,question:string|undefined,provider:string,model:string|undefined,response:any){
   try{
+    await ensureWorkspace(workspace);
     await query("INSERT INTO aqua_ai_audit(workspace_key,tank_id,mode,question,provider,model,response) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb)",[workspace,tankId||null,mode,question||null,provider,model||null,JSON.stringify(response)]);
   }catch{}
 }
