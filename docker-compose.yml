@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aqua_nexus}
+      POSTGRES_USER: ${POSTGRES_USER:-aqua}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aqua} -d ${POSTGRES_DB:-aqua_nexus}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [aqua_internal]
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aqua}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-aqua_nexus}
+      DATABASE_SSL: disable
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+      AQUA_UPLOAD_DIR: /data/uploads
+      AQUA_UPLOAD_MAX_MB: ${AQUA_UPLOAD_MAX_MB:-12}
+      NEXT_PUBLIC_AQUA_CLOUD_SYNC: ${NEXT_PUBLIC_AQUA_CLOUD_SYNC:-0}
+      AQUA_AI_BASE_URL: ${AQUA_AI_BASE_URL:-}
+      AQUA_AI_API_KEY: ${AQUA_AI_API_KEY:-}
+      AQUA_AI_MODEL: ${AQUA_AI_MODEL:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      CRON_SECRET: ${CRON_SECRET}
+    volumes:
+      - uploads_data:/data/uploads
+    networks: [aqua_internal]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [app]
+    environment:
+      AQUA_DOMAIN: ${AQUA_DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [aqua_internal]
+
+volumes:
+  postgres_data:
+  uploads_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  aqua_internal:
+    driver: bridge
