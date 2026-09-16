@@ -2,6 +2,8 @@ import type { Tank } from "./types";
 import { chemistryAgeDays, chemistryHealth, tankHealthTrend, bioload } from "./health";
 import { analyzeNutrients } from "./nutrientEngine";
 import { mediaPredictions } from "./mediaPredictor";
+import { learnedTankSignals } from "./tankPatterns";
+import { proactivePredictions } from "./tankLearning";
 
 export interface SmartInsight {
   level: "info"|"good"|"warn"|"danger";
@@ -17,6 +19,8 @@ export function smartInsights(tank: Tank): SmartInsight[] {
   const bio = bioload(tank);
   const nutrients = analyzeNutrients(tank);
   const media = mediaPredictions(tank);
+  const learned = learnedTankSignals(tank);
+  const predictions = proactivePredictions(tank);
 
   if (age > 7) out.push({
     level:"warn",
@@ -56,6 +60,16 @@ export function smartInsights(tank: Tank): SmartInsight[] {
     if (signal.level !== "good" || out.length === 0) out.push(signal);
   });
 
+  learned.forEach(signal=>{
+    if(signal.level!=="good"||out.length===0)out.push(signal);
+  });
+
+  predictions.filter(x=>x.days<=5).slice(0,2).forEach(x=>out.push({
+    level:x.level==="danger"?"danger":x.level==="warn"?"warn":"info",
+    ar:x.ar,
+    en:x.en
+  }));
+
   media.forEach(({item,prediction})=>{
     if(prediction.state==="replace") out.push({
       level:"warn",
@@ -94,7 +108,7 @@ export function smartInsights(tank: Tank): SmartInsight[] {
     ar:"لا توجد إشارات ذكية حرجة حالياً.",
     en:"No critical smart signals are currently detected."
   });
-  return out;
+  return out.slice(0,12);
 }
 
 export function forecastTank(tank: Tank) {
@@ -104,14 +118,16 @@ export function forecastTank(tank: Tank) {
   const nutrientRisk = ["both-depleted","phosphate-depleted","nitrate-depleted","elevated"].includes(nutrients.state);
   const mediaRisk=mediaPredictions(tank).some(x=>x.prediction.state==="replace");
   const emergencyActive=(tank.emergencySessions??[]).some(x=>x.status==="active");
+  const learnedRisk=learnedTankSignals(tank).some(x=>x.level==="warn");
+  const nearPrediction=proactivePredictions(tank).some(x=>x.days<=3);
 
   if (emergencyActive) return {
     ar:"التوقع غير مستقر حالياً لأن بروتوكول طوارئ ما يزال نشطاً. أكمل خطوات الاستجابة ثم أعد تقييم الكيمياء والمعدات قبل الاعتماد على توقع 7 أيام.",
     en:"Forecast is temporarily unstable because an emergency protocol is still active. Complete the response and recheck chemistry/equipment before relying on the 7-day outlook."
   };
-  if (trend==="declining" || chem<60 || nutrientRisk || mediaRisk) return {
-    ar:"إذا استمر الاتجاه الحالي فهناك احتمال تراجع إضافي خلال 7 أيام. ابدأ بالفحوص والمهام المتأخرة، راجع ميديا الفلترة، وصحح اختلال المغذيات تدريجياً دون تغييرات حادة.",
-    en:"If the current trend continues, further decline is possible within 7 days. Start with overdue tests and maintenance, review filter media, then correct nutrient imbalance gradually without abrupt changes."
+  if (trend==="declining" || chem<60 || nutrientRisk || mediaRisk || learnedRisk || nearPrediction) return {
+    ar:"إذا استمر الاتجاه الحالي فهناك احتمال تراجع إضافي خلال 7 أيام. ابدأ بالفحوص والمهام المتأخرة، راجع نمط الحوض الشخصي وميديا الفلترة، وصحح أي اختلال تدريجياً دون تغييرات حادة.",
+    en:"If the current trend continues, further decline is possible within 7 days. Start with overdue tests and maintenance, review the tank's personalized pattern and filter media, then correct imbalances gradually without abrupt changes."
   };
   if (trend==="improving") return {
     ar:"الاتجاه الحالي إيجابي، ومع استمرار الصيانة والفحوص الأسبوعية واستقرار NO3/PO4 وميديا الفلترة يُتوقع بقاء النظام مستقراً أو تحسنه.",
