@@ -2,7 +2,15 @@ import type { Language, Tank } from "@/domain/types";
 import { bioload,chemistryHealth,maintenanceHealth,tankHealth,tankHealthTrend } from "@/domain/health";
 import { aquaWorkspaceHeaders,getAquaDeviceId } from "@/lib/anonymousWorkspace";
 
-const VAPID_PUBLIC_KEY="BD9A5jEWZLVFsG8PGXEIZyM4OCv1H4QHOJyXTi26-AyWb8Cm-b9q0wuQZiMG4SVAdoQYsrMGu5SBPcmsxu1_c20";
+const FALLBACK_VAPID_PUBLIC_KEY="BD9A5jEWZLVFsG8PGXEIZyM4OCv1H4QHOJyXTi26-AyWb8Cm-b9q0wuQZiMG4SVAdoQYsrMGu5SBPcmsxu1_c20";
+
+async function vapidPublicKey(){
+  try{
+    const response=await fetch("/api/push/key",{cache:"no-store"});
+    if(response.ok){const json=await response.json();if(json?.publicKey)return String(json.publicKey);}
+  }catch{}
+  return FALLBACK_VAPID_PUBLIC_KEY;
+}
 
 function urlBase64ToUint8Array(value:string){
   const padding="=".repeat((4-value.length%4)%4);
@@ -37,13 +45,14 @@ export async function syncPushReminders(tanks:Tank[],language:Language,createSub
   if(Notification.permission!=="granted") return {ok:false,reason:"permission"};
   const registration=await navigator.serviceWorker.ready;
   if(!("PushManager" in window)||!registration.pushManager) return {ok:false,reason:"push-unsupported"};
+  const publicKey=await vapidPublicKey();
   let subscription=await registration.pushManager.getSubscription();
-  if(subscription&&uint8ToBase64Url(subscription.options.applicationServerKey)!==VAPID_PUBLIC_KEY){
+  if(subscription&&uint8ToBase64Url(subscription.options.applicationServerKey)!==publicKey){
     await subscription.unsubscribe().catch(()=>false);
     subscription=null;
   }
   if(!subscription&&createSubscription){
-    subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
+    subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(publicKey)});
   }
   if(!subscription) return {ok:false,reason:"no-subscription"};
   const now=Date.now();
