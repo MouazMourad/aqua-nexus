@@ -92,14 +92,17 @@ export function DashboardCommandCollapse(){
       let backdrop=document.querySelector<HTMLButtonElement>(".aqua-sheet-backdrop");
       if(sheets.length){
         document.body.classList.add("aqua-sheet-open");
+        const backdropHost=sheets[0]?.parentElement??document.body;
         if(!backdrop){
           backdrop=document.createElement("button");
           backdrop.type="button";
           backdrop.className="aqua-sheet-backdrop";
           backdrop.setAttribute("aria-label","Close panel");
           backdrop.addEventListener("click",closeSheets);
-          document.body.appendChild(backdrop);
         }
+        // Keep the overlay in the same stacking context as the floating sheet.
+        // A body-level backdrop can cover/blur fixed descendants on iOS Safari.
+        if(backdrop.parentElement!==backdropHost)backdropHost.appendChild(backdrop);
       }else{
         document.body.classList.remove("aqua-sheet-open");
         backdrop?.remove();
@@ -147,9 +150,9 @@ export function DashboardCommandCollapse(){
     .aqua-command-glance>em{font-size:11px;font-style:normal;color:#79e4b0;white-space:nowrap}
     .aqua-command-center.aqua-command-expanded{border-color:rgba(83,218,255,.22)!important;box-shadow:0 14px 34px rgba(0,0,0,.16)}
 
-    .aqua-sheet-backdrop{position:fixed;inset:0;z-index:8390;border:0;background:rgba(0,9,15,.68);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);padding:0;margin:0;width:100vw;height:100dvh;cursor:default}
+    .aqua-sheet-backdrop{position:fixed;inset:0;z-index:8390;border:0;background:rgba(0,9,15,.52);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);padding:0;margin:0;width:100vw;height:100dvh;cursor:default}
     body.aqua-sheet-open{overflow:hidden}
-    .pd-inline-share.aqua-floating-sheet,.pd-customizer.aqua-floating-sheet{position:fixed!important;z-index:8400!important;left:50%!important;right:auto!important;bottom:max(18px,env(safe-area-inset-bottom))!important;top:auto!important;transform:translateX(-50%);width:min(720px,calc(100vw - 24px));max-height:min(78dvh,760px);overflow:auto;margin:0!important;border-color:rgba(77,213,244,.34)!important;box-shadow:0 30px 90px rgba(0,0,0,.58),0 0 34px rgba(51,200,235,.08)!important;animation:aquaSheetUp .2s ease-out}
+    .pd-inline-share.aqua-floating-sheet,.pd-customizer.aqua-floating-sheet{position:fixed!important;z-index:8400!important;left:50%!important;right:auto!important;bottom:max(18px,env(safe-area-inset-bottom))!important;top:auto!important;transform:translateX(-50%);width:min(720px,calc(100vw - 24px));max-height:min(78dvh,760px);overflow:auto;margin:0!important;border-color:rgba(77,213,244,.34)!important;background:linear-gradient(180deg,rgba(9,35,49,.995),rgba(5,24,35,.998))!important;box-shadow:0 30px 90px rgba(0,0,0,.58),0 0 34px rgba(51,200,235,.08)!important;isolation:isolate;animation:aquaSheetUp .2s ease-out}
     .pd-inline-share.aqua-floating-sheet>.module-head,.pd-customizer.aqua-floating-sheet>.module-head{position:sticky;top:0;z-index:2;padding-bottom:9px;background:linear-gradient(180deg,rgba(7,30,43,.98) 74%,rgba(7,30,43,0));backdrop-filter:blur(10px)}
     .aqua-sheet-close{margin-inline-start:6px;flex:0 0 34px}
     body.aqua-sheet-open .aqua-ai-shell{opacity:0!important;pointer-events:none!important}
@@ -163,6 +166,7 @@ export function DashboardCommandCollapse(){
       .aqua-command-center.aqua-command-collapsed .command-head h3{font-size:18px;margin-top:2px}
       .aqua-command-center.aqua-command-collapsed .aqua-command-glance{grid-template-columns:24px 1fr auto;padding:9px 10px}
       .aqua-command-glance>b{font-size:11px}.aqua-command-glance>em{font-size:10px}
+      .aqua-sheet-backdrop{background:rgba(0,9,15,.48);backdrop-filter:none;-webkit-backdrop-filter:none}
       .pd-inline-share.aqua-floating-sheet,.pd-customizer.aqua-floating-sheet{bottom:0!important;width:100vw;max-height:84dvh;border-radius:24px 24px 0 0!important;padding-bottom:max(16px,env(safe-area-inset-bottom))!important}
       .pd-customizer.aqua-floating-sheet .pd-custom-list{grid-template-columns:1fr!important}
       .aqua-ai-fish-button{width:70px!important;height:52px!important;border-radius:18px!important}
