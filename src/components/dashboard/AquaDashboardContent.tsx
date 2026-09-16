@@ -6,21 +6,21 @@ import { SafeAquariumScene } from "@/components/three/SafeAquariumScene";
 import { EquipmentPanel } from "@/components/panels/EquipmentPanel";
 import { HealthTimelineChart } from "@/components/dashboard/HealthTimelineChart";
 import { TankHealthShareCard } from "@/components/dashboard/TankHealthShareCard";
-import { chemistryHealth,maintenanceHealth,tankHealth,tankHealthTrend,chemistryAgeDays } from "@/domain/health";
+import { bioload,chemistryHealth,maintenanceHealth,tankHealth,tankHealthTrend,chemistryAgeDays } from "@/domain/health";
 import { smartInsights } from "@/domain/smartInsights";
 import { tankContextStats,tankForecast,tankStateView } from "@/domain/tankIntelligence";
 import { biologicalMemory,proactivePredictions,tankMood } from "@/domain/tankLearning";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr } from "@/i18n";
 
-type ModuleId="chemistry"|"maintenance"|"forecast"|"intelligence"|"digitalTwin"|"equipment"|"predictions"|"memory"|"context"|"history"|"share";
+type ModuleId="chemistry"|"maintenance"|"bioload"|"forecast"|"intelligence"|"digitalTwin"|"equipment"|"predictions"|"memory"|"context"|"history"|"share";
 type SceneMode="tank"|"equipment"|"flow"|"empty";
-const DEFAULT_ORDER:ModuleId[]=["chemistry","maintenance","forecast","intelligence","digitalTwin","equipment","predictions","memory","context","history","share"];
+const DEFAULT_ORDER:ModuleId[]=["chemistry","maintenance","bioload","forecast","intelligence","digitalTwin","equipment","predictions","memory","context","history","share"];
 const DEFAULT_HIDDEN:ModuleId[]=["predictions","memory","context","history","share"];
 
 export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:AppPage)=>void}) {
  const lang=useAquaStore(s=>s.language);
- const ch=chemistryHealth(tank),mh=maintenanceHealth(tank),th=tankHealth(tank),trend=tankHealthTrend(tank);
+ const ch=chemistryHealth(tank),mh=maintenanceHealth(tank),th=tankHealth(tank),trend=tankHealthTrend(tank),bio=bioload(tank);
  const insights=smartInsights(tank),state=tankStateView(tank),forecast=tankForecast(tank),context=tankContextStats(tank);
  const mood=tankMood(tank),predictions=proactivePredictions(tank),memory=biologicalMemory(tank);
  const today=new Date().toISOString().slice(0,10);
@@ -55,12 +55,14 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
  }
  function resetLayout(){persist(DEFAULT_ORDER,DEFAULT_HIDDEN);setExpanded(null);}
 
+ const bioLabel=lang==="ar"?(bio.status==="danger"?"مرتفع جداً":bio.status==="high"?"مرتفع":bio.status==="good"?"مناسب":"منخفض"):(bio.status==="danger"?"Very high":bio.status==="high"?"High":bio.status==="good"?"Good":"Low");
  const labels:Record<ModuleId,{icon:string;ar:string;en:string}>={
-  chemistry:{icon:"⚗",ar:"الكيمياء",en:"Chemistry"},maintenance:{icon:"✓",ar:"الصيانة",en:"Maintenance"},forecast:{icon:"↗",ar:"توقع 7 أيام",en:"7-day outlook"},intelligence:{icon:"✦",ar:"فهم الحوض",en:"Tank intelligence"},digitalTwin:{icon:"◫",ar:"المجسم الرقمي",en:"Digital twin"},equipment:{icon:"⚙",ar:"التجهيزات",en:"Equipment"},predictions:{icon:"⌁",ar:"التنبؤ الاستباقي",en:"Predictions"},memory:{icon:"◉",ar:"ذاكرة الحوض",en:"Tank memory"},context:{icon:"◎",ar:"سياق الحوض",en:"Tank context"},history:{icon:"▥",ar:"تاريخ الصحة",en:"Health history"},share:{icon:"↗",ar:"مشاركة",en:"Share"}
+  chemistry:{icon:"⚗",ar:"الكيمياء",en:"Chemistry"},maintenance:{icon:"✓",ar:"الصيانة",en:"Maintenance"},bioload:{icon:"◌",ar:"الحمل الحيوي",en:"Bioload"},forecast:{icon:"↗",ar:"توقع 7 أيام",en:"7-day outlook"},intelligence:{icon:"✦",ar:"فهم الحوض",en:"Tank intelligence"},digitalTwin:{icon:"◫",ar:"المجسم الرقمي",en:"Digital twin"},equipment:{icon:"⚙",ar:"التجهيزات",en:"Equipment"},predictions:{icon:"⌁",ar:"التنبؤ الاستباقي",en:"Predictions"},memory:{icon:"◉",ar:"ذاكرة الحوض",en:"Tank memory"},context:{icon:"◎",ar:"سياق الحوض",en:"Tank context"},history:{icon:"▥",ar:"تاريخ الصحة",en:"Health history"},share:{icon:"↗",ar:"مشاركة",en:"Share"}
  };
  const summary:Record<ModuleId,{value:string;note:string;level?:string}>={
   chemistry:{value:`${ch}%`,note:lang==="ar"?`آخر فحص منذ ${Math.floor(age)} يوم`:`Last test ${Math.floor(age)}d ago`,level:age>7?"warn":"good"},
-  maintenance:{value:due.length?String(due.length):"✓",note:lang==="ar"?(due.length?"مهام مستحقة":"لا مهام متأخرة"):(due.length?"due tasks":"nothing overdue"),level:due.length?"warn":"good"},
+  maintenance:{value:`${mh}%`,note:lang==="ar"?(due.length?`${due.length} مهام مستحقة`:"لا مهام متأخرة"):(due.length?`${due.length} due task(s)`:"nothing overdue"),level:mh<70||due.length?"warn":"good"},
+  bioload:{value:`${Math.round(bio.ratio*100)}%`,note:bioLabel,level:bio.status==="danger"||bio.status==="high"?"warn":"good"},
   forecast:{value:`${forecast.projected7d}%`,note:lang==="ar"?forecast.ar:forecast.en,level:forecast.direction==="declining"?"warn":"good"},
   intelligence:{value:state.score+"%",note:insights[0]?(lang==="ar"?insights[0].ar:insights[0].en):(lang==="ar"?"لا إشارة حرجة إضافية":"No extra critical signal"),level:state.band},
   digitalTwin:{value:"3D",note:lang==="ar"?"المجسم لا يُحمّل إلا عند الطلب":"Loads only when requested"},
@@ -77,14 +79,15 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
 
  function detailsFor(id:ModuleId){
   if(id==="chemistry")return <div className="pd-detail"><div className={`inline-alert ${age>7?"warn":"good"}`}>{tr(lang,"chemistryFreshness")}: {Math.floor(age)} {lang==="ar"?"يوم":"days"}</div><div className="chem-mini-grid compact-chem-grid">{Object.entries(latest).slice(0,6).map(([k,v])=><span key={k}><small>{k}</small><b>{String(v)}</b></span>)}</div><button className="btn primary" onClick={()=>onNavigate("chemistry")}>{tr(lang,"openChemistry")}</button></div>;
-  if(id==="maintenance")return <div className="pd-detail">{due.length?due.slice(0,4).map(x=><div className="mini-row" key={x.id}><b>{lang==="ar"?x.title:(x.titleEn||x.title)}</b><span>{x.nextDue??"—"}</span></div>):<div className="inline-alert good">{tr(lang,"good")}</div>}<button className="btn primary" onClick={()=>onNavigate("maintenance")}>{tr(lang,"openMaintenance")}</button></div>;
+  if(id==="maintenance")return <div className="pd-detail"><div className={`inline-alert ${mh<70?"warn":"good"}`}><b>{lang==="ar"?"صحة الصيانة":"Maintenance health"}: {mh}%</b></div>{due.length?due.slice(0,4).map(x=><div className="mini-row" key={x.id}><b>{lang==="ar"?x.title:(x.titleEn||x.title)}</b><span>{x.nextDue??"—"}</span></div>):<div className="inline-alert good">{tr(lang,"good")}</div>}<button className="btn primary" onClick={()=>onNavigate("maintenance")}>{tr(lang,"openMaintenance")}</button></div>;
+  if(id==="bioload")return <div className="pd-detail"><div className={`inline-alert ${bio.status==="danger"||bio.status==="high"?"warn":"good"}`}><b>{lang==="ar"?"الحمل الحيوي التقريبي":"Estimated bioload"}: {Math.round(bio.ratio*100)}%</b> • {bioLabel}</div><p className="note">{lang==="ar"?`المؤشر تقريبي ويعتمد على الكائنات المسجلة وحجم النظام (${tank.systemVolumeLiters.toFixed(0)} لتر)، لذلك يُستخدم كإشارة مساعدة وليس كقياس مخبري.`:`This is an estimate based on registered livestock and system volume (${tank.systemVolumeLiters.toFixed(0)} L), so use it as a supporting signal rather than a laboratory measurement.`}</p><button className="btn primary" onClick={()=>onNavigate("livestock")}>{lang==="ar"?"فتح الكائنات":"Open livestock"}</button></div>;
   if(id==="forecast")return <div className="pd-detail"><div className="pd-forecast"><b>{forecast.current}%</b><span>→</span><b>{forecast.projected7d}%</b></div><p>{lang==="ar"?forecast.ar:forecast.en}</p><small>{lang==="ar"?"ثقة التوقع":"Forecast confidence"}: {forecast.confidence}</small></div>;
-  if(id==="intelligence")return <div className="pd-detail">{insights.slice(0,4).map((x,i)=><div key={i} className={`inline-alert ${x.level}`}>{lang==="ar"?x.ar:x.en}</div>)}<p className="note">{lang==="ar"?"للتفاعل خطوة بخطوة افتح Local Best AI من زر السمكة.":"For step-by-step interaction, open Local Best AI from the fish button."}</p></div>;
+  if(id==="intelligence")return <div className="pd-detail">{state.drivers.slice(0,4).map((x,i)=><div key={`driver-${i}`} className={`inline-alert ${x.level}`}>{lang==="ar"?x.ar:x.en}</div>)}{insights.slice(0,2).map((x,i)=><div key={`insight-${i}`} className={`inline-alert ${x.level}`}>{lang==="ar"?x.ar:x.en}</div>)}<p className="note">{lang==="ar"?"للتفاعل خطوة بخطوة افتح Local Best AI من زر السمكة.":"For step-by-step interaction, open Local Best AI from the fish button."}</p></div>;
   if(id==="digitalTwin")return <div className="pd-detail pd-scene-detail"><div className="pd-scene-modes"><button className={`btn ${sceneMode==="tank"?"primary":""}`} onClick={()=>setSceneMode("tank")}>{lang==="ar"?"الحوض":"Tank"}</button><button className={`btn ${sceneMode==="equipment"?"primary":""}`} onClick={()=>setSceneMode("equipment")}>{lang==="ar"?"التجهيزات":"Equipment"}</button><button className={`btn ${sceneMode==="flow"?"primary":""}`} onClick={()=>setSceneMode("flow")}>{lang==="ar"?"اتجاه الماء":"Water flow"}</button><button className={`btn ${sceneMode==="empty"?"primary":""}`} onClick={()=>setSceneMode("empty")}>{lang==="ar"?"الحوض الفاضي":"Empty tank"}</button></div><div className="card scene-card dashboard-scene-card"><SafeAquariumScene tank={tank} view={sceneView} mode={sceneMode}/></div></div>;
   if(id==="equipment")return <div className="pd-detail"><EquipmentPanel tank={tank}/><button className="btn primary" onClick={()=>onNavigate("equipment")}>{lang==="ar"?"فتح إدارة التجهيزات":"Open equipment management"}</button></div>;
   if(id==="predictions")return <div className="pd-detail">{predictions.length?predictions.slice(0,4).map(x=><div key={x.id} className={`prediction-row ${x.level}`}><div className="prediction-days"><b>{x.days}</b><small>{lang==="ar"?"يوم":"days"}</small></div><div><b>{x.parameter}</b><p>{lang==="ar"?x.ar:x.en}</p></div></div>):<div className="note">{lang==="ar"?"لسه ما في تاريخ قياسات كافي لتنبؤ موثوق.":"Not enough history yet for a reliable forecast."}</div>}</div>;
   if(id==="memory")return <div className="pd-detail">{memory.length?memory.slice(0,5).map(x=><div className={`memory-row ${x.level}`} key={x.id}><span className="memory-arrow">{typeof x.scoreDelta==="number"?(x.scoreDelta>0?"↗":x.scoreDelta<0?"↘":"→"):"•"}</span><div><b>{lang==="ar"?x.event.textAr:x.event.textEn}</b><p>{lang==="ar"?x.ar:x.en}</p></div></div>):<div className="note">{lang==="ar"?"الذاكرة تحتاج أحداث وقياسات أكثر.":"Memory needs more events and readings."}</div>}</div>;
-  if(id==="context")return <div className="pd-detail"><div className="context-kpis"><span><small>{lang==="ar"?"تغذية / 7 أيام":"Feedings / 7d"}</small><b>{context.feedings7d}</b></span><span><small>{lang==="ar"?"جرعات / 7 أيام":"Doses / 7d"}</small><b>{context.dosing7d}</b></span><span><small>{lang==="ar"?"تغيير ماء / 30 يوم":"Water changes / 30d"}</small><b>{context.waterChanges30d}</b></span><span><small>{lang==="ar"?"حجر نشط":"Active quarantine"}</small><b>{context.activeQuarantine}</b></span></div></div>;
+  if(id==="context")return <div className="pd-detail"><div className="context-kpis"><span><small>{lang==="ar"?"تغذية / 7 أيام":"Feedings / 7d"}</small><b>{context.feedings7d}</b></span><span><small>{lang==="ar"?"جرعات / 7 أيام":"Doses / 7d"}</small><b>{context.dosing7d}</b></span><span><small>{lang==="ar"?"تغيير ماء / 30 يوم":"Water changes / 30d"}</small><b>{context.waterChanges30d}</b></span><span><small>{lang==="ar"?"حجر نشط":"Active quarantine"}</small><b>{context.activeQuarantine}</b></span><span><small>{lang==="ar"?"مصاريف الشهر":"This month"}</small><b>{context.monthlySpend.toFixed(0)} {context.currency}</b></span></div></div>;
   if(id==="history")return <div className="pd-detail"><HealthTimelineChart tank={tank}/></div>;
   return <div className="pd-detail"><TankHealthShareCard tank={tank}/></div>;
  }
