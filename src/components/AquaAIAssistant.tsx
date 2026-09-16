@@ -85,7 +85,7 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
     <div className="aqua-ai-reasoning-list">{details.slice(0,6).map((x,i)=><div key={i}><i>{i+1}</i><span>{x}</span></div>)}</div>
     <div className="aqua-ai-evidence"><small>{lang==="ar"?"مبني على بيانات الحوض":"Based on tank data"}</small><div>{evidence.map((x,i)=><span key={i}>{x}</span>)}</div></div>
     <div className="aqua-ai-local-note">{lang==="ar"?"هذا التحليل حالياً من محرك Aqua Nexus المحلي القائم على بيانات الحوض وقواعد الربط والتعلّم؛ مو نموذج LLM خارجي بعد.":"This analysis currently comes from Aqua Nexus' local tank-data reasoning engine; it is not yet an external LLM."}</div>
-    {active.action&&<button className="btn primary aqua-ai-action" onClick={()=>go(active.action!.page)}>{actionText} →</button>}
+    {active.action&&onNavigate&&<button className="btn primary aqua-ai-action" onClick={()=>go(active.action!.page)}>{actionText} →</button>}
    </div>
 
    <div className="aqua-ai-quick">{quick.map(x=><button key={x} onClick={()=>run(x)}>{x}</button>)}</div>
