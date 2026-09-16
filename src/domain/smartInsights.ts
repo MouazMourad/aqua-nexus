@@ -1,5 +1,6 @@
 import type { Tank } from "./types";
 import { chemistryAgeDays, chemistryHealth, tankHealthTrend, bioload } from "./health";
+import { analyzeNutrients } from "./nutrientEngine";
 
 export interface SmartInsight {
   level: "info"|"good"|"warn"|"danger";
@@ -13,6 +14,7 @@ export function smartInsights(tank: Tank): SmartInsight[] {
   const age = chemistryAgeDays(tank);
   const trend = tankHealthTrend(tank);
   const bio = bioload(tank);
+  const nutrients = analyzeNutrients(tank);
 
   if (age > 7) out.push({
     level:"warn",
@@ -49,6 +51,11 @@ export function smartInsights(tank: Tank): SmartInsight[] {
     });
   }
 
+  // Nutrient balance engine: contextual signal, not a deterministic algae predictor.
+  nutrients.signals.forEach(signal => {
+    if (signal.level !== "good" || out.length === 0) out.push(signal);
+  });
+
   if (typeof latest.PO4 === "number" && latest.PO4 > .18 && tank.type==="marine") out.push({
     level:"warn",
     ar:"الفوسفات مرتفع؛ راقب التغذية والفلترة وتكرار تغيير الماء.",
@@ -66,16 +73,19 @@ export function smartInsights(tank: Tank): SmartInsight[] {
 export function forecastTank(tank: Tank) {
   const chem = chemistryHealth(tank);
   const trend = tankHealthTrend(tank);
-  if (trend==="declining" || chem<60) return {
-    ar:"إذا استمر الاتجاه الحالي فهناك احتمال تراجع إضافي خلال 7 أيام. نفّذ الفحوص والمهام المتأخرة أولاً.",
-    en:"If the current trend continues, further decline is possible within 7 days. Complete overdue tests and maintenance first."
+  const nutrients = analyzeNutrients(tank);
+  const nutrientRisk = ["both-depleted","phosphate-depleted","nitrate-depleted","elevated"].includes(nutrients.state);
+
+  if (trend==="declining" || chem<60 || nutrientRisk) return {
+    ar:"إذا استمر الاتجاه الحالي فهناك احتمال تراجع إضافي خلال 7 أيام. ابدأ بالفحوص والمهام المتأخرة وصحح اختلال المغذيات تدريجياً دون تغييرات حادة.",
+    en:"If the current trend continues, further decline is possible within 7 days. Start with overdue tests and maintenance, then correct nutrient imbalance gradually without abrupt changes."
   };
   if (trend==="improving") return {
-    ar:"الاتجاه الحالي إيجابي، ومع استمرار الصيانة والفحوص الأسبوعية يُتوقع بقاء النظام مستقراً أو تحسنه.",
-    en:"The current trend is positive. With regular maintenance and weekly testing, the system is expected to remain stable or improve."
+    ar:"الاتجاه الحالي إيجابي، ومع استمرار الصيانة والفحوص الأسبوعية واستقرار NO3/PO4 يُتوقع بقاء النظام مستقراً أو تحسنه.",
+    en:"The current trend is positive. With regular maintenance, weekly testing and stable NO3/PO4, the system is expected to remain stable or improve."
   };
   return {
-    ar:"التوقع الحالي مستقر، بشرط استمرار الصيانة الأسبوعية وعدم تأخير قياسات الكيمياء.",
-    en:"The current forecast is stable, provided weekly maintenance and chemistry testing stay on schedule."
+    ar:"التوقع الحالي مستقر، بشرط استمرار الصيانة الأسبوعية وعدم تأخير قياسات الكيمياء أو السماح للمغذيات بالوصول إلى الصفر.",
+    en:"The current forecast is stable, provided weekly maintenance and chemistry testing stay on schedule and nutrients are not allowed to bottom out."
   };
 }
