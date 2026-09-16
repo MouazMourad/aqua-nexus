@@ -114,7 +114,7 @@ export function AquaDashboard() {
   </header>
   <PageRouter page={page} tank={tank} tanks={tanks} selectedTankId={selectedTankId} onSelectTank={id=>{handleSelectTank(id);setPage("dashboard")}} onNavigate={setPage}/>
 
-  <AquaAIAssistant tank={tank} page={page}/>
+  <AquaAIAssistant tank={tank} page={page} onNavigate={setPage}/>
 
   <Modal open={open} title={tr(language,"smartSetup")} onClose={()=>setOpen(false)}>
    <div className="wizard-step-label"><b>{step}. {wizardSteps[step-1]}</b><span>{step}/7</span></div>
