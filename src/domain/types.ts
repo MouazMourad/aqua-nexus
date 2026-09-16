@@ -157,6 +157,17 @@ export interface DoserChannel {
   color: string;
 }
 
+export interface FilterMediaItem {
+  id: string;
+  name: string;
+  kind: "gfo" | "activatedCarbon" | "other";
+  amountGrams: number;
+  installedAt: string;
+  referenceLifeDays: number;
+  chamberId?: string;
+  notes?: string;
+}
+
 export interface QuarantineCase {
   id: string;
   organism: string;
@@ -164,6 +175,26 @@ export interface QuarantineCase {
   plan: string;
   start: string;
   status: "active" | "closed";
+  quarantineVolumeLiters?: number;
+  treatmentProduct?: string;
+  labelDoseMlPer100L?: number;
+  intervalHours?: number;
+  totalDoses?: number;
+  dosesGiven?: number;
+  nextDoseAt?: string;
+  lastDoseAt?: string;
+  notes?: string;
+}
+
+export interface EmergencySession {
+  id: string;
+  scenarioId: string;
+  titleAr: string;
+  titleEn: string;
+  startedAt: string;
+  completedAt?: string;
+  completedSteps: number[];
+  status: "active" | "completed";
 }
 
 export interface ExpenseItem {
@@ -272,7 +303,9 @@ export interface Tank {
   feeding: FeedingLog[];
   dosing: DosingLog[];
   doserChannels: DoserChannel[];
+  filterMedia?: FilterMediaItem[];
   quarantine: QuarantineCase[];
+  emergencySessions?: EmergencySession[];
   expenses: ExpenseItem[];
   waterChanges: WaterChangeLog[];
   rodi: RODILog[];
