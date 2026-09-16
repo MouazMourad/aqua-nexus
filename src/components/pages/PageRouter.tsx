@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import type { Tank } from "@/domain/types";
 import type { AppPage } from "@/components/navigation/MainNav";
 import { AquaDashboardContent } from "@/components/dashboard/AquaDashboardContent";
-import { PageHelpButton } from "@/components/help/HelpCenter";
 import { CreatorContactStrip } from "@/components/CreatorContactStrip";
 import { TanksPage } from "./TanksPage";
 import { EquipmentPage } from "./EquipmentPage";
@@ -56,7 +55,6 @@ export function PageRouter({page,tank,tanks,selectedTankId,onSelectTank,onNaviga
   default:content=<AquaDashboardContent tank={tank} onNavigate={onNavigate}/>;
  }
  return <div className="page-help-wrap">
-  <PageHelpButton page={page}/>
   {page==="dashboard"&&<CreatorContactStrip/>}
   {content}
  </div>;
