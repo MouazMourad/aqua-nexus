@@ -54,7 +54,9 @@ function normalize(tank: Tank): Tank {
     feeding:tank.feeding ?? [],
     dosing:tank.dosing ?? [],
     doserChannels:tank.doserChannels ?? [],
+    filterMedia:tank.filterMedia ?? [],
     quarantine:tank.quarantine ?? [],
+    emergencySessions:tank.emergencySessions ?? [],
     expenses:tank.expenses ?? [],
     waterChanges:tank.waterChanges ?? [],
     rodi:tank.rodi ?? [],
@@ -76,10 +78,12 @@ function changeReason(before:Tank,after:Tank):ChangeReason|null{
   if(fingerprint(after.maintenance.map(x=>[x.id,x.done,x.nextDue,x.lastDone]))!==fingerprint(before.maintenance.map(x=>[x.id,x.done,x.nextDue,x.lastDone])))return {ar:"تغيرت حالة خطة الصيانة.",en:"The maintenance plan status changed."};
   if(fingerprint(after.equipment.map(x=>[x.id,x.status,x.location]))!==fingerprint(before.equipment.map(x=>[x.id,x.status,x.location])))return {ar:"تغيرت حالة أو إعدادات المعدات.",en:"Equipment status or configuration changed."};
   if(fingerprint(after.livestock.map(x=>[x.id,x.quantity,x.health]))!==fingerprint(before.livestock.map(x=>[x.id,x.quantity,x.health])))return {ar:"تغيرت كائنات الحوض أو حالتها.",en:"Tank livestock or livestock health changed."};
+  if(fingerprint((after.filterMedia??[]).map(x=>[x.id,x.kind,x.amountGrams,x.installedAt]))!==fingerprint((before.filterMedia??[]).map(x=>[x.id,x.kind,x.amountGrams,x.installedAt])))return {ar:"تغيرت ميديا الفلترة أو تم استبدالها.",en:"Filter media configuration or replacement changed."};
   if(after.waterChanges.length!==before.waterChanges.length)return {ar:"تم تسجيل تغيير ماء.",en:"A water change was logged."};
   if(after.dosing.length!==before.dosing.length)return {ar:"تم تسجيل جرعة جديدة.",en:"A dosing event was logged."};
   if(after.feeding.length!==before.feeding.length)return {ar:"تم تسجيل تغذية.",en:"A feeding event was logged."};
-  if(fingerprint(after.quarantine.map(x=>[x.id,x.status,x.reason]))!==fingerprint(before.quarantine.map(x=>[x.id,x.status,x.reason])))return {ar:"تغيرت حالة الحجر أو العلاج.",en:"Quarantine or treatment status changed."};
+  if(fingerprint(after.quarantine.map(x=>[x.id,x.status,x.reason,x.dosesGiven,x.nextDoseAt]))!==fingerprint(before.quarantine.map(x=>[x.id,x.status,x.reason,x.dosesGiven,x.nextDoseAt])))return {ar:"تغيرت حالة الحجر أو العلاج.",en:"Quarantine or treatment status changed."};
+  if(fingerprint((after.emergencySessions??[]).map(x=>[x.id,x.status,x.completedSteps.length]))!==fingerprint((before.emergencySessions??[]).map(x=>[x.id,x.status,x.completedSteps.length])))return {ar:"تغيرت حالة بروتوكول طوارئ.",en:"Emergency protocol status changed."};
   if(fingerprint((after.acclimationSessions??[]).map(x=>[x.id,x.status,x.completedAt]))!==fingerprint((before.acclimationSessions??[]).map(x=>[x.id,x.status,x.completedAt])))return {ar:"تغيرت حالة جلسة الإقلمة.",en:"Acclimation session status changed."};
   const beforeScore=tankStateScore(before),afterScore=tankStateScore(after);
   if(beforeScore!==afterScore)return {ar:"تغيرت حالة الحوض المحسوبة.",en:"The calculated tank state changed."};
@@ -157,7 +161,7 @@ export const useAquaStore = create<AquaStore>()(
     }),
     {
       name:"aqua-nexus-3d-v1",
-      version:6,
+      version:7,
       migrate:(persisted:any)=>{
         const p=persisted??{};
         return {...p,tanks:(p.tanks??[]).map((t:Tank)=>normalize(t))};
