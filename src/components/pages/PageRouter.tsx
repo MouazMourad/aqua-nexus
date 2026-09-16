@@ -1,7 +1,10 @@
 "use client";
+import type { ReactNode } from "react";
 import type { Tank } from "@/domain/types";
 import type { AppPage } from "@/components/navigation/MainNav";
 import { AquaDashboardContent } from "@/components/dashboard/AquaDashboardContent";
+import { PageHelpButton } from "@/components/help/HelpCenter";
+import { CreatorContactStrip } from "@/components/CreatorContactStrip";
 import { TanksPage } from "./TanksPage";
 import { EquipmentPage } from "./EquipmentPage";
 import { SumpPage } from "./SumpPage";
@@ -26,29 +29,35 @@ import { ReportsPage } from "./ReportsPage";
 import { SettingsPage } from "./SettingsPage";
 
 export function PageRouter({page,tank,tanks,selectedTankId,onSelectTank,onNavigate}:{page:AppPage;tank:Tank;tanks:Tank[];selectedTankId:string;onSelectTank:(id:string)=>void;onNavigate:(p:AppPage)=>void}) {
+ let content:ReactNode;
  switch(page){
-  case"tanks":return <TanksPage tanks={tanks} selectedTankId={selectedTankId} onSelect={onSelectTank}/>;
-  case"equipment":return <EquipmentPage tank={tank}/>;
-  case"sump":return <SumpPage tank={tank}/>;
-  case"livestock":return <LivestockPage tank={tank} onLibrary={()=>onNavigate("library")}/>;
-  case"acclimation":return <AcclimationPage tank={tank}/>;
-  case"library":return <LibraryPage tank={tank}/>;
-  case"chemistry":return <ChemistryPage tank={tank}/>;
-  case"maintenance":return <MaintenancePage tank={tank}/>;
-  case"inventory":return <InventoryPage tank={tank}/>;
-  case"diseases":return <DiseasesPage tank={tank}/>;
-  case"timeline":return <TimelinePage tank={tank}/>;
-  case"journal":return <JournalPage tank={tank}/>;
-  case"waterchange":return <WaterChangePage tank={tank}/>;
-  case"feeding":return <FeedingPage tank={tank}/>;
-  case"dosing":return <DosingPage tank={tank}/>;
-  case"quarantine":return <QuarantinePage tank={tank}/>;
-  case"emergency":return <EmergencyPage tank={tank}/>;
-  case"rodi":return <RODIPage tank={tank}/>;
-  case"expenses":return <ExpensesPage tank={tank}/>;
-  case"alerts":return <AlertsPage tank={tank}/>;
-  case"reports":return <ReportsPage tank={tank}/>;
-  case"settings":return <SettingsPage tank={tank}/>;
-  default:return <AquaDashboardContent tank={tank} onNavigate={onNavigate}/>;
+  case"tanks":content=<TanksPage tanks={tanks} selectedTankId={selectedTankId} onSelect={onSelectTank}/>;break;
+  case"equipment":content=<EquipmentPage tank={tank}/>;break;
+  case"sump":content=<SumpPage tank={tank}/>;break;
+  case"livestock":content=<LivestockPage tank={tank} onLibrary={()=>onNavigate("library")}/>;break;
+  case"acclimation":content=<AcclimationPage tank={tank}/>;break;
+  case"library":content=<LibraryPage tank={tank}/>;break;
+  case"chemistry":content=<ChemistryPage tank={tank}/>;break;
+  case"maintenance":content=<MaintenancePage tank={tank}/>;break;
+  case"inventory":content=<InventoryPage tank={tank}/>;break;
+  case"diseases":content=<DiseasesPage tank={tank}/>;break;
+  case"timeline":content=<TimelinePage tank={tank}/>;break;
+  case"journal":content=<JournalPage tank={tank}/>;break;
+  case"waterchange":content=<WaterChangePage tank={tank}/>;break;
+  case"feeding":content=<FeedingPage tank={tank}/>;break;
+  case"dosing":content=<DosingPage tank={tank}/>;break;
+  case"quarantine":content=<QuarantinePage tank={tank}/>;break;
+  case"emergency":content=<EmergencyPage tank={tank}/>;break;
+  case"rodi":content=<RODIPage tank={tank}/>;break;
+  case"expenses":content=<ExpensesPage tank={tank}/>;break;
+  case"alerts":content=<AlertsPage tank={tank}/>;break;
+  case"reports":content=<ReportsPage tank={tank}/>;break;
+  case"settings":content=<SettingsPage tank={tank}/>;break;
+  default:content=<AquaDashboardContent tank={tank} onNavigate={onNavigate}/>;
  }
+ return <div className="page-help-wrap">
+  <PageHelpButton page={page}/>
+  {page==="dashboard"&&<CreatorContactStrip/>}
+  {content}
+ </div>;
 }
