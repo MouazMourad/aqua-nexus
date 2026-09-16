@@ -65,21 +65,26 @@ function recentEvents(tank:Tank,days=14){
   const cutoff=Date.now()-days*DAY;
   return tank.timeline.filter(x=>new Date(x.timestamp).getTime()>=cutoff);
 }
+function ageDays(timestamp?:string){
+  if(!timestamp)return undefined;
+  const t=new Date(timestamp).getTime();
+  return Number.isFinite(t)?Math.max(0,Math.floor((Date.now()-t)/DAY)):undefined;
+}
 
 export function nextBestAction(tank:Tank):AquaAIAction{
   const activeEmergency=(tank.emergencySessions??[]).some(x=>x.status==="active");
-  if(activeEmergency)return {page:"emergency",ar:"كمّل بروتوكول الطوارئ النشط",en:"Continue the active emergency protocol"};
+  if(activeEmergency)return {page:"emergency",ar:"أكمل بروتوكول الطوارئ النشط",en:"Continue the active emergency protocol"};
   const today=new Date().toISOString().slice(0,10);
   const overdue=tank.maintenance.filter(x=>!x.done&&(!x.nextDue||x.nextDue<=today));
   const oldChem=tank.chemistry[0]?Math.floor((Date.now()-new Date(tank.chemistry[0].timestamp).getTime())/DAY):999;
-  if(oldChem>7)return {page:"chemistry",ar:"سجل فحص كيميائي جديد",en:"Log a fresh chemistry test"};
+  if(oldChem>7)return {page:"chemistry",ar:"سجّل فحصاً كيميائياً جديداً",en:"Log a fresh chemistry test"};
   const pred=proactivePredictions(tank)[0];
-  if(pred&&pred.days<=5&&["KH","Ca","Mg"].includes(pred.parameter))return {page:"dosing",ar:`راجع جرعة ${pred.parameter} قبل الوصول للحد الأدنى`,en:`Review ${pred.parameter} dosing before the lower boundary`};
+  if(pred&&pred.days<=5&&["KH","Ca","Mg"].includes(pred.parameter))return {page:"dosing",ar:`راجع جرعة ${pred.parameter} قبل الوصول إلى الحد الأدنى`,en:`Review ${pred.parameter} dosing before the lower boundary`};
   if(overdue.length)return {page:"maintenance",ar:`أنجز ${overdue.length} مهمة صيانة مستحقة`,en:`Complete ${overdue.length} due maintenance task(s)`};
   const warning=tank.equipment.find(x=>x.status==="warning"||x.status==="service");
   if(warning)return {page:"equipment",ar:`راجع ${warning.name}`,en:`Review ${warning.name}`};
-  if(tank.quarantine.some(x=>x.status==="active"))return {page:"quarantine",ar:"راجع الحجر/العلاج النشط",en:"Review the active quarantine/treatment"};
-  return {page:"dashboard",ar:"استمر بالمراقبة وسجل أي تغير جديد",en:"Keep monitoring and log meaningful changes"};
+  if(tank.quarantine.some(x=>x.status==="active"))return {page:"quarantine",ar:"راجع الحجر أو العلاج النشط",en:"Review the active quarantine/treatment"};
+  return {page:"dashboard",ar:"استمر بالمراقبة وسجّل أي تغير مهم",en:"Keep monitoring and log meaningful changes"};
 }
 
 function parameterAnswer(tank:Tank,param:Param):AquaAIAnswer{
@@ -94,7 +99,7 @@ function parameterAnswer(tank:Tank,param:Param):AquaAIAnswer{
   }
   if(current!==undefined&&previous!==undefined){
     const d=current-previous;
-    detailsAr.push(`مقارنة بالقراءة السابقة: ${d>=0?"ارتفع":"انخفض"} ${Math.abs(d).toFixed(param==="PO4"?3:2)}.`);
+    detailsAr.push(`مقارنة بالقراءة السابقة: ${d>=0?"ارتفع":"انخفض"} بمقدار ${Math.abs(d).toFixed(param==="PO4"?3:2)}.`);
     detailsEn.push(`Versus the previous reading: ${d>=0?"up":"down"} ${Math.abs(d).toFixed(param==="PO4"?3:2)}.`);
   }
   if(prediction){detailsAr.push(prediction.ar);detailsEn.push(prediction.en);}
@@ -103,13 +108,13 @@ function parameterAnswer(tank:Tank,param:Param):AquaAIAnswer{
     detailsEn.push(`Possible temporal link: ${links[0].en}`);
   }
   if(doses.length){
-    detailsAr.push(`يوجد ${doses.length} تسجيل جرعة حديثة لـ ${param} ضمن السجل الظاهر.`);
+    detailsAr.push(`يوجد ${doses.length} تسجيل جرعة حديثة لـ ${param} ضمن السجل المتاح.`);
     detailsEn.push(`${doses.length} recent ${param} dose log(s) are available in the visible history.`);
   }
-  if(!detailsAr.length){detailsAr.push(`ما عندي بيانات كافية عن ${param} لهالحوض بعد.`);detailsEn.push(`There is not enough ${param} data for this tank yet.`);}
+  if(!detailsAr.length){detailsAr.push(`لا توجد بيانات كافية عن ${param} لهذا الحوض حتى الآن.`);detailsEn.push(`There is not enough ${param} data for this tank yet.`);}
   return {
-    titleAr:`تحليل ${param} لهالحوض`,titleEn:`${param} analysis for this tank`,
-    summaryAr:prediction?`في نمط قابل للقياس لـ ${param} وبقدر أستخدمه للتنبؤ المبكر.`:`حالياً بقدر أوصف اتجاه ${param}، بس التنبؤ الشخصي بيتحسن مع قراءات أكثر.`,
+    titleAr:`تحليل ${param} لهذا الحوض`,titleEn:`${param} analysis for this tank`,
+    summaryAr:prediction?`يوجد نمط قابل للقياس لـ ${param} ويمكن استخدامه للتنبؤ المبكر.`:`يمكن وصف اتجاه ${param} حالياً، لكن التنبؤ الشخصي يتحسن مع المزيد من القراءات.`,
     summaryEn:prediction?`There is a measurable ${param} pattern that can support an early forecast.`:`I can describe the current ${param} direction; personalized forecasting improves with more readings.`,
     detailsAr,detailsEn,
     evidenceAr:[`${tank.chemistry.length} قراءة كيميائية`,`${links.length} ارتباط حدث قريب`,`${doses.length} جرعات مسجلة`],
@@ -125,7 +130,7 @@ function memoryAnswer(tank:Tank):AquaAIAnswer{
   const rows=memory.slice(0,4);
   return {
     titleAr:"الذاكرة البيولوجية للحوض",titleEn:"Tank biological memory",
-    summaryAr:rows.length?"عم أربط القرارات السابقة بالأثر يلي ظهر بعدها على الصحة والكيمياء، مع اعتبارها علاقة زمنية مو إثبات سببية.":"لسه التاريخ قصير. كل جرعة، تغيير ماء، صيانة وقراءة جديدة رح تقوّي ذاكرة الحوض.",
+    summaryAr:rows.length?"أربط القرارات السابقة بالأثر الذي ظهر بعدها على الصحة والكيمياء، مع اعتبارها علاقة زمنية لا إثباتاً للسببية.":"التاريخ ما يزال قصيراً. كل جرعة وتغيير ماء وصيانة وقراءة جديدة تقوّي ذاكرة الحوض.",
     summaryEn:rows.length?"I am linking past actions with the health and chemistry changes that followed, treating these as temporal associations rather than proof of causation.":"The history is still short. Each dose, water change, maintenance action and new reading strengthens the tank memory.",
     detailsAr:rows.map(x=>x.ar),detailsEn:rows.map(x=>x.en),
     evidenceAr:[`${memory.length} نمط متعلم`,`${links.length} ربط كيميائي مع أحداث`],
@@ -139,12 +144,61 @@ function forecastAnswer(tank:Tank):AquaAIAnswer{
   return {
     titleAr:"التوقع الاستباقي",titleEn:"Proactive outlook",
     summaryAr:f.ar,summaryEn:f.en,
-    detailsAr:pred.length?pred.slice(0,4).map(x=>x.ar):["ما في استهلاك/هبوط ثابت كافي حالياً لبناء تنبؤ كيميائي شخصي موثوق."],
+    detailsAr:pred.length?pred.slice(0,4).map(x=>x.ar):["لا يوجد حالياً نمط استهلاك أو هبوط ثابت بما يكفي لبناء تنبؤ كيميائي شخصي موثوق."],
     detailsEn:pred.length?pred.slice(0,4).map(x=>x.en):["There is not yet a stable enough depletion pattern for a reliable personalized chemistry forecast."],
     evidenceAr:[`${tank.healthSnapshots?.length??0} نقاط حالة محفوظة`,`${tank.chemistry.length} قراءات كيميائية`],
     evidenceEn:[`${tank.healthSnapshots?.length??0} saved state points`,`${tank.chemistry.length} chemistry readings`],
     confidence:f.confidence,action:nextBestAction(tank)
   };
+}
+
+function maintenanceAnswer(tank:Tank):AquaAIAnswer{
+  const today=new Date().toISOString().slice(0,10);
+  const due=tank.maintenance.filter(x=>!x.done&&(!x.nextDue||x.nextDue<=today));
+  const upcoming=tank.maintenance.filter(x=>!x.done&&x.nextDue&&x.nextDue>today).sort((a,b)=>String(a.nextDue).localeCompare(String(b.nextDue))).slice(0,3);
+  return {
+    titleAr:"تحليل الصيانة",titleEn:"Maintenance analysis",
+    summaryAr:due.length?`هناك ${due.length} مهمة مستحقة تؤثر على حالة الصيانة الحالية.`:"لا توجد مهام متأخرة حالياً.",
+    summaryEn:due.length?`${due.length} due task(s) are affecting the current maintenance state.`:"There are no overdue maintenance tasks right now.",
+    detailsAr:[`صحة الصيانة: ${maintenanceHealth(tank)}%.`,...(due.slice(0,4).map(x=>`مستحق: ${x.title}${x.nextDue?` • ${x.nextDue}`:""}.`)),...(upcoming.map(x=>`قريباً: ${x.title}${x.nextDue?` • ${x.nextDue}`:""}.`))],
+    detailsEn:[`Maintenance health: ${maintenanceHealth(tank)}%.`,...(due.slice(0,4).map(x=>`Due: ${x.titleEn||x.title}${x.nextDue?` • ${x.nextDue}`:""}.`)),...(upcoming.map(x=>`Upcoming: ${x.titleEn||x.title}${x.nextDue?` • ${x.nextDue}`:""}.`))],
+    evidenceAr:[`${tank.maintenance.length} مهمة مسجلة`,`${due.length} مستحقة`],evidenceEn:[`${tank.maintenance.length} registered tasks`,`${due.length} due`],confidence:"high",action:{page:"maintenance",ar:"افتح الصيانة",en:"Open maintenance"}
+  };
+}
+
+function livestockAnswer(tank:Tank):AquaAIAnswer{
+  const bio=bioload(tank),watch=tank.livestock.filter(x=>x.health==="watch"),treatment=tank.livestock.filter(x=>x.health==="treatment");
+  const recent=tank.livestock.filter(x=>{const d=ageDays(x.addedAt);return d!==undefined&&d<=14;});
+  return {
+    titleAr:"تحليل الكائنات والحمل الحيوي",titleEn:"Livestock & bioload analysis",
+    summaryAr:watch.length||treatment.length?"توجد كائنات تحتاج متابعة، لذلك يجب قراءة سلوكها مع الكيمياء والأحداث الأخيرة لا بشكل منفصل.":"لا توجد كائنات مسجلة بحالة علاج أو مراقبة حالياً.",
+    summaryEn:watch.length||treatment.length?"Some livestock need attention, so their condition should be read together with chemistry and recent events rather than in isolation.":"No livestock are currently marked for treatment or watch.",
+    detailsAr:[`الحمل الحيوي التقريبي: ${Math.round(bio.ratio*100)}%.`,`كائنات تحت المراقبة: ${watch.length} • تحت العلاج: ${treatment.length}.`,`إضافات خلال 14 يوماً: ${recent.length}.`,...(watch.slice(0,3).map(x=>`مراقبة: ${x.name}.`)),...(treatment.slice(0,3).map(x=>`علاج: ${x.name}.`))],
+    detailsEn:[`Estimated bioload: ${Math.round(bio.ratio*100)}%.`,`Under watch: ${watch.length} • treatment: ${treatment.length}.`,`Added in the last 14 days: ${recent.length}.`,...(watch.slice(0,3).map(x=>`Watch: ${x.nameEn||x.name}.`)),...(treatment.slice(0,3).map(x=>`Treatment: ${x.nameEn||x.name}.`))],
+    evidenceAr:[`${tank.livestock.length} سجل كائنات`,`${recent.length} إضافات حديثة`],evidenceEn:[`${tank.livestock.length} livestock records`,`${recent.length} recent additions`],confidence:confidence(tank),action:{page:"livestock",ar:"افتح الكائنات",en:"Open livestock"}
+  };
+}
+
+function emergencyAnswer(tank:Tank):AquaAIAnswer{
+  const active=(tank.emergencySessions??[]).filter(x=>x.status==="active");
+  const warnings=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
+  return {
+    titleAr:"وضع الطوارئ",titleEn:"Emergency status",
+    summaryAr:active.length?`هناك ${active.length} بروتوكول طوارئ نشط ويجب إكماله قبل اعتبار الحوض مستقراً.`:"لا يوجد بروتوكول طوارئ نشط حالياً.",
+    summaryEn:active.length?`${active.length} emergency protocol(s) are active and should be completed before the tank is considered stable.`:"No emergency protocol is active right now.",
+    detailsAr:[...(active.map(x=>`${x.titleAr}: أُنجز ${x.completedSteps.length} خطوة حتى الآن.`)),...(warnings.slice(0,3).map(x=>`جهاز بحاجة انتباه: ${x.name} (${x.status}).`)),active.length?"بعد انتهاء الطوارئ، أعد فحص الكيمياء والمعدات وسجّل النتيجة لمقارنة التعافي.":"يمكن تشغيل بروتوكول الطوارئ عند الحاجة من صفحة الطوارئ."],
+    detailsEn:[...(active.map(x=>`${x.titleEn}: ${x.completedSteps.length} step(s) completed so far.`)),...(warnings.slice(0,3).map(x=>`Equipment attention: ${x.name} (${x.status}).`)),active.length?"After the emergency, recheck chemistry/equipment and log the result to track recovery.":"An emergency protocol can be started from the Emergency page when needed."],
+    evidenceAr:[`${active.length} طوارئ نشطة`,`${warnings.length} تحذيرات معدات`],evidenceEn:[`${active.length} active emergency`,`${warnings.length} equipment warnings`],confidence:"high",action:{page:"emergency",ar:"افتح الطوارئ",en:"Open emergency"}
+  };
+}
+
+function rodiAnswer(tank:Tank):AquaAIAnswer{
+  const last=tank.rodi[0];
+  const links=eventChemistryLinks(tank).filter(x=>/water.?change|تغيير.?ماء/i.test(`${x.event.type} ${x.event.textAr} ${x.event.textEn}`)).slice(0,2);
+  const age=ageDays(last?.timestamp);
+  const detailsAr=last?[`آخر TDS داخل: ${last.tdsIn} • خارج: ${last.tdsOut}.`,`آخر تسجيل منذ ${age??0} يوم • إنتاج ${last.liters} لتر.`,...(links.map(x=>x.ar))]:["لا توجد قراءات RO/DI مسجلة حتى الآن."];
+  const detailsEn=last?[`Latest TDS in: ${last.tdsIn} • out: ${last.tdsOut}.`,`Last log: ${age??0} day(s) ago • ${last.liters} L produced.`,...(links.map(x=>x.en))]:["No RO/DI readings have been logged yet."];
+  return {titleAr:"تحليل RO/DI وماء المصدر",titleEn:"RO/DI & source-water analysis",summaryAr:last?(last.tdsOut>2?"TDS الخارج يستحق المراجعة قبل استخدام الماء في تغيير جديد.":"آخر قراءة RO/DI لا تُظهر مشكلة واضحة بحد ذاتها."):"أحتاج إلى قراءة TDS كي أربط جودة ماء المصدر بتغييرات الحوض.",summaryEn:last?(last.tdsOut>2?"Product-water TDS deserves review before the next water change.":"The latest RO/DI reading does not show an obvious issue by itself."):"A TDS reading is needed before source-water quality can be linked to tank changes.",detailsAr,detailsEn,evidenceAr:[`${tank.rodi.length} سجلات RO/DI`,`${links.length} روابط مع تغيير الماء`],evidenceEn:[`${tank.rodi.length} RO/DI logs`,`${links.length} water-change links`],confidence:last?"medium":"low",action:{page:"rodi",ar:"افتح RO/DI",en:"Open RO/DI"}};
 }
 
 function equipmentAnswer(tank:Tank):AquaAIAnswer{
@@ -153,8 +207,8 @@ function equipmentAnswer(tank:Tank):AquaAIAnswer{
   const currency=tank.energySettings?.currency||"";
   const top=[...energy.rows].sort((a,b)=>b.monthlyKwh-a.monthlyKwh).slice(0,3);
   const detailsAr=[
-    `${tank.equipment.length} تجهيزة مسجلة؛ ${warnings.length} منها بحاجة انتباه/صيانة.`,
-    energy.configured?`الاستهلاك المحسوب تقريباً ${energy.monthlyKwh.toFixed(1)} kWh بالشهر${tank.energySettings?.pricePerKwh?`، بتكلفة ${energy.monthlyCost.toFixed(2)} ${currency}`:""}.`:"بيانات الطاقة مو مكتملة بعد لكل الأجهزة.",
+    `${tank.equipment.length} تجهيزة مسجلة؛ ${warnings.length} منها بحاجة انتباه أو صيانة.`,
+    energy.configured?`الاستهلاك المحسوب تقريباً ${energy.monthlyKwh.toFixed(1)} kWh شهرياً${tank.energySettings?.pricePerKwh?`، بتكلفة ${energy.monthlyCost.toFixed(2)} ${currency}`:""}.`:"بيانات الطاقة غير مكتملة بعد لكل الأجهزة.",
     ...(top.filter(x=>x.monthlyKwh>0).map(x=>`${x.equipment.name}: ${x.monthlyKwh.toFixed(1)} kWh/شهر.`))
   ];
   const detailsEn=[
@@ -162,15 +216,19 @@ function equipmentAnswer(tank:Tank):AquaAIAnswer{
     energy.configured?`Estimated energy use is ${energy.monthlyKwh.toFixed(1)} kWh/month${tank.energySettings?.pricePerKwh?`, costing ${energy.monthlyCost.toFixed(2)} ${currency}`:""}.`:"Energy data is not complete for all devices yet.",
     ...(top.filter(x=>x.monthlyKwh>0).map(x=>`${x.equipment.name}: ${x.monthlyKwh.toFixed(1)} kWh/month.`))
   ];
-  return {titleAr:"ذكاء المعدات والطاقة",titleEn:"Equipment & energy intelligence",summaryAr:warnings.length?"في أجهزة لازم تنفحص قبل ما تتحول لمشكلة بالحوض.":"ما في تحذير جهاز مباشر حالياً، وبقدر كمان أراقب أثر الطاقة والتكلفة.",summaryEn:warnings.length?"Some devices need attention before they become a tank problem.":"No device is directly flagged right now; I can also track energy and cost impact.",detailsAr,detailsEn,evidenceAr:[`${energy.configured} جهاز ببيانات طاقة`],evidenceEn:[`${energy.configured} device(s) with energy data`],confidence:energy.configured>=2?"medium":"low",action:{page:"equipment",ar:"افتح إدارة المعدات",en:"Open equipment management"}};
+  return {titleAr:"ذكاء المعدات والطاقة",titleEn:"Equipment & energy intelligence",summaryAr:warnings.length?"هناك أجهزة يجب فحصها قبل أن تتحول إلى مشكلة في الحوض.":"لا يوجد تحذير جهاز مباشر حالياً، ويمكن أيضاً مراقبة أثر الطاقة والتكلفة.",summaryEn:warnings.length?"Some devices need attention before they become a tank problem.":"No device is directly flagged right now; I can also track energy and cost impact.",detailsAr,detailsEn,evidenceAr:[`${energy.configured} جهاز ببيانات طاقة`],evidenceEn:[`${energy.configured} device(s) with energy data`],confidence:energy.configured>=2?"medium":"low",action:{page:"equipment",ar:"افتح إدارة المعدات",en:"Open equipment management"}};
 }
 
 export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer{
   const q=(question||"").trim().toLowerCase();
   const param=textParam(q);
   if(param)return parameterAnswer(tank,param);
-  if(/ذاكر|history|memory|ليش صار|شو صار بعد|بعد ما|اثر|أثر|event|حدث/.test(q))return memoryAnswer(tank);
-  if(/توقع|forecast|predict|كم يوم|رايح|مستقبل|الاستهلاك/.test(q))return forecastAnswer(tank);
+  if(/ذاكر|history|memory|لماذا حدث|شو صار بعد|بعد ما|اثر|أثر|event|حدث/.test(q))return memoryAnswer(tank);
+  if(/توقع|forecast|predict|كم يوم|إلى أين|رايح|مستقبل|الاستهلاك/.test(q))return forecastAnswer(tank);
+  if(/صيان|maintenance|task|مهمة/.test(q))return maintenanceAnswer(tank);
+  if(/سمك|مرجان|كائن|livestock|fish|coral|bioload/.test(q))return livestockAnswer(tank);
+  if(/طوار|emerg|تسريب|انقطاع|overheat|خطر/.test(q))return emergencyAnswer(tank);
+  if(/rodi|ro\/di|tds|ماء المصدر|مياه المصدر/.test(q))return rodiAnswer(tank);
   if(/جهاز|معدات|equipment|pump|light|skimmer|heater|طاقة|كهرب|energy|cost/.test(q))return equipmentAnswer(tank);
 
   const mood=tankMood(tank),state=tankStateView(tank),forecast=tankForecast(tank),pred=proactivePredictions(tank)[0],memory=biologicalMemory(tank)[0],nutrients=analyzeNutrients(tank),insights=smartInsights(tank);
@@ -182,9 +240,9 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
     `مزاج الحوض: ${mood.ar}. ${mood.noteAr}`,
     `الحالة ${state.score}% • الكيمياء ${chemistryHealth(tank)}% • الصيانة ${maintenanceHealth(tank)}% • الحمل الحيوي ${bio}%.`,
     `توقع 7 أيام: ${forecast.projected7d}% (${forecast.direction}).`,
-    pred?.ar||"ما في تنبؤ استهلاك كيميائي قوي كفاية حالياً.",
+    pred?.ar||"لا يوجد تنبؤ استهلاك كيميائي قوي بما يكفي حالياً.",
     memory?`من ذاكرة الحوض: ${memory.ar}`:(insights[0]?.ar||"لا توجد إشارة حرجة إضافية حالياً."),
-    nutrients.signals.find(x=>x.level!=="good")?.ar||"توازن NO3/PO4 ما عم يعطي إشارة خطر واضحة حالياً."
+    nutrients.signals.find(x=>x.level!=="good")?.ar||"توازن NO3/PO4 لا يعطي إشارة خطر واضحة حالياً."
   ];
   const detailsEn=[
     `Tank mood: ${mood.en}. ${mood.noteEn}`,
@@ -200,7 +258,7 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
     summaryAr:`${tank.name} حالياً ${mood.ar}. أهم خطوة مقترحة: ${action.ar}.`,
     summaryEn:`${tank.name} is currently ${mood.en}. Best next step: ${action.en}.`,
     detailsAr,detailsEn,
-    evidenceAr:[`${tank.chemistry.length} قراءات`,`${recentEvents(tank).length} أحداث / 14 يوم`,`${due.length} مهام مستحقة`, `الواجهة الحالية: ${page}`],
+    evidenceAr:[`${tank.chemistry.length} قراءات`,`${recentEvents(tank).length} أحداث / 14 يوماً`,`${due.length} مهام مستحقة`, `الواجهة الحالية: ${page}`],
     evidenceEn:[`${tank.chemistry.length} readings`,`${recentEvents(tank).length} events / 14d`,`${due.length} due tasks`,`Current section: ${page}`],
     confidence:confidence(tank),action
   };
