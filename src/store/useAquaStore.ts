@@ -20,6 +20,8 @@ interface AquaStore extends AquaState {
   resetDemo: () => void;
 }
 
+type ChangeReason={ar:string;en:string;eventId?:string;timestamp?:string};
+
 function recalcTank(tank: Tank): Tank {
   const gross = liters(tank.display.length, tank.display.width, tank.display.height);
   const net = gross * (1 - tank.display.displacementPercent / 100);
@@ -65,7 +67,7 @@ function fingerprint(values:any[]){
   return JSON.stringify(values);
 }
 
-function changeReason(before:Tank,after:Tank){
+function changeReason(before:Tank,after:Tank):ChangeReason|null{
   const latest=after.timeline[0];
   if(latest&&latest.id!==before.timeline[0]?.id){
     return {ar:latest.textAr,en:latest.textEn,eventId:latest.id,timestamp:latest.timestamp};
