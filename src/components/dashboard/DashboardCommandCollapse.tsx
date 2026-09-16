@@ -35,7 +35,8 @@ export function DashboardCommandCollapse(){
       const taskText=isArabic
         ? (count===0?"لا مهام ضرورية اليوم":count===1?"1 مهمة اليوم":`${count} مهام اليوم`)
         : (count===0?"No required tasks today":count===1?"1 task today":`${count} tasks today`);
-      glance.innerHTML=`<span>${count===0?"✓":"◎"}</span><b>${taskText}</b><em>${isArabic?"ثقة":"Confidence"} ${confidence}</em>`;
+      const html=`<span>${count===0?"✓":"◎"}</span><b>${taskText}</b><em>${isArabic?"ثقة":"Confidence"} ${confidence}</em>`;
+      if(glance.innerHTML!==html)glance.innerHTML=html;
     };
 
     const bindCommand=(panel:HTMLElement)=>{
