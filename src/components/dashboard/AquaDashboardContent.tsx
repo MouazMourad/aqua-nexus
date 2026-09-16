@@ -5,9 +5,11 @@ import { SafeAquariumScene } from "@/components/three/SafeAquariumScene";
 import { EquipmentPanel } from "@/components/panels/EquipmentPanel";
 import { SystemOverview } from "@/components/panels/SystemOverview";
 import { HealthTimelineChart } from "@/components/dashboard/HealthTimelineChart";
+import { TankHealthShareCard } from "@/components/dashboard/TankHealthShareCard";
 import { chemistryHealth,maintenanceHealth,tankHealth,bioload,tankHealthTrend,chemistryAgeDays } from "@/domain/health";
 import { smartInsights } from "@/domain/smartInsights";
 import { eventCorrelations,tankContextStats,tankForecast,tankStateView } from "@/domain/tankIntelligence";
+import { biologicalMemory,eventChemistryLinks,proactivePredictions,tankMood } from "@/domain/tankLearning";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr } from "@/i18n";
 
@@ -16,6 +18,7 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
  const ch=chemistryHealth(tank),mh=maintenanceHealth(tank),th=tankHealth(tank);
  const bio=bioload(tank),trend=tankHealthTrend(tank),insights=smartInsights(tank);
  const state=tankStateView(tank),forecast=tankForecast(tank),correlations=eventCorrelations(tank),context=tankContextStats(tank);
+ const mood=tankMood(tank),predictions=proactivePredictions(tank),memory=biologicalMemory(tank),chemLinks=eventChemistryLinks(tank);
  const today=new Date().toISOString().slice(0,10);
  const due=tank.maintenance.filter(x=>!x.done&&(!x.nextDue||x.nextDue<=today)).slice(0,5);
  const age=chemistryAgeDays(tank);
@@ -23,6 +26,7 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
  const activeAcclimation=(tank.acclimationSessions??[]).find(s=>s.status!=="completed");
 
  const tickerItems=[
+  `${lang==="ar"?"مزاج الحوض":"Tank mood"}: ${lang==="ar"?mood.ar:mood.en}`,
   tr(lang,"quickNote1"),
   tr(lang,"quickNote2"),
   tr(lang,"quickNote3"),
@@ -40,10 +44,7 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
 
  return <div className="dashboard-final">
    <div className="guidance-strip news-ticker">
-    <div className="ticker-track">
-      <TickerGroup/>
-      <TickerGroup hidden/>
-    </div>
+    <div className="ticker-track"><TickerGroup/><TickerGroup hidden/></div>
    </div>
 
    <div className="dashboard-health-row">
@@ -65,8 +66,8 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
 
    <div className="tank-mirror-grid">
     <section className={`card panel tank-state-card state-${state.band}`}>
-      <div className="module-head"><div><small className="eyebrow-mini">AQUA NEXUS STATE</small><h3>{lang==="ar"?"شو حاسس الحوض هلق؟":"How is the tank feeling now?"}</h3></div><b className="tank-state-score">{state.score}%</b></div>
-      <div className="tank-state-word">{lang==="ar"?state.ar:state.en}</div>
+      <div className="module-head"><div><small className="eyebrow-mini">AQUA NEXUS STATE</small><h3>{lang==="ar"?"شو حاسس الحوض هلق؟":"How is the tank feeling now?"}</h3></div><div className={`mood-orb mood-${mood.key}`}><b>{mood.symbol}</b></div></div>
+      <div className="tank-state-mainline"><div><div className="tank-state-word">{lang==="ar"?mood.ar:mood.en}</div><p className="tank-mood-note">{lang==="ar"?mood.noteAr:mood.noteEn}</p></div><b className="tank-state-score">{state.score}%</b></div>
       <div className="state-driver-list">{state.drivers.map((x,i)=><div key={i} className={`inline-alert ${x.level}`}>{lang==="ar"?x.ar:x.en}</div>)}</div>
     </section>
 
@@ -94,18 +95,27 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
    <HealthTimelineChart tank={tank}/>
 
    <div className="dashboard-intelligence-grid intelligence-priority-grid">
+    <section className="card panel dashboard-module proactive-module">
+      <div className="module-head"><div><small className="eyebrow-mini">PROACTIVE ENGINE</small><h3>{lang==="ar"?"التنبؤ الاستباقي":"Proactive predictions"}</h3></div><button className="btn glass-button" onClick={()=>onNavigate("dosing")}>{lang==="ar"?"الجرعات":"Dosing"}</button></div>
+      {predictions.length?predictions.map(x=><div key={x.id} className={`prediction-row ${x.level}`}><div className="prediction-days"><b>{x.days}</b><small>{lang==="ar"?"يوم":"days"}</small></div><div><b>{x.parameter}</b><p>{lang==="ar"?x.ar:x.en}</p><small>{lang==="ar"?"الثقة":"Confidence"}: {x.confidence}</small></div></div>):<div className="note">{lang==="ar"?"لسه ما في تاريخ قياسات نظيف كفاية للتنبؤ بالاستهلاك. مع القراءات القادمة رح يبدأ المحرك يتعلم نمط هالحوض.":"There is not enough clean measurement history yet for depletion prediction. The engine will learn this tank's pattern as more readings arrive."}</div>}
+    </section>
+
     <section className="card panel dashboard-module">
       <h3>{tr(lang,"smartInsights")}</h3>
       {insights.map((x,i)=><div key={i} className={`inline-alert ${x.level}`}>{lang==="ar"?x.ar:x.en}</div>)}
     </section>
 
     <section className="card panel dashboard-module">
-      <h3>{tr(lang,"eventCorrelation")}</h3>
-      {correlations.length?correlations.slice(0,4).map(point=><div className="correlation-row" key={point.id}>
-        <span className={point.delta<0?"delta-down":"delta-up"}>{point.delta>0?`+${point.delta}`:point.delta}</span>
-        <div><b>{lang==="ar"?point.reasonAr:point.reasonEn}</b><small>{new Date(point.timestamp).toLocaleDateString()} • {point.score}%</small></div>
-      </div>):<div className="note">{lang==="ar"?"ما في تغير كبير مرتبط بحدث حتى الآن. مع كل استخدام رح تصير الصورة أغنى.":"No major event-linked movement yet. The picture becomes richer as the tank history grows."}</div>}
+      <small className="eyebrow-mini">EVENT CORRELATION</small><h3>{tr(lang,"eventCorrelation")}</h3>
+      {chemLinks.length?chemLinks.slice(0,4).map(point=><div className={`event-impact-row ${point.level}`} key={point.id}><b>{lang==="ar"?point.event.textAr:point.event.textEn}</b><p>{lang==="ar"?point.ar:point.en}</p><small>{new Date(point.event.timestamp).toLocaleDateString()}</small></div>):correlations.length?correlations.slice(0,4).map(point=><div className="correlation-row" key={point.id}><span className={point.delta<0?"delta-down":"delta-up"}>{point.delta>0?`+${point.delta}`:point.delta}</span><div><b>{lang==="ar"?point.reasonAr:point.reasonEn}</b><small>{new Date(point.timestamp).toLocaleDateString()} • {point.score}%</small></div></div>):<div className="note">{lang==="ar"?"ما في تغير واضح مرتبط بحدث حتى الآن. كل ما زاد تاريخ الحوض رح تصير الروابط أذكى.":"No clear event-linked change yet. Correlations get smarter as the tank history grows."}</div>}
     </section>
+
+    <section className="card panel dashboard-module biological-memory-card">
+      <small className="eyebrow-mini">BIOLOGICAL MEMORY</small><h3>{lang==="ar"?"ذاكرة الحوض: شو عملنا وشو صار بعده؟":"Tank memory: what we did and what happened next"}</h3>
+      {memory.length?memory.slice(0,5).map(x=><div className={`memory-row ${x.level}`} key={x.id}><span className="memory-arrow">{typeof x.scoreDelta==="number"?(x.scoreDelta>0?"↗":x.scoreDelta<0?"↘":"→"):"•"}</span><div><b>{lang==="ar"?x.event.textAr:x.event.textEn}</b><p>{lang==="ar"?x.ar:x.en}</p>{typeof x.scoreDelta==="number"&&<small className={x.scoreDelta<0?"delta-down":"delta-up"}>{x.scoreDelta>0?"+":""}{x.scoreDelta} {lang==="ar"?"نقطة صحة":"health points"}</small>}</div></div>):<div className="note">{lang==="ar"?"الذاكرة البيولوجية بدأت، بس بدها أحداث وقياسات لاحقة حتى تقدر تربط القرار بأثره الفعلي.":"Biological memory is ready, but it needs events followed by measurements to connect actions to their real effects."}</div>}
+    </section>
+
+    <TankHealthShareCard tank={tank}/>
 
     {activeAcclimation&&<section className="card panel dashboard-module">
       <div className="module-head"><h3>{tr(lang,"activeAcclimation")}</h3><button className="btn glass-button" onClick={()=>onNavigate("acclimation")}>{tr(lang,"openAcclimation")}</button></div>
@@ -115,18 +125,14 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
 
    <div className="dashboard-visual-row">
     <aside className="dashboard-equipment-column"><EquipmentPanel tank={tank}/></aside>
-
     <section className="card scene-card dashboard-scene-card">
-      <div className="scene-toolbar">
-        <div className="scene-badge">{tr(lang,"3dDigitalTwin")}</div>
-        <div className="scene-badge">{tank.type==="marine"?tr(lang,"marine"):tr(lang,"freshwater")}</div>
-        <div className={`scene-badge state-badge state-${state.band}`}>{lang==="ar"?state.ar:state.en} • {state.score}%</div>
-      </div>
+      <div className="scene-toolbar"><div className="scene-badge">{tr(lang,"3dDigitalTwin")}</div><div className="scene-badge">{tank.type==="marine"?tr(lang,"marine"):tr(lang,"freshwater")}</div><div className={`scene-badge state-badge state-${state.band}`}>{lang==="ar"?mood.ar:mood.en} • {state.score}%</div></div>
       <SafeAquariumScene tank={tank}/>
     </section>
    </div>
 
    <div className="summary-strip dashboard-summary-strip">
+    <div className="summary"><small>{lang==="ar"?"مزاج الحوض":"Tank Mood"}</small><b>{lang==="ar"?mood.ar:mood.en}</b></div>
     <div className="summary"><small>{lang==="ar"?"حالة الحوض":"Tank State"}</small><b>{state.score}%</b></div>
     <div className="summary"><small>{tr(lang,"tankHealth")}</small><b>{th}%</b></div>
     <div className="summary"><small>{tr(lang,"healthTrend")}</small><b className={`trend-${trend}`}>{tr(lang,trend)}</b></div>
