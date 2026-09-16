@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./mobile-hotfix.css";
 import "./aqua-ai.css";
+import "./aqua-ai-v2.css";
 import "./ticker-rtl-fix.css";
 import "./tank-swipe.css";
 import "./intelligence.css";
