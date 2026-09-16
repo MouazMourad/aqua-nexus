@@ -5,6 +5,16 @@ import * as THREE from "three";
 import type { Equipment, Tank } from "@/domain/types";
 import { clamp, displayScenePosition, resolvedPosition } from "@/lib/displayLayout";
 
+function FlowZone({position,level,strength}:{position:THREE.Vector3;level:"high"|"medium"|"low";strength:number}){
+  const color=level==="high"?"#ff695f":level==="medium"?"#ffc15a":"#4cc9ff";
+  const scale=level==="high"?.20:level==="medium"?.27:.34;
+  const opacity=level==="high"?.13:level==="medium"?.10:.08;
+  return <mesh position={position} scale={[scale*(.8+strength*.25),scale*.55,scale]}>
+    <sphereGeometry args={[1,18,12]}/>
+    <meshBasicMaterial color={color} transparent opacity={opacity} depthWrite={false}/>
+  </mesh>;
+}
+
 function Jet({
   equipment,width,depth,height,displayBottom,index,total,color
 }:{
@@ -30,6 +40,12 @@ function Jet({
     return new THREE.CatmullRomCurve3([start,mid,end],false,"catmullrom",.35);
   },[start.x,start.y,start.z,angle,strength,width,depth,height,displayBottom,index]);
 
+  const zones=useMemo(()=>[
+    {level:"high" as const,p:curve.getPoint(.18)},
+    {level:"medium" as const,p:curve.getPoint(.50)},
+    {level:"low" as const,p:curve.getPoint(.82)}
+  ],[curve]);
+
   useFrame(({clock})=>{
     if(!group.current)return;
     group.current.children.forEach((c,i)=>{
@@ -41,6 +57,7 @@ function Jet({
   });
 
   return <group>
+    {zones.map(z=><FlowZone key={z.level} position={z.p} level={z.level} strength={strength}/>)}
     <mesh>
       <tubeGeometry args={[curve,50,.008,8,false]}/>
       <meshBasicMaterial color={color} transparent opacity={.18}/>
