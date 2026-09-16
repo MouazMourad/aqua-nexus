@@ -1,4 +1,4 @@
-const CACHE_NAME="aqua-nexus-pwa-v2";
+const CACHE_NAME="aqua-nexus-pwa-v3";
 
 self.addEventListener("install",()=>self.skipWaiting());
 self.addEventListener("activate",event=>{
@@ -13,7 +13,8 @@ function show(data={}){
   return self.registration.showNotification(data.title||"Aqua Nexus",{
     body:data.body||"Your aquarium needs attention.",
     tag:data.tag||"aqua-nexus-reminder",
-    renotify:false,
+    renotify:Boolean(data.renotify),
+    requireInteraction:Boolean(data.renotify),
     data:{url:data.url||"/"}
   });
 }
@@ -34,10 +35,14 @@ self.addEventListener("notificationclick",event=>{
   event.notification.close();
   const url=event.notification.data?.url||"/";
   event.waitUntil((async()=>{
+    const absolute=new URL(url,self.location.origin).href;
     const windows=await self.clients.matchAll({type:"window",includeUncontrolled:true});
     for(const client of windows){
+      if("navigate" in client){
+        try{await client.navigate(absolute);}catch{}
+      }
       if("focus" in client){await client.focus();return;}
     }
-    if(self.clients.openWindow) await self.clients.openWindow(url);
+    if(self.clients.openWindow) await self.clients.openWindow(absolute);
   })());
 });
