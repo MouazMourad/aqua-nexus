@@ -1,0 +1,85 @@
+"use client";
+
+import { useState } from "react";
+import type { Language } from "@/domain/types";
+import type { AppPage } from "@/components/navigation/MainNav";
+import { Modal } from "@/components/ui/Modal";
+import { useAquaStore } from "@/store/useAquaStore";
+
+type PageHelp={
+ titleAr:string;titleEn:string;
+ summaryAr:string;summaryEn:string;
+ capabilitiesAr:string[];capabilitiesEn:string[];
+ featuresAr:string[];featuresEn:string[];
+};
+
+const HELP:Record<AppPage,PageHelp>={
+ dashboard:{titleAr:"لوحة القيادة",titleEn:"Dashboard",summaryAr:"ملخص ذكي لحالة الحوض يجمع الصحة والكيمياء والصيانة والاتجاهات والذاكرة والتوقعات في مكان واحد.",summaryEn:"A smart tank overview combining health, chemistry, maintenance, trends, memory and forecasts in one place.",capabilitiesAr:["قراءة Tank State وTank Mood","توقع 7 أيام واتجاه الصحة","ربط الأحداث بالنتائج","ذاكرة بيولوجية للحوض","عرض 3D Digital Twin"],capabilitiesEn:["Tank State and Tank Mood","7-day health outlook","Event-to-outcome correlation","Biological tank memory","3D Digital Twin"],featuresAr:["مؤشرات صحة فورية","مهام مستحقة","ملخص الكيمياء","تنبيهات استباقية","مشاركة بطاقة صحة الحوض"],featuresEn:["Live health indicators","Due tasks","Chemistry summary","Proactive alerts","Tank health sharing card"]},
+ tanks:{titleAr:"الأحواض",titleEn:"Tanks",summaryAr:"إدارة جميع الأحواض والتبديل بينها مع الاحتفاظ بسياق وبيانات مستقلة لكل حوض.",summaryEn:"Manage all aquariums and switch between them while keeping independent context and data for each tank.",capabilitiesAr:["تعدد الأحواض","اختيار الحوض النشط","مراجعة الحجم والنوع والحالة"],capabilitiesEn:["Multiple tanks","Select active tank","Review volume, type and status"],featuresAr:["فصل البيانات لكل حوض","إعداد ذكي لحوض جديد","انتقال سريع بين الأحواض"],featuresEn:["Per-tank data separation","Smart tank setup","Fast tank switching"]},
+ equipment:{titleAr:"المعدات",titleEn:"Equipment",summaryAr:"إدارة معدات الحوض ومراقبة حالتها وعمرها وصيانتها واستهلاكها التقديري.",summaryEn:"Manage aquarium equipment, status, service life, maintenance and estimated consumption.",capabilitiesAr:["سجل المعدات","حالة التشغيل والصيانة","تقدير استهلاك الطاقة","متابعة عمر الميديا والمكونات"],capabilitiesEn:["Equipment registry","Operational/service status","Energy estimation","Media/component life tracking"],featuresAr:["تحذيرات الخدمة","ربط المعدة بموقعها","مؤشرات الاستبدال والصيانة"],featuresEn:["Service warnings","Equipment location mapping","Replacement and maintenance indicators"]},
+ sump:{titleAr:"السامب",titleEn:"Sump",summaryAr:"تمثيل وترتيب حجر السامب ومكوناته ضمن النظام المائي.",summaryEn:"Represent and organize sump chambers and components within the water system.",capabilitiesAr:["تقسيم الحجر","تحديد ارتفاع الماء","ربط الميديا والمعدات بالحجر"],capabilitiesEn:["Chamber layout","Water-height setup","Media/equipment placement"],featuresAr:["تمثيل بصري","حسابات حجم السامب","تنظيم مسار النظام"],featuresEn:["Visual representation","Sump volume calculations","System flow organization"]},
+ livestock:{titleAr:"الكائنات",titleEn:"Livestock",summaryAr:"سجل الأسماك والمرجان والنباتات والكائنات الأخرى مع الحالة والصحة والملاحظات.",summaryEn:"Track fish, corals, plants and other organisms with status, health and notes.",capabilitiesAr:["إضافة وتصنيف الكائنات","متابعة الصحة","ربط الصور والسجل بالكائن","تقدير الحمل الحيوي"],capabilitiesEn:["Add and classify livestock","Health tracking","Link photos/history to organisms","Bioload estimation"],featuresAr:["حالة كل كائن","معلومات النوع","ربط مع الحجر والتأقلم والمكتبة"],featuresEn:["Per-organism status","Species information","Links to quarantine, acclimation and library"]},
+ acclimation:{titleAr:"التأقلم",titleEn:"Acclimation",summaryAr:"معالج مخصص لإدخال الكائنات الجديدة بشكل منظم مع تتبع الوقت والحالة.",summaryEn:"A guided workflow for introducing new organisms with time and status tracking.",capabilitiesAr:["جلسات تأقلم","تتبع الكائنات داخل الشحنة","حالة كل كائن","تسجيل النتيجة"],capabilitiesEn:["Acclimation sessions","Shipment organism tracking","Per-organism status","Outcome logging"],featuresAr:["خطوات واضحة","سجل نهائي","ربط مع الحوض والكائنات"],featuresEn:["Guided steps","Final record","Tank/livestock linkage"]},
+ library:{titleAr:"المكتبة",titleEn:"Library",summaryAr:"مرجع داخلي للأنواع والمعلومات المساعدة المرتبطة بالكائنات وإدارتها.",summaryEn:"An internal reference for species and care information linked to aquarium management.",capabilitiesAr:["بحث مرجعي","معلومات الأنواع","استخدام البيانات عند إضافة الكائنات"],capabilitiesEn:["Reference search","Species information","Use data when adding livestock"],featuresAr:["وصول سريع للمعلومة","ربط مع الكائنات","مرجع داخل نفس البرنامج"],featuresEn:["Fast reference access","Livestock linkage","In-app knowledge source"]},
+ chemistry:{titleAr:"الكيمياء",titleEn:"Chemistry",summaryAr:"تسجيل وفهم كيمياء الحوض مع الاتجاهات والصحة والقراءات السابقة.",summaryEn:"Log and understand tank chemistry with trends, health scoring and historical readings.",capabilitiesAr:["تسجيل القياسات","مقارنة القراءات","مؤشر صحة الكيمياء","تتبع الاتجاهات"],capabilitiesEn:["Measurement logging","Reading comparison","Chemistry health score","Trend tracking"],featuresAr:["تنبيه القراءات القديمة","قراءة التغيرات","ربط مع الذكاء المحلي"],featuresEn:["Stale-reading alerts","Change interpretation","Local intelligence integration"]},
+ maintenance:{titleAr:"الصيانة",titleEn:"Maintenance",summaryAr:"تنظيم مهام الصيانة الدورية والمستحقة ومتابعة تنفيذها.",summaryEn:"Organize recurring and due maintenance tasks and track completion.",capabilitiesAr:["مهام دورية","مواعيد استحقاق","متابعة الإنجاز","مؤشر صحة الصيانة"],capabilitiesEn:["Recurring tasks","Due dates","Completion tracking","Maintenance health score"],featuresAr:["قائمة المستحق","متابعة الروتين","ربط بالأحداث والتنبيهات"],featuresEn:["Due-task list","Routine tracking","Event and alert linkage"]},
+ inventory:{titleAr:"المخزون",titleEn:"Inventory",summaryAr:"متابعة المواد والمنتجات والقطع المستخدمة في تشغيل الحوض.",summaryEn:"Track supplies, products and parts used to operate the aquarium.",capabilitiesAr:["إضافة الأصناف","تسجيل الكميات","متابعة النقص"],capabilitiesEn:["Add items","Quantity tracking","Low-stock monitoring"],featuresAr:["تنظيم المستهلكات","مرجع للجرعات والصيانة","متابعة الاحتياج"],featuresEn:["Consumables organization","Reference for dosing/maintenance","Restock awareness"]},
+ diseases:{titleAr:"الأمراض",titleEn:"Diseases",summaryAr:"مرجع وإدارة أولية للحالات المرضية والأعراض بدون ادعاء تشخيص قطعي.",summaryEn:"Reference and first-line management for disease signs without claiming definitive diagnosis.",capabilitiesAr:["مراجعة الأعراض","مرجع للحالات المحتملة","ربط مع الحجر والمتابعة"],capabilitiesEn:["Symptom review","Possible-condition reference","Quarantine/follow-up linkage"],featuresAr:["تنظيم الملاحظات","دعم القرار الآمن","ربط مع Visual Tank Insight"],featuresEn:["Structured observations","Safer decision support","Visual Tank Insight linkage"]},
+ timeline:{titleAr:"الخط الزمني",titleEn:"Timeline",summaryAr:"سجل موحد لكل ما حدث بالحوض حتى يمكن فهم التسلسل وربط السبب بالنتيجة.",summaryEn:"A unified history of what happened in the tank to support sequence and cause/effect review.",capabilitiesAr:["تسجيل الأحداث","عرض تاريخي مرتب","ربط مع القراءات والخطط"],capabilitiesEn:["Event logging","Chronological history","Links to readings and plans"],featuresAr:["ذاكرة تشغيلية للحوض","دعم التحليل المحلي","مرجع لأي تغيير سابق"],featuresEn:["Operational tank memory","Local analysis support","Reference for prior changes"]},
+ journal:{titleAr:"الصور والسجل",titleEn:"Journal",summaryAr:"سجل الصور، تتبع النمو، وVisual Tank Insight المحلي لتحليل الحوض أو الكائنات ضمن سياق نفس الحوض.",summaryEn:"Photo journal, growth tracking and local Visual Tank Insight for the current tank and its organisms.",capabilitiesAr:["صور الحوض والكائنات","Growth Tracker","تحليل بصري محلي","مقارنة زمنية"],capabilitiesEn:["Tank and organism photos","Growth Tracker","Local visual analysis","Time-series comparison"],featuresAr:["What I Notice","Possible Meaning","Next Best Check","Confidence Level"],featuresEn:["What I Notice","Possible Meaning","Next Best Check","Confidence Level"]},
+ waterchange:{titleAr:"تغيير الماء",titleEn:"Water Change",summaryAr:"تسجيل تغييرات الماء وربطها بتاريخ الحوض والقراءات اللاحقة.",summaryEn:"Log water changes and connect them to tank history and later readings.",capabilitiesAr:["تسجيل الحجم والنسبة","حفظ التاريخ","ربط مع الأحداث"],capabilitiesEn:["Volume/percentage logging","Date history","Event linkage"],featuresAr:["مرجع للتأثير على الكيمياء","متابعة انتظام التغيير","دعم التحليل الزمني"],featuresEn:["Chemistry-effect reference","Routine tracking","Time-series analysis support"]},
+ feeding:{titleAr:"التغذية",titleEn:"Feeding",summaryAr:"سجل التغذية لمتابعة الكمية والتكرار وربطها بالمغذيات والحمل الحيوي.",summaryEn:"Feeding log to track frequency and connect feeding with nutrients and bioload.",capabilitiesAr:["تسجيل الوجبات","متابعة التكرار","ربط مع سياق الحوض"],capabilitiesEn:["Feeding logs","Frequency tracking","Tank-context linkage"],featuresAr:["مفيد لتحليل NO3/PO4","مرجع للحمل الحيوي","ذاكرة غذائية"],featuresEn:["Useful for NO3/PO4 analysis","Bioload reference","Feeding history"]},
+ dosing:{titleAr:"الجرعات",titleEn:"Dosing",summaryAr:"تسجيل الجرعات وتتبع تأثيرها مع دعم حسابات ذكية ضمن حدود السلامة.",summaryEn:"Log doses and track their effects with intelligent calculations within safety limits.",capabilitiesAr:["سجل الجرعات","قنوات Doser","متابعة الاستهلاك","خطط متابعة"],capabilitiesEn:["Dose logging","Doser channels","Consumption tracking","Follow-up plans"],featuresAr:["ربط الجرعة بالقراءة اللاحقة","Smart Dosing","تنبؤ الاستهلاك"],featuresEn:["Dose-to-next-reading linkage","Smart Dosing","Consumption prediction"]},
+ quarantine:{titleAr:"الحجر",titleEn:"Quarantine",summaryAr:"إدارة حجر الكائنات الجديدة أو المريضة مع سجل الحالة والمتابعة.",summaryEn:"Manage quarantine for new or sick organisms with status and follow-up history.",capabilitiesAr:["حالات حجر نشطة","متابعة الكائن","تسجيل الملاحظات","ربط بالأمراض"],capabilitiesEn:["Active quarantine cases","Organism tracking","Observation logging","Disease linkage"],featuresAr:["فصل المتابعة عن الحوض الرئيسي","سجل زمني","دعم قرارات أكثر أماناً"],featuresEn:["Separate follow-up from display tank","Timeline","Safer decision support"]},
+ emergency:{titleAr:"الطوارئ",titleEn:"Emergency",summaryAr:"بروتوكولات منظمة للتعامل مع الحالات الحرجة خطوة بخطوة.",summaryEn:"Structured protocols for handling critical aquarium situations step by step.",capabilitiesAr:["سيناريوهات طوارئ","خطوات مرتبة","متابعة الحالة"],capabilitiesEn:["Emergency scenarios","Ordered steps","Status tracking"],featuresAr:["تقليل القرارات العشوائية","أولوية الإجراءات","سجل للطوارئ"],featuresEn:["Reduce random reactions","Action priority","Emergency history"]},
+ rodi:{titleAr:"RO/DI",titleEn:"RO/DI",summaryAr:"متابعة مياه التحضير وحالة نظام RO/DI والميديا المرتبطة به.",summaryEn:"Track preparation water and RO/DI system/media condition.",capabilitiesAr:["سجل ماء RO/DI","متابعة الميديا","ربط مع الصيانة"],capabilitiesEn:["RO/DI water log","Media tracking","Maintenance linkage"],featuresAr:["مؤشر لعمر الميديا","مرجع لجودة ماء المصدر","تنبيهات استبدال"],featuresEn:["Media-life indicator","Source-water reference","Replacement alerts"]},
+ expenses:{titleAr:"المصاريف",titleEn:"Expenses",summaryAr:"تسجيل مصاريف الحوض ومعرفة الإنفاق الشهري والتراكمي.",summaryEn:"Track aquarium spending and review monthly and cumulative costs.",capabilitiesAr:["تسجيل المصروف","تصنيف التكاليف","ملخص شهري"],capabilitiesEn:["Expense logging","Cost categories","Monthly summary"],featuresAr:["ميزانية تشغيلية","مرجع للشراء","عرض إجمالي الإنفاق"],featuresEn:["Operating budget","Purchase reference","Total-spend view"]},
+ alerts:{titleAr:"التنبيهات",titleEn:"Alerts",summaryAr:"تجميع التنبيهات المهمة الناتجة عن حالة الحوض والصيانة والمعدات والقياسات.",summaryEn:"Collect important alerts from tank condition, maintenance, equipment and measurements.",capabilitiesAr:["عرض التنبيهات","تمييز الأولوية","متابعة السبب"],capabilitiesEn:["Alert list","Priority indication","Cause follow-up"],featuresAr:["مركز تنبيه موحد","ربط مع الوحدات","دعم الاستجابة السريعة"],featuresEn:["Unified alert center","Module linkage","Faster response support"]},
+ reports:{titleAr:"التقارير",titleEn:"Reports",summaryAr:"عرض وتجميع معلومات الحوض بشكل يصلح للمراجعة والمشاركة.",summaryEn:"Compile tank information into reviewable and shareable reports.",capabilitiesAr:["ملخصات الحوض","تجميع البيانات","مراجعة الأداء"],capabilitiesEn:["Tank summaries","Data consolidation","Performance review"],featuresAr:["مرجع إداري","متابعة التقدم","دعم المشاركة"],featuresEn:["Management reference","Progress tracking","Sharing support"]},
+ settings:{titleAr:"الإعدادات",titleEn:"Settings",summaryAr:"إدارة إعدادات الحوض وتجربة البرنامج والخيارات العامة.",summaryEn:"Manage aquarium and application preferences and general options.",capabilitiesAr:["إعدادات الحوض","خيارات العرض","إعدادات عامة"],capabilitiesEn:["Tank settings","Display preferences","General options"],featuresAr:["تخصيص التجربة","ضبط بيانات النظام","إدارة السلوك العام"],featuresEn:["Customize experience","System data setup","General behavior controls"]}
+};
+
+const order=(Object.keys(HELP) as AppPage[]);
+
+function PageHelpBody({page,lang}:{page:AppPage;lang:Language}){
+ const h=HELP[page];
+ const capabilities=lang==="ar"?h.capabilitiesAr:h.capabilitiesEn;
+ const features=lang==="ar"?h.featuresAr:h.featuresEn;
+ return <div className="help-page-body">
+  <div className="help-hero"><small>{lang==="ar"?"شرح الصفحة":"PAGE GUIDE"}</small><h2>{lang==="ar"?h.titleAr:h.titleEn}</h2><p>{lang==="ar"?h.summaryAr:h.summaryEn}</p></div>
+  <div className="help-columns">
+   <section><h4>{lang==="ar"?"شو بتقدر تعمل هون؟":"What can you do here?"}</h4>{capabilities.map((x,i)=><div className="help-point" key={i}><i>✓</i><span>{x}</span></div>)}</section>
+   <section><h4>{lang==="ar"?"أهم الميزات":"Key features"}</h4>{features.map((x,i)=><div className="help-point" key={i}><i>◆</i><span>{x}</span></div>)}</section>
+  </div>
+ </div>;
+}
+
+export function GlobalHelpButton({lang}:{lang:Language}){
+ const [open,setOpen]=useState(false);
+ return <>
+  <button type="button" className="btn help-global-button" onClick={()=>setOpen(true)} aria-label={lang==="ar"?"تعليمات البرنامج":"Program help"}>? {lang==="ar"?"تعليمات":"Help"}</button>
+  <Modal open={open} title={lang==="ar"?"دليل Aqua Nexus":"Aqua Nexus Guide"} onClose={()=>setOpen(false)}>
+   <div className="help-overview">
+    <div className="help-hero"><small>AQUA NEXUS</small><h2>{lang==="ar"?"كيف تستخدم البرنامج؟":"How to use the platform"}</h2><p>{lang==="ar"?"Aqua Nexus مو مجرد سجل. هو نظام يفهم حالة الحوض من الكيمياء والصيانة والكائنات والمعدات والصور والتاريخ، ويربطهم مع بعض ليعطيك حالة الحوض واتجاهه والخطوة التالية.":"Aqua Nexus is more than a log. It connects chemistry, maintenance, livestock, equipment, photos and history to understand the tank state, direction and next best check."}</p></div>
+    <div className="help-overview-grid">
+     <div><b>{lang==="ar"?"1. أنشئ الحوض":"1. Create the tank"}</b><span>{lang==="ar"?"ابدأ بمعالج الإعداد وحدد الحجم والنوع والمعدات والكيمياء الأساسية.":"Use Smart Setup for dimensions, type, equipment and starting chemistry."}</span></div>
+     <div><b>{lang==="ar"?"2. سجّل ما يحدث":"2. Record what happens"}</b><span>{lang==="ar"?"القياسات والصيانة والتغذية والجرعات والصور كلها تصبح ذاكرة للحوض.":"Measurements, maintenance, feeding, dosing and photos become the tank memory."}</span></div>
+     <div><b>{lang==="ar"?"3. راقب الفهم الذكي":"3. Read the intelligence"}</b><span>{lang==="ar"?"تابع Tank State وMood والتوقعات والروابط بين الأحداث والنتائج.":"Follow Tank State, Mood, forecasts and event-to-outcome links."}</span></div>
+     <div><b>{lang==="ar"?"4. استخدم Local Best AI":"4. Use Local Best AI"}</b><span>{lang==="ar"?"الذكاء الداخلي يفهم الحوض الحالي ويحلل الصور محلياً ضمن سياق نفس الحوض.":"Internal intelligence understands the current tank and analyzes images locally in that tank's context."}</span></div>
+    </div>
+    <h4 className="help-modules-title">{lang==="ar"?"وحدات البرنامج":"Program modules"}</h4>
+    <div className="help-module-grid">{order.map(key=>{const h=HELP[key];return <div className="help-module-card" key={key}><b>{lang==="ar"?h.titleAr:h.titleEn}</b><span>{lang==="ar"?h.summaryAr:h.summaryEn}</span></div>})}</div>
+   </div>
+  </Modal>
+ </>;
+}
+
+export function PageHelpButton({page}:{page:AppPage}){
+ const lang=useAquaStore(s=>s.language);
+ const [open,setOpen]=useState(false);
+ const h=HELP[page];
+ return <>
+  <button type="button" className="page-help-button" onClick={()=>setOpen(true)} aria-label={lang==="ar"?`تعليمات ${h.titleAr}`:`${h.titleEn} help`} title={lang==="ar"?`تعليمات ${h.titleAr}`:`${h.titleEn} help`}>?</button>
+  <Modal open={open} title={lang==="ar"?`تعليمات • ${h.titleAr}`:`Help • ${h.titleEn}`} onClose={()=>setOpen(false)}><PageHelpBody page={page} lang={lang}/></Modal>
+ </>;
+}
