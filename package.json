@@ -1,6 +1,6 @@
 {
   "name": "aqua-nexus-3d",
-  "version": "0.1.8.0",
+  "version": "0.1.9.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -12,6 +12,7 @@
     "@react-three/drei": "10.7.8",
     "@react-three/fiber": "9.7.0",
     "next": "15.5.21",
+    "pg": "^8.13.1",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "recharts": "3.2.1",
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@types/pg": "^8.11.10",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@types/three": "^0.180.0",
