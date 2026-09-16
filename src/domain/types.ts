@@ -109,6 +109,18 @@ export interface TimelineEvent {
   textEn: string;
 }
 
+export interface HealthSnapshot {
+  id: string;
+  timestamp: string;
+  score: number;
+  chemistry: number;
+  maintenance: number;
+  state: "excellent" | "stable" | "watch" | "stressed" | "critical";
+  reasonAr: string;
+  reasonEn: string;
+  relatedEventId?: string;
+}
+
 export interface JournalPhoto {
   id: string;
   timestamp: string;
@@ -255,6 +267,7 @@ export interface Tank {
   livestock: LivestockItem[];
   inventory: InventoryItem[];
   timeline: TimelineEvent[];
+  healthSnapshots?: HealthSnapshot[];
   photos: JournalPhoto[];
   feeding: FeedingLog[];
   dosing: DosingLog[];
