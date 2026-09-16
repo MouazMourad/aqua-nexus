@@ -3,6 +3,7 @@
 import { useRef,useState } from "react";
 import { tr } from "@/i18n";
 import type { Language } from "@/domain/types";
+import { GlobalHelpButton } from "@/components/help/HelpCenter";
 
 export type AppPage =
   | "dashboard" | "tanks" | "equipment" | "sump" | "livestock" | "acclimation" | "library"
@@ -48,30 +49,16 @@ function dockScale(index:number,hoverIndex:number|null){
 export function MainNav({active,onChange,lang}:{active:AppPage;onChange:(p:AppPage)=>void;lang:Language}) {
   const viewport=useRef<HTMLDivElement>(null);
   const [hoverIndex,setHoverIndex]=useState<number|null>(null);
-
-  const move=(dir:-1|1)=>{
-    viewport.current?.scrollBy({left:dir*420,behavior:"smooth"});
-  };
+  const move=(dir:-1|1)=>viewport.current?.scrollBy({left:dir*420,behavior:"smooth"});
 
   return <div className="dock-shell">
+    <GlobalHelpButton lang={lang}/>
     <button type="button" className="dock-arrow dock-arrow-left" aria-label="Previous modules" onClick={()=>move(-1)}>‹</button>
     <div className="dock-viewport" ref={viewport} dir="ltr">
       <nav className="main-nav full-modules-nav mac-dock" onMouseLeave={()=>setHoverIndex(null)}>
         {items.map((item,index)=>{
           const scale=dockScale(index,hoverIndex);
-          return <button
-            type="button"
-            key={item.key}
-            className={`nav-item dock-item ${active===item.key?"active":""}`}
-            style={{
-              "--dock-scale":scale,
-              "--dock-color":item.color
-            } as React.CSSProperties}
-            onMouseEnter={()=>setHoverIndex(index)}
-            onFocus={()=>setHoverIndex(index)}
-            onBlur={()=>setHoverIndex(null)}
-            onClick={(e)=>{e.preventDefault();e.stopPropagation();onChange(item.key)}}
-          >
+          return <button type="button" key={item.key} className={`nav-item dock-item ${active===item.key?"active":""}`} style={{"--dock-scale":scale,"--dock-color":item.color} as React.CSSProperties} onMouseEnter={()=>setHoverIndex(index)} onFocus={()=>setHoverIndex(index)} onBlur={()=>setHoverIndex(null)} onClick={(e)=>{e.preventDefault();e.stopPropagation();onChange(item.key)}}>
             <span className="nav-icon">{item.icon}</span>
             <span className="dock-label" dir={lang==="ar"?"rtl":"ltr"}>{tr(lang,item.label)}</span>
           </button>;
