@@ -1,5 +1,6 @@
 import type { Language, Tank } from "@/domain/types";
 import { bioload,chemistryHealth,maintenanceHealth,tankHealth,tankHealthTrend } from "@/domain/health";
+import { aquaWorkspaceHeaders,getAquaDeviceId } from "@/lib/anonymousWorkspace";
 
 const VAPID_PUBLIC_KEY="BD9A5jEWZLVFsG8PGXEIZyM4OCv1H4QHOJyXTi26-AyWb8Cm-b9q0wuQZiMG4SVAdoQYsrMGu5SBPcmsxu1_c20";
 
@@ -16,13 +17,6 @@ function uint8ToBase64Url(value:ArrayBuffer|null){
   let binary="";
   bytes.forEach(b=>binary+=String.fromCharCode(b));
   return window.btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
-}
-
-function deviceId(){
-  const key="aqua-nexus-device-id";
-  let id=localStorage.getItem(key);
-  if(!id){id=`device-${crypto.randomUUID?.()??Math.random().toString(36).slice(2)}-${Date.now()}`;localStorage.setItem(key,id);}
-  return id;
 }
 
 function stabilityState(t:Tank){
@@ -59,6 +53,10 @@ export async function syncPushReminders(tanks:Tank[],language:Language,createSub
     if(!Number.isFinite(lastVisit)||lastVisit<=0){lastVisit=now;localStorage.setItem(key,String(now));}
     return {id:t.id,name:t.name,lastVisit,...stabilityState(t)};
   });
-  const response=await fetch("/api/push/register",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({deviceId:deviceId(),language,subscription:subscription.toJSON(),tanks:tankState})});
+  const response=await fetch("/api/push/register",{
+    method:"POST",
+    headers:aquaWorkspaceHeaders({"content-type":"application/json"}),
+    body:JSON.stringify({deviceId:getAquaDeviceId(),language,subscription:subscription.toJSON(),tanks:tankState})
+  });
   return {ok:response.ok,reason:response.ok?"ok":"server"};
 }
