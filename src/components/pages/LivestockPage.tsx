@@ -26,6 +26,7 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
  function reset(){setSelected("");setCustom("");setQty(1);setRiskConfirmed(false)}
  function close(){setOpen(false);reset()}
  function add(){
+  if(check?.blocked)return;
   if(check?.requiresConfirmation && !riskConfirmed)return;
   const name=selected==="__other__"?(custom||tr(lang,"otherEntry")):(chosen?.ar||custom);
   const nameEn=selected==="__other__"?(custom||"Other"):(chosen?.en||custom);
@@ -68,10 +69,13 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
       <div><small>{tr(lang,"projectedBioload")}</small><b className={`bio-${check.projectedStatus}`}>{Math.round(check.projectedRatio*100)}%</b></div>
     </div>
     {check.issues.length ? <div className="compat-issues">{check.issues.map((issue,i)=><div key={i} className={`inline-alert ${issue.level}`}>{lang==="ar"?issue.ar:issue.en}</div>)}</div> : <div className="inline-alert good">{tr(lang,"noConflict")}</div>}
-    {check.requiresConfirmation&&<label className="risk-confirm"><input type="checkbox" checked={riskConfirmed} onChange={e=>setRiskConfirmed(e.target.checked)}/><span>{tr(lang,"confirmRisk")}</span></label>}
+    {check.blocked&&<div className="inline-alert danger"><b>{lang==="ar"?"لن يسمح Aqua Nexus بإضافة هذا الكائن لأن التعارض مصنف خطراً.":"Aqua Nexus will not add this organism because the detected incompatibility is classified as dangerous."}</b></div>}
+    {check.requiresConfirmation&&!check.blocked&&<label className="risk-confirm"><input type="checkbox" checked={riskConfirmed} onChange={e=>setRiskConfirmed(e.target.checked)}/><span>{tr(lang,"confirmRisk")}</span></label>}
    </div>}
 
-   <div className="modal-actions"><button className="btn" onClick={close}>{tr(lang,"cancel")}</button><button className="btn primary" onClick={add} disabled={!selected || (!!check?.requiresConfirmation&&!riskConfirmed)}>{tr(lang,"save")}</button></div>
+   {selected==="__other__"&&<div className="inline-alert warn">{lang==="ar"?"الإدخال اليدوي لا يمكن فحص توافقه تلقائياً قبل إضافته. استخدم المكتبة كلما كان النوع موجوداً فيها.":"Manual entries cannot be automatically compatibility-checked before adding. Use the library whenever the species is available."}</div>}
+
+   <div className="modal-actions"><button className="btn" onClick={close}>{tr(lang,"cancel")}</button><button className="btn primary" onClick={add} disabled={!selected || !!check?.blocked || (!!check?.requiresConfirmation&&!riskConfirmed)}>{check?.blocked?(lang==="ar"?"غير مناسب للحوض":"Not suitable") : tr(lang,"save")}</button></div>
   </Modal>
  </section>;
 }
