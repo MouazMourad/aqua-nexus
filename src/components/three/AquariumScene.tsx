@@ -17,6 +17,8 @@ import { DisplayEquipmentLayer } from "./DisplayEquipmentLayer";
 import { TankFlowField } from "./TankFlowField";
 import { ExternalEquipmentRack } from "./ExternalEquipmentRack";
 
+export type AquariumSceneMode="default"|"tank"|"equipment"|"flow"|"empty";
+
 function Frame({ width, depth, displayBottom, sumpBottom }: { width:number; depth:number; displayBottom:number; sumpBottom:number }) {
   const frameW=width+.24, frameD=depth+.16, postH=Math.max(.5,displayBottom-sumpBottom+.08), postY=(displayBottom+sumpBottom)/2;
   return <group>
@@ -32,7 +34,6 @@ function Backdrop({accent}:{accent:string}){
    <pointLight position={[0,1.6,-1.8]} color={accent} intensity={.72} distance={6}/>
  </group>;
 }
-
 
 function equipmentLabel(e:Equipment, lang:"ar"|"en", index:number){
   const raw=(e.name||"").trim();
@@ -147,13 +148,16 @@ function DisplayLabelsOverlay({labels,lang}:{labels:TrackedLabel[];lang:"ar"|"en
   </div>;
 }
 
-function Scene({ tank, view, lang, onLabelsUpdate }: { tank: Tank; view:"system"|"display"; lang:"ar"|"en"; onLabelsUpdate:(labels:TrackedLabel[])=>void }) {
+function Scene({ tank, view, mode, lang, onLabelsUpdate }: { tank: Tank; view:"system"|"display"; mode:AquariumSceneMode; lang:"ar"|"en"; onLabelsUpdate:(labels:TrackedLabel[])=>void }) {
   const w=cm(tank.display.length),d=cm(tank.display.width),h=cm(tank.display.height);
   const displayY=view==="display"?.15:1.15,displayBottom=displayY-h/2,waterY=displayY+h/2-.08;
   const sumpHeight=tank.sump.enabled?cm(tank.sump.dimensions.height):.6,sumpY=-1.02,sumpBottom=sumpY-sumpHeight/2;
   const displayEquipment=tank.equipment.filter(e=>e.location==="display");
   const marine=tank.type==="marine",accent=marine?"#39dcff":"#56d99b",bg=marine?"#020b14":"#04130e";
   const showSystem=view==="system";
+  const showHabitat=mode!=="empty";
+  const showEquipment=mode==="default"||mode==="equipment";
+  const showFlow=mode==="default"||mode==="flow";
 
   const overflow=tank.equipment.find(e=>e.location==="display"&&e.kind==="overflow");
   const overflowPos=overflow
@@ -203,17 +207,17 @@ function Scene({ tank, view, lang, onLabelsUpdate }: { tank: Tank; view:"system"
       <GlassBox width={w} depth={d} height={h} position={[0,displayY,0]} edge={accent}/>
       <mesh position={[0,displayY,-d/2+.025]}><boxGeometry args={[w*.98,h*.97,.035]}/><meshStandardMaterial color={marine?"#073151":"#0b4034"} transparent opacity={.58} roughness={.7}/></mesh>
       <WaterSurface width={w*.985} depth={d*.985} y={waterY} freshwater={!marine}/>
-      <HabitatScene tank={tank} width={w} depth={d} height={h} baseY={displayBottom+.02}/>
-      <LightingRig equipment={displayEquipment} width={w} depth={d} height={h} topY={displayY+h/2+.34} marine={marine}/>
-      <DisplayEquipmentLayer tank={tank} width={w} depth={d} height={h} displayBottom={displayBottom}/>
-      <TankFlowField tank={tank} width={w} depth={d} height={h} displayBottom={displayBottom} accent={accent}/>
+      {showHabitat&&<HabitatScene tank={tank} width={w} depth={d} height={h} baseY={displayBottom+.02}/>} 
+      {showEquipment&&<LightingRig equipment={displayEquipment} width={w} depth={d} height={h} topY={displayY+h/2+.34} marine={marine}/>} 
+      {showEquipment&&<DisplayEquipmentLayer tank={tank} width={w} depth={d} height={h} displayBottom={displayBottom}/>} 
+      {showFlow&&<TankFlowField tank={tank} width={w} depth={d} height={h} displayBottom={displayBottom} accent={accent}/>} 
       {showSystem&&tank.sump.enabled&&<>
         <SumpScene tank={tank} y={sumpY}/>
-        <FlowRoute points={downPoints} direction="down" color={accent}/>
-        <FlowRoute points={upPoints} direction="up" color={accent}/>
+        {showFlow&&<FlowRoute points={downPoints} direction="down" color={accent}/>} 
+        {showFlow&&<FlowRoute points={upPoints} direction="up" color={accent}/>} 
       </>}
-      {showSystem&&<ExternalEquipmentRack tank={tank} x={w/2+1.0} y={-.15} z={-.08}/>}
-      <SceneLabelTracker tank={tank} lang={lang} width={w} depth={d} height={h} displayBottom={displayBottom} onUpdate={onLabelsUpdate}/>
+      {showSystem&&showEquipment&&<ExternalEquipmentRack tank={tank} x={w/2+1.0} y={-.15} z={-.08}/>}
+      {showEquipment&&<SceneLabelTracker tank={tank} lang={lang} width={w} depth={d} height={h} displayBottom={displayBottom} onUpdate={onLabelsUpdate}/>} 
     </group>
     <ContactShadows position={[0,showSystem?sumpBottom-.17:displayBottom-.22,0]} opacity={.42} scale={7} blur={2.8} far={4}/>
     <OrbitControls makeDefault target={[0,showSystem?.05:displayY,0]} minDistance={view==="display"?3.0:4.7} maxDistance={view==="display"?7.5:12} minPolarAngle={.7} maxPolarAngle={1.43} enablePan={false}/>
@@ -222,10 +226,11 @@ function Scene({ tank, view, lang, onLabelsUpdate }: { tank: Tank; view:"system"
 
 function liters(n:number){ return `${n.toFixed(1)} L`; }
 
-export function AquariumScene({ tank, view="system" }: { tank: Tank; view?:"system"|"display" }) {
+export function AquariumScene({ tank, view="system", mode="default" }: { tank: Tank; view?:"system"|"display"; mode?:AquariumSceneMode }) {
   const lang=useAquaStore(s=>s.language);
   const [trackedLabels,setTrackedLabels]=useState<TrackedLabel[]>([]);
   const showSystem=view==="system";
+  const showEquipment=mode==="default"||mode==="equipment";
   const camera=showSystem?{position:[4.35,1.65,7.45] as [number,number,number],fov:42}:{position:[3.55,1.9,5.7] as [number,number,number],fov:39};
 
   const sumpGross = tank.sump.enabled ? tank.sump.dimensions.length * tank.sump.dimensions.width * tank.sump.dimensions.height / 1000 : 0;
@@ -237,7 +242,6 @@ export function AquariumScene({ tank, view="system" }: { tank: Tank; view?:"syst
         <small>{lang==="ar"?"أبعاد الحوض":"Display dimensions"}</small>
         <div className="scene-side-main"><b>{tank.display.length} × {tank.display.width} × {tank.display.height}</b><em>cm</em></div>
       </div>
-
       {showSystem&&tank.sump.enabled&&<div className="scene-side-card">
         <small>{lang==="ar"?"أبعاد السامب":"Sump dimensions"}</small>
         <div className="scene-side-main"><b>{tank.sump.dimensions.length} × {tank.sump.dimensions.width} × {tank.sump.dimensions.height}</b><em>cm</em></div>
@@ -259,10 +263,10 @@ export function AquariumScene({ tank, view="system" }: { tank: Tank; view?:"syst
       </div>
     </div>
 
-    <DisplayLabelsOverlay labels={trackedLabels} lang={lang}/>
+    <DisplayLabelsOverlay labels={showEquipment?trackedLabels:[]} lang={lang}/>
 
     <Canvas shadows dpr={[1,1.6]} camera={camera} gl={{antialias:true,alpha:false,powerPreference:"high-performance"}} onCreated={({gl})=>{gl.toneMapping=THREE.ACESFilmicToneMapping;gl.toneMappingExposure=1.16;}}>
-      <Scene tank={tank} view={view} lang={lang} onLabelsUpdate={setTrackedLabels}/>
+      <Scene tank={tank} view={view} mode={mode} lang={lang} onLabelsUpdate={setTrackedLabels}/>
     </Canvas>
   </div>;
 }
