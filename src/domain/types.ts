@@ -34,6 +34,13 @@ export interface Equipment {
   displayPosition?: DisplayEquipmentPosition;
   overflowPlumbingMode?: "combined" | "separate";
   overflowReturnPosition?: DisplayEquipmentPosition;
+  powerWatts?: number;
+  hoursPerDay?: number;
+}
+
+export interface EnergySettings {
+  pricePerKwh: number;
+  currency: string;
 }
 
 export interface SumpChamber {
@@ -293,6 +300,7 @@ export interface Tank {
   sump: Sump;
   systemVolumeLiters: number;
   equipment: Equipment[];
+  energySettings?: EnergySettings;
   chemistry: ChemistryReading[];
   maintenance: MaintenanceTask[];
   livestock: LivestockItem[];
