@@ -9,6 +9,7 @@ import { tankStateView } from "./tankIntelligence";
 import { tankMood } from "./tankLearning";
 import { analyzeNutrients } from "./nutrientEngine";
 import { tankEnergy } from "./equipmentIntelligence";
+import { answerSpecialOperation } from "./aquaAIOperationAnswers";
 
 function actionDomain(page:string):AquaDomain{
  if(page==="chemistry")return "chemistry";
@@ -71,6 +72,8 @@ function snapshot(tank:Tank,plan:AquaAIQueryPlan){
 
 export function answerAquaQuery(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswer{
  const plan=buildAquaAIQueryPlan(intent);
+ const special=answerSpecialOperation(tank,intent,plan);
+ if(special)return special;
  const reasoned=reasonLocally(tank,intent);
  const snap=snapshot(tank,plan);
  const signals=reasoned.signals.filter(x=>plan.crossDomain||plan.allowedSources.includes(x.source));
@@ -87,8 +90,8 @@ export function answerAquaQuery(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswe
   summaryAr=topSignal?`أهم اتجاه ظاهر: ${topSignal.ar}`:snap.ar;
   summaryEn=topSignal?`Main visible trend: ${topSignal.en}`:snap.en;
  }
- const suffixAr=plan.operation==="why"?"تحليل السبب":plan.operation==="action"?"الخطوة التالية":plan.operation==="trend"?"الاتجاه":plan.operation==="compare"?"المقارنة":"الحالة";
- const suffixEn=plan.operation==="why"?"cause analysis":plan.operation==="action"?"next action":plan.operation==="trend"?"trend":plan.operation==="compare"?"comparison":"status";
+ const suffixAr=plan.operation==="why"?"تحليل السبب":plan.operation==="action"?"الخطوة التالية":plan.operation==="how"?"طريقة العمل":plan.operation==="when"?"الموعد":plan.operation==="list"?"القائمة":plan.operation==="count"?"العدد":plan.operation==="trend"?"الاتجاه":plan.operation==="compare"?"المقارنة":"الحالة";
+ const suffixEn=plan.operation==="why"?"cause analysis":plan.operation==="action"?"next action":plan.operation==="how"?"how to":plan.operation==="when"?"timing":plan.operation==="list"?"list":plan.operation==="count"?"count":plan.operation==="trend"?"trend":plan.operation==="compare"?"comparison":"status";
  return {
   titleAr:`${domainTitle(plan.primary,"ar")} — ${suffixAr}`,titleEn:`${domainTitle(plan.primary,"en")} — ${suffixEn}`,
   summaryAr,summaryEn,
