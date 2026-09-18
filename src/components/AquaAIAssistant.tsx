@@ -43,10 +43,11 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
   if(clean.includes("| follow-up:"))return false;
   const intent=parseAquaQuestion(clean);
   const namedTankEntity=[...tank.livestock.map(x=>x.name),...tank.livestock.map(x=>x.nameEn||""),...tank.equipment.map(x=>x.name),...tank.equipment.map(x=>x.brand||""),...tank.equipment.map(x=>x.model||"")].filter(Boolean).some(name=>clean.toLowerCase().includes(name.toLowerCase()));
-  const aquariumWords=/(حوض|احواض|أحواض|سمك|اسماك|أسماك|مرجان|مشروم|تورش|هامر|بابل|انيمون|أنيمون|روبيان|جمبري|قشريات|حلزون|نجم بحر|قنفذ|كائن|كائنات|ملوح|حرار|كيميا|كيمياء|نيترات|نترات|فوسفات|كالسيوم|مغنيسيوم|مغنزيوم|قلوي|kh\b|ca\b|mg\b|no3\b|po4\b|nh3\b|no2\b|ph\b|salinity|reef|aquarium|tank|fish|coral|shrimp|snail|livestock|skimmer|pump|heater|filter|sump|acclimation|dosing|water change|rodi|ro\/di)/i.test(clean);
+  const fishWord=/(^|\\s)(?:ال)?سمك($|\\s)|(^|\\s)(?:ال)?اسماك($|\\s)/i.test(clean);
+  const aquariumWords=fishWord||/(حوض|احواض|أحواض|مرجان|مشروم|تورش|هامر|بابل|انيمون|أنيمون|روبيان|جمبري|قشريات|حلزون|نجم بحر|قنفذ|كائن|كائنات|ملوح|حرار|كيميا|كيمياء|نيترات|نترات|فوسفات|كالسيوم|مغنيسيوم|مغنزيوم|قلوي|kh\b|ca\b|mg\b|no3\b|po4\b|nh3\b|no2\b|ph\b|salinity|reef|aquarium|tank|fish|coral|shrimp|snail|livestock|skimmer|pump|heater|filter|sump|acclimation|dosing|water change|rodi|ro\/di)/i.test(clean);
   const aquariumIntent=intent.params.length>0||intent.topics.some(x=>x!=="general")||intent.asksAboutBioload;
   if(namedTankEntity||aquariumWords||aquariumIntent)return false;
-  const explicitOutside=/(مباراة|كرة قدم|دوري|سياسة|انتخابات|رئيس|وزير|حكومة|طقس|مطر|ثلج|رسالة رسمية|ايميل|إيميل|برمجة|كود|سيرة ذاتية|سيارة|موبايل|ايفون|آيفون|اندرويد|راتب|وظيفة|وظائف|بورصة|اسهم|أسهم|بيتكوين|عملة|وصفة طبخ|طبخ|فيلم|مسلسل|اغنية|أغنية|ترجم|ترجمة|رياضيات|معادلة|من هو|مين هو|عاصمة|تاريخ|football|match|league|politic|election|president|minister|government|weather|email|resume|code|programming|car\b|phone|iphone|android|salary|job\b|stocks?|bitcoin|recipe|movie|series|song|translate|capital of|who is)/i.test(clean);
+  const explicitOutside=/(مباراة|كرة قدم|دوري|سياسة|انتخابات|رئيس|وزير|حكومة|طقس|مطر|ثلج|رسالة رسمية|ايميل|إيميل|برمجة|كود|سيرة ذاتية|سيارة|موبايل|ايفون|آيفون|اندرويد|راتب|وظيفة|وظائف|بورصة|اسهم|أسهم|بيتكوين|عملة|دولار|يورو|ليرة|سعر الصرف|صرف العملة|وصفة طبخ|طبخ|فيلم|مسلسل|اغنية|أغنية|ترجم|ترجمة|رياضيات|معادلة|من هو|مين هو|عاصمة|تاريخ|football|match|league|politic|election|president|minister|government|weather|email|resume|code|programming|car\b|phone|iphone|android|salary|job\b|stocks?|bitcoin|currency|exchange rate|dollar|euro|recipe|movie|series|song|translate|capital of|who is)/i.test(clean);
   return explicitOutside;
  }
  function scopeReply(q:string){
