@@ -535,10 +535,28 @@ export function AcclimationPage({tank}:{tank:Tank}) {
      <div className="exception-picker-footer"><span>{bi(lang,"يمكن اختيار كائن واحد أو عدة كائنات أو اختيار الكل. هذا المسار لا يوقف عداد نقل بقية الشحنة.","Choose one, several, or all items. This track does not stop the transfer timer for the rest of the shipment.")}</span><button className="btn danger" disabled={!selectedExceptionIds.length} onClick={startSelectedExceptions}>🚨 {bi(lang,"تأكيد النقل للأوعية وبدء التنقيط السريع","Confirm container transfer & start rapid drip")}</button></div>
     </div>}
    </section>
-   {emergencyItems.length>0&&<section className="card panel full-span emergency-track">
-    <div className="section-title"><div><small>FAST TRACK</small><h2>🚨 {bi(lang,"صندوق الاستثناءات — التنقيط السريع","Exception Box — Rapid Drip")}</h2><p className="note">{bi(lang,"يحتوي فقط على الكائنات المتعبة التي تم تحديدها أثناء مرحلة النقل إلى الأوعية. عداداتها مستقلة وتعمل بالتوازي مع الخطة العامة.","Contains only distressed livestock selected during the container-transfer stage. Their timers are independent and run in parallel with the main plan.")}</p></div></div>
-    <div className="emergency-track-grid">{emergencyItems.map(item=>{const rem=remaining(item,now);return <article className={`emergency-track-item ${item.status}`} key={item.id}><div className="emergency-track-head"><div><small>{releaseLaneLabel(lang,releaseLaneKey(item))}</small><h3>{lang==="ar"?item.name:(item.nameEn||item.name)} ×{item.quantity}</h3></div><span className={`status ${item.status}`}>{acclimationStatusLabel(lang,item.status)}</span></div><div className="emergency-track-meta"><span>{healthLabel(lang,item.health)}</span><span>{sensitivityLabel(lang,item.sensitivity||"normal")}</span></div><div className="emergency-track-timer">{fmt(rem)}</div><div className="acclimation-actions">{item.status==="emergency"&&<button className="btn" onClick={()=>itemAction(item.id,"pause")}>{bi(lang,"إيقاف","Pause")}</button>}{item.status==="paused"&&<button className="btn primary" onClick={()=>itemAction(item.id,"resume")}>{bi(lang,"استئناف","Resume")}</button>}{["emergency","paused"].includes(item.status)&&<button className="btn good" onClick={()=>itemAction(item.id,"ready")}>{bi(lang,"جاهز للفحص","Ready for check")}</button>}{item.status==="ready"&&<button className="btn primary" onClick={()=>markAdded(item)}>✓ {bi(lang,"تم النقل إلى الحوض","Transferred to tank")}</button>}<button className="btn warn" onClick={()=>cancelEmergency(item.id)}>↩ {bi(lang,"إرجاع للخطة العامة","Return to main plan")}</button></div></article>})}</div>
-   </section>}
+   {exceptionAllItems.length>0&&(()=>{const runtime=exceptionBoxRuntime();const visible=runtime.remainingItems;const expanded=exceptionBoxExpanded;return <section className="full-span exception-batch-board">
+    <article className={`batch-box exception-batch-box ${runtime.allAdded?"success":runtime.status}`}>
+     <button className="batch-box-head" onClick={()=>!runtime.allAdded&&setExceptionBoxExpanded(v=>!v)}>
+      <span className="batch-box-icon">🚨</span>
+      <span className="batch-box-title"><small>FAST TRACK</small><b>{bi(lang,"صندوق الاستثناءات","Exception Box")}</b><em>{runtime.allItems.length} {bi(lang,"مجموعة","groups")} • {bi(lang,"مرحلة سريعة مستقلة","Independent rapid stage")}</em></span>
+      <span className={`batch-box-status ${runtime.status}`}>{runtime.allAdded?bi(lang,"تم نقل الاستثناءات للحوض بنجاح","Exceptions transferred successfully"):runtime.status==="ready"?bi(lang,"جاهز للفحص والنقل","Ready for inspection & transfer"):acclimationStatusLabel(lang,runtime.status)}</span>
+      <span className="batch-box-timer">{runtime.allAdded?"✓":fmt(runtime.timer)}</span>
+      <span className="batch-box-chevron">{runtime.allAdded?"✓":expanded?"⌃":"⌄"}</span>
+     </button>
+     {!runtime.allAdded&&<div className="exception-batch-note">🚨 {bi(lang,"للكائنات المتعبة فقط. عند انتهاء العداد يصدر صوت الاستثناء، يفتح الصندوق تلقائياً، ثم تنقل الكائنات إلى الحوض واحداً واحداً. بقية خطة الإقلمة تستمر بدون توقف.","For distressed livestock only. When the timer ends, the exception sound plays, the box opens automatically, and livestock can be transferred one by one. The rest of the acclimation plan keeps running.")}</div>}
+     {expanded&&!runtime.allAdded&&<div className="batch-box-body">
+      {visible.map((item:AcclimationItem)=><div className={`batch-livestock-row ${item.status}`} key={item.id}>
+       <span className="batch-live-icon">{releaseLaneIcon(releaseLaneKey(item))}</span>
+       <div><b>{lang==="ar"?item.name:(item.nameEn||item.name)} ×{item.quantity}</b><small>{releaseLaneLabel(lang,releaseLaneKey(item))} • {healthLabel(lang,item.health)} • {sensitivityLabel(lang,item.sensitivity||"normal")}</small></div>
+       <div className="batch-live-actions">
+        {item.status==="ready"?<button className="btn primary" onClick={()=>markAdded(item)}>✓ {bi(lang,"تم النقل إلى الحوض","Transferred to tank")}</button>:<span className="waiting-chip">⏱ {bi(lang,"التنقيط السريع قيد التشغيل","Rapid drip running")}</span>}
+        {!["added","deferred"].includes(item.status)&&<button className="btn warn" onClick={()=>cancelEmergency(item.id)}>↩ {bi(lang,"إرجاع للخطة العامة","Return to main plan")}</button>}
+       </div>
+      </div>)}
+     </div>}
+    </article>
+   </section>})()}
    <div className="acclimation-metrics full-span"><div className="card metric"><small>{bi(lang,"الحوض","Tank")}</small><b>{tank.name}</b></div><div className="card metric"><small>{bi(lang,"العناصر","Items")}</small><b>{active.items.length}</b></div><div className="card metric"><small>{bi(lang,"تم نقلها","Transferred")}</small><b>{done}/{active.items.length}</b><div className="progress"><i style={{width:`${pct}%`}}/></div></div><div className="card metric"><small>{bi(lang,"المرحلة","Stage")}</small><b>{acclimationGuide.stage}/5</b></div></div>
    {active.dripStartedAt&&<section className="full-span batch-board">
     <div className="section-title"><div><h2>{bi(lang,"دفعات التنقيط — كلها تعد بالتوازي","Drip batches — all timers run in parallel")}</h2><p className="note">{bi(lang,"كل صندوق له عداده الخاص. عند انتهاء عداد أي دفعة يصدر صوت النوع، يُفتح الصندوق تلقائياً، وتظهر أزرار نقل الكائنات إلى الحوض. بقية العدادات تستمر بدون توقف.","Each box has its own timer. When a batch finishes, its category sound plays, the box opens automatically, and transfer buttons appear. All other timers continue without interruption.")}</p></div></div>
