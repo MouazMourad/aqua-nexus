@@ -1,5 +1,6 @@
 import type { HealthSnapshot, Tank, TimelineEvent } from "./types";
 import { bioload, chemistryAgeDays, chemistryHealth, chemistryHistoryScore, maintenanceHealth, tankHealth } from "./health";
+import { chemistryGuidance } from "./chemistryGuidance";
 
 export type TankStateBand = "excellent" | "stable" | "watch" | "stressed" | "critical";
 
@@ -89,13 +90,28 @@ export function tankStateView(tank:Tank):TankStateView {
   const text=bandText(band);
   const drivers:StateDriver[]=[];
   const chem=chemistryHealth(tank),maint=maintenanceHealth(tank),age=chemistryAgeDays(tank),bio=bioload(tank);
+  const chemGuide=chemistryGuidance(tank);
   const overdue=tank.maintenance.filter(x=>!x.done&&x.nextDue&&x.nextDue<new Date().toISOString().slice(0,10));
   const equipment=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
   const livestock=tank.livestock.filter(x=>x.health==="watch"||x.health==="treatment");
 
+  if(chemGuide.dataIssues.length){
+    const issue=chemGuide.dataIssues[0];
+    drivers.push({level:"danger",ar:`مشكلة بيانات كيميائية: ${issue.reasonAr}`,en:`Chemistry data issue: ${issue.reasonEn}`});
+  }
+
   if(chem<60)drivers.push({level:"danger",ar:`الكيمياء هي العامل الأضعف حالياً (${chem}%).`,en:`Chemistry is currently the weakest driver (${chem}%).`});
   else if(chem<80)drivers.push({level:"warn",ar:`الكيمياء تحتاج متابعة (${chem}%).`,en:`Chemistry needs attention (${chem}%).`});
   else drivers.push({level:"good",ar:`الكيمياء ضمن حالة جيدة (${chem}%).`,en:`Chemistry is in good condition (${chem}%).`});
+
+  chemGuide.problems
+    .filter(item=>!item.suspectedFormat)
+    .slice(0,2)
+    .forEach(item=>drivers.push({
+      level:item.level==="danger"?"danger":"warn",
+      ar:`${item.reasonAr} الإجراء المقترح: ${item.actionAr}`,
+      en:`${item.reasonEn} Suggested action: ${item.actionEn}`
+    }));
 
   if(maint<70||overdue.length)drivers.push({level:maint<50?"danger":"warn",ar:`الصيانة ${maint}%${overdue.length?` • ${overdue.length} مهمة متأخرة`:""}.`,en:`Maintenance is ${maint}%${overdue.length?` • ${overdue.length} overdue task(s)`:""}.`});
   if(age>7)drivers.push({level:"warn",ar:`آخر فحص كيميائي منذ ${Math.floor(age)} يوم.`,en:`The last chemistry test was ${Math.floor(age)} days ago.`});
