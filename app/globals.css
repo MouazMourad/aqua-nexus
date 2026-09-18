@@ -1518,3 +1518,169 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .acclimation-timer-alert>span{width:30px;height:30px;font-size:16px}
   .acclimation-timer-alert b{font-size:9px}
 }
+
+
+/* ===== Live acclimation workflow + next action ===== */
+.acclimation-live-guide{
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 88% 0%,rgba(var(--theme-rgb),.10),transparent 34%),
+    linear-gradient(180deg,rgba(7,32,45,.92),rgba(4,22,31,.96));
+}
+.acclimation-live-guide-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+.acclimation-live-guide-head small{
+  display:block;
+  font-size:8px;
+  letter-spacing:.14em;
+  color:var(--accent);
+  font-weight:900;
+}
+.acclimation-live-guide-head h2{
+  margin:3px 0 0;
+  font-size:18px;
+}
+.acclimation-live-guide-head>span{
+  flex:0 0 auto;
+  padding:6px 8px;
+  border-radius:999px;
+  border:1px solid rgba(var(--theme-rgb),.20);
+  background:rgba(var(--theme-rgb),.06);
+  font-size:8px;
+  color:#bdeef4;
+}
+.acclimation-phase-rail{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:6px;
+  margin:12px 0;
+}
+.acclimation-phase{
+  position:relative;
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:8px;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:11px;
+  background:rgba(255,255,255,.025);
+  opacity:.58;
+}
+.acclimation-phase>span{
+  flex:0 0 auto;
+  width:27px;height:27px;
+  display:grid;place-items:center;
+  border-radius:9px;
+  background:rgba(255,255,255,.035);
+}
+.acclimation-phase b{
+  min-width:0;
+  font-size:8px;
+  line-height:1.3;
+}
+.acclimation-phase.past{
+  opacity:.82;
+  border-color:rgba(91,224,167,.16);
+}
+.acclimation-phase.past>span{
+  background:rgba(91,224,167,.08);
+}
+.acclimation-phase.active{
+  opacity:1;
+  border-color:rgba(var(--theme-rgb),.42);
+  background:rgba(var(--theme-rgb),.08);
+  box-shadow:0 0 0 1px rgba(var(--theme-rgb),.07),0 8px 24px rgba(0,0,0,.12);
+}
+.acclimation-now{
+  display:grid;
+  grid-template-columns:44px minmax(0,1fr) auto;
+  gap:11px;
+  align-items:center;
+  padding:12px;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:15px;
+  background:rgba(4,19,27,.58);
+}
+.acclimation-now.ready{border-color:rgba(91,224,167,.28);background:rgba(28,92,68,.11)}
+.acclimation-now.running{border-color:rgba(66,215,231,.25);background:rgba(26,94,111,.10)}
+.acclimation-now.action{border-color:rgba(255,201,99,.27);background:rgba(111,79,24,.10)}
+.acclimation-now.done{border-color:rgba(91,224,167,.36);background:rgba(28,92,68,.14)}
+.acclimation-now-icon{
+  width:44px;height:44px;
+  display:grid;place-items:center;
+  border-radius:13px;
+  background:rgba(255,255,255,.04);
+  font-size:23px;
+}
+.acclimation-now-copy small{
+  display:block;
+  font-size:8px;
+  color:var(--accent);
+  font-weight:900;
+}
+.acclimation-now-copy h3{
+  margin:3px 0 4px;
+  font-size:15px;
+}
+.acclimation-now-copy p{
+  margin:0;
+  max-width:760px;
+  font-size:9px;
+  line-height:1.6;
+  color:var(--muted);
+}
+.acclimation-now-copy em{
+  display:block;
+  margin-top:6px;
+  font-size:8px;
+  font-style:normal;
+  color:#ffb4ba;
+}
+.acclimation-now-actions{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  gap:6px;
+  max-width:420px;
+}
+.acclimation-now-actions .btn{
+  font-size:8px;
+  padding:7px 9px;
+  white-space:nowrap;
+}
+@media(max-width:850px){
+  .acclimation-phase-rail{
+    display:flex;
+    overflow-x:auto;
+    padding-bottom:3px;
+  }
+  .acclimation-phase{
+    flex:0 0 145px;
+  }
+  .acclimation-now{
+    grid-template-columns:40px minmax(0,1fr);
+  }
+  .acclimation-now-icon{width:40px;height:40px}
+  .acclimation-now-actions{
+    grid-column:1/-1;
+    max-width:none;
+    justify-content:stretch;
+  }
+  .acclimation-now-actions .btn{flex:1 1 150px}
+}
+@media(max-width:520px){
+  .acclimation-live-guide{padding:10px!important}
+  .acclimation-live-guide-head h2{font-size:16px}
+  .acclimation-live-guide-head>span{font-size:7px}
+  .acclimation-phase{flex-basis:128px;padding:7px}
+  .acclimation-phase b{font-size:7px}
+  .acclimation-now{padding:9px;gap:8px}
+  .acclimation-now-copy h3{font-size:13px}
+  .acclimation-now-copy p{font-size:8px}
+  .acclimation-now-actions .btn{width:100%;flex-basis:100%}
+}
