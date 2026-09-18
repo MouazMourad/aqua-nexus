@@ -458,94 +458,49 @@ export function AcclimationPage({tank}:{tank:Tank}) {
 
   {step>=5&&<>
    {timerAlerts.length>0&&<div className="acclimation-alert-stack full-span">{timerAlerts.map(a=><div className={`acclimation-timer-alert ${soundFamily(a.lane)}`} key={a.id}><span>{a.lane==="fish"?"🐠":a.lane==="coral"?"🪸":a.lane==="plant"||a.lane==="macroalgae"?"🌿":a.lane==="emergency"?"🚨":a.lane==="global"?"⏱":"🦐"}</span><b>{a.message}</b><button onClick={()=>setTimerAlerts(v=>v.filter(x=>x.id!==a.id))}>×</button></div>)}</div>}
-   <section className="card panel full-span acclimation-live-guide">
-    <div className="acclimation-live-guide-head"><div><small>LIVE WORKFLOW</small><h2>{bi(lang,"مراحل الإقلمة","Acclimation stages")}</h2></div><span>{bi(lang,`المرحلة الحالية ${acclimationGuide.stage}/5`,`Current stage ${acclimationGuide.stage}/5`)}</span></div>
+   <section className="card panel full-span acclimation-master-stage">
+    <div className="acclimation-live-guide-head"><div><small>LIVE ACCLIMATION</small><h2>{bi(lang,"مراحل الإقلمة — شو عم يعد هلق؟","Acclimation stages — what is counting now?")}</h2></div><span>{bi(lang,`المرحلة ${acclimationGuide.stage}/5`,`Stage ${acclimationGuide.stage}/5`)}</span></div>
     <div className="acclimation-phase-rail">
-     {[
-      {ar:"موازنة الحرارة",en:"Temperature",ico:"🌡️"},
-      {ar:"النقل للأوعية",en:"Containers",ico:"🪣"},
-      {ar:"التنقيط المتوازي",en:"Parallel drip",ico:"💧"},
-      {ar:"الفحص النهائي",en:"Final check",ico:"🔎"},
-      {ar:"التنزيل والتوثيق",en:"Release & log",ico:"✅"}
-     ].map((p,i)=>{const n=i+1;return <div key={n} className={`acclimation-phase ${n===acclimationGuide.stage?"active":n<acclimationGuide.stage?"past":""}`}><span>{p.ico}</span><b>{n}. {lang==="ar"?p.ar:p.en}</b></div>})}
+     {[{ar:"موازنة الحرارة",en:"Temperature",ico:"🌡️"},{ar:"النقل للأوعية",en:"Containers",ico:"🪣"},{ar:"التنقيط المتوازي",en:"Parallel drip",ico:"💧"},{ar:"الفحص والنقل",en:"Inspect & transfer",ico:"🔎"},{ar:"التوثيق",en:"Log complete",ico:"✅"}].map((p,i)=>{const n=i+1;return <div key={n} className={`acclimation-phase ${n===acclimationGuide.stage?"active":n<acclimationGuide.stage?"past":""}`}><span>{p.ico}</span><b>{n}. {lang==="ar"?p.ar:p.en}</b></div>})}
     </div>
-    <div className={`acclimation-now ${acclimationGuide.tone}`}>
-     <div className="acclimation-now-icon">{acclimationGuide.stage===1?"🌡️":acclimationGuide.stage===2?"🪣":acclimationGuide.stage===3?"⏱️":acclimationGuide.stage===4?"🔎":"✅"}</div>
-     <div className="acclimation-now-copy"><small>{bi(lang,"شو تعمل هلق؟","What should you do now?")}</small><h3>{acclimationGuide.title}</h3><p>{acclimationGuide.detail}</p>{emergencyItems.length>0&&<em>🚨 {bi(lang,`انتبه: في ${emergencyItems.length} كائن/مجموعة بالمسار الاستثنائي السريع بالتوازي.`,`Attention: ${emergencyItems.length} item/group is running in the rapid exception track in parallel.`)}</em>}</div>
-     <div className="acclimation-now-actions">
-      {!active.floatConfirmed&&active.floatStatus==="ready"&&<button className="btn good" onClick={()=>floatAction("done")}>✓ {bi(lang,"تأكيد انتهاء موازنة الحرارة","Confirm temperature stage")}</button>}
-      {active.floatConfirmed&&acclimationGuide.stage===2&&releaseLanes.map(lane=>{const runtime=laneRuntime(lane);return !runtime.completed&&!runtime.started&&runtime.items.some((i:AcclimationItem)=>i.status==="waiting")?<button key={lane.key} className="btn primary" onClick={()=>startLaneBatch(lane.key,runtime.currentBatch)}>{releaseLaneIcon(lane.key)} {bi(lang,`ابدأ ${releaseLaneLabel(lang,lane.key)} — دفعة ${runtime.currentBatch}`,`Start ${releaseLaneLabel(lang,lane.key)} — Batch ${runtime.currentBatch}`)}</button>:null})}
-      {acclimationGuide.stage===4&&releaseLanes.map(lane=>{const runtime=laneRuntime(lane);return runtime.items.some((i:AcclimationItem)=>i.status==="ready")?<button key={lane.key} className="btn good" onClick={()=>setExpandedLanes(v=>({...v,[lane.key]:true}))}>{releaseLaneIcon(lane.key)} {bi(lang,`افتح ${releaseLaneLabel(lang,lane.key)} للفحص`,`Open ${releaseLaneLabel(lang,lane.key)} for inspection`)}</button>:null})}
+    <div className={`master-stage-box ${acclimationGuide.tone}`}>
+     <div className="master-stage-copy"><small>{bi(lang,"المرحلة الحالية","Current stage")}</small><h3>{acclimationGuide.title}</h3><p>{acclimationGuide.detail}</p>{emergencyItems.length>0&&<em>🚨 {bi(lang,`هناك ${emergencyItems.length} كائن/مجموعة في المسار الاستثنائي السريع بالتوازي.`,`There are ${emergencyItems.length} item/group(s) in the parallel rapid exception track.`)}</em>}</div>
+     <div className="master-stage-timer">
+      <small>{!active.floatConfirmed?bi(lang,"عداد موازنة الحرارة — لكل الشحنة","Temperature timer — whole shipment"):active.bucketStatus!=="done"?bi(lang,"عداد النقل إلى الأوعية — لكل الشحنة","Container-transfer timer — whole shipment"):!active.dripStartedAt?bi(lang,"جاهز لبدء التنقيط","Ready to start drip"):bi(lang,"أقرب دفعة ستصبح جاهزة","Next batch ready in")}</small>
+      <b>{!active.floatConfirmed?fmt(floatRem):active.bucketStatus!=="done"?fmt(bucketRem):!active.dripStartedAt?"05:00":fmt(nearestBatchRem)}</b>
+     </div>
+     <div className="master-stage-actions">
+      {!active.floatConfirmed&&active.floatStatus==="running"&&<button className="btn" onClick={()=>floatAction("pause")}>{bi(lang,"إيقاف مؤقت","Pause")}</button>}
+      {!active.floatConfirmed&&active.floatStatus==="paused"&&<button className="btn primary" onClick={()=>floatAction("resume")}>{bi(lang,"استئناف","Resume")}</button>}
+      {!active.floatConfirmed&&["running","paused"].includes(active.floatStatus||"")&&<button className="btn" onClick={()=>floatAction("plus5")}>+5</button>}
+      {!active.floatConfirmed&&active.floatStatus==="ready"&&<button className="btn good" onClick={()=>floatAction("done")}>✓ {bi(lang,"تأكيد الحرارة — ابدأ 5 دقائق النقل للأوعية","Confirm temperature — start 5-minute container transfer")}</button>}
+      {active.floatConfirmed&&active.bucketStatus==="running"&&<button className="btn" onClick={()=>bucketAction("pause")}>{bi(lang,"إيقاف مؤقت","Pause")}</button>}
+      {active.floatConfirmed&&active.bucketStatus==="paused"&&<button className="btn primary" onClick={()=>bucketAction("resume")}>{bi(lang,"استئناف","Resume")}</button>}
+      {active.floatConfirmed&&active.bucketStatus==="ready"&&<button className="btn good" onClick={()=>bucketAction("done")}>✓ {bi(lang,"تم نقل كل الكائنات إلى الأوعية","All livestock moved to containers")}</button>}
+      {active.floatConfirmed&&active.bucketStatus==="done"&&!active.dripStartedAt&&<button className="btn primary master-drip-start" onClick={startAllDripBatches}>💧 {bi(lang,"ابدأ التنقيط لكل الدفعات الآن","Start drip acclimation for all batches now")}</button>}
      </div>
     </div>
    </section>
-   {emergencyItems.length>0&&<div className="acclimation-emergency full-span">🚨 <b>{bi(lang,"مسار استثنائي سريع يعمل بالتوازي","Rapid exception track running in parallel")}</b> — {emergencyItems.map(x=>lang==="ar"?x.name:(x.nameEn||x.name)).join(", ")}</div>}
-   <div className="acclimation-metrics full-span"><div className="card metric"><small>{bi(lang,"الحوض","Tank")}</small><b>{tank.name}</b></div><div className="card metric"><small>{bi(lang,"العناصر","Items")}</small><b>{active.items.length}</b></div><div className="card metric"><small>{bi(lang,"التقدم","Progress")}</small><b>{done}/{active.items.length}</b><div className="progress"><i style={{width:`${pct}%`}}/></div></div><div className="card metric"><small>{bi(lang,"الحالة","Status")}</small><b>{pct===100?bi(lang,"مكتمل","Complete"):bi(lang,"قيد الإقلمة","Acclimating")}</b></div></div>
-   <section className="card panel full-span acclimation-stage"><div className="section-title"><div><small>1</small><h2>{bi(lang,"موازنة حرارة الأكياس المغلقة","Global sealed-bag temperature equalization")}</h2></div><span className={`status ${active.floatStatus}`}>{acclimationStatusLabel(lang,active.floatStatus)}</span></div><div className="stage-timer">{fmt(floatRem)}</div><p className="note">{bi(lang,"يمكن وضع الأكياس المغلقة معاً. لا تفتحها قبل تأكيد انتهاء هذه المرحلة.","All sealed bags can float together. Do not open them before confirming this stage.")}</p><div className="acclimation-actions">{active.floatStatus==="running"&&<button className="btn" onClick={()=>floatAction("pause")}>{bi(lang,"إيقاف","Pause")}</button>}{active.floatStatus==="paused"&&<button className="btn primary" onClick={()=>floatAction("resume")}>{bi(lang,"استئناف","Resume")}</button>}<button className="btn" onClick={()=>floatAction("plus5")}>+5</button><button className="btn" onClick={()=>floatAction("plus15")}>+15</button>{(active.floatStatus==="ready"||active.floatStatus==="paused"||active.floatStatus==="running")&&<button className="btn good" onClick={()=>floatAction("done")}>{bi(lang,"تأكيد انتهاء المرحلة","Confirm stage complete")}</button>}</div></section>
    {emergencyItems.length>0&&<section className="card panel full-span emergency-track">
-    <div className="section-title"><div><small>FAST TRACK</small><h2>🚨 {bi(lang,"الإقلمة الاستثنائية السريعة","Rapid Exception Acclimation")}</h2><p className="note">{bi(lang,"هذا المسار مستقل ويعمل بالتوازي مع الخطة العامة. يختصر الوقت للكائن المتعب مع إبقاء فحص الحالة والحرارة والملوحة أولوية قبل النقل.","This independent track runs in parallel with the main plan. It shortens acclimation for distressed livestock while keeping condition, temperature and salinity checks mandatory before transfer.")}</p></div></div>
-    <div className="emergency-checks"><span>✓ {bi(lang,"فحص الحالة والتنفس / الاستجابة","Condition + breathing / response check")}</span><span>✓ {bi(lang,"تأكيد الحرارة","Confirm temperature")}</span>{tank.type==="marine"&&<span>✓ {bi(lang,"مراجعة فرق الملوحة","Check salinity difference")}</span>}</div>
-    <div className="emergency-track-grid">{emergencyItems.map(item=>{const rem=remaining(item,now);return <article className={`emergency-track-item ${item.status}`} key={item.id}>
-      <div className="emergency-track-head"><div><small>{categoryText(lang,item.category)}{item.subtype?` • ${subtypeLabel(lang,item.subtype)}`:""}</small><h3>{lang==="ar"?item.name:(item.nameEn||item.name)} ×{item.quantity}</h3></div><span className={`status ${item.status}`}>{acclimationStatusLabel(lang,item.status)}</span></div>
-      <div className="emergency-track-meta"><span>{healthLabel(lang,item.health)}</span><span>{sensitivityLabel(lang,item.sensitivity||"normal")}</span><span>{bi(lang,"زمن سريع مقترح","Rapid target")}: {Math.round(emergencyDuration(item)/60000)} {bi(lang,"د","min")}</span></div>
-      {["emergency","paused","ready"].includes(item.status)&&<div className="emergency-track-timer">{fmt(rem)}</div>}
-      <p>{bi(lang,"انتهاء العداد يعني جاهز للفحص النهائي، وليس أمراً تلقائياً بالنقل.","Timer completion means ready for final assessment, not automatic transfer.")}</p>
-      <div className="acclimation-actions">
-       {item.status==="emergency"&&<button className="btn" onClick={()=>itemAction(item.id,"pause")}>{bi(lang,"إيقاف","Pause")}</button>}
-       {item.status==="paused"&&<button className="btn primary" onClick={()=>itemAction(item.id,"resume")}>{bi(lang,"استئناف","Resume")}</button>}
-       {["emergency","paused","ready"].includes(item.status)&&<><button className="btn" onClick={()=>itemAction(item.id,"plus5")}>+5</button><button className="btn" onClick={()=>itemAction(item.id,"plus15")}>+15</button></>}
-       {["emergency","paused"].includes(item.status)&&<button className="btn good" onClick={()=>itemAction(item.id,"ready")}>{bi(lang,"جاهز للفحص","Ready for check")}</button>}
-       {item.status==="ready"&&<button className="btn primary" onClick={()=>markAdded(item)}>{bi(lang,"نقل الكائن فقط — بدون ماء الشحنة","Transfer animal only — no shipping water")}</button>}
-       <button className="btn warn" onClick={()=>cancelEmergency(item.id)}>↩ {bi(lang,"إرجاع للخطة العامة","Return to main plan")}</button>
-      </div>
-     </article>})}</div>
+    <div className="section-title"><div><small>FAST TRACK</small><h2>🚨 {bi(lang,"الإقلمة الاستثنائية السريعة","Rapid Exception Acclimation")}</h2><p className="note">{bi(lang,"المسار الاستثنائي مستقل عن عدادات الدفعات العامة ويستمر بالتوازي معها.","The exception track is independent from the normal batch timers and continues in parallel.")}</p></div></div>
+    <div className="emergency-track-grid">{emergencyItems.map(item=>{const rem=remaining(item,now);return <article className={`emergency-track-item ${item.status}`} key={item.id}><div className="emergency-track-head"><div><small>{releaseLaneLabel(lang,releaseLaneKey(item))}</small><h3>{lang==="ar"?item.name:(item.nameEn||item.name)} ×{item.quantity}</h3></div><span className={`status ${item.status}`}>{acclimationStatusLabel(lang,item.status)}</span></div><div className="emergency-track-meta"><span>{healthLabel(lang,item.health)}</span><span>{sensitivityLabel(lang,item.sensitivity||"normal")}</span></div><div className="emergency-track-timer">{fmt(rem)}</div><div className="acclimation-actions">{item.status==="emergency"&&<button className="btn" onClick={()=>itemAction(item.id,"pause")}>{bi(lang,"إيقاف","Pause")}</button>}{item.status==="paused"&&<button className="btn primary" onClick={()=>itemAction(item.id,"resume")}>{bi(lang,"استئناف","Resume")}</button>}{["emergency","paused"].includes(item.status)&&<button className="btn good" onClick={()=>itemAction(item.id,"ready")}>{bi(lang,"جاهز للفحص","Ready for check")}</button>}{item.status==="ready"&&<button className="btn primary" onClick={()=>markAdded(item)}>✓ {bi(lang,"تم النقل إلى الحوض","Transferred to tank")}</button>}<button className="btn warn" onClick={()=>cancelEmergency(item.id)}>↩ {bi(lang,"إرجاع للخطة العامة","Return to main plan")}</button></div></article>})}</div>
    </section>}
-   <section className="full-span parallel-release-section">
- <div className="section-title"><div><h2>{bi(lang,"خطة الإقلمة المتوازية","Parallel acclimation plan")}</h2><p className="note">{bi(lang,"الأسماك والقشريات والمرجان وبقية المجموعات تعمل كمسارات مستقلة بالتوازي؛ لا تنتظر مجموعة انتهاء الأخرى. داخل كل مسار يتم التقسيم إلى دفعات مرتبة حسب الحساسية وحالة الوصول والسلوك.","Fish, crustaceans, corals and the other groups run as independent parallel lanes; one group does not wait for another to finish. Each lane is split into batches ordered by sensitivity, arrival condition and temperament.")}</p></div></div>
- <div className="parallel-lane-overview">{releaseLanes.map(lane=><span key={lane.key}><i>{releaseLaneIcon(lane.key)}</i><b>{releaseLaneLabel(lang,lane.key)}</b><small>{lane.total} {bi(lang,"مجموعة","groups")} • {lane.totalBatches} {bi(lang,"دفعات","batches")}</small></span>)}</div>
- <div className="parallel-release-note">↔ <b>{bi(lang,"تعمل جميع المسارات بالتوازي","All lanes run in parallel")}</b><span>{bi(lang,"بعد تأكيد موازنة الحرارة يمكنك بدء تنقيط دفعة أسماك ودفعة قشريات ودفعة مرجان بنفس الوقت، وكل عداد يعمل مستقلاً.","After temperature equalization is confirmed, you can start a fish batch, a crustacean batch and a coral batch at the same time; every timer runs independently.")}</span></div>
- <div className="release-lanes">
-  {releaseLanes.map(lane=>{const runtime=laneRuntime(lane);const expanded=Boolean(expandedLanes[lane.key]);return <section className={`release-lane ${expanded?"expanded":""}`} key={lane.key}>
-   <div className="release-lane-summary">
-    <button type="button" className="release-lane-toggle" onClick={()=>setExpandedLanes(v=>({...v,[lane.key]:!v[lane.key]}))}>
-     <span className="release-lane-icon">{releaseLaneIcon(lane.key)}</span>
-     <span className="release-lane-title"><small>{bi(lang,"مسار مستقل • يعمل بالتوازي","Independent lane • runs in parallel")}</small><b>{releaseLaneLabel(lang,lane.key)}</b><em>{lane.total} {bi(lang,"مجموعة","groups")} • {lane.totalBatches} {bi(lang,"دفعات","batches")}</em></span>
-     <span className={`lane-state ${runtime.status}`}>{runtime.completed?bi(lang,"مكتمل","Complete"):acclimationStatusLabel(lang,runtime.status)}</span>
-     <span className="lane-outer-timer"><small>{runtime.completed?bi(lang,"انتهى","Done"):bi(lang,`الدفعة ${runtime.currentBatch}`,`Batch ${runtime.currentBatch}`)}</small><b>{runtime.completed?"00:00":fmt(runtime.timer)}</b></span>
-     <span className="lane-chevron">{expanded?"⌃":"⌄"}</span>
-    </button>
-    {!runtime.completed&&<div className="lane-quick-actions">
-     {!runtime.started&&<button className="btn primary" disabled={!active.floatConfirmed||!runtime.items.some((i:AcclimationItem)=>i.status==="waiting")} onClick={()=>startLaneBatch(lane.key,runtime.currentBatch)}>▶ {bi(lang,`ابدأ الدفعة ${runtime.currentBatch}`,`Start Batch ${runtime.currentBatch}`)}</button>}
-     {runtime.started&&<span className="lane-running-note">⏱ {bi(lang,"العداد يعمل بشكل مستقل","Independent timer running")}</span>}
-    </div>}
-   </div>
-   {expanded&&<div className="release-lane-details">
-    <div className="release-batch-chips lane-batches">{lane.batches.map(x=><span key={x.batch} className={`${x.sensitive?"has-sensitive":""} ${x.batch===runtime.currentBatch?"current":""}`}><b>{bi(lang,`دفعة ${x.batch}`,`Batch ${x.batch}`)}</b><small>{x.count} {bi(lang,"مجموعة","groups")}{x.sensitive?` • ${x.sensitive} ${bi(lang,"حساسة","sensitive")}`:""}</small></span>)}</div>
-    <div className="acclimation-queue">
-     {lane.entries.map(({item,order,batch,totalBatches})=>{const rem=remaining(item,now);return <article className={`acclimation-item ${item.status}`} key={item.id}>
-      <div className="batch-ribbon"><b>{bi(lang,`دفعة ${batch}`,`Batch ${batch}`)}</b>{totalBatches>1&&<small>{batch}/{totalBatches}</small>}</div>
-      {item.imageDataUrl?<img className="acclimation-item-photo" src={item.imageDataUrl} alt=""/>:<div className="acclimation-item-photo placeholder">{icon[item.category]}</div>}
-      <div className="itembody"><div className="itemhead"><div><small>{releaseLaneLabel(lang,lane.key)} • {bi(lang,`ترتيب #${order}`,`Order #${order}`)}</small><h3>{lang==="ar"?item.name:(item.nameEn||item.name)} ×{item.quantity}</h3></div><span className={`status ${item.status}`}>{acclimationStatusLabel(lang,item.status)}</span></div>
-       <div className="meta"><span className="pill">{healthLabel(lang,item.health)}</span>{item.subtype&&<span className="pill">{subtypeLabel(lang,item.subtype)}</span>}<span className="pill">{temperamentLabel(lang,item.temperament||"peaceful")}</span><span className="pill">{sensitivityLabel(lang,item.sensitivity||"normal")}</span></div>
-       <p className="placement">📍 {item.placement||"—"}</p>
-       {["acclimating","paused","ready"].includes(item.status)&&<div className="item-timer">{fmt(rem)}</div>}
-       <div className="acclimation-actions">
-        {item.status==="waiting"&&<button className="btn primary" disabled={!active.floatConfirmed} onClick={()=>startDrip(item.id)}>{bi(lang,"تم النقل — ابدأ التنقيط","Transferred — start drip")}</button>}
-        {item.status==="acclimating"&&<button className="btn" onClick={()=>itemAction(item.id,"pause")}>{bi(lang,"إيقاف","Pause")}</button>}
-        {item.status==="paused"&&<button className="btn primary" onClick={()=>itemAction(item.id,"resume")}>{bi(lang,"استئناف","Resume")}</button>}
-        {["acclimating","paused","ready"].includes(item.status)&&<><button className="btn" onClick={()=>itemAction(item.id,"plus5")}>+5</button><button className="btn" onClick={()=>itemAction(item.id,"plus15")}>+15</button></>}
-        {["acclimating","paused"].includes(item.status)&&<button className="btn good" onClick={()=>itemAction(item.id,"ready")}>{bi(lang,"جاهز للفحص","Ready for check")}</button>}
-        {item.status==="ready"&&<button className="btn primary" onClick={()=>markAdded(item)}>{bi(lang,"نقل الكائن فقط — بدون ماء الشحنة","Transfer animal only — no shipping water")}</button>}
-        {!["added","deferred"].includes(item.status)&&<button className="btn warn" onClick={()=>itemAction(item.id,"defer")}>{bi(lang,"تخطي / تأجيل","Skip / defer")}</button>}
-        {!["added","deferred"].includes(item.status)&&<button className="btn danger" onClick={()=>startEmergency(item.id)}>🚨 {bi(lang,"إضافة استثنائية","Add exception")}</button>}
-       </div>
-      </div>
+   <div className="acclimation-metrics full-span"><div className="card metric"><small>{bi(lang,"الحوض","Tank")}</small><b>{tank.name}</b></div><div className="card metric"><small>{bi(lang,"العناصر","Items")}</small><b>{active.items.length}</b></div><div className="card metric"><small>{bi(lang,"تم نقلها","Transferred")}</small><b>{done}/{active.items.length}</b><div className="progress"><i style={{width:`${pct}%`}}/></div></div><div className="card metric"><small>{bi(lang,"المرحلة","Stage")}</small><b>{acclimationGuide.stage}/5</b></div></div>
+   {active.dripStartedAt&&<section className="full-span batch-board">
+    <div className="section-title"><div><h2>{bi(lang,"دفعات التنقيط — كلها تعد بالتوازي","Drip batches — all timers run in parallel")}</h2><p className="note">{bi(lang,"كل صندوق له عداده الخاص. عند انتهاء عداد أي دفعة يصدر صوت النوع، يُفتح الصندوق تلقائياً، وتظهر أزرار نقل الكائنات إلى الحوض. بقية العدادات تستمر بدون توقف.","Each box has its own timer. When a batch finishes, its category sound plays, the box opens automatically, and transfer buttons appear. All other timers continue without interruption.")}</p></div></div>
+    <div className="batch-board-grid">
+     {releaseBatches.map(batch=>{const runtime=batchRuntime(batch);const expanded=Boolean(expandedBatches[batch.id]);const visibleItems=runtime.remainingItems.filter((i:AcclimationItem)=>!i.emergency);const isReady=runtime.status==="ready";return <article className={`batch-box ${runtime.allAdded?"success":runtime.status}`} key={batch.id}>
+      <button className="batch-box-head" onClick={()=>!runtime.allAdded&&setExpandedBatches(v=>({...v,[batch.id]:!v[batch.id]}))}>
+       <span className="batch-box-icon">{releaseLaneIcon(batch.lane)}</span><span className="batch-box-title"><small>{releaseLaneLabel(lang,batch.lane)}</small><b>{bi(lang,`الدفعة ${batch.batch}`,`Batch ${batch.batch}`)} {batch.totalBatches>1?`/ ${batch.totalBatches}`:""}</b><em>{runtime.allItems.length} {bi(lang,"مجموعة","groups")} • {batch.plannedMinutes} {bi(lang,"دقيقة مخططة","planned min")}</em></span>
+       <span className={`batch-box-status ${runtime.status}`}>{runtime.allAdded?bi(lang,"تم نقل الدفعة للحوض بنجاح","Batch transferred successfully"):acclimationStatusLabel(lang,runtime.status)}</span>
+       <span className="batch-box-timer">{runtime.allAdded?"✓":fmt(runtime.timer)}</span><span className="batch-box-chevron">{runtime.allAdded?"✓":expanded?"⌃":"⌄"}</span>
+      </button>
+      {expanded&&!runtime.allAdded&&<div className="batch-box-body">
+       {visibleItems.length===0?<div className="batch-empty">{bi(lang,"لا توجد عناصر متبقية في هذه الدفعة ضمن المسار العام.","No remaining items in this normal batch.")}</div>:visibleItems.map((item:AcclimationItem)=><div className={`batch-livestock-row ${item.status}`} key={item.id}><span className="batch-live-icon">{icon[item.category]}</span><div><b>{lang==="ar"?item.name:(item.nameEn||item.name)} ×{item.quantity}</b><small>{healthLabel(lang,item.health)} • {sensitivityLabel(lang,item.sensitivity||"normal")}{item.subtype?` • ${subtypeLabel(lang,item.subtype)}`:""}</small></div><div className="batch-live-actions">{item.status==="ready"?<button className="btn primary" onClick={()=>markAdded(item)}>✓ {bi(lang,"تم النقل إلى الحوض","Transferred to tank")}</button>:<span className="waiting-chip">⏱ {bi(lang,"بانتظار انتهاء عداد الدفعة","Waiting for batch timer")}</span>}{!["added","deferred"].includes(item.status)&&<button className="btn danger" onClick={()=>startEmergency(item.id)}>🚨 {bi(lang,"استثناء","Exception")}</button>}</div></div>)}
+      </div>}
      </article>})}
     </div>
-   </div>}
-  </section>})}
- </div>
-</section>
+   </section>}
    <section className="card panel full-span acclimation-registry" id="acclimationRegistry"><div className="section-title"><div><h2>{bi(lang,"سجل الكائنات المدخلة","Livestock Input Register")}</h2><p className="note">{bi(lang,"يمكن طباعته أو حفظه PDF من المتصفح.","Print or save as PDF from the browser.")}</p></div><div className="actions"><button className="btn" onClick={()=>window.print()}>🖨 {bi(lang,"طباعة / PDF","Print / PDF")}</button><button className="btn" onClick={exportTxt}>TXT</button></div></div><div className="record-wrap"><table className="records"><thead><tr><th>#</th><th>{bi(lang,"النوع","Species")}</th><th>{bi(lang,"الفئة","Category")}</th><th>{bi(lang,"الصحة","Health")}</th><th>{bi(lang,"الحالة","Status")}</th><th>{bi(lang,"تاريخ الإدخال","Added")}</th><th>{bi(lang,"المكان / الملاحظات","Placement / Notes")}</th></tr></thead><tbody>{active.items.map((x,i)=><tr key={x.id}><td>{i+1}</td><td><b>{lang==="ar"?x.name:(x.nameEn||x.name)}</b> ×{x.quantity}</td><td>{categoryText(lang,x.category)}{x.subtype?` • ${subtypeLabel(lang,x.subtype)}`:""}</td><td>{healthLabel(lang,x.health)}</td><td>{acclimationStatusLabel(lang,x.status)}</td><td>{x.addedAt?new Date(x.addedAt).toLocaleString():"—"}</td><td>{x.placement||"—"}<div className="record-note">{x.notes}</div></td></tr>)}</tbody></table></div></section>
    <section className="card panel full-span"><div className="section-title"><h2>{tr(lang,"eventLog")}</h2></div><div className="history-list">{active.events.map(x=><div className="history-row" key={x.id}><b>{lang==="ar"?x.textAr:x.textEn}</b><span>{new Date(x.timestamp).toLocaleString()}</span></div>)}</div></section>
   </>}
