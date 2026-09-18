@@ -133,6 +133,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   }
   if(active.bucketStatus!=="done"){
    if(active.bucketStatus==="ready")return{stage:2,title:bi(lang,"انتهى وقت النقل إلى الأوعية","Container-transfer time is complete"),detail:bi(lang,"تأكد أن كل الأسماك والقشريات والمرجان وبقية الكائنات نُقلت إلى أوعيتها المخصصة. بعد ذلك أكد المرحلة وابدأ التنقيط لجميع الدفعات دفعة واحدة.","Confirm all fish, crustaceans, corals and other livestock have been moved to their dedicated containers. Then confirm this stage and start drip acclimation for all batches together."),tone:"ready" as const};
+   if(!active.bucketStatus||active.bucketStatus==="waiting")return{stage:2,title:bi(lang,"جاهز لبدء نقل الكائنات إلى الأوعية","Ready to start transfer to containers"),detail:bi(lang,"اضغط «ابدأ عداد النقل — 5 دقائق»، ثم انقل كل مجموعة إلى وعائها المخصص وجهّز خطوط التنقيط. هذا العداد يخص كل الشحنة.","Tap “Start transfer timer — 5 min,” then move every group into its dedicated container and prepare the drip lines. This timer applies to the whole shipment."),tone:"action" as const};
    return{stage:2,title:bi(lang,"انقل كل الكائنات إلى الأوعية الآن","Move all livestock to containers now"),detail:bi(lang,"عداد 5 دقائق هذا عام لكل الشحنة. خلاله انقل كل مجموعة إلى وعائها المخصص وجهّز خطوط التنقيط. لا تبدأ التنقيط قبل انتهاء هذه المرحلة.","This 5-minute timer applies to the whole shipment. Use it to move every group into its dedicated container and prepare drip lines. Do not start dripping before this stage ends."),tone:"action" as const};
   }
   if(!active.dripStartedAt){
@@ -269,13 +270,14 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   const status=allAdded?"done":remainingItems.some((i:AcclimationItem)=>i.status==="acclimating")?"running":remainingItems.some((i:AcclimationItem)=>i.status==="paused")?"paused":remainingItems.length&&remainingItems.every((i:AcclimationItem)=>i.status==="ready")?"ready":"waiting";
   return{allItems,remainingItems,allAdded,complete,started,timer,status};
  }
- function bucketAction(action:"pause"|"resume"|"done"){
+ function bucketAction(action:"start"|"pause"|"resume"|"done"){
   if(!active)return;
   let s={...active},r=s.bucketRemainingMs??5*60000;
   if(s.bucketStatus==="running"&&s.bucketEndAt)r=Math.max(0,s.bucketEndAt-Date.now());
+  if(action==="start")s={...s,bucketStatus:"running",bucketStartedAt:nowISO(),bucketRemainingMs:r,bucketEndAt:Date.now()+r,events:[ev("بدأ عداد نقل كل الكائنات إلى الأوعية لمدة 5 دقائق.","Started the 5-minute transfer-to-containers timer for the whole shipment."),...s.events]};
   if(action==="pause")s={...s,bucketStatus:"paused",bucketRemainingMs:r,bucketEndAt:null};
-  if(action==="resume")s={...s,bucketStatus:"running",bucketRemainingMs:r,bucketEndAt:Date.now()+r};
-  if(action==="done")s={...s,bucketStatus:"done",bucketRemainingMs:0,bucketEndAt:null};
+  if(action==="resume")s={...s,bucketStatus:"running",bucketEndAt:Date.now()+r,bucketRemainingMs:r};
+  if(action==="done")s={...s,bucketStatus:"done",bucketRemainingMs:0,bucketEndAt:null,events:[ev("تم تأكيد نقل كل الكائنات إلى الأوعية. جاهز لبدء التنقيط العام.","Confirmed all livestock moved to containers. Ready to start global drip acclimation."),...s.events]};
   saveSession(s);
  }
  function startAllDripBatches(){
@@ -321,7 +323,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   if(action==="pause")s={...s,floatStatus:"paused",floatRemainingMs:r,floatEndAt:null};
   if(action==="resume")s={...s,floatStatus:"running",floatEndAt:Date.now()+r};
   if(action==="plus5"||action==="plus15"){const add=(action==="plus5"?5:15)*60000;s={...s,floatRemainingMs:r+add,floatEndAt:s.floatStatus==="running"?Date.now()+r+add:null,floatStatus:s.floatStatus==="ready"?"paused":s.floatStatus};}
-  if(action==="done"){const bucketMs=5*60000;s={...s,floatConfirmed:true,floatStatus:"done",floatRemainingMs:0,floatEndAt:null,status:"transfer",bucketStatus:"running",bucketStartedAt:nowISO(),bucketRemainingMs:bucketMs,bucketEndAt:Date.now()+bucketMs,events:[ev("تم تأكيد موازنة الحرارة وبدأت مرحلة نقل الكائنات إلى الأوعية لمدة 5 دقائق.","Temperature equalization confirmed; the 5-minute transfer-to-containers stage started."),...s.events]};}
+  if(action==="done"){const bucketMs=5*60000;s={...s,floatConfirmed:true,floatStatus:"done",floatRemainingMs:0,floatEndAt:null,status:"transfer",bucketStatus:"waiting",bucketStartedAt:undefined,bucketRemainingMs:bucketMs,bucketEndAt:null,events:[ev("تم تأكيد موازنة الحرارة. المرحلة التالية: نقل كل الكائنات إلى الأوعية لمدة 5 دقائق.","Temperature equalization confirmed. Next stage: move all livestock to containers for 5 minutes."),...s.events]};}
   saveSession(s);
  }
  function updateItem(id:string,fn:(x:AcclimationItem)=>AcclimationItem){if(!active)return;saveSession({...active,items:active.items.map(x=>x.id===id?fn(x):x)});}
@@ -474,6 +476,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
       {!active.floatConfirmed&&active.floatStatus==="paused"&&<button className="btn primary" onClick={()=>floatAction("resume")}>{bi(lang,"استئناف","Resume")}</button>}
       {!active.floatConfirmed&&["running","paused"].includes(active.floatStatus||"")&&<button className="btn" onClick={()=>floatAction("plus5")}>+5</button>}
       {!active.floatConfirmed&&active.floatStatus==="ready"&&<button className="btn good" onClick={()=>floatAction("done")}>✓ {bi(lang,"تأكيد الحرارة — ابدأ 5 دقائق النقل للأوعية","Confirm temperature — start 5-minute container transfer")}</button>}
+      {active.floatConfirmed&&(!active.bucketStatus||active.bucketStatus==="waiting")&&<button className="btn primary master-transfer-start" onClick={()=>bucketAction("start")}>🪣 {bi(lang,"ابدأ عداد النقل — 5 دقائق","Start transfer timer — 5 min")}</button>}
       {active.floatConfirmed&&active.bucketStatus==="running"&&<button className="btn" onClick={()=>bucketAction("pause")}>{bi(lang,"إيقاف مؤقت","Pause")}</button>}
       {active.floatConfirmed&&active.bucketStatus==="paused"&&<button className="btn primary" onClick={()=>bucketAction("resume")}>{bi(lang,"استئناف","Resume")}</button>}
       {active.floatConfirmed&&active.bucketStatus==="ready"&&<button className="btn good" onClick={()=>bucketAction("done")}>✓ {bi(lang,"تم نقل كل الكائنات إلى الأوعية","All livestock moved to containers")}</button>}
