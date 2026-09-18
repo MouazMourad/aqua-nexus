@@ -55,7 +55,7 @@ export function parseAquaQuestion(raw:string):AquaQuestionIntent{
  const topics:AquaQuestionTopic[]=[];
  const add=(t:AquaQuestionTopic)=>{if(!topics.includes(t))topics.push(t);};
  if(params.length||hasAny(s,["كيميا","كيمياء","قراءه","قراءه","chemistry","parameter"]))add("chemistry");
- if(hasAny(s,["سمك","اسماك","مرجان","كائن","حلزون","قشريات","روبيان","جمبري","livestock","fish","coral","snail","shrimp","bioload","حمل حيوي"]))add("livestock");
+ if(hasAny(s,[/(?:^|\\s)(?:ال)?سمك(?:$|\\s)/,/(?:^|\\s)(?:ال)?اسماك(?:$|\\s)/,"مرجان","كائن","حلزون","قشريات","روبيان","جمبري","livestock","fish","coral","snail","shrimp","bioload","حمل حيوي"]))add("livestock");
  if(hasAny(s,["جهاز","معدات","مضخه","مضخة","سكيمر","سخان","اضاءه","اضاءة","فلتر","equipment","pump","skimmer","heater","light"]))add("equipment");
  if(hasAny(s,["صيانه","صيانة","تنظيف","موعد","مهمه","مهمة","maintenance","clean","service"]))add("maintenance");
  if(hasAny(s,["جرعه","جرعة","دوز","dosing","dose","all for reef","بيكربونات","مكمل"]))add("dosing");
