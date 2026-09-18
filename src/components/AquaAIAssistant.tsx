@@ -5,7 +5,7 @@ import type { AppPage } from "@/components/navigation/MainNav";
 import { useAquaStore } from "@/store/useAquaStore";
 import { bioload,chemistryHealth,maintenanceHealth,tankHealth,tankHealthTrend } from "@/domain/health";
 import { aquaAIAnswer,type AquaAIAnswer,type AquaAIPage } from "@/domain/aquaAIBrain";
-import { resolveAquaFollowup } from "@/domain/aquaAIIntent";
+import { parseAquaQuestion,resolveAquaFollowup } from "@/domain/aquaAIIntent";
 import { tankMood } from "@/domain/tankLearning";
 import { learnedTankSignals } from "@/domain/tankPatterns";
 import { createActionPlan,evaluatePlanOutcome,type AquaActionPlan } from "@/domain/actionPlanEngine";
@@ -37,8 +37,33 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
  useEffect(()=>{if(typeof window==="undefined")return;const key="tank-intelligence-session-greeting-v2";if(sessionStorage.getItem(key))return;const timer=window.setTimeout(()=>{setGreeting(true);sessionStorage.setItem(key,"1")},650);const hide=window.setTimeout(()=>setGreeting(false),8000);return()=>{window.clearTimeout(timer);window.clearTimeout(hide)}},[]);
 
  function go(pageKey:AquaAIPage){setOpen(false);onNavigate?.(pageKey as AppPage);}
- function outOfScope(q:string){return /(مباراة|كرة قدم|سياسة|انتخابات|رئيس|طقس|رسالة رسمية|ايميل|إيميل|برمجة|كود|سيرة ذاتية|سيارة|football|match|politic|election|weather|email|resume|code|programming|car\b)/i.test(q);}
- function ask(prompt:string,id:string|null=null){const clean=prompt.trim();if(!clean)return;const resolved=resolveAquaFollowup(clean,conversationContext);setSelected(id);setAskedQuestion(clean);setResolvedQuestion(resolved);setConversationContext(resolved);setQuestion("");setStage(1);setPlanNote("");setScopeBlocked(outOfScope(clean));}
+ function outOfScope(q:string){
+  const clean=(q||"").trim();
+  if(!clean)return false;
+  if(clean.includes("| follow-up:"))return false;
+  const intent=parseAquaQuestion(clean);
+  const namedTankEntity=[...tank.livestock.map(x=>x.name),...tank.livestock.map(x=>x.nameEn||""),...tank.equipment.map(x=>x.name),...tank.equipment.map(x=>x.brand||""),...tank.equipment.map(x=>x.model||"")].filter(Boolean).some(name=>clean.toLowerCase().includes(name.toLowerCase()));
+  const aquariumWords=/(حوض|احواض|أحواض|سمك|اسماك|أسماك|مرجان|مشروم|تورش|هامر|بابل|انيمون|أنيمون|روبيان|جمبري|قشريات|حلزون|نجم بحر|قنفذ|كائن|كائنات|ملوح|حرار|كيميا|كيمياء|نيترات|نترات|فوسفات|كالسيوم|مغنيسيوم|مغنزيوم|قلوي|kh\b|ca\b|mg\b|no3\b|po4\b|nh3\b|no2\b|ph\b|salinity|reef|aquarium|tank|fish|coral|shrimp|snail|livestock|skimmer|pump|heater|filter|sump|acclimation|dosing|water change|rodi|ro\/di)/i.test(clean);
+  const aquariumIntent=intent.params.length>0||intent.topics.some(x=>x!=="general")||intent.asksAboutBioload;
+  if(namedTankEntity||aquariumWords||aquariumIntent)return false;
+  const explicitOutside=/(مباراة|كرة قدم|دوري|سياسة|انتخابات|رئيس|وزير|حكومة|طقس|مطر|ثلج|رسالة رسمية|ايميل|إيميل|برمجة|كود|سيرة ذاتية|سيارة|موبايل|ايفون|آيفون|اندرويد|راتب|وظيفة|وظائف|بورصة|اسهم|أسهم|بيتكوين|عملة|وصفة طبخ|طبخ|فيلم|مسلسل|اغنية|أغنية|ترجم|ترجمة|رياضيات|معادلة|من هو|مين هو|عاصمة|تاريخ|football|match|league|politic|election|president|minister|government|weather|email|resume|code|programming|car\b|phone|iphone|android|salary|job\b|stocks?|bitcoin|recipe|movie|series|song|translate|capital of|who is)/i.test(clean);
+  return explicitOutside;
+ }
+ function scopeReply(q:string){
+  const seed=[...q].reduce((s,ch)=>s+ch.charCodeAt(0),0)%3;
+  const ar=[
+   {title:"😂 هون طلعتني برا الحوض!",text:"أنا Local Best AI، مخّي مبلّل شوي 😄 اختصاصي الحوض وبس: السمك، المرجان، الكيمياء، المعدات، الصيانة والأقلمة. سيارات وسياسة ومباريات وباقي الدنيا؟ لا دخلني فيهن… رجّعني للمي وبخدمك من عيوني 🐠"},
+   {title:"🐠 أنا ساكن بالحوض يا معلم!",text:"ذكائي مربوط بـ Aqua Nexus وبيانات حوضك فقط. إذا السؤال عن الحوض أنا معك للآخر؛ إذا عن شي تاني، بعمل حالي سمكة وما سمعت السؤال 😄"},
+   {title:"😄 برا المي ما إلي شغل!",text:"أنا اختصاصي أحواض حصراً: كائنات، كيمياء، فلترة، معدات، صيانة، أقلمة وتحليل حالة الحوض. أي موضوع تاني خلّيه للمساعد العام… وأنا برجع أراقب السمك 🫡🐟"}
+  ];
+  const en=[
+   {title:"😂 You pulled me out of the tank!",text:"I’m Local Best AI — my brain lives in aquarium water 😄 I handle livestock, chemistry, equipment, maintenance and acclimation. Cars, politics, sports and the rest of the world? Not my tank 🐠"},
+   {title:"🐠 I live in the aquarium!",text:"My intelligence is tied to Aqua Nexus and your tank data only. Ask me anything aquarium-related and I’m all in; anything else and I’ll pretend I’m a fish that didn’t hear it 😄"},
+   {title:"😄 Outside the water, I’m off duty!",text:"I specialize in aquariums only: livestock, chemistry, filtration, equipment, maintenance, acclimation and tank analysis. For everything else, use the general assistant — I’ll get back to watching the fish 🐟"}
+  ];
+  return (lang==="ar"?ar:en)[seed];
+ }
+ function ask(prompt:string,id:string|null=null){const clean=prompt.trim();if(!clean)return;const resolved=resolveAquaFollowup(clean,conversationContext);setSelected(id);setAskedQuestion(clean);setResolvedQuestion(resolved);setConversationContext(resolved);setQuestion("");setStage(1);setPlanNote("");setScopeBlocked(outOfScope(resolved));}
  function submit(e:FormEvent){e.preventDefault();ask(question,null);}
  function resetConversation(){setSelected(null);setQuestion("");setAskedQuestion("");setResolvedQuestion("");setStage(0);setScopeBlocked(false);setPlanNote("");}
  function createPlan(){
@@ -60,6 +85,7 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
  const greetingText=lang==="ar"?`أنا جاهز أفهم ${tank.name} معك. اسألني عن حالته، شو تغيّر، ليش، أو شو تعمل بعدين.`:`I am ready to understand ${tank.name} with you. Ask about its state, what changed, why, or what to do next.`;
  const title=active?(lang==="ar"?active.titleAr:active.titleEn):"",summary=active?(lang==="ar"?active.summaryAr:active.summaryEn):"",details=active?(lang==="ar"?active.detailsAr:active.detailsEn):[],evidence=active?(lang==="ar"?active.evidenceAr:active.evidenceEn):[],actionText=active?.action?(lang==="ar"?active.action.ar:active.action.en):"";
  const nextCheck=actionText||(lang==="ar"?"استمر بالمراقبة وسجّل أي تغير جديد قبل تعديل أكثر من متغير بنفس الوقت.":"Keep monitoring and record any new change before altering multiple variables at once.");
+ const scopeMessage=scopeBlocked?scopeReply(askedQuestion):null;
 
  return <div className={`aqua-ai-shell ${open?"open":""} state-${state}`} dir={lang==="ar"?"rtl":"ltr"}>
   {greeting&&!open&&<button type="button" className="aqua-ai-greeting" onClick={()=>{setGreeting(false);setOpen(true)}}><b>Local Best AI</b><span>{greetingText}</span></button>}
@@ -75,7 +101,7 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
 
    {(askedQuestion||scopeBlocked)&&<div className="ai-conversation-flow">
     <div className="ai-chat-bubble user"><span>{askedQuestion}</span></div>
-    {scopeBlocked?<div className="ai-chat-bubble assistant"><small>Local Best AI</small><b>{lang==="ar"?"أنا متخصص بحوضك وإدارته":"I specialize in your aquarium"}</b><span>{lang==="ar"?"فيني أساعدك بحالة الحوض، الكيمياء، الكائنات، الصيانة، المعدات، الأحداث والتوقعات. للأسئلة العامة استخدم مساعدك العام على حسابك.":"I can help with tank state, chemistry, livestock, maintenance, equipment, events and forecasts. Use your general assistant for unrelated questions."}</span></div>:active&&<>
+    {scopeBlocked?<div className="ai-chat-bubble assistant ai-out-of-scope"><small>Local Best AI • AQUARIUM ONLY</small><b>{scopeMessage?.title}</b><span>{scopeMessage?.text}</span><div className="ai-scope-hints"><span>🐠 {lang==="ar"?"الكائنات":"Livestock"}</span><span>🧪 {lang==="ar"?"الكيمياء":"Chemistry"}</span><span>⚙️ {lang==="ar"?"المعدات":"Equipment"}</span><span>🧹 {lang==="ar"?"الصيانة":"Maintenance"}</span><span>💧 {lang==="ar"?"الأقلمة":"Acclimation"}</span></div></div>:active&&<>
       <div className="ai-chat-bubble assistant ai-summary-bubble"><div className="aqua-ai-answer-head"><div><small>{lang==="ar"?"الجواب المختصر":"SHORT ANSWER"}</small><h3>{title}</h3></div><span className={`ai-confidence ${active.confidence}`}>{confidenceLabel(active.confidence)}</span></div><p>{summary}</p></div>
       {stage>=2&&<div className="ai-chat-bubble assistant"><small>{lang==="ar"?"ليش؟ • ماذا ألاحظ":"WHY • WHAT I NOTICE"}</small><div className="aqua-ai-reasoning-list">{details.slice(0,5).map((x,i)=><div key={i}><i>{i+1}</i><span>{x}</span></div>)}</div>{learned.length>0&&<div className="aqua-ai-learned-block"><small>{lang==="ar"?"من ذاكرة الحوض":"FROM TANK MEMORY"}</small>{learned.slice(0,2).map(x=><div key={x.id} className={`learned-signal ${x.level}`}>{lang==="ar"?x.ar:x.en}</div>)}</div>}</div>}
       {stage>=3&&<div className="ai-chat-bubble assistant"><small>{lang==="ar"?"شو أعمل هلق؟":"WHAT NEXT?"}</small><b>{nextCheck}</b>{active.action&&onNavigate&&<button className="btn primary aqua-ai-action" onClick={()=>go(active.action!.page)}>{actionText} →</button>}<button className="btn aqua-ai-action" onClick={createPlan}>{lang==="ar"?"+ اعمل خطة متابعة":"+ Create follow-up plan"}</button></div>}
