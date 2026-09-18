@@ -11,6 +11,7 @@ export interface AquaQuestionIntent{
  asksForReason:boolean;
  asksForAction:boolean;
  asksForRisk:boolean;
+ asksAboutBioload:boolean;
  confidence:"low"|"medium"|"high";
 }
 
@@ -68,6 +69,7 @@ export function parseAquaQuestion(raw:string):AquaQuestionIntent{
  const asksForReason=hasAny(s,["ليش","لماذا","سبب","شو السبب","why","cause","reason"]);
  const asksForAction=hasAny(s,["شو اعمل","شو ساوي","ماذا افعل","الحل","حل","نصيحه","نصيحة","اقترح","اقتراح","what should i do","what do i do","solution","recommend","advice"]);
  const asksForRisk=hasAny(s,["خطر","خطير","حرج","safe","danger","risk","مناسب","امن","آمن"]);
+ const asksAboutBioload=hasAny(s,["bioload","bio load","حمل حيوي","الحمل الحيوي","الحمل البيولوجي","البيولوجي عندي","قدره الحوض","قدرة الحوض"]);
  let mode:AquaQuestionMode="general";
  if(hasAny(s,["بقدر ضيف","فيني ضيف","اقدر اضيف","هل اضيف","can i add","safe to add","اضافه سمك","إضافة سمك","اضافه كائن","إضافة كائن"]))mode="canAdd";
  else if(hasAny(s,["تغيير مي","تغيير ماء","water change","change water"]))mode="waterChange";
@@ -82,7 +84,7 @@ export function parseAquaQuestion(raw:string):AquaQuestionIntent{
  let confidence:"low"|"medium"|"high"="low";
  const signals=params.length+topics.filter(x=>x!=="general").length+(mode!=="general"?1:0);
  if(signals>=3)confidence="high";else if(signals>=1)confidence="medium";
- return {raw,normalized:s,mode,topics,params,asksForReason,asksForAction,asksForRisk,confidence};
+ return {raw,normalized:s,mode,topics,params,asksForReason,asksForAction,asksForRisk,asksAboutBioload,confidence};
 }
 
 export function resolveAquaFollowup(current:string,previous?:string){
