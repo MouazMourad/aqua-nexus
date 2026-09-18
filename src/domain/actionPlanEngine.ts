@@ -1,6 +1,8 @@
 import type { Tank } from "./types";
 import type { AquaAIAnswer } from "./aquaAIBrain";
 import { tankStateScore } from "./tankIntelligence";
+import { parseAquaQuestion } from "./aquaAIIntent";
+import { reasonLocally } from "./aquaAILocalReasoner";
 
 export interface AquaActionStep{ id:string; titleAr:string; titleEn:string; done:boolean; completedAt?:string; }
 export interface AquaActionPlan{
@@ -12,6 +14,7 @@ const uid=(p:string)=>`${p}-${Date.now()}-${Math.random().toString(36).slice(2,7
 
 export function createActionPlan(tank:Tank,question:string,answer:AquaAIAnswer):AquaActionPlan{
  const page=answer.action?.page||"dashboard";
+ const reasoning=reasonLocally(tank,parseAquaQuestion(question));
  let steps:Omit<AquaActionStep,"id"|"done">[]=[];
  let reviewAfterHours=48;
  if(page==="dosing"){
@@ -27,7 +30,15 @@ export function createActionPlan(tank:Tank,question:string,answer:AquaAIAnswer):
  } else if(page==="quarantine"){
   steps=[{titleAr:"راجع الجرعة والمنتج حسب ملصق الشركة",titleEn:"Verify medication dose/product label"},{titleAr:"راقب الكائن والسلوك قبل الجرعة التالية",titleEn:"Observe organism and behavior before next dose"},{titleAr:"سجل كل جرعة وتغيير ماء بالحجر",titleEn:"Log each dose and quarantine water change"},{titleAr:"قيّم الاستجابة قبل تمديد أو تغيير العلاج",titleEn:"Assess response before extending/changing treatment"}];reviewAfterHours=24;
  } else {
-  steps=[{titleAr:answer.action?.ar||"نفذ الإجراء المقترح",titleEn:answer.action?.en||"Apply the suggested action"},{titleAr:"سجل الحدث أو التغيير على الخط الزمني",titleEn:"Log the event/change on the timeline"},{titleAr:"لا تغيّر عدة عوامل معاً إلا للضرورة",titleEn:"Avoid changing several variables at once unless necessary"},{titleAr:"أعد تقييم حالة الحوض وقارن النتيجة",titleEn:"Reassess tank state and compare the result"}];
+  const ranked=reasoning.actions.slice(0,4);
+  if(ranked.length){
+   steps=ranked.map(x=>({titleAr:x.ar,titleEn:x.en}));
+   const verify=ranked[0];
+   if(steps.length<4)steps.push({titleAr:verify.recheckAr,titleEn:verify.recheckEn});
+   reviewAfterHours=ranked.some(x=>x.level==="danger")?12:ranked.some(x=>x.level==="warn")?24:36;
+  } else {
+   steps=[{titleAr:answer.action?.ar||"نفذ الإجراء المقترح",titleEn:answer.action?.en||"Apply the suggested action"},{titleAr:"سجل الحدث أو التغيير على الخط الزمني",titleEn:"Log the event/change on the timeline"},{titleAr:"لا تغيّر عدة عوامل معاً إلا للضرورة",titleEn:"Avoid changing several variables at once unless necessary"},{titleAr:"أعد تقييم حالة الحوض وقارن النتيجة",titleEn:"Reassess tank state and compare the result"}];
+  }
  }
  return {id:uid("plan"),createdAt:new Date().toISOString(),sourceQuestion:question,titleAr:answer.titleAr,titleEn:answer.titleEn,status:"active",baselineScore:tankStateScore(tank),reviewAfterHours,steps:steps.map(s=>({id:uid("step"),done:false,...s}))};
 }
