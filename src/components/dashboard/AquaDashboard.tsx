@@ -5,6 +5,7 @@ import { MainNav,type AppPage } from "@/components/navigation/MainNav";
 import { PageRouter } from "@/components/pages/PageRouter";
 import { Modal } from "@/components/ui/Modal";
 import { AquaAIAssistant } from "@/components/AquaAIAssistant";
+import { TrainingCoach } from "@/components/dashboard/TrainingCoach";
 import type { EquipmentKind,Tank,TankStatus,TankType } from "@/domain/types";
 import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
 import { tr,bi } from "@/i18n";
@@ -223,9 +224,10 @@ export function AquaDashboard() {
   {attention.length>0&&<div className="tank-attention-banner"><div><b>🔔 {language==="ar"?"متابعة مطلوبة":"Follow-up needed"}</b><span>{language==="ar"?`مرّ أكثر من أسبوع بدون متابعة: ${attention.join("، ")}`:`More than a week without a check-in: ${attention.join(", ")}`}</span></div><div className="attention-actions"><button className="btn primary" onClick={enablePhoneReminders}>{language==="ar"?"تفعيل تنبيهات الهاتف":"Enable phone alerts"}</button><button className="icon-btn" onClick={()=>setAttention([])}>×</button></div></div>}
   {reminderNote&&<div className="toast-note">{reminderNote}</div>}
   <header className="topbar topbar-v12 interactive-header"><div className="brand"><div className="brand-mark">AN</div><div><strong>Aqua Nexus 3D</strong><small>{tr(language,"brand")}</small></div></div>
-   <div className="top-actions"><select className="select" value={selectedTankId} onChange={e=>handleSelectTank(e.target.value)}>{tanks.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select><button className="btn" onClick={()=>setLanguage(language==="ar"?"en":"ar")}>{language==="ar"?"EN":"AR"}</button><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(language,"addTank")}</button></div>
+   <div className="top-actions"><select className="select" value={tank.id} onChange={e=>handleSelectTank(e.target.value)}>{tanks.map(t=><option key={t.id} value={t.id}>{t.isTraining?(language==="ar"?(t.type==="marine"?"🎓 حوض التدريب البحري":"🎓 حوض التدريب النهري"):(t.type==="marine"?"🎓 Marine Training Tank":"🎓 Freshwater Training Tank")):t.name}</option>)}</select><button className="btn" onClick={()=>setLanguage(language==="ar"?"en":"ar")}>{language==="ar"?"EN":"AR"}</button><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(language,"addTank")}</button></div>
    <MainNav active={page} onChange={setPage} lang={language}/>
   </header>
+  {page==="dashboard"&&tank.isTraining&&<TrainingCoach tank={tank} onNavigate={setPage}/>}
   <PageRouter page={page} tank={tank} tanks={tanks} selectedTankId={selectedTankId} onSelectTank={id=>{handleSelectTank(id);setPage("dashboard")}} onNavigate={setPage}/>
 
   <AquaAIAssistant tank={tank} page={page} onNavigate={setPage}/>
