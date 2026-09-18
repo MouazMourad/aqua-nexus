@@ -3,7 +3,8 @@
 import { useEffect,useMemo,useState } from "react";
 import { createPortal } from "react-dom";
 import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
-import { bioload,chemistryAgeDays,chemistryHealth,maintenanceHealth,parameterScore,tankHealth,tankHealthTrend } from "@/domain/health";
+import { bioload,chemistryAgeDays,chemistryHealth,maintenanceHealth,parameterScore,tankHealthTrend } from "@/domain/health";
+import { systemHealth } from "@/domain/systemHealth";
 import { tankStateView } from "@/domain/tankIntelligence";
 import { chemistryGuidance } from "@/domain/chemistryGuidance";
 import { useAquaStore } from "@/store/useAquaStore";
@@ -47,7 +48,8 @@ export function DashboardHealthPulse(){
   const [breakdownOpen,setBreakdownOpen]=useState(false);
   const [targets,setTargets]=useState<PortalTargets>({hero:null,chemistryCopy:null});
 
-  const health=tank?tankHealth(tank):0;
+  const system=tank?systemHealth(tank):null;
+  const health=system?.score??0;
   const chemistry=tank?chemistryHealth(tank):0;
   const maintenance=tank?maintenanceHealth(tank):0;
   const trend=tank?tankHealthTrend(tank):"stable";
@@ -139,6 +141,8 @@ export function DashboardHealthPulse(){
 
     if(overdue.length)actions.push({ar:`أنجز مهمة الصيانة الأقرب: ${overdue[0].title} ثم حدّث سجلها.`,en:`Complete the nearest maintenance task: ${overdue[0].titleEn||overdue[0].title}, then update its log.`,focus:"maintenance"});
     if(equipmentWarnings.length&&!criticalEquipment)actions.push({ar:`افحص ${equipmentWarnings[0].name} لأنه مسجّل كجهاز يحتاج انتباهاً/صيانة.`,en:`Check ${equipmentWarnings[0].name}; it is marked for attention/service.`,focus:"equipment"});
+    if(system?.equipmentAudit.issues.length){const x=system.equipmentAudit.issues[0];actions.push({ar:x.recommendationAr||x.ar,en:x.recommendationEn||x.en,focus:"equipment",urgent:x.level==="danger"});}
+    if(system?.compatibilityAudit.issues.length){const x=system.compatibilityAudit.issues[0];actions.push({ar:`راجع تعارض الكائنات: ${x.ar}`,en:`Review livestock compatibility: ${x.en}`,focus:"bioload",urgent:x.level==="danger"});}
     if(bio.status==="high"||bio.status==="danger")actions.push({ar:"أوقف إضافة كائنات جديدة مؤقتاً وراجع الحمل الحيوي وكفاءة الترشيح.",en:"Pause new livestock additions and review bioload and filtration capacity.",focus:"bioload"});
     if(livestockWarnings.length)actions.push({ar:`راقب ${livestockWarnings[0].name} بشكل قريب وسجّل أي تغير قبل تعديل أكثر من عامل بالحوض.`,en:`Watch ${livestockWarnings[0].nameEn||livestockWarnings[0].name} closely and log any change before adjusting multiple tank factors.`,focus:"bioload"});
     if(activeAcclimation)actions.push({ar:"هناك أقلمة نشطة؛ تجنّب تغييرات كبيرة بالحوض إلى أن تكتمل وتستقر الكائنات.",en:"An acclimation session is active; avoid major tank changes until it is complete and livestock settles."});
@@ -148,7 +152,7 @@ export function DashboardHealthPulse(){
     const attentionCount=state.drivers.filter(driver=>driver.level==="warn"||driver.level==="danger").length;
     const primaryReason=state.drivers.find(driver=>driver.level==="danger"||driver.level==="warn")??state.drivers[0];
     return {age,chemistryIssues,chemistryAdvice,chemistryTrends,latestActivity,actions:actions.slice(0,4),attentionCount,primaryReason};
-  },[tank,state]);
+  },[tank,state,system]);
 
   useEffect(()=>{
     if(!tank||!state||typeof document==="undefined")return;
