@@ -5,7 +5,7 @@ export type AquaDomain=
  |"dosing"|"acclimation"|"emergency"|"rodi"|"feeding"|"water";
 
 export type AquaOperation=
- |"status"|"why"|"action"|"how"|"when"|"list"|"count"|"trend"|"forecast"|"compare"
+ |"status"|"why"|"action"|"how"|"when"|"latest"|"list"|"count"|"trend"|"forecast"|"compare"
  |"canAdd"|"waterChange"|"dose"|"general";
 
 export interface AquaAIQueryPlan{
