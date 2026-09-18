@@ -163,19 +163,33 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    const key=`${active.id}:global-float`;
    if(!notifiedTimersRef.current.has(key)){
     notifiedTimersRef.current.add(key);
-    setTimerAlerts(prev=>[{id:uid("alert"),lane:"global",message:bi(lang,"انتهى عداد موازنة حرارة الأكياس — جاهزة للتأكيد والفحص.","Sealed-bag temperature timer finished — ready for confirmation and inspection.")},...prev].slice(0,5));
+    setTimerAlerts(prev=>[{id:uid("alert"),lane:"global",message:bi(lang,"انتهى عداد موازنة حرارة الأكياس — جاهزة للتأكيد.","Sealed-bag temperature timer finished — ready for confirmation.")},...prev].slice(0,5));
     playTimerSound("global");
    }
   }
-  for(const lane of releaseLanes){
-   const runtime=laneRuntime(lane);
-   if(!runtime.started||!runtime.items.length)continue;
-   const finished=runtime.items.every((i:AcclimationItem)=>["ready","added","deferred"].includes(i.status));
-   if(!finished)continue;
-   const key=`${active.id}:${lane.key}:${runtime.currentBatch}`;
-   if(notifiedTimersRef.current.has(key))continue;
-   notifiedTimersRef.current.add(key);
-   pushTimerAlert(lane.key,runtime.currentBatch);
+  if(active.bucketStatus==="ready"&&active.bucketStartedAt){
+   const key=`${active.id}:bucket-transfer`;
+   if(!notifiedTimersRef.current.has(key)){
+    notifiedTimersRef.current.add(key);
+    setTimerAlerts(prev=>[{id:uid("alert"),lane:"global",message:bi(lang,"انتهت 5 دقائق نقل الكائنات إلى الأوعية — تأكد أن الجميع جاهز ثم ابدأ التنقيط.","The 5-minute transfer-to-containers stage is complete — confirm all groups are ready, then start drip acclimation.")},...prev].slice(0,5));
+    playTimerSound("global");
+   }
+  }
+  if(active.dripStartedAt){
+   for(const batch of releaseBatches){
+    const runtime=batchRuntime(batch);
+    const normalItems=runtime.allItems.filter((i:AcclimationItem)=>!i.emergency);
+    if(!normalItems.length)continue;
+    const finished=normalItems.every((i:AcclimationItem)=>["ready","added","deferred"].includes(i.status));
+    if(!finished)continue;
+    const key=`${active.id}:batch:${batch.id}`;
+    if(!notifiedTimersRef.current.has(key)){
+     notifiedTimersRef.current.add(key);
+     pushTimerAlert(batch.lane,batch.batch);
+     setExpandedBatches(v=>({...v,[batch.id]:true}));
+    }
+    if(runtime.allAdded)setExpandedBatches(v=>({...v,[batch.id]:false}));
+   }
   }
   for(const item of emergencyItems){
    if(item.status!=="ready"||!item.startedAt)continue;
@@ -184,7 +198,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    notifiedTimersRef.current.add(key);
    pushTimerAlert("emergency",undefined,lang==="ar"?item.name:(item.nameEn||item.name));
   }
- },[active?.items,active?.floatStatus,releaseLanes,emergencyItems,step,lang]);
+ },[active?.items,active?.floatStatus,active?.bucketStatus,active?.dripStartedAt,releaseBatches,emergencyItems,step,lang]);
 
  function ev(ar:string,en:string){return{id:uid("ace"),timestamp:nowISO(),textAr:ar,textEn:en}}
  function unlockAudio(){
