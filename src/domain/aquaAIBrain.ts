@@ -8,6 +8,8 @@ import { tankEnergy } from "./equipmentIntelligence";
 import { chemistryGuidance } from "./chemistryGuidance";
 import { parseAquaQuestion,type AquaQuestionIntent,type AquaQuestionParam } from "./aquaAIIntent";
 import { reasonLocally } from "./aquaAILocalReasoner";
+import { compatibilityCheck } from "./compatibility";
+import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
 
 export type AquaAIConfidence="low"|"medium"|"high";
 export type AquaAIPage="dashboard"|"chemistry"|"maintenance"|"equipment"|"livestock"|"timeline"|"dosing"|"quarantine"|"emergency"|"rodi"|"journal"|"acclimation";
@@ -72,6 +74,24 @@ function ageDays(timestamp?:string){
   if(!timestamp)return undefined;
   const t=new Date(timestamp).getTime();
   return Number.isFinite(t)?Math.max(0,Math.floor((Date.now()-t)/DAY)):undefined;
+}
+function normText(s:string){return (s||"").toLowerCase().normalize("NFKD").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/ؤ/g,"و").replace(/ئ/g,"ي").replace(/[^a-z0-9\u0600-\u06ff]+/g," ").replace(/\s+/g," ").trim();}
+function candidateFromQuestion(question:string,tank:Tank){
+ const q=normText(question);
+ const rows=(LIVESTOCK_LIBRARY as readonly any[]).filter(x=>!x.type||x.type===tank.type);
+ const scored=rows.map(x=>{
+  const names=[x.ar,x.en,x.id].filter(Boolean).map((v:string)=>normText(v));
+  const match=Math.max(0,...names.map((n:string)=>q.includes(n)?n.length:0));
+  return{x,match};
+ }).filter(x=>x.match>2).sort((a,b)=>b.match-a.match);
+ return scored[0]?.x;
+}
+function quantityFromQuestion(question:string){
+ const map:any={"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9"};
+ const normalized=(question||"").replace(/[٠-٩]/g,m=>map[m]||m);
+ const m=normalized.match(/(?:x|×|عدد|qty|quantity)?\s*(\d{1,2})/i);
+ const n=m?Number(m[1]):1;
+ return Number.isFinite(n)&&n>0?Math.min(50,n):1;
 }
 
 export function nextBestAction(tank:Tank):AquaAIAction{
@@ -270,18 +290,20 @@ function multiParameterAnswer(tank:Tank,params:AquaQuestionParam[]):AquaAIAnswer
   };
 }
 
-function stockingReadinessAnswer(tank:Tank):AquaAIAnswer{
+function stockingReadinessAnswer(tank:Tank,question:string):AquaAIAnswer{
   const guide=chemistryGuidance(tank),bio=bioload(tank),state=tankStateView(tank);
+  const candidate=candidateFromQuestion(question,tank),quantity=quantityFromQuestion(question);
+  const compatibility=candidate?compatibilityCheck(tank,candidate,quantity):null;
   const activeAcclimation=(tank.acclimationSessions??[]).some(x=>x.status!=="completed");
   const blocking=guide.problems.filter(x=>x.level==="danger"||x.suspectedFormat);
   const caution=guide.problems.filter(x=>x.level==="warn"&&!x.suspectedFormat);
-  const canAdd=blocking.length===0&&bio.status!=="danger"&&state.band!=="critical"&&!activeAcclimation;
-  const detailsAr=[`حالة الحوض: ${state.score}% (${state.ar}).`,`الحمل الحيوي: ${Math.round(bio.ratio*100)}%.`,`الكيمياء: ${guide.health}%.`,...(blocking.slice(0,3).map(x=>`مانع محتمل: ${x.reasonAr}`)),...(caution.slice(0,2).map(x=>`تنبيه: ${x.reasonAr}`)),activeAcclimation?"هناك جلسة أقلمة نشطة حالياً؛ الأفضل عدم إضافة كائنات جديدة حتى تنتهي وتستقر الكائنات.":"لا توجد جلسة أقلمة نشطة."];
-  const detailsEn=[`Tank state: ${state.score}% (${state.en}).`,`Bioload: ${Math.round(bio.ratio*100)}%.`,`Chemistry: ${guide.health}%.`,...(blocking.slice(0,3).map(x=>`Potential blocker: ${x.reasonEn}`)),...(caution.slice(0,2).map(x=>`Caution: ${x.reasonEn}`)),activeAcclimation?"An acclimation session is active; avoid adding more livestock until it is complete and livestock settles.":"No acclimation session is active."];
+  const canAdd=blocking.length===0&&bio.status!=="danger"&&state.band!=="critical"&&!activeAcclimation&&!(compatibility?.blocked);
+  const detailsAr=[candidate?`الكائن المطلوب: ${candidate.ar||candidate.en} ×${quantity}.`:"ما قدرت أحدد نوع كائن محدد من السؤال، لذلك التقييم عام للحوض.",`حالة الحوض: ${state.score}% (${state.ar}).`,`الحمل الحيوي الحالي: ${Math.round(bio.ratio*100)}%.`,compatibility?`الحمل الحيوي المتوقع بعد الإضافة: ${Math.round(compatibility.projectedRatio*100)}%.`:"",`الكيمياء: ${guide.health}%.`,...(compatibility?.issues??[]).slice(0,5).map(x=>`${x.level==="danger"?"مانع":"تنبيه"} توافق: ${x.ar}`),...(blocking.slice(0,3).map(x=>`مانع محتمل: ${x.reasonAr}`)),...(caution.slice(0,2).map(x=>`تنبيه: ${x.reasonAr}`)),activeAcclimation?"هناك جلسة أقلمة نشطة حالياً؛ الأفضل عدم إضافة كائنات جديدة حتى تنتهي وتستقر الكائنات.":"لا توجد جلسة أقلمة نشطة."].filter(Boolean);
+  const detailsEn=[candidate?`Requested livestock: ${candidate.en||candidate.ar} ×${quantity}.`:"No specific candidate was recognized, so this is a general tank-readiness assessment.",`Tank state: ${state.score}% (${state.en}).`,`Current bioload: ${Math.round(bio.ratio*100)}%.`,compatibility?`Projected bioload after addition: ${Math.round(compatibility.projectedRatio*100)}%.`:"",`Chemistry: ${guide.health}%.`,...(compatibility?.issues??[]).slice(0,5).map(x=>`${x.level==="danger"?"Compatibility blocker":"Compatibility caution"}: ${x.en}`),...(blocking.slice(0,3).map(x=>`Potential blocker: ${x.reasonEn}`)),...(caution.slice(0,2).map(x=>`Caution: ${x.reasonEn}`)),activeAcclimation?"An acclimation session is active; avoid adding more livestock until it is complete and livestock settles.":"No acclimation session is active."].filter(Boolean);
   return {
    titleAr:"جاهزية إضافة كائنات",titleEn:"Livestock-addition readiness",
-   summaryAr:canAdd?"المؤشرات الحالية لا تظهر مانعاً واضحاً، لكن أضف تدريجياً وراقب الحمل الحيوي والكيمياء بعد الإضافة.":"حالياً في عوامل لازم تنحل أو تتأكد قبل إضافة كائنات جديدة.",
-   summaryEn:canAdd?"Current indicators show no obvious blocker, but add gradually and monitor bioload and chemistry afterward.":"There are current factors to resolve or verify before adding new livestock.",
+   summaryAr:canAdd?(candidate?`المؤشرات الحالية ما بتبين مانع واضح لإضافة ${candidate.ar||candidate.en} ×${quantity}، مع إدخال تدريجي ومراقبة بعد الإضافة.`:"المؤشرات الحالية لا تظهر مانعاً واضحاً، لكن أضف تدريجياً وراقب الحمل الحيوي والكيمياء بعد الإضافة."):(candidate?`حالياً في مانع أو تنبيه مهم قبل إضافة ${candidate.ar||candidate.en}.`:"حالياً في عوامل لازم تنحل أو تتأكد قبل إضافة كائنات جديدة."),
+   summaryEn:canAdd?(candidate?`Current indicators show no obvious blocker to adding ${candidate.en||candidate.ar} ×${quantity}, with gradual introduction and post-addition monitoring.`:"Current indicators show no obvious blocker, but add gradually and monitor bioload and chemistry afterward."):(candidate?`There is currently a blocker or important caution before adding ${candidate.en||candidate.ar}.`:"There are current factors to resolve or verify before adding new livestock."),
    detailsAr,detailsEn,evidenceAr:[`${guide.health}% صحة كيمياء`,`${Math.round(bio.ratio*100)}% حمل حيوي`,`حالة النظام ${state.score}%`],evidenceEn:[`${guide.health}% chemistry health`,`${Math.round(bio.ratio*100)}% bioload`,`System state ${state.score}%`],confidence:confidence(tank),action:{page:canAdd?"livestock":"chemistry",ar:canAdd?"افتح الكائنات وخطط للإضافة":"راجع الكيمياء أولاً",en:canAdd?"Open livestock and plan the addition":"Review chemistry first"}
   };
 }
@@ -319,7 +341,7 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   const localReasoning=reasonLocally(tank,intent);
   if(intent.params.length>1)return multiParameterAnswer(tank,intent.params);
   if(intent.params.length===1)return parameterAnswer(tank,intent.params[0] as Param);
-  if(intent.mode==="canAdd")return stockingReadinessAnswer(tank);
+  if(intent.mode==="canAdd")return stockingReadinessAnswer(tank,question);
   if(intent.mode==="waterChange")return waterChangeAnswer(tank);
   if(intent.mode==="forecast")return forecastAnswer(tank);
   if(intent.mode==="why"||intent.mode==="action"||intent.mode==="status"||intent.mode==="trend"||intent.mode==="compare"||intent.mode==="dose")return reasoningAnswer(tank,intent);
