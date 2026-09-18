@@ -85,7 +85,7 @@ export function buildAquaAIQueryPlan(intent:AquaQuestionIntent):AquaAIQueryPlan{
       ...secondary.flatMap(x=>SOURCE_MAP[x])
     ])];
 
- const confidence:intent["confidence"] = intent.confidence;
+ const confidence:AquaAIQueryPlan["confidence"] = intent.confidence;
 
  return {
   operation,
