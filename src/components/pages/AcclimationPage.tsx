@@ -122,30 +122,34 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const step=active?.wizardStep??1;
  const acclimationGuide=useMemo(()=>{
   const items=active?.items??[];
-  const ready=items.filter(i=>i.status==="ready");
-  const running=items.filter(i=>i.status==="acclimating"||i.status==="emergency");
-  const waiting=items.filter(i=>i.status==="waiting");
+  const ready=items.filter(i=>i.status==="ready"&&!i.emergency);
+  const running=items.filter(i=>i.status==="acclimating"&&!i.emergency);
+  const waiting=items.filter(i=>i.status==="waiting"&&!i.emergency);
   const completed=items.filter(i=>i.status==="added"||i.status==="deferred");
   if(!active)return{stage:1,title:"",detail:"",tone:"info" as const};
   if(!active.floatConfirmed){
-   if(active.floatStatus==="ready")return{stage:1,title:bi(lang,"أكد انتهاء موازنة الحرارة","Confirm temperature equalization"),detail:bi(lang,"العداد انتهى. تأكد أن حرارة الأكياس قريبة من حرارة الحوض، ثم اضغط «تأكيد انتهاء المرحلة». أبقِ الأكياس مغلقة حتى التأكيد.","The timer is finished. Confirm bag temperature is close to tank temperature, then tap “Confirm stage complete.” Keep bags sealed until then."),tone:"ready" as const};
-   return{stage:1,title:bi(lang,"اترك الأكياس مغلقة وانتظر العداد","Keep bags sealed and wait for the timer"),detail:bi(lang,"حالياً المطلوب فقط موازنة الحرارة. لا تفتح الأكياس ولا تبدأ التنقيط قبل تأكيد انتهاء هذه المرحلة.","Right now, only temperature equalization is required. Do not open bags or start dripping before this stage is confirmed."),tone:"info" as const};
+   if(active.floatStatus==="ready")return{stage:1,title:bi(lang,"أكد انتهاء موازنة الحرارة","Confirm temperature equalization"),detail:bi(lang,"العداد الكبير انتهى. تأكد أن حرارة الأكياس قريبة من حرارة الحوض، ثم أكد انتهاء المرحلة. بعدها سيبدأ تلقائياً عداد 5 دقائق لنقل كل الكائنات إلى الأوعية.","The main timer has finished. Confirm bag temperature is close to tank temperature, then confirm the stage. A 5-minute transfer-to-containers timer will start automatically next."),tone:"ready" as const};
+   return{stage:1,title:bi(lang,"موازنة حرارة كل الشحنة","Temperature equalization for the whole shipment"),detail:bi(lang,"هذا العداد يخص كل الشحنة. حالياً اترك جميع الأكياس مغلقة حتى ينتهي العداد.","This timer applies to the whole shipment. Keep all bags sealed until it finishes."),tone:"info" as const};
+  }
+  if(active.bucketStatus!=="done"){
+   if(active.bucketStatus==="ready")return{stage:2,title:bi(lang,"انتهى وقت النقل إلى الأوعية","Container-transfer time is complete"),detail:bi(lang,"تأكد أن كل الأسماك والقشريات والمرجان وبقية الكائنات نُقلت إلى أوعيتها المخصصة. بعد ذلك أكد المرحلة وابدأ التنقيط لجميع الدفعات دفعة واحدة.","Confirm all fish, crustaceans, corals and other livestock have been moved to their dedicated containers. Then confirm this stage and start drip acclimation for all batches together."),tone:"ready" as const};
+   return{stage:2,title:bi(lang,"انقل كل الكائنات إلى الأوعية الآن","Move all livestock to containers now"),detail:bi(lang,"عداد 5 دقائق هذا عام لكل الشحنة. خلاله انقل كل مجموعة إلى وعائها المخصص وجهّز خطوط التنقيط. لا تبدأ التنقيط قبل انتهاء هذه المرحلة.","This 5-minute timer applies to the whole shipment. Use it to move every group into its dedicated container and prepare drip lines. Do not start dripping before this stage ends."),tone:"action" as const};
+  }
+  if(!active.dripStartedAt){
+   return{stage:3,title:bi(lang,"ابدأ التنقيط لجميع الدفعات","Start drip acclimation for all batches"),detail:bi(lang,"كل الكائنات أصبحت في أوعيتها. اضغط «ابدأ التنقيط» مرة واحدة؛ بعدها ستظهر صناديق الدفعات وتبدأ كل عداداتها معاً بالتوازي.","All livestock is now in its containers. Tap “Start drip acclimation” once; the batch boxes will appear and all their timers will start together in parallel."),tone:"action" as const};
   }
   if(ready.length){
-   const names=ready.slice(0,3).map(i=>lang==="ar"?i.name:(i.nameEn||i.name)).join("، ");
-   return{stage:4,title:bi(lang,"افحص الكائنات الجاهزة الآن","Inspect the ready livestock now"),detail:bi(lang,`${ready.length} مجموعة جاهزة للفحص${names?`: ${names}`:""}. راجع التنفس/الاستجابة والحالة والملوحة عند الحاجة، ثم انقل الكائن فقط بدون ماء الشحنة إذا كان مستقراً.`,`${ready.length} group(s) are ready for inspection${names?`: ${names}`:""}. Check breathing/response, condition, and salinity when relevant, then transfer the animal only—without shipping water—if stable.`),tone:"ready" as const};
+   return{stage:4,title:bi(lang,"دفعة أو أكثر جاهزة للنقل","One or more batches are ready for transfer"),detail:bi(lang,"الصندوق الجاهز سيفتح تلقائياً ويصدر صوته الخاص. افحص الكائنات داخله، ثم اضغط «تم النقل إلى الحوض» لكل كائن. بقية عدادات الدفعات تستمر بدون أي تأثير.","A ready batch opens automatically and plays its category-specific sound. Inspect its livestock, then tap “Transferred to tank” for each item. All other batch timers continue unaffected."),tone:"ready" as const};
   }
   if(running.length){
-   return{stage:3,title:bi(lang,"راقب العدادات — الإقلمة تعمل بالتوازي","Monitor the timers — acclimation is running in parallel"),detail:bi(lang,`${running.length} مجموعة قيد الإقلمة الآن. لا تحتاج أن تنتظر نوعاً لينتهي قبل الآخر؛ راقب كل مسار، وسيصلك تنبيه وصوت خاص عند انتهاء عداده.`,`${running.length} group(s) are acclimating now. One category does not need to wait for another; monitor each lane and you will get a distinct alert and sound when its timer finishes.`),tone:"running" as const};
-  }
-  if(waiting.length){
-   return{stage:2,title:bi(lang,"ابدأ الدفعات الحالية للمسارات الجاهزة","Start the current batches for the ready lanes"),detail:bi(lang,"انتهت موازنة الحرارة. انقل كل مجموعة إلى وعائها المخصص وابدأ دفعة الأسماك والقشريات والمرجان وغيرها بالتوازي حسب المسارات الظاهرة أدناه.","Temperature equalization is complete. Move each group to its dedicated container and start the current fish, crustacean, coral, and other batches in parallel using the lanes below."),tone:"action" as const};
+   return{stage:3,title:bi(lang,"التنقيط شغال لكل الدفعات بالتوازي","All batch drip timers are running in parallel"),detail:bi(lang,"كل صندوق له عداده الخاص. لا تحتاج تعمل شي الآن غير المراقبة؛ عند انتهاء أي دفعة سيظهر تنبيه وصوت مميز وتُفتح تلقائياً للفحص والنقل.","Every batch box has its own timer. For now, just monitor them; when any batch finishes, you’ll get a distinct alert and sound and that box will open automatically for inspection and transfer."),tone:"running" as const};
   }
   if(items.length&&completed.length===items.length){
-   return{stage:5,title:bi(lang,"اكتملت جلسة الإقلمة","Acclimation session complete"),detail:bi(lang,"تمت معالجة كل المجموعات. راجع سجل الإدخال وتأكد أن الكائنات المنقولة موثقة بالمكان والحالة الصحيحة.","All groups have been processed. Review the input register and confirm transferred livestock is documented with the correct placement and condition."),tone:"done" as const};
+   return{stage:5,title:bi(lang,"اكتملت جلسة الإقلمة","Acclimation session complete"),detail:bi(lang,"تم نقل كل الدفعات ومعالجة كل العناصر. راجع سجل الإدخال للتأكد من توثيق الكائنات بالحوض.","All batches have been processed and transferred. Review the input register to confirm all livestock is recorded in the tank."),tone:"done" as const};
   }
-  return{stage:5,title:bi(lang,"راجع الحالة الحالية","Review the current state"),detail:bi(lang,"راجع المسارات والتنبيهات أدناه وحدد المجموعة التالية التي تحتاج فحصاً أو نقلاً.","Review the lanes and alerts below and identify the next group needing inspection or transfer."),tone:"info" as const};
- },[active?.items,active?.floatConfirmed,active?.floatStatus,lang]);
+  if(waiting.length)return{stage:3,title:bi(lang,"جاهز لبدء التنقيط","Ready to start drip acclimation"),detail:bi(lang,"اضغط زر بدء التنقيط العام ليبدأ عداد كل دفعة بالتوازي.","Tap the global start-drip button to start every batch timer in parallel."),tone:"action" as const};
+  return{stage:4,title:bi(lang,"راجع الدفعات الجاهزة","Review ready batches"),detail:bi(lang,"راجع الصناديق المفتوحة وانقل الكائنات الجاهزة إلى الحوض واحداً واحداً.","Review the open batch boxes and transfer ready livestock to the tank one by one."),tone:"ready" as const};
+ },[active?.items,active?.floatConfirmed,active?.floatStatus,active?.bucketStatus,active?.dripStartedAt,lang]);
  useEffect(()=>{const id=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(id)},[]);
  useEffect(()=>{
   if(!active)return;
