@@ -6,6 +6,7 @@ import { biologicalMemory, eventChemistryLinks, proactivePredictions, tankMood }
 import { analyzeNutrients } from "./nutrientEngine";
 import { tankEnergy } from "./equipmentIntelligence";
 import { chemistryGuidance } from "./chemistryGuidance";
+import { parseAquaQuestion,type AquaQuestionParam } from "./aquaAIIntent";
 
 export type AquaAIConfidence="low"|"medium"|"high";
 export type AquaAIPage="dashboard"|"chemistry"|"maintenance"|"equipment"|"livestock"|"timeline"|"dosing"|"quarantine"|"emergency"|"rodi"|"journal";
@@ -30,7 +31,7 @@ export interface AquaAIAnswer {
 }
 
 const DAY=86400000;
-const PARAMS=["KH","Ca","Mg","NO3","PO4","pH","salinity","temperature"] as const;
+const PARAMS=["KH","Ca","Mg","NO3","PO4","pH","salinity","temperature","NH3","NO2","GH","TDS"] as const;
 type Param=typeof PARAMS[number];
 
 function n(v:unknown){return typeof v==="number"&&Number.isFinite(v)?v:undefined;}
@@ -225,17 +226,81 @@ function equipmentAnswer(tank:Tank):AquaAIAnswer{
   return {titleAr:"ذكاء المعدات والطاقة",titleEn:"Equipment & energy intelligence",summaryAr:warnings.length?"هناك أجهزة يجب فحصها قبل أن تتحول إلى مشكلة في الحوض.":"لا يوجد تحذير جهاز مباشر حالياً، ويمكن أيضاً مراقبة أثر الطاقة والتكلفة.",summaryEn:warnings.length?"Some devices need attention before they become a tank problem.":"No device is directly flagged right now; I can also track energy and cost impact.",detailsAr,detailsEn,evidenceAr:[`${energy.configured} جهاز ببيانات طاقة`],evidenceEn:[`${energy.configured} device(s) with energy data`],confidence:energy.configured>=2?"medium":"low",action:{page:"equipment",ar:"افتح إدارة المعدات",en:"Open equipment management"}};
 }
 
+function multiParameterAnswer(tank:Tank,params:AquaQuestionParam[]):AquaAIAnswer{
+  const guidance=chemistryGuidance(tank);
+  const rows=params.map(param=>guidance.all.find(x=>x.key===param)).filter(Boolean) as NonNullable<ReturnType<typeof chemistryGuidance>["all"][number]>[];
+  const problems=rows.filter(x=>x.level!=="good"||x.suspectedFormat);
+  const detailsAr=(problems.length?problems:rows).map(x=>`${x.reasonAr} الإجراء: ${x.actionAr}`);
+  const detailsEn=(problems.length?problems:rows).map(x=>`${x.reasonEn} Action: ${x.actionEn}`);
+  const top=problems[0]||rows[0];
+  return {
+    titleAr:"تحليل القيم المطلوبة معاً",titleEn:"Combined parameter analysis",
+    summaryAr:top?`الأولوية الآن: ${top.titleAr}. ${top.actionAr}`:"لا توجد بيانات كافية للقيم المطلوبة.",
+    summaryEn:top?`Current priority: ${top.titleEn}. ${top.actionEn}`:"There is not enough data for the requested parameters.",
+    detailsAr:detailsAr.length?detailsAr:["لا توجد بيانات كافية حالياً."],detailsEn:detailsEn.length?detailsEn:["There is not enough data yet."],
+    evidenceAr:[`${tank.chemistry.length} قراءات كيميائية`,`${params.length} عوامل مطلوبة`],evidenceEn:[`${tank.chemistry.length} chemistry readings`,`${params.length} requested parameters`],
+    confidence:confidence(tank),action:{page:"chemistry",ar:"افتح الكيمياء والتفاصيل",en:"Open chemistry details"}
+  };
+}
+
+function stockingReadinessAnswer(tank:Tank):AquaAIAnswer{
+  const guide=chemistryGuidance(tank),bio=bioload(tank),state=tankStateView(tank);
+  const activeAcclimation=(tank.acclimationSessions??[]).some(x=>x.status!=="completed");
+  const blocking=guide.problems.filter(x=>x.level==="danger"||x.suspectedFormat);
+  const caution=guide.problems.filter(x=>x.level==="warn"&&!x.suspectedFormat);
+  const canAdd=blocking.length===0&&bio.status!=="danger"&&state.band!=="critical"&&!activeAcclimation;
+  const detailsAr=[`حالة الحوض: ${state.score}% (${state.ar}).`,`الحمل الحيوي: ${Math.round(bio.ratio*100)}%.`,`الكيمياء: ${guide.health}%.`,...(blocking.slice(0,3).map(x=>`مانع محتمل: ${x.reasonAr}`)),...(caution.slice(0,2).map(x=>`تنبيه: ${x.reasonAr}`)),activeAcclimation?"هناك جلسة أقلمة نشطة حالياً؛ الأفضل عدم إضافة كائنات جديدة حتى تنتهي وتستقر الكائنات.":"لا توجد جلسة أقلمة نشطة."];
+  const detailsEn=[`Tank state: ${state.score}% (${state.en}).`,`Bioload: ${Math.round(bio.ratio*100)}%.`,`Chemistry: ${guide.health}%.`,...(blocking.slice(0,3).map(x=>`Potential blocker: ${x.reasonEn}`)),...(caution.slice(0,2).map(x=>`Caution: ${x.reasonEn}`)),activeAcclimation?"An acclimation session is active; avoid adding more livestock until it is complete and livestock settles.":"No acclimation session is active."];
+  return {
+   titleAr:"جاهزية إضافة كائنات",titleEn:"Livestock-addition readiness",
+   summaryAr:canAdd?"المؤشرات الحالية لا تظهر مانعاً واضحاً، لكن أضف تدريجياً وراقب الحمل الحيوي والكيمياء بعد الإضافة.":"حالياً في عوامل لازم تنحل أو تتأكد قبل إضافة كائنات جديدة.",
+   summaryEn:canAdd?"Current indicators show no obvious blocker, but add gradually and monitor bioload and chemistry afterward.":"There are current factors to resolve or verify before adding new livestock.",
+   detailsAr,detailsEn,evidenceAr:[`${guide.health}% صحة كيمياء`,`${Math.round(bio.ratio*100)}% حمل حيوي`,`حالة النظام ${state.score}%`],evidenceEn:[`${guide.health}% chemistry health`,`${Math.round(bio.ratio*100)}% bioload`,`System state ${state.score}%`],confidence:confidence(tank),action:{page:canAdd?"livestock":"chemistry",ar:canAdd?"افتح الكائنات وخطط للإضافة":"راجع الكيمياء أولاً",en:canAdd?"Open livestock and plan the addition":"Review chemistry first"}
+  };
+}
+
+function waterChangeAnswer(tank:Tank):AquaAIAnswer{
+  const guide=chemistryGuidance(tank);
+  const latest=tank.waterChanges[0];
+  const highNutrients=guide.problems.filter(x=>["NO3","PO4","NH3","NO2"].includes(x.key));
+  const dataIssue=guide.dataIssues[0];
+  const needs=dataIssue?false:highNutrients.length>0||guide.health<70;
+  return {
+   titleAr:"هل تغيير الماء هو الخطوة المناسبة؟",titleEn:"Is a water change the right next step?",
+   summaryAr:dataIssue?"قبل قرار تغيير الماء صحح القراءة المشكوك فيها أولاً.":needs?"تغيير ماء مناسب قد يكون جزءاً من الحل، لكن لازم يترافق مع معالجة السبب وليس كحل وحيد.":"ما في إشارة حالياً إن تغيير ماء كبير هو أول إجراء لازم.",
+   summaryEn:dataIssue?"Correct the suspicious reading before deciding on a water change.":needs?"An appropriate water change may be part of the solution, but it should accompany root-cause correction rather than act as the only fix.":"There is no clear sign that a large water change is the first action needed right now.",
+   detailsAr:[...(dataIssue?[dataIssue.reasonAr,dataIssue.actionAr]:[]),...highNutrients.slice(0,3).map(x=>`${x.reasonAr} ${x.actionAr}`),latest?`آخر تغيير ماء مسجل: ${latest.liters} لتر بتاريخ ${new Date(latest.timestamp).toLocaleDateString()}.`:"لا يوجد تغيير ماء مسجل مؤخراً."],
+   detailsEn:[...(dataIssue?[dataIssue.reasonEn,dataIssue.actionEn]:[]),...highNutrients.slice(0,3).map(x=>`${x.reasonEn} ${x.actionEn}`),latest?`Latest logged water change: ${latest.liters} L on ${new Date(latest.timestamp).toLocaleDateString()}.`:"No recent water change is logged."],
+   evidenceAr:[`${guide.health}% صحة كيمياء`,`${tank.waterChanges.length} تغييرات ماء مسجلة`],evidenceEn:[`${guide.health}% chemistry health`,`${tank.waterChanges.length} logged water changes`],confidence:confidence(tank),action:{page:"chemistry",ar:"راجع الكيمياء قبل القرار",en:"Review chemistry before deciding"}
+  };
+}
+
+function actionAnswer(tank:Tank):AquaAIAnswer{
+  const guide=chemistryGuidance(tank),state=tankStateView(tank),action=nextBestAction(tank);
+  const top=guide.problems.slice(0,3);
+  return {
+   titleAr:"أفضل خطوة الآن",titleEn:"Best next action",
+   summaryAr:`${action.ar}.`,summaryEn:`${action.en}.`,
+   detailsAr:[`حالة النظام: ${state.score}% (${state.ar}).`,...top.map(x=>`${x.reasonAr} ${x.actionAr}`),...(state.drivers.filter(x=>x.level==="danger"||x.level==="warn").slice(0,2).map(x=>x.ar))],
+   detailsEn:[`System state: ${state.score}% (${state.en}).`,...top.map(x=>`${x.reasonEn} ${x.actionEn}`),...(state.drivers.filter(x=>x.level==="danger"||x.level==="warn").slice(0,2).map(x=>x.en))],
+   evidenceAr:[`${guide.health}% صحة كيمياء`,`حالة النظام ${state.score}%`],evidenceEn:[`${guide.health}% chemistry health`,`System state ${state.score}%`],confidence:confidence(tank),action
+  };
+}
 export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer{
   const q=(question||"").trim().toLowerCase();
-  const param=textParam(q);
-  if(param)return parameterAnswer(tank,param);
+  const intent=parseAquaQuestion(question);
+  if(intent.params.length>1)return multiParameterAnswer(tank,intent.params);
+  if(intent.params.length===1)return parameterAnswer(tank,intent.params[0] as Param);
+  if(intent.mode==="canAdd")return stockingReadinessAnswer(tank);
+  if(intent.mode==="waterChange")return waterChangeAnswer(tank);
+  if(intent.mode==="action")return actionAnswer(tank);
+  if(intent.mode==="forecast")return forecastAnswer(tank);
+  if(intent.topics.includes("maintenance"))return maintenanceAnswer(tank);
+  if(intent.topics.includes("livestock"))return livestockAnswer(tank);
+  if(intent.topics.includes("emergency"))return emergencyAnswer(tank);
+  if(intent.topics.includes("rodi"))return rodiAnswer(tank);
+  if(intent.topics.includes("equipment"))return equipmentAnswer(tank);
   if(/ذاكر|history|memory|لماذا حدث|شو صار بعد|بعد ما|اثر|أثر|event|حدث/.test(q))return memoryAnswer(tank);
-  if(/توقع|forecast|predict|كم يوم|إلى أين|رايح|مستقبل|الاستهلاك/.test(q))return forecastAnswer(tank);
-  if(/صيان|maintenance|task|مهمة/.test(q))return maintenanceAnswer(tank);
-  if(/سمك|مرجان|كائن|livestock|fish|coral|bioload/.test(q))return livestockAnswer(tank);
-  if(/طوار|emerg|تسريب|انقطاع|overheat|خطر/.test(q))return emergencyAnswer(tank);
-  if(/rodi|ro\/di|tds|ماء المصدر|مياه المصدر/.test(q))return rodiAnswer(tank);
-  if(/جهاز|معدات|equipment|pump|light|skimmer|heater|طاقة|كهرب|energy|cost/.test(q))return equipmentAnswer(tank);
 
   const mood=tankMood(tank),state=tankStateView(tank),forecast=tankForecast(tank),pred=proactivePredictions(tank)[0],memory=biologicalMemory(tank)[0],nutrients=analyzeNutrients(tank),insights=smartInsights(tank);
   const chemistry=chemistryGuidance(tank);
