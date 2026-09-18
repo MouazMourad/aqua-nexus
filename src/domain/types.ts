@@ -291,6 +291,8 @@ export interface Tank {
   name: string;
   /** Built-in protected aquarium used only for learning/exploration. */
   isTraining?: boolean;
+  /** Start of the current hands-on training run; reset with the training tank. */
+  trainingStartedAt?: string;
   type: TankType;
   status: TankStatus;
   ageMonths?: number;
