@@ -4,6 +4,7 @@ import type { AquaQuestionIntent } from "./aquaAIIntent";
 import type { AquaAIQueryPlan } from "./aquaAIQueryPlan";
 import { resolveAquaEntities,equipmentKindLabel } from "./aquaAIEntities";
 import { maintenanceProcedure } from "./aquaAIMaintenanceKnowledge";
+import { latestTankAnswer } from "./aquaAILatestAnswer";
 
 function dateOnly(value?:string){
  if(!value)return undefined;
@@ -172,6 +173,7 @@ export function answerSpecialOperation(tank:Tank,intent:AquaQuestionIntent,plan:
   if(procedure)return procedure;
  }
  if(plan.operation==="when"&&(plan.primary==="maintenance"||plan.primary==="equipment"))return maintenanceWhenAnswer(tank,intent);
+ if(plan.operation==="latest")return latestTankAnswer(tank,plan);
  if(plan.operation==="list"||plan.operation==="count")return listOrCountAnswer(tank,plan);
  return undefined;
 }
