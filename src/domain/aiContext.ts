@@ -6,13 +6,14 @@ import { learnedTankSignals,repeatedResponsePatterns,tankBaselines } from "./tan
 import { analyzeNutrients } from "./nutrientEngine";
 import { mediaPredictions } from "./mediaPredictor";
 import { tankEnergy } from "./equipmentIntelligence";
+import { chemistryGuidance } from "./chemistryGuidance";
 
 export interface TankAIContext {
   schema:"aqua-nexus-ai-context/v1";
   generatedAt:string;
   tank:{id:string;name:string;type:string;status:string;ageMonths?:number;systemVolumeLiters:number};
   state:{health:number;chemistry:number;maintenance:number;bioloadPercent:number;stateScore:number;stateBand:string;mood:string;forecast7d:number;forecastDirection:string;forecastConfidence:string};
-  chemistry:{latest:Record<string,number|null>;readingCount:number;recent:Array<{timestamp:string;values:Record<string,number|null>}>};
+  chemistry:{latest:Record<string,number|null>;readingCount:number;recent:Array<{timestamp:string;values:Record<string,number|null>}>;guidance:ReturnType<typeof chemistryGuidance>};
   learning:{baselines:ReturnType<typeof tankBaselines>;signals:ReturnType<typeof learnedTankSignals>;predictions:ReturnType<typeof proactivePredictions>;repeatedPatterns:ReturnType<typeof repeatedResponsePatterns>;memory:ReturnType<typeof biologicalMemory>;eventLinks:ReturnType<typeof eventChemistryLinks>};
   nutrients:ReturnType<typeof analyzeNutrients>;
   maintenance:{due:Array<{id:string;title:string;titleEn?:string;nextDue?:string}>;total:number};
@@ -34,7 +35,7 @@ export function buildTankAIContext(tank:Tank):TankAIContext{
     generatedAt:new Date().toISOString(),
     tank:{id:tank.id,name:tank.name,type:tank.type,status:tank.status,ageMonths:tank.ageMonths,systemVolumeLiters:tank.systemVolumeLiters},
     state:{health:tankHealth(tank),chemistry:chemistryHealth(tank),maintenance:maintenanceHealth(tank),bioloadPercent:Math.round(bio.ratio*100),stateScore:state.score,stateBand:state.band,mood:mood.key,forecast7d:forecast.projected7d,forecastDirection:forecast.direction,forecastConfidence:forecast.confidence},
-    chemistry:{latest:tank.chemistry[0]?.values??{},readingCount:tank.chemistry.length,recent:tank.chemistry.slice(0,12).map(x=>({timestamp:x.timestamp,values:x.values}))},
+    chemistry:{latest:tank.chemistry[0]?.values??{},readingCount:tank.chemistry.length,recent:tank.chemistry.slice(0,12).map(x=>({timestamp:x.timestamp,values:x.values})),guidance:chemistryGuidance(tank)},
     learning:{baselines:tankBaselines(tank),signals:learnedTankSignals(tank),predictions:proactivePredictions(tank),repeatedPatterns:repeatedResponsePatterns(tank),memory:biologicalMemory(tank),eventLinks:eventChemistryLinks(tank)},
     nutrients:analyzeNutrients(tank),
     maintenance:{due,total:tank.maintenance.length},
@@ -54,7 +55,9 @@ export function aquaAISystemPrompt(language:"ar"|"en"){
     "Prioritize aquarium stability and gradual changes. Respect configured dosing safety limits and product-label instructions.",
     "For image-based disease analysis, present possible causes and confidence, not a definitive veterinary diagnosis.",
     "Prefer tank-specific learned baselines over generic assumptions, while still flagging when a tank-specific baseline itself appears unsafe.",
-    "Explain why an action is suggested and what result should be rechecked afterward."
+    "Explain why an action is suggested and what result should be rechecked afterward.",
+    "Treat suspected data-format errors as data-quality problems first. Do not recommend physical tank corrections until the recorded value is validated.",
+    "When chemistry health is reduced, identify the specific parameters lowering the score and give prioritized, gradual next actions."
   ];
   if(language==="ar")shared.push("Respond in clear Modern Arabic with familiar aquarium terminology; keep technical parameter names such as KH, Ca, Mg, NO3 and PO4 as written.");
   else shared.push("Respond in clear concise English using standard aquarium terminology.");
