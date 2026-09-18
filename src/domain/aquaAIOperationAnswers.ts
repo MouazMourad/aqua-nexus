@@ -77,7 +77,7 @@ function maintenanceWhenAnswer(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswer
  const entities=resolveAquaEntities(tank,intent.raw);
  const matchedTasks=tank.maintenance.filter(x=>entities.maintenanceTaskIds.includes(x.id));
  const pool=(matchedTasks.length?matchedTasks:tank.maintenance)
-  .filter(x=>!x.done&&x.nextDue)
+  .filter(x=>Boolean(x.nextDue)&&(x.cadence!=="once"||!x.done))
   .map(x=>({task:x,days:daysFromNow(x.nextDue)!}))
   .filter(x=>Number.isFinite(x.days))
   .sort((a,b)=>a.days-b.days);
