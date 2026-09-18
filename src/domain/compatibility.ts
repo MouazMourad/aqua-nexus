@@ -240,3 +240,110 @@ export function compatibilityCheck(
     blocked
   };
 }
+
+
+export interface TankCompatibilityAudit {
+  score:number;
+  level:CompatibilityLevel;
+  issues:CompatibilityIssue[];
+  dangerCount:number;
+  warningCount:number;
+}
+
+function pushUniqueIssue(list:CompatibilityIssue[],issue:CompatibilityIssue){
+  if(!list.some(x=>x.level===issue.level&&x.ar===issue.ar))list.push(issue);
+}
+
+export function auditTankCompatibility(tank:Tank):TankCompatibilityAudit {
+  const issues:CompatibilityIssue[]=[];
+  const rows=tank.livestock.map(item=>({item,catalog:catalogById(item.libraryId)}));
+  const hasCorals=tank.livestock.some(x=>x.category==="coral");
+  const hasInverts=tank.livestock.some(x=>x.category==="invert");
+  const hasPlants=tank.livestock.some(x=>x.category==="plant");
+
+  for(const {item,catalog} of rows){
+    if(!catalog)continue;
+    const nameAr=displayName(catalog,"ar")||item.name;
+    const nameEn=displayName(catalog,"en")||item.nameEn||item.name;
+
+    if(Number(catalog.min||0)>tank.systemVolumeLiters){
+      pushUniqueIssue(issues,{
+        level:"danger",
+        ar:`${nameAr}: حجم النظام ${tank.systemVolumeLiters.toFixed(0)} لتر أقل من الحد المقترح ${catalog.min} لتر.`,
+        en:`${nameEn}: system volume ${tank.systemVolumeLiters.toFixed(0)} L is below the suggested minimum of ${catalog.min} L.`
+      });
+    }
+
+    if(catalog.schoolMin){
+      const total=tank.livestock.filter(x=>x.libraryId===catalog.id).reduce((s,x)=>s+x.quantity,0);
+      if(total<catalog.schoolMin){
+        pushUniqueIssue(issues,{
+          level:"warn",
+          ar:`${nameAr}: العدد الحالي ${total} بينما هذا النوع يفضل مجموعة لا تقل عن ${catalog.schoolMin}.`,
+          en:`${nameEn}: current group size is ${total}, while this species prefers at least ${catalog.schoolMin}.`
+        });
+      }
+    }
+
+    const t=tags(catalog);
+    if(hasCorals&&(catalog.reefSafe===false||catalog.reefSafe==="caution"||t.includes("coralRisk"))){
+      pushUniqueIssue(issues,{
+        level:catalog.reefSafe===false?"danger":"warn",
+        ar:`${nameAr} قد يعض أو يزعج المرجان الموجود.`,
+        en:`${nameEn} may nip or disturb existing corals.`
+      });
+    }
+    if(hasInverts&&(catalog.invertSafe===false||catalog.invertSafe==="caution"||t.includes("shrimpRisk"))){
+      pushUniqueIssue(issues,{
+        level:catalog.invertSafe===false?"danger":"warn",
+        ar:`${nameAr} قد يشكل خطراً على القشريات أو اللافقاريات الموجودة.`,
+        en:`${nameEn} may threaten existing crustaceans or invertebrates.`
+      });
+    }
+    if(tank.type==="freshwater"&&hasPlants&&(catalog.plantSafe===false||catalog.plantSafe==="caution")){
+      pushUniqueIssue(issues,{
+        level:catalog.plantSafe===false?"danger":"warn",
+        ar:`${nameAr} قد يضر بالنباتات الموجودة.`,
+        en:`${nameEn} may damage existing plants.`
+      });
+    }
+  }
+
+  for(let i=0;i<rows.length;i++){
+    const a=rows[i].catalog;if(!a)continue;
+    for(let j=i+1;j<rows.length;j++){
+      const b=rows[j].catalog;if(!b)continue;
+      const aBad=new Set<string>(Array.isArray(a.incompatibleWith)?a.incompatibleWith:[]);
+      const bBad=new Set<string>(Array.isArray(b.incompatibleWith)?b.incompatibleWith:[]);
+      if(aBad.has(b.id)||bBad.has(a.id)){
+        pushUniqueIssue(issues,{
+          level:"danger",
+          ar:`تعارض مباشر معروف بين ${displayName(a,"ar")} و${displayName(b,"ar")}.`,
+          en:`A direct known incompatibility exists between ${displayName(a,"en")} and ${displayName(b,"en")}.`
+        });
+      }
+      const at=tags(a),bt=tags(b);
+      if(at.includes("predator")&&isSmallPrey(b)){
+        pushUniqueIssue(issues,{level:"danger",ar:`${displayName(a,"ar")} مفترس وقد يهدد ${displayName(b,"ar")}.`,en:`${displayName(a,"en")} is predatory and may threaten ${displayName(b,"en")}.`});
+      }
+      if(bt.includes("predator")&&isSmallPrey(a)){
+        pushUniqueIssue(issues,{level:"danger",ar:`${displayName(b,"ar")} مفترس وقد يهدد ${displayName(a,"ar")}.`,en:`${displayName(b,"en")} is predatory and may threaten ${displayName(a,"en")}.`});
+      }
+      const aAgg=at.some(x=>["aggressive","semiAggressive","territorial","finNipper"].includes(x));
+      const bAgg=bt.some(x=>["aggressive","semiAggressive","territorial","finNipper"].includes(x));
+      if(mappedCategory(a.cat)==="fish"&&mappedCategory(b.cat)==="fish"&&aAgg&&bAgg){
+        pushUniqueIssue(issues,{
+          level:"warn",
+          ar:`احتمال نزاع أو عدوانية بين ${displayName(a,"ar")} و${displayName(b,"ar")}.`,
+          en:`Possible territorial/aggression conflict between ${displayName(a,"en")} and ${displayName(b,"en")}.`
+        });
+      }
+    }
+  }
+
+  const dangerCount=issues.filter(x=>x.level==="danger").length;
+  const warningCount=issues.filter(x=>x.level==="warn").length;
+  const score=Math.max(0,Math.round(100-dangerCount*25-warningCount*8));
+  const level:CompatibilityLevel=dangerCount?"danger":warningCount?"warn":"good";
+  return {score,level,issues,dangerCount,warningCount};
+}
