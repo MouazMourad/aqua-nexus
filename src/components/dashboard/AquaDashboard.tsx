@@ -102,7 +102,8 @@ export function AquaDashboard() {
   addTank(newTank);setOpen(false);resetWizard();setPage("dashboard");
  }
 
- const wizardModal=(\n  <Modal open={open} title={tr(language,"smartSetup")} onClose={()=>setOpen(false)}>
+ const wizardModal=(
+  <Modal open={open} title={tr(language,"smartSetup")} onClose={()=>setOpen(false)}>
    <div className="wizard-step-label"><b>{step}. {wizardSteps[step-1]}</b><span>{step}/7</span></div>
    <div className="wizard-progress"><i style={{width:`${step/7*100}%`}}/></div>
 
@@ -141,7 +142,10 @@ export function AquaDashboard() {
    </div>}
 
    <div className="modal-actions">{step>1&&<button className="btn" onClick={()=>setStep(step-1)}>{tr(language,"back")}</button>}{step<7?<button className="btn primary" onClick={()=>setStep(step+1)}>{tr(language,"next")}</button>:<button className="btn primary" onClick={create}>{tr(language,"finish")}</button>}</div>
-  </Modal>\n );\n\n if(!tank) return <main className="app-shell empty-tank-shell" dir={language==="ar"?"rtl":"ltr"}>
+  </Modal>
+ );
+
+ if(!tank) return <main className="app-shell empty-tank-shell" dir={language==="ar"?"rtl":"ltr"}>
   <header className="empty-tank-topbar">
    <div className="brand"><div className="brand-mark">AN</div><div><strong>Aqua Nexus 3D</strong><small>{tr(language,"brand")}</small></div></div>
    <button className="btn empty-language-btn" onClick={()=>setLanguage(language==="ar"?"en":"ar")}>{language==="ar"?"EN":"AR"}</button>
