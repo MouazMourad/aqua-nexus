@@ -82,6 +82,8 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const [expandedLanes,setExpandedLanes]=useState<Record<string,boolean>>({});
  const [expandedBatches,setExpandedBatches]=useState<Record<string,boolean>>({});
  const [timerAlerts,setTimerAlerts]=useState<{id:string;lane:string;batch?:number;message:string}[]>([]);
+ const [exceptionPickerOpen,setExceptionPickerOpen]=useState(false);
+ const [selectedExceptionIds,setSelectedExceptionIds]=useState<string[]>([]);
  const audioCtxRef=useRef<AudioContext|null>(null);
  const notifiedTimersRef=useRef<Set<string>>(new Set());
  const lib:any[]=LIVESTOCK_LIBRARY.filter((x:any)=>x.type===tank.type);
@@ -119,6 +121,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   return{id:`${lane.key}-${meta.batch}`,lane:lane.key,batch:meta.batch,totalBatches:lane.totalBatches,entries,plannedMinutes};
  })),[releaseLanes]);
  const emergencyItems=useMemo(()=>[...(active?.items??[])].filter(i=>i.emergency&&!["added","deferred"].includes(i.status)),[active?.items]);
+ const exceptionCandidates=useMemo(()=>[...(active?.items??[])].filter(i=>!i.emergency&&!["added","deferred"].includes(i.status)),[active?.items]);
  const step=active?.wizardStep??1;
  const acclimationGuide=useMemo(()=>{
   const items=active?.items??[];
@@ -345,6 +348,27 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   const item=active.items.find(x=>x.id===id);if(!item)return;
   saveSession({...active,items:active.items.map(x=>x.id===id?{...x,emergency:false,status:"waiting" as const,startedAt:undefined,endAt:null,remainingMs:itemDuration(x),readyAt:undefined}:x),events:[ev(`أعيد ${item.name} إلى خطة الإقلمة العامة.`,`${item.nameEn||item.name} returned to the standard acclimation plan.`),...active.events]});
  }
+ function toggleExceptionCandidate(id:string){
+  setSelectedExceptionIds(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
+ }
+ function selectAllExceptionCandidates(){
+  setSelectedExceptionIds(exceptionCandidates.map(x=>x.id));
+ }
+ function clearExceptionSelection(){setSelectedExceptionIds([]);}
+ function startSelectedExceptions(){
+  if(!active||!selectedExceptionIds.length)return;
+  unlockAudio();
+  const ids=new Set(selectedExceptionIds);
+  const started=Date.now();
+  const selectedItems=active.items.filter(x=>ids.has(x.id));
+  saveSession({...active,items:active.items.map(x=>{
+   if(!ids.has(x.id))return x;
+   const rapid=emergencyDuration(x);
+   return{...x,emergency:true,status:"emergency" as const,startedAt:nowISO(),remainingMs:rapid,endAt:started+rapid,readyAt:undefined};
+  }),events:[ev(`تم نقل ${selectedItems.length} كائن/مجموعة إلى صندوق الاستثناءات وبدأ التنقيط السريع.`,`Moved ${selectedItems.length} item/group(s) to the exception box and started rapid drip acclimation.`),...active.events]});
+  setSelectedExceptionIds([]);
+  setExceptionPickerOpen(false);
+ }
  function markAdded(item:AcclimationItem){if(!active)return;const catalog:any=lib.find((x:any)=>x.id===item.libraryId);if(catalog){const check=compatibilityCheck(tank,catalog,item.quantity);if(check.level==="danger"&&!window.confirm(lang==="ar"?"يوجد تحذير توافق/حمل بيولوجي قوي. هل تريد متابعة الإدخال رغم ذلك؟":"A strong compatibility/bioload warning exists. Continue anyway?"))return;}
   const livestock:LivestockItem={id:uid("live"),libraryId:item.libraryId,name:item.name,nameEn:item.nameEn,category:item.category,quantity:item.quantity,health:item.health==="critical"||item.health==="stressed"?"watch":"good",load:catalog?.load??1,addedAt:today()};const nextItems=active.items.map(x=>x.id===item.id?{...x,status:"added" as const,addedAt:nowISO()}:x);const allDone=nextItems.every(x=>x.status==="added"||x.status==="deferred");patch(tank.id,t=>({...t,acclimationSessions:[{...active,status:allDone?"completed":"release",completedAt:allDone?nowISO():undefined,items:nextItems,events:[ev(`تم إدخال ${item.name} إلى الحوض بدون ماء الشحنة.`,`Transferred ${item.nameEn||item.name} to the aquarium without shipping water.`),...active.events]},...(t.acclimationSessions??[]).filter(x=>x.id!==active.id)],livestock:[...t.livestock,livestock],timeline:[{id:uid("ev"),timestamp:nowISO(),type:"acclimation",textAr:`اكتملت أقلمة ${item.name} وتم إدخاله.`,textEn:`Acclimation completed for ${item.nameEn||item.name}.`},...t.timeline]}));
  }
@@ -476,6 +500,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
       {!active.floatConfirmed&&active.floatStatus==="paused"&&<button className="btn primary" onClick={()=>floatAction("resume")}>{bi(lang,"استئناف","Resume")}</button>}
       {!active.floatConfirmed&&["running","paused"].includes(active.floatStatus||"")&&<button className="btn" onClick={()=>floatAction("plus5")}>+5</button>}
       {!active.floatConfirmed&&active.floatStatus==="ready"&&<button className="btn good" onClick={()=>floatAction("done")}>✓ {bi(lang,"تأكيد الحرارة — ابدأ 5 دقائق النقل للأوعية","Confirm temperature — start 5-minute container transfer")}</button>}
+      {active.floatConfirmed&&active.bucketStatus!=="done"&&<button className="btn danger" onClick={()=>setExceptionPickerOpen(v=>!v)}>🚨 {bi(lang,"استثناءات — للكائنات المتعبة فقط","Exceptions — distressed livestock only")}</button>}
       {active.floatConfirmed&&(!active.bucketStatus||active.bucketStatus==="waiting")&&<button className="btn primary master-transfer-start" onClick={()=>bucketAction("start")}>🪣 {bi(lang,"ابدأ عداد النقل — 5 دقائق","Start transfer timer — 5 min")}</button>}
       {active.floatConfirmed&&active.bucketStatus==="running"&&<button className="btn" onClick={()=>bucketAction("pause")}>{bi(lang,"إيقاف مؤقت","Pause")}</button>}
       {active.floatConfirmed&&active.bucketStatus==="paused"&&<button className="btn primary" onClick={()=>bucketAction("resume")}>{bi(lang,"استئناف","Resume")}</button>}
@@ -483,9 +508,15 @@ export function AcclimationPage({tank}:{tank:Tank}) {
       {active.floatConfirmed&&active.bucketStatus==="done"&&!active.dripStartedAt&&<button className="btn primary master-drip-start" onClick={startAllDripBatches}>💧 {bi(lang,"ابدأ التنقيط لكل الدفعات الآن","Start drip acclimation for all batches now")}</button>}
      </div>
     </div>
+    {active.floatConfirmed&&active.bucketStatus!=="done"&&exceptionPickerOpen&&<div className="exception-picker">
+     <div className="exception-picker-head"><div><small>EMERGENCY SELECTION</small><h3>🚨 {bi(lang,"اختيار الكائنات المتعبة فقط","Select distressed livestock only")}</h3><p>{bi(lang,"استخدم الاستثناء فقط للكائن الذي يظهر عليه تعب أو إجهاد واضح. عند التأكيد نعتبر المحدد نُقل إلى وعائه ويبدأ له فوراً تنقيط سريع مستقل بالتوازي مع نقل بقية الشحنة.","Use this only for livestock showing clear stress or distress. On confirmation, selected items are treated as moved to their containers and immediately start an independent rapid drip timer while the rest of the shipment continues.")}</p></div><button className="btn" onClick={()=>setExceptionPickerOpen(false)}>×</button></div>
+     <div className="exception-picker-tools"><span>{selectedExceptionIds.length} / {exceptionCandidates.length} {bi(lang,"محدد","selected")}</span><div className="actions"><button className="btn" onClick={selectAllExceptionCandidates}>{bi(lang,"اختيار الكل","Select all")}</button><button className="btn" onClick={clearExceptionSelection}>{bi(lang,"إلغاء التحديد","Clear")}</button></div></div>
+     <div className="exception-picker-list">{exceptionCandidates.map(item=><label className={`exception-choice ${selectedExceptionIds.includes(item.id)?"selected":""}`} key={item.id}><input type="checkbox" checked={selectedExceptionIds.includes(item.id)} onChange={()=>toggleExceptionCandidate(item.id)}/><span className="exception-choice-icon">{releaseLaneIcon(releaseLaneKey(item))}</span><span className="exception-choice-copy"><b>{lang==="ar"?item.name:(item.nameEn||item.name)} ×{item.quantity}</b><small>{releaseLaneLabel(lang,releaseLaneKey(item))} • {healthLabel(lang,item.health)} • {sensitivityLabel(lang,item.sensitivity||"normal")}</small></span><em>{Math.round(emergencyDuration(item)/60000)} {bi(lang,"د","min")}</em></label>)}</div>
+     <div className="exception-picker-footer"><span>{bi(lang,"يمكن اختيار كائن واحد أو عدة كائنات أو اختيار الكل. هذا المسار لا يوقف عداد نقل بقية الشحنة.","Choose one, several, or all items. This track does not stop the transfer timer for the rest of the shipment.")}</span><button className="btn danger" disabled={!selectedExceptionIds.length} onClick={startSelectedExceptions}>🚨 {bi(lang,"تأكيد النقل للأوعية وبدء التنقيط السريع","Confirm container transfer & start rapid drip")}</button></div>
+    </div>}
    </section>
    {emergencyItems.length>0&&<section className="card panel full-span emergency-track">
-    <div className="section-title"><div><small>FAST TRACK</small><h2>🚨 {bi(lang,"الإقلمة الاستثنائية السريعة","Rapid Exception Acclimation")}</h2><p className="note">{bi(lang,"المسار الاستثنائي مستقل عن عدادات الدفعات العامة ويستمر بالتوازي معها.","The exception track is independent from the normal batch timers and continues in parallel.")}</p></div></div>
+    <div className="section-title"><div><small>FAST TRACK</small><h2>🚨 {bi(lang,"صندوق الاستثناءات — التنقيط السريع","Exception Box — Rapid Drip")}</h2><p className="note">{bi(lang,"يحتوي فقط على الكائنات المتعبة التي تم تحديدها أثناء مرحلة النقل إلى الأوعية. عداداتها مستقلة وتعمل بالتوازي مع الخطة العامة.","Contains only distressed livestock selected during the container-transfer stage. Their timers are independent and run in parallel with the main plan.")}</p></div></div>
     <div className="emergency-track-grid">{emergencyItems.map(item=>{const rem=remaining(item,now);return <article className={`emergency-track-item ${item.status}`} key={item.id}><div className="emergency-track-head"><div><small>{releaseLaneLabel(lang,releaseLaneKey(item))}</small><h3>{lang==="ar"?item.name:(item.nameEn||item.name)} ×{item.quantity}</h3></div><span className={`status ${item.status}`}>{acclimationStatusLabel(lang,item.status)}</span></div><div className="emergency-track-meta"><span>{healthLabel(lang,item.health)}</span><span>{sensitivityLabel(lang,item.sensitivity||"normal")}</span></div><div className="emergency-track-timer">{fmt(rem)}</div><div className="acclimation-actions">{item.status==="emergency"&&<button className="btn" onClick={()=>itemAction(item.id,"pause")}>{bi(lang,"إيقاف","Pause")}</button>}{item.status==="paused"&&<button className="btn primary" onClick={()=>itemAction(item.id,"resume")}>{bi(lang,"استئناف","Resume")}</button>}{["emergency","paused"].includes(item.status)&&<button className="btn good" onClick={()=>itemAction(item.id,"ready")}>{bi(lang,"جاهز للفحص","Ready for check")}</button>}{item.status==="ready"&&<button className="btn primary" onClick={()=>markAdded(item)}>✓ {bi(lang,"تم النقل إلى الحوض","Transferred to tank")}</button>}<button className="btn warn" onClick={()=>cancelEmergency(item.id)}>↩ {bi(lang,"إرجاع للخطة العامة","Return to main plan")}</button></div></article>})}</div>
    </section>}
    <div className="acclimation-metrics full-span"><div className="card metric"><small>{bi(lang,"الحوض","Tank")}</small><b>{tank.name}</b></div><div className="card metric"><small>{bi(lang,"العناصر","Items")}</small><b>{active.items.length}</b></div><div className="card metric"><small>{bi(lang,"تم نقلها","Transferred")}</small><b>{done}/{active.items.length}</b><div className="progress"><i style={{width:`${pct}%`}}/></div></div><div className="card metric"><small>{bi(lang,"المرحلة","Stage")}</small><b>{acclimationGuide.stage}/5</b></div></div>
