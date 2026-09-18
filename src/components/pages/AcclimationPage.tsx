@@ -51,6 +51,28 @@ function emergencyDuration(i:AcclimationItem){
  const sensitivityExtra=i.sensitivity==="sensitive"?5:0;
  return Math.max(5,base+sensitivityExtra)*60000;
 }
+function releaseLaneKey(i:AcclimationItem){
+ if(i.category==="fish")return "fish";
+ if(i.category==="coral")return "coral";
+ if(i.category==="plant")return i.subtype==="macroalgae"?"macroalgae":"plant";
+ if(i.category==="invert"){
+  if(i.subtype==="crustacean")return "crustacean";
+  if(i.subtype==="snail")return "snail";
+  if(i.subtype==="echinoderm")return "echinoderm";
+  if(i.subtype==="worm")return "worm";
+  return "invert";
+ }
+ return "other";
+}
+function releaseLaneLabel(lang:"ar"|"en",key:string){
+ const ar:any={fish:"الأسماك",crustacean:"القشريات",snail:"الحلزون",echinoderm:"القنافذ ونجوم البحر",worm:"الوورمز / الديدان الأنبوبية",coral:"المرجان",macroalgae:"الماكرو ألجي",plant:"النباتات",invert:"اللافقاريات الأخرى",other:"أخرى"};
+ const en:any={fish:"Fish",crustacean:"Crustaceans",snail:"Snails",echinoderm:"Urchins & Starfish",worm:"Worms / Feather Dusters",coral:"Corals",macroalgae:"Macroalgae",plant:"Plants",invert:"Other Invertebrates",other:"Other"};
+ return (lang==="ar"?ar:en)[key]||key;
+}
+function releaseLaneIcon(key:string){
+ const icons:any={fish:"🐠",crustacean:"🦐",snail:"🐌",echinoderm:"⭐",worm:"🪱",coral:"🪸",macroalgae:"🌿",plant:"🌿",invert:"🦐",other:"◌"};
+ return icons[key]||"◌";
+}
 
 export function AcclimationPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
@@ -61,21 +83,28 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const allowedCats:Cat[]=tank.type==="marine"?["fish","invert","coral","plant"]:["fish","invert","plant"];
  const choices=useMemo(()=>lib.filter((x:any)=>{const c=String(x.cat).toLowerCase(),m=c==="fish"?"fish":c==="coral"?"coral":c==="invert"?"invert":c==="plant"?"plant":"other";return m===category}),[category,tank.type]);
  const chosen:any=choices.find(x=>x.id===selected);
- const releasePlan=useMemo(()=>{
-  const ordered=[...(active?.items??[])].filter(i=>!i.emergency).sort((a,b)=>{
-   const delta=releasePriority(a)-releasePriority(b);
-   if(delta!==0)return delta;
-   return (a.nameEn||a.name).localeCompare(b.nameEn||b.name);
+ const releaseLanes=useMemo(()=>{
+  const normal=[...(active?.items??[])].filter(i=>!i.emergency);
+  const preferred=["fish","crustacean","snail","echinoderm","worm","coral","macroalgae","plant","invert","other"];
+  const keys=[...new Set(normal.map(releaseLaneKey))].sort((a,b)=>preferred.indexOf(a)-preferred.indexOf(b));
+  return keys.map(key=>{
+   const ordered=normal.filter(i=>releaseLaneKey(i)===key).sort((a,b)=>{
+    const delta=releasePriority(a)-releasePriority(b);
+    if(delta!==0)return delta;
+    return (a.nameEn||a.name).localeCompare(b.nameEn||b.name);
+   });
+   const batchSize=suggestedBatchSize(ordered.length);
+   const totalBatches=Math.max(1,Math.ceil(ordered.length/batchSize));
+   const entries=ordered.map((item,index)=>({item,order:index+1,batch:Math.floor(index/batchSize)+1,totalBatches,lane:key}));
+   const batches=Array.from({length:totalBatches},(_,i)=>{
+    const batch=i+1,items=entries.filter(x=>x.batch===batch).map(x=>x.item);
+    const sensitive=items.filter(x=>x.sensitivity==="sensitive"||x.health==="stressed"||x.health==="critical"||x.health==="watch").length;
+    return {batch,count:items.length,sensitive};
+   });
+   return {key,entries,batches,total:ordered.length,totalBatches};
   });
-  const batchSize=suggestedBatchSize(ordered.length);
-  const totalBatches=Math.max(1,Math.ceil(ordered.length/batchSize));
-  return ordered.map((item,index)=>({item,order:index+1,batch:Math.floor(index/batchSize)+1,totalBatches}));
  },[active?.items]);
- const batchSummary=useMemo(()=>Array.from({length:releasePlan[0]?.totalBatches??0},(_,i)=>{
-  const batch=i+1,items=releasePlan.filter(x=>x.batch===batch).map(x=>x.item);
-  const sensitive=items.filter(x=>x.sensitivity==="sensitive"||x.health==="stressed"||x.health==="critical"||x.health==="watch").length;
-  return {batch,count:items.length,sensitive};
- }),[releasePlan]);
+ const releasePlan=useMemo(()=>releaseLanes.flatMap(x=>x.entries),[releaseLanes]);
  const emergencyItems=useMemo(()=>[...(active?.items??[])].filter(i=>i.emergency&&!["added","deferred"].includes(i.status)),[active?.items]);
  const step=active?.wizardStep??1;
  useEffect(()=>{const id=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(id)},[]);
