@@ -289,6 +289,8 @@ export interface AcclimationSession {
 export interface Tank {
   id: string;
   name: string;
+  /** Built-in protected aquarium used only for learning/exploration. */
+  isTraining?: boolean;
   type: TankType;
   status: TankStatus;
   ageMonths?: number;
