@@ -341,6 +341,102 @@ function waterChangeAnswer(tank:Tank):AquaAIAnswer{
   };
 }
 
+function bioloadAnswer(tank:Tank):AquaAIAnswer{
+  const bio=bioload(tank);
+  const ratio=Math.round(bio.ratio*100);
+  const capacity=tank.systemVolumeLiters/35;
+  const labelAr=bio.status==="danger"?"خطر":bio.status==="high"?"مرتفع":bio.status==="good"?"جيد":"منخفض";
+  const labelEn=bio.status==="danger"?"danger":bio.status==="high"?"high":bio.status==="good"?"good":"low";
+  const action=bio.status==="danger"||bio.status==="high"
+    ? {page:"livestock" as AquaAIPage,ar:"لا تضيف كائنات جديدة حالياً، وراجع التغذية والفلترة وNO3/PO4 قبل أي إضافة.",en:"Do not add new livestock now; review feeding, filtration and NO3/PO4 before another addition."}
+    : {page:"livestock" as AquaAIPage,ar:"الحمل الحالي مقبول. خليك على إضافات تدريجية وراقب NO3/PO4 بعد كل إضافة.",en:"Current bioload is acceptable. Keep additions gradual and monitor NO3/PO4 after each addition."};
+  return {
+    titleAr:"حالة الحمل الحيوي",titleEn:"Bioload status",
+    summaryAr:`الحمل الحيوي الحالي حوالي ${ratio}% من القدرة التقديرية للحوض، وتصنيفه ${labelAr}.`,
+    summaryEn:`Current bioload is about ${ratio}% of estimated capacity and is classified as ${labelEn}.`,
+    detailsAr:[
+      `الحمل المحسوب: ${Number(bio.load.toFixed(1))} وحدة.`,
+      `القدرة التقديرية: ${Number(capacity.toFixed(1))} وحدة بناءً على حجم النظام.`,
+      `عدد سجلات الكائنات: ${tank.livestock.length}.`,
+      action.ar
+    ],
+    detailsEn:[
+      `Calculated load: ${Number(bio.load.toFixed(1))} units.`,
+      `Estimated capacity: ${Number(capacity.toFixed(1))} units based on system volume.`,
+      `Livestock records: ${tank.livestock.length}.`,
+      action.en
+    ],
+    evidenceAr:[`${tank.systemVolumeLiters} لتر حجم نظام`,`${tank.livestock.length} سجلات كائنات`],
+    evidenceEn:[`${tank.systemVolumeLiters} L system volume`,`${tank.livestock.length} livestock records`],
+    confidence:"high",action
+  };
+}
+
+function chemistryOverviewAnswer(tank:Tank):AquaAIAnswer{
+  const guide=chemistryGuidance(tank);
+  const top=guide.problems.slice(0,4);
+  const dataIssue=guide.dataIssues[0];
+  const first= dataIssue || top[0];
+  const summaryAr=dataIssue
+    ? `صحة الكيمياء ${guide.health}%. قبل أي تصحيح بالحوض في مشكلة بيانات لازم تتأكد منها: ${dataIssue.reasonAr}`
+    : top.length
+      ? `صحة الكيمياء ${guide.health}%. أهم عامل يحتاج انتباه الآن: ${top[0].reasonAr}`
+      : `صحة الكيمياء ${guide.health}% والقيم الحالية ما فيها مشكلة رئيسية واضحة.`;
+  const summaryEn=dataIssue
+    ? `Chemistry health is ${guide.health}%. Before changing the tank, verify this data issue: ${dataIssue.reasonEn}`
+    : top.length
+      ? `Chemistry health is ${guide.health}%. The main parameter needing attention is: ${top[0].reasonEn}`
+      : `Chemistry health is ${guide.health}% and there is no clear major issue in the current readings.`;
+  return {
+    titleAr:"وضع الكيمياء الآن",titleEn:"Current chemistry status",
+    summaryAr,summaryEn,
+    detailsAr:[
+      ...(dataIssue?[dataIssue.reasonAr,dataIssue.actionAr]:[]),
+      ...top.filter(x=>x!==dataIssue).slice(0,4).map(x=>`${x.reasonAr} الإجراء: ${x.actionAr}`),
+      guide.agePenalty>0?`تنبيه: في خصم ${guide.agePenalty} نقطة بسبب قدم آخر قراءة.`:""
+    ].filter(Boolean),
+    detailsEn:[
+      ...(dataIssue?[dataIssue.reasonEn,dataIssue.actionEn]:[]),
+      ...top.filter(x=>x!==dataIssue).slice(0,4).map(x=>`${x.reasonEn} Action: ${x.actionEn}`),
+      guide.agePenalty>0?`Note: ${guide.agePenalty} points are deducted because the latest reading is old.`:""
+    ].filter(Boolean),
+    evidenceAr:[`${tank.chemistry.length} قراءات كيميائية`,`صحة الكيمياء ${guide.health}%`],
+    evidenceEn:[`${tank.chemistry.length} chemistry readings`,`${guide.health}% chemistry health`],
+    confidence:confidence(tank),
+    action:first?{page:"chemistry",ar:first.actionAr,en:first.actionEn}:{page:"chemistry",ar:"استمر بالمراقبة وسجّل القراءة القادمة",en:"Keep monitoring and log the next reading"}
+  };
+}
+
+function systemOverviewAnswer(tank:Tank):AquaAIAnswer{
+  const state=tankStateView(tank),guide=chemistryGuidance(tank),bio=bioload(tank),mood=tankMood(tank);
+  const maint=maintenanceHealth(tank);
+  const warning=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
+  const activeAcclimation=(tank.acclimationSessions??[]).some(x=>x.status!=="completed");
+  const primary=nextBestAction(tank);
+  return {
+    titleAr:"الوضع العام للحوض",titleEn:"Overall tank status",
+    summaryAr:`الحوض ${mood.ar} حالياً. حالة النظام ${state.score}%، الكيمياء ${guide.health}%، الصيانة ${maint}%، والحمل الحيوي ${Math.round(bio.ratio*100)}%.`,
+    summaryEn:`The tank is currently ${mood.en}. System state is ${state.score}%, chemistry ${guide.health}%, maintenance ${maint}%, and bioload ${Math.round(bio.ratio*100)}%.`,
+    detailsAr:[
+      `المزاج: ${mood.ar}. ${mood.noteAr}`,
+      guide.problems[0]?`أهم ملاحظة كيميائية: ${guide.problems[0].reasonAr}`:"الكيمياء ما فيها مشكلة رئيسية واضحة.",
+      warning.length?`في ${warning.length} جهاز بحاجة انتباه.`:"ما في أجهزة مسجلة بتحذير أو صيانة حالياً.",
+      activeAcclimation?"في جلسة أقلمة نشطة حالياً.":"ما في جلسة أقلمة نشطة.",
+      `أفضل خطوة الآن: ${primary.ar}.`
+    ],
+    detailsEn:[
+      `Mood: ${mood.en}. ${mood.noteEn}`,
+      guide.problems[0]?`Main chemistry note: ${guide.problems[0].reasonEn}`:"No major chemistry issue is currently obvious.",
+      warning.length?`${warning.length} equipment item(s) need attention.`:"No equipment is currently marked warning/service.",
+      activeAcclimation?"An acclimation session is active.":"No acclimation session is active.",
+      `Best next action: ${primary.en}.`
+    ],
+    evidenceAr:[`حالة النظام ${state.score}%`,`الكيمياء ${guide.health}%`,`الصيانة ${maint}%`,`الحمل الحيوي ${Math.round(bio.ratio*100)}%`],
+    evidenceEn:[`System state ${state.score}%`,`Chemistry ${guide.health}%`,`Maintenance ${maint}%`,`Bioload ${Math.round(bio.ratio*100)}%`],
+    confidence:confidence(tank),action:primary
+  };
+}
+
 function actionAnswer(tank:Tank):AquaAIAnswer{
   const guide=chemistryGuidance(tank),state=tankStateView(tank),action=nextBestAction(tank);
   const top=guide.problems.slice(0,3);
@@ -378,6 +474,12 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   if(intent.mode==="canAdd")return stockingReadinessAnswer(tank,question);
   if(intent.mode==="waterChange")return waterChangeAnswer(tank);
   if(intent.mode==="forecast")return forecastAnswer(tank);
+  if(intent.asksAboutBioload)return bioloadAnswer(tank);
+  if(intent.topics.includes("chemistry")&&(intent.mode==="status"||intent.mode==="general"))return chemistryOverviewAnswer(tank);
+  if(intent.topics.includes("maintenance")&&(intent.mode==="status"||intent.mode==="general"))return maintenanceAnswer(tank);
+  if(intent.topics.includes("equipment")&&(intent.mode==="status"||intent.mode==="general"))return equipmentAnswer(tank);
+  if(intent.topics.includes("livestock")&&(intent.mode==="status"||intent.mode==="general"))return livestockAnswer(tank);
+  if(intent.mode==="status"&&intent.topics.includes("general"))return systemOverviewAnswer(tank);
   if(intent.mode==="why"||intent.mode==="action"||intent.mode==="status"||intent.mode==="trend"||intent.mode==="compare"||intent.mode==="dose")return reasoningAnswer(tank,intent);
   if(localReasoning.mentionedLivestock.length||localReasoning.mentionedEquipment.length)return reasoningAnswer(tank,intent);
   if(intent.topics.includes("maintenance"))return maintenanceAnswer(tank);
