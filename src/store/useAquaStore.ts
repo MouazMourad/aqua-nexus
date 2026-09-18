@@ -18,6 +18,7 @@ interface AquaStore extends AquaState {
   addChemistryReading: (tankId: string, reading: ChemistryReading) => void;
   replaceData: (data: Pick<AquaState, "language"|"selectedTankId"|"tanks">) => void;
   resetDemo: () => void;
+  resetTrainingTank: (tankId: string) => void;
 }
 
 type ChangeReason={ar:string;en:string;eventId?:string;timestamp?:string};
@@ -125,8 +126,14 @@ function canonicalTrainingTanks():Tank[]{
 }
 
 function withCanonicalTraining(tanks:Tank[]):Tank[]{
+  const canonical=canonicalTrainingTanks();
+  const persistedTraining=tanks.filter(t=>t.isTraining||TRAINING_IDS.has(t.id));
+  const protectedTraining=canonical.map(base=>{
+    const existing=persistedTraining.find(t=>t.id===base.id);
+    return existing?normalize({...existing,isTraining:true,trainingStartedAt:existing.trainingStartedAt??base.trainingStartedAt}):base;
+  });
   const real=tanks.filter(t=>!t.isTraining&&!TRAINING_IDS.has(t.id)).map(normalize);
-  return [...canonicalTrainingTanks(),...real];
+  return [...protectedTraining,...real];
 }
 
 export const useAquaStore = create<AquaStore>()(
@@ -190,6 +197,14 @@ export const useAquaStore = create<AquaStore>()(
         const tanks=[...canonicalTrainingTanks(),...real];
         const selectedExists=real.some(t=>t.id===state.selectedTankId);
         return {...state,tanks,selectedTankId:selectedExists?state.selectedTankId:demoMarineTank.id};
+      }),
+
+      resetTrainingTank:(tankId)=>set((state)=>{
+        const source=tankId===demoFreshwaterTank.id?demoFreshwaterTank:demoMarineTank;
+        const fresh=freshTrainingTank(source);
+        const exists=state.tanks.some(t=>t.id===fresh.id);
+        const tanks=exists?state.tanks.map(t=>t.id===fresh.id?fresh:t):[fresh,...state.tanks];
+        return {...state,tanks,selectedTankId:fresh.id};
       })
     }),
     {
