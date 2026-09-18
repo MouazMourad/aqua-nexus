@@ -121,6 +121,34 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   if(active.floatStatus==="running"&&active.floatEndAt&&active.floatEndAt<=now){changed=true;next={...next,floatStatus:"ready",floatEndAt:null,floatRemainingMs:0};}
   if(changed)saveSession(next,false);
  },[now]);
+ useEffect(()=>{
+  if(!active||step<5)return;
+  if(active.floatStatus==="ready"&&active.floatStartedAt){
+   const key=`${active.id}:global-float`;
+   if(!notifiedTimersRef.current.has(key)){
+    notifiedTimersRef.current.add(key);
+    setTimerAlerts(prev=>[{id:uid("alert"),lane:"global",message:bi(lang,"انتهى عداد موازنة حرارة الأكياس — جاهزة للتأكيد والفحص.","Sealed-bag temperature timer finished — ready for confirmation and inspection.")},...prev].slice(0,5));
+    playTimerSound("global");
+   }
+  }
+  for(const lane of releaseLanes){
+   const runtime=laneRuntime(lane);
+   if(!runtime.started||!runtime.items.length)continue;
+   const finished=runtime.items.every((i:AcclimationItem)=>["ready","added","deferred"].includes(i.status));
+   if(!finished)continue;
+   const key=`${active.id}:${lane.key}:${runtime.currentBatch}`;
+   if(notifiedTimersRef.current.has(key))continue;
+   notifiedTimersRef.current.add(key);
+   pushTimerAlert(lane.key,runtime.currentBatch);
+  }
+  for(const item of emergencyItems){
+   if(item.status!=="ready"||!item.startedAt)continue;
+   const key=`${active.id}:emergency:${item.id}`;
+   if(notifiedTimersRef.current.has(key))continue;
+   notifiedTimersRef.current.add(key);
+   pushTimerAlert("emergency",undefined,lang==="ar"?item.name:(item.nameEn||item.name));
+  }
+ },[active?.items,active?.floatStatus,releaseLanes,emergencyItems,step,lang]);
 
  function ev(ar:string,en:string){return{id:uid("ace"),timestamp:nowISO(),textAr:ar,textEn:en}}
  function unlockAudio(){
@@ -135,6 +163,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   if(lane==="coral")return "coral";
   if(lane==="plant"||lane==="macroalgae")return "plant";
   if(lane==="emergency")return "emergency";
+  if(lane==="global")return "global";
   return "invert";
  }
  function playTimerSound(lane:string){
@@ -146,7 +175,8 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    invert:[[520,0,.09],[390,.13,.09],[520,.26,.12]],
    coral:[[660,0,.16],[660,.22,.16],[820,.46,.18]],
    plant:[[440,0,.13],[554,.18,.13],[659,.36,.18]],
-   emergency:[[980,0,.12],[620,.16,.12],[980,.32,.12],[620,.48,.16]]
+   emergency:[[980,0,.12],[620,.16,.12],[980,.32,.12],[620,.48,.16]],
+   global:[[740,0,.14],[920,.20,.14],[1120,.40,.20]]
   };
   const gain=ctx.createGain();gain.connect(ctx.destination);gain.gain.setValueAtTime(.0001,ctx.currentTime);
   for(const [freq,delay,dur] of patterns[family]){
