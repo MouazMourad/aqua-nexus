@@ -7,6 +7,7 @@ import { analyzeNutrients } from "./nutrientEngine";
 import { mediaPredictions } from "./mediaPredictor";
 import { tankEnergy } from "./equipmentIntelligence";
 import { chemistryGuidance } from "./chemistryGuidance";
+import { systemHealth } from "./systemHealth";
 
 export interface TankAIContext {
   schema:"aqua-nexus-ai-context/v1";
@@ -36,6 +37,7 @@ export function buildTankAIContext(tank:Tank):TankAIContext{
     tank:{id:tank.id,name:tank.name,type:tank.type,status:tank.status,ageMonths:tank.ageMonths,systemVolumeLiters:tank.systemVolumeLiters},
     state:{health:tankHealth(tank),chemistry:chemistryHealth(tank),maintenance:maintenanceHealth(tank),bioloadPercent:Math.round(bio.ratio*100),stateScore:state.score,stateBand:state.band,mood:mood.key,forecast7d:forecast.projected7d,forecastDirection:forecast.direction,forecastConfidence:forecast.confidence},
     chemistry:{latest:tank.chemistry[0]?.values??{},readingCount:tank.chemistry.length,recent:tank.chemistry.slice(0,12).map(x=>({timestamp:x.timestamp,values:x.values})),guidance:chemistryGuidance(tank)},
+    systemHealth:systemHealth(tank),
     learning:{baselines:tankBaselines(tank),signals:learnedTankSignals(tank),predictions:proactivePredictions(tank),repeatedPatterns:repeatedResponsePatterns(tank),memory:biologicalMemory(tank),eventLinks:eventChemistryLinks(tank)},
     nutrients:analyzeNutrients(tank),
     maintenance:{due,total:tank.maintenance.length},
