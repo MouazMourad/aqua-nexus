@@ -97,6 +97,26 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
   }
  }
 
+ const latest=tank.chemistry[0]?.values??{};
+ const val=(key:string)=>typeof latest[key]==="number"&&Number.isFinite(latest[key])?Number(latest[key]):undefined;
+ const kh=val("KH"),ca=val("Ca"),mg=val("Mg"),no3=val("NO3"),po4=val("PO4"),nh3=val("NH3"),no2=val("NO2"),ph=val("pH");
+ if(tank.type==="marine"&&kh!==undefined&&ca!==undefined&&kh<7.5&&ca>460){
+  pushSignal({id:"relation-kh-ca",level:"warn",confidence:"high",source:"chemistry",score:93,ar:`KH منخفض (${kh}) بينما Ca مرتفع (${ca}). هاد عدم توازن أهم من قراءة كل عامل لحاله.`,en:`KH is low (${kh}) while Ca is high (${ca}). This imbalance matters more than reading either value alone.`});
+  pushAction({id:"relation-kh-ca-action",priority:94,level:"warn",page:"chemistry",ar:"أعد فحص KH وCa معاً، ولا تبدأ جرعة متوازنة ترفع الاثنين قبل تأكيد القراءات.",en:"Retest KH and Ca together, and avoid starting a balanced additive that raises both until the readings are confirmed.",whyAr:"رفع KH بمنتج يرفع Ca أيضاً ممكن يزيد الكالسيوم المرتفع أكثر.",whyEn:"Raising KH with a product that also raises Ca can push already-high calcium even higher.",recheckAr:"بعد تأكيد القراءتين، صحح العامل المحتاج فقط وبشكل تدريجي.",recheckEn:"After confirming both readings, correct only the parameter that needs correction and do it gradually."});
+ }
+ if(no3!==undefined&&po4!==undefined&&no3>15&&po4>0.1){
+  pushSignal({id:"relation-nutrients-high",level:"warn",confidence:"high",source:"nutrients",score:86,ar:`NO3 (${no3}) وPO4 (${po4}) مرتفعان معاً؛ النمط يوحي بحمل عضوي/تصدير مغذيات غير كافٍ أكثر من مشكلة عنصر منفرد.`,en:`NO3 (${no3}) and PO4 (${po4}) are both elevated; the pattern points more toward organic load or insufficient nutrient export than a single-parameter problem.`});
+  pushAction({id:"relation-nutrients-action",priority:83,level:"warn",page:"maintenance",ar:"راجع أولاً مصادر الحمل العضوي: بقايا أو كائن ميت، الجوارب/الفلاتر، التغذية، السكيمر وتراكم الرواسب.",en:"First review organic-load sources: debris or dead livestock, socks/mechanical filters, feeding, skimming, and detritus buildup.",whyAr:"خفض رقم واحد كيميائياً بدون معالجة المصدر ممكن يرجعه بسرعة أو يخل بتوازن المغذيات.",whyEn:"Chemically lowering one number without fixing the source can make it rebound or unbalance nutrients.",recheckAr:"أعد NO3 وPO4 بعد معالجة السبب وتغيير ماء مناسب إن لزم.",recheckEn:"Retest NO3 and PO4 after addressing the source and performing an appropriate water change if needed."});
+ }
+ if(nh3!==undefined&&nh3>0){
+  pushSignal({id:"relation-ammonia",level:"danger",confidence:"high",source:"chemistry",score:99,ar:`NH3 ليس صفراً (${nh3}). هاي أولوية قبل أي تحسين تجميلي ببقية القيم.`,en:`NH3 is not zero (${nh3}). This takes priority over cosmetic optimization of other values.`});
+ }
+ if(tank.type==="freshwater"&&no2!==undefined&&no2>0){
+  pushSignal({id:"relation-nitrite",level:"danger",confidence:"high",source:"chemistry",score:98,ar:`NO2 ليس صفراً (${no2}) ويجب التعامل معه كإشارة خلل بالاستقرار البيولوجي.`,en:`NO2 is not zero (${no2}) and should be treated as a biological-stability warning.`});
+ }
+ if(ph!==undefined&&ph>=8&&ph<=8.3&&kh!==undefined&&kh<7.5&&tank.type==="marine"){
+  pushSignal({id:"relation-ph-kh",level:"info",confidence:"high",source:"chemistry",score:44,ar:`pH طبيعي (${ph}) رغم أن KH منخفض (${kh})؛ لا يوجد سبب لمطاردة pH حالياً.`,en:`pH is normal (${ph}) even though KH is low (${kh}); there is no reason to chase pH right now.`});
+ }
  if(age>7&&(topicRelevant(intent,"chemistry")||intent.topics.includes("general"))){
   pushSignal({id:"stale-chemistry",level:"warn",confidence:"high",source:"data",score:70,ar:`آخر فحص كيميائي عمره ${Math.floor(age)} يوم، لذلك جزء من الاستنتاجات يحتاج قراءة أحدث.`,en:`The latest chemistry test is ${Math.floor(age)} days old, so part of the reasoning needs fresher data.`});
   pushAction({id:"retest-chemistry",priority:88,level:"warn",page:"chemistry",ar:"أعد فحص الكيمياء قبل اتخاذ قرار كبير.",en:"Retest chemistry before making a major decision.",whyAr:"القراءات القديمة تقلل الثقة بالقرار الحالي.",whyEn:"Stale readings reduce confidence in the current decision.",recheckAr:"أعد التحليل مباشرة بعد تسجيل القراءة الجديدة.",recheckEn:"Re-run the analysis immediately after logging the new reading."});
@@ -134,6 +154,9 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
   pushAction({id:"acclimation-stability",priority:50,level:"info",page:"acclimation",ar:"تجنب تغييرات كبيرة بالحوض أثناء الأقلمة إلا إذا في طارئ.",en:"Avoid major tank changes during active acclimation unless there is an emergency.",whyAr:"لأن تغيير البيئة أثناء إدخال كائنات جديدة يصعب فصل سبب أي استجابة أو إجهاد.",whyEn:"Changing the environment during livestock introduction makes stress and root-cause interpretation harder.",recheckAr:"أعد تقييم الحوض بعد انتهاء الأقلمة واستقرار الكائنات.",recheckEn:"Reassess after acclimation is complete and livestock settles."});
  }
 
+ if(activeAcclimation.length&&guide.problems.some(x=>x.level==="warn"||x.level==="danger")){
+  pushAction({id:"acclimation-change-gate",priority:78,level:"warn",page:"acclimation",ar:"أثناء الأقلمة لا تعمل عدة تصحيحات كبيرة مع بعض؛ نفذ فقط الإجراء الضروري الأعلى أولوية ثم راقب.",en:"During acclimation, avoid several major corrections at once; perform only the highest-priority necessary action, then observe.",whyAr:"الكائنات الجديدة تحت إجهاد انتقال وأي تغييرات متعددة بتصعّب معرفة سبب الاستجابة.",whyEn:"New livestock is already under transition stress, and multiple changes make the response harder to interpret.",recheckAr:"أعد تقييم الكيمياء وسلوك الكائنات بعد انتهاء الأقلمة.",recheckEn:"Reassess chemistry and livestock behavior after acclimation."});
+ }
  for(const p of proactivePredictions(tank)){
   if(!(intent.mode==="forecast"||intent.mode==="trend"||relevantParam(intent,p.parameter)))continue;
   pushSignal({id:p.id,level:p.level==="danger"?"danger":p.level==="warn"?"warn":"info",confidence:p.confidence,source:"trend",score:p.level==="danger"?82:p.level==="warn"?60:35,ar:p.ar,en:p.en});
