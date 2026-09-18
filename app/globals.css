@@ -1158,3 +1158,108 @@ button:disabled{opacity:.45;cursor:not-allowed}
     font-size:8px;
   }
 }
+
+
+/* ===== Rapid exception acclimation track ===== */
+.emergency-track{
+  border-color:rgba(255,112,122,.38)!important;
+  background:
+    radial-gradient(circle at 90% 0%,rgba(255,112,122,.12),transparent 34%),
+    linear-gradient(180deg,rgba(42,18,25,.92),rgba(14,24,32,.96))!important;
+}
+.emergency-track .section-title small{color:#ff9da5;font-weight:900;letter-spacing:.14em}
+.emergency-checks{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  margin:9px 0 12px;
+}
+.emergency-checks span{
+  padding:6px 8px;
+  border-radius:999px;
+  border:1px solid rgba(255,157,165,.22);
+  background:rgba(255,112,122,.055);
+  font-size:8px;
+  color:#ffd5d9;
+}
+.emergency-track-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:9px;
+}
+.emergency-track-item{
+  min-width:0;
+  border:1px solid rgba(255,112,122,.28);
+  border-radius:15px;
+  padding:11px;
+  background:rgba(25,16,23,.56);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+}
+.emergency-track-item.ready{
+  border-color:rgba(91,224,167,.44);
+  background:rgba(10,48,40,.34);
+}
+.emergency-track-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:8px;
+}
+.emergency-track-head small{font-size:7px;color:#ffb7bd}
+.emergency-track-head h3{
+  margin:3px 0 0;
+  font-size:13px;
+  line-height:1.4;
+  overflow-wrap:anywhere;
+}
+.emergency-track-meta{
+  display:flex;
+  gap:5px;
+  flex-wrap:wrap;
+  margin:8px 0;
+}
+.emergency-track-meta span{
+  padding:4px 6px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.07);
+  background:rgba(255,255,255,.035);
+  font-size:7px;
+}
+.emergency-track-timer{
+  margin:7px 0;
+  padding:8px;
+  border-radius:11px;
+  border:1px solid rgba(255,112,122,.30);
+  background:rgba(7,13,18,.62);
+  text-align:center;
+  font-size:27px;
+  font-weight:950;
+  font-variant-numeric:tabular-nums;
+  color:#ffe8ea;
+}
+.emergency-track-item>p{
+  margin:6px 0;
+  font-size:8px;
+  line-height:1.5;
+  color:var(--muted);
+}
+.status.emergency{
+  background:rgba(164,45,58,.72);
+  color:#ffe4e6;
+}
+@media(max-width:720px){
+  .emergency-track{padding:11px!important}
+  .emergency-track-grid{grid-template-columns:1fr}
+  .emergency-track-item{padding:9px}
+  .emergency-track-timer{font-size:23px}
+  .emergency-track-item .acclimation-actions{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .emergency-track-item .acclimation-actions .btn{
+    width:100%;
+    min-width:0;
+    padding:6px 5px;
+    font-size:8px;
+  }
+}
