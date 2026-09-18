@@ -111,26 +111,48 @@ function withHealthSnapshot(before:Tank,after:Tank):Tank{
   return {...after,healthSnapshots:[snapshot,...(after.healthSnapshots??[])].slice(0,365)};
 }
 
+const TRAINING_IDS=new Set([demoMarineTank.id,demoFreshwaterTank.id,"reef-01","fresh-01"]);
+
+function freshTrainingTank(source:Tank):Tank{
+  const copy=JSON.parse(JSON.stringify(source)) as Tank;
+  if(copy.chemistry[0])copy.chemistry[0]={...copy.chemistry[0],timestamp:new Date().toISOString(),usingDefaults:false};
+  copy.healthSnapshots=[];
+  return normalize(copy);
+}
+
+function canonicalTrainingTanks():Tank[]{
+  return [freshTrainingTank(demoMarineTank),freshTrainingTank(demoFreshwaterTank)];
+}
+
+function withCanonicalTraining(tanks:Tank[]):Tank[]{
+  const real=tanks.filter(t=>!t.isTraining&&!TRAINING_IDS.has(t.id)).map(normalize);
+  return [...canonicalTrainingTanks(),...real];
+}
+
 export const useAquaStore = create<AquaStore>()(
   persist(
     (set) => ({
       language:"ar",
       selectedTankId:demoMarineTank.id,
-      tanks:[demoMarineTank,demoFreshwaterTank],
+      tanks:canonicalTrainingTanks(),
 
       setLanguage:(language)=>set({language}),
       selectTank:(selectedTankId)=>set({selectedTankId}),
 
       addTank:(tank)=>set((state)=>({
-        tanks:[...state.tanks,normalize(tank)],
+        tanks:[...state.tanks,normalize({...tank,isTraining:false})],
         selectedTankId:tank.id
       })),
 
       deleteTank:(tankId)=>set((state)=>{
+        const target=state.tanks.find(t=>t.id===tankId);
+        if(target?.isTraining)return state;
         const tanks=state.tanks.filter(t=>t.id!==tankId);
+        const real=tanks.filter(t=>!t.isTraining);
         return {
+          ...state,
           tanks,
-          selectedTankId: state.selectedTankId===tankId ? (tanks[0]?.id ?? "") : state.selectedTankId
+          selectedTankId: state.selectedTankId===tankId ? (real[0]?.id ?? tanks[0]?.id ?? demoMarineTank.id) : state.selectedTankId
         };
       }),
 
@@ -151,24 +173,41 @@ export const useAquaStore = create<AquaStore>()(
         })
       })),
 
-      replaceData:(data)=>set({
-        language:data.language,
-        selectedTankId:data.selectedTankId,
-        tanks:data.tanks.map(normalize)
+      replaceData:(data)=>set((state)=>{
+        const tanks=withCanonicalTraining(data.tanks);
+        const requested=tanks.find(t=>t.id===data.selectedTankId);
+        const firstReal=tanks.find(t=>!t.isTraining);
+        return {
+          ...state,
+          language:data.language,
+          selectedTankId:requested?.id ?? firstReal?.id ?? demoMarineTank.id,
+          tanks
+        };
       }),
 
-      resetDemo:()=>set({language:"ar",selectedTankId:demoMarineTank.id,tanks:[demoMarineTank,demoFreshwaterTank]})
+      resetDemo:()=>set((state)=>{
+        const real=state.tanks.filter(t=>!t.isTraining&&!TRAINING_IDS.has(t.id)).map(normalize);
+        const tanks=[...canonicalTrainingTanks(),...real];
+        const selectedExists=real.some(t=>t.id===state.selectedTankId);
+        return {...state,tanks,selectedTankId:selectedExists?state.selectedTankId:demoMarineTank.id};
+      })
     }),
     {
       name:"aqua-nexus-3d-v1",
-      version:7,
+      version:8,
       migrate:(persisted:any)=>{
         const p=persisted??{};
-        return {...p,tanks:(p.tanks??[]).map((t:Tank)=>normalize(t))};
+        // v8 intentionally starts clean: previous prototype tanks are removed and
+        // replaced by the two protected training tanks. New real tanks created
+        // after this migration are preserved on future reloads.
+        return {...p,selectedTankId:demoMarineTank.id,tanks:canonicalTrainingTanks()};
       },
       merge:(persisted:any,current)=>{
         const p=persisted??{};
-        return {...current,...p,tanks:(p.tanks??current.tanks).map((t:Tank)=>normalize(t))};
+        const tanks=withCanonicalTraining(p.tanks??current.tanks);
+        const requested=tanks.find(t=>t.id===p.selectedTankId);
+        const firstReal=tanks.find(t=>!t.isTraining);
+        return {...current,...p,tanks,selectedTankId:requested?.id??firstReal?.id??demoMarineTank.id};
       }
     }
   )
