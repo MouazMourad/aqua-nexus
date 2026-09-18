@@ -1,5 +1,6 @@
 import type { HealthSnapshot, Tank, TimelineEvent } from "./types";
-import { bioload, chemistryAgeDays, chemistryHealth, chemistryHistoryScore, maintenanceHealth, tankHealth } from "./health";
+import { bioload, chemistryAgeDays, chemistryHealth, chemistryHistoryScore, maintenanceHealth } from "./health";
+import { systemHealth } from "./systemHealth";
 import { chemistryGuidance } from "./chemistryGuidance";
 
 export type TankStateBand = "excellent" | "stable" | "watch" | "stressed" | "critical";
@@ -81,7 +82,7 @@ function contextPenalty(tank:Tank){
 }
 
 export function tankStateScore(tank:Tank){
-  return clamp(Math.round(tankHealth(tank)+contextPenalty(tank)));
+  return systemHealth(tank).score;
 }
 
 export function tankStateView(tank:Tank):TankStateView {
@@ -90,6 +91,7 @@ export function tankStateView(tank:Tank):TankStateView {
   const text=bandText(band);
   const drivers:StateDriver[]=[];
   const chem=chemistryHealth(tank),maint=maintenanceHealth(tank),age=chemistryAgeDays(tank),bio=bioload(tank);
+  const system=systemHealth(tank);
   const chemGuide=chemistryGuidance(tank);
   const overdue=tank.maintenance.filter(x=>!x.done&&x.nextDue&&x.nextDue<new Date().toISOString().slice(0,10));
   const equipment=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
@@ -117,11 +119,21 @@ export function tankStateView(tank:Tank):TankStateView {
   if(age>7)drivers.push({level:"warn",ar:`آخر فحص كيميائي منذ ${Math.floor(age)} يوم.`,en:`The last chemistry test was ${Math.floor(age)} days ago.`});
   if(bio.status==="high"||bio.status==="danger")drivers.push({level:bio.status==="danger"?"danger":"warn",ar:`الحمل البيولوجي ${Math.round(bio.ratio*100)}% ويؤثر على هامش استقرار الحوض.`,en:`Bioload is ${Math.round(bio.ratio*100)}% and is reducing the tank's stability margin.`});
   if(equipment.length)drivers.push({level:"warn",ar:`هناك ${equipment.length} جهاز يحتاج انتباهاً أو صيانة.`,en:`${equipment.length} equipment item(s) need attention or service.`});
+  if(system.equipmentAudit.issues.length){
+    const first=system.equipmentAudit.issues[0];
+    drivers.push({level:first.level==="danger"?"danger":"warn",ar:`كفاية التجهيزات ${system.equipment}%: ${first.ar}`,en:`Equipment adequacy ${system.equipment}%: ${first.en}`});
+  } else if(system.equipment<90){
+    drivers.push({level:"info",ar:`كفاية التجهيزات ${system.equipment}% وتحتاج استكمال بعض بيانات السعة/التدفق.`,en:`Equipment adequacy is ${system.equipment}%; some capacity/flow data still needs to be completed.`});
+  }
+  if(system.compatibilityAudit.issues.length){
+    const first=system.compatibilityAudit.issues[0];
+    drivers.push({level:first.level==="danger"?"danger":"warn",ar:`توافق الكائنات ${system.compatibility}%: ${first.ar}`,en:`Livestock compatibility ${system.compatibility}%: ${first.en}`});
+  }
   if(livestock.length)drivers.push({level:"warn",ar:`هناك ${livestock.length} كائن بحالة مراقبة أو علاج.`,en:`${livestock.length} livestock item(s) are under watch or treatment.`});
   if(tank.quarantine.some(x=>x.status==="active"))drivers.push({level:"info",ar:"يوجد حجر/علاج نشط يجب أخذه بالحسبان عند تقييم الحالة.",en:"An active quarantine/treatment case is part of the current tank context."});
   if((tank.acclimationSessions??[]).some(x=>x.status!=="completed"))drivers.push({level:"info",ar:"هناك جلسة أقلمة نشطة حالياً.",en:"An acclimation session is currently active."});
 
-  return {score,band,ar:text.ar,en:text.en,drivers:drivers.slice(0,6)};
+  return {score,band,ar:text.ar,en:text.en,drivers:drivers.slice(0,8)};
 }
 
 function nearestEvent(tank:Tank,timestamp:string,maxHours=48){
@@ -137,11 +149,18 @@ function nearestEvent(tank:Tank,timestamp:string,maxHours=48){
 }
 
 function estimatedPoints(tank:Tank):HealthTimelinePoint[]{
+  const system=systemHealth(tank);
   const maint=maintenanceHealth(tank);
-  const penalty=contextPenalty(tank);
   return tank.chemistry.map((reading,index)=>{
     const chem=chemistryHistoryScore(tank,index)??50;
-    const score=clamp(Math.round(chem*.7+maint*.3+penalty));
+    const score=clamp(Math.round(
+      chem*.30+
+      maint*.15+
+      system.bioload*.15+
+      system.equipment*.20+
+      system.compatibility*.15+
+      system.livestock*.05
+    ));
     const event=nearestEvent(tank,reading.timestamp);
     return {
       id:`chem-${index}-${reading.timestamp}`,
