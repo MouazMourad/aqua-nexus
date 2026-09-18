@@ -84,3 +84,17 @@ export function parseAquaQuestion(raw:string):AquaQuestionIntent{
  if(signals>=3)confidence="high";else if(signals>=1)confidence="medium";
  return {raw,normalized:s,mode,topics,params,asksForReason,asksForAction,asksForRisk,confidence};
 }
+
+export function resolveAquaFollowup(current:string,previous?:string){
+ const clean=(current||"").trim();
+ if(!clean||!previous?.trim())return clean;
+ const n=normalizeArabic(clean);
+ const short=n.split(" ").filter(Boolean).length<=5;
+ const referential=hasAny(n,[
+  "ليش","طيب ليش","شو الحل","شو ساوي","شو اعمل","وبعدين","بعدها","هلق شو","هاد","هالشي","هالقيمه","هالقيمة","هي","هو","طيب","then","why","what next","what do i do","this","that","it"
+ ]);
+ const parsed=parseAquaQuestion(clean);
+ const standalone=parsed.params.length>0||parsed.topics.some(x=>x!=="general")||["canAdd","waterChange","forecast","compare","trend","dose"].includes(parsed.mode);
+ if((short&&referential)||(!standalone&&referential))return previous+" | follow-up: "+clean;
+ return clean;
+}
