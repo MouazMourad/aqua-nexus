@@ -5,6 +5,7 @@ import type { AppPage } from "@/components/navigation/MainNav";
 import { useAquaStore } from "@/store/useAquaStore";
 import { bioload,chemistryHealth,maintenanceHealth,tankHealth,tankHealthTrend } from "@/domain/health";
 import { aquaAIAnswer,type AquaAIAnswer,type AquaAIPage } from "@/domain/aquaAIBrain";
+import { resolveAquaFollowup } from "@/domain/aquaAIIntent";
 import { tankMood } from "@/domain/tankLearning";
 import { learnedTankSignals } from "@/domain/tankPatterns";
 import { createActionPlan,evaluatePlanOutcome,type AquaActionPlan } from "@/domain/actionPlanEngine";
@@ -18,7 +19,7 @@ type InsightView={id:string;labelAr:string;labelEn:string;promptAr:string;prompt
 
 export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;onNavigate?:(page:AppPage)=>void}){
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
- const [open,setOpen]=useState(false),[selected,setSelected]=useState<string|null>(null),[question,setQuestion]=useState(""),[askedQuestion,setAskedQuestion]=useState(""),[stage,setStage]=useState(0),[scopeBlocked,setScopeBlocked]=useState(false),[greeting,setGreeting]=useState(false),[planNote,setPlanNote]=useState("");
+ const [open,setOpen]=useState(false),[selected,setSelected]=useState<string|null>(null),[question,setQuestion]=useState(""),[askedQuestion,setAskedQuestion]=useState(""),[resolvedQuestion,setResolvedQuestion]=useState(""),[conversationContext,setConversationContext]=useState(""),[stage,setStage]=useState(0),[scopeBlocked,setScopeBlocked]=useState(false),[greeting,setGreeting]=useState(false),[planNote,setPlanNote]=useState("");
  const th=tankHealth(tank),ch=chemistryHealth(tank),mh=maintenanceHealth(tank),trend=tankHealthTrend(tank),bio=bioload(tank),mood=tankMood(tank);
  const warnings=tank.equipment.some(x=>x.status==="warning"||x.status==="service");
  const state:"normal"|"alert"|"critical"=(th<60||ch<55||bio.status==="danger")?"critical":(th<80||ch<75||mh<70||trend==="declining"||warnings)?"alert":"normal";
@@ -30,16 +31,16 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
   {id:"changed",labelAr:"شو تغيّر؟",labelEn:"What changed?",promptAr:"شو صار بعد الأحداث الأخيرة؟ وشو تعلمت من تاريخ الحوض؟",promptEn:"What changed after recent events and what did you learn from tank history?"},
   {id:"action",labelAr:"شو أعمل هلق؟",labelEn:"What should I do?",promptAr:"شو أعمل هلق بالحوض؟",promptEn:"What should I do with the tank now?"}
  ];
- const active=useMemo(()=>askedQuestion&&!scopeBlocked?aquaAIAnswer(askedQuestion,tank,page):null,[askedQuestion,scopeBlocked,tank,page]);
+ const active=useMemo(()=>askedQuestion&&!scopeBlocked?aquaAIAnswer(resolvedQuestion||askedQuestion,tank,page):null,[askedQuestion,resolvedQuestion,scopeBlocked,tank,page]);
 
- useEffect(()=>{setSelected(null);setQuestion("");setAskedQuestion("");setStage(0);setScopeBlocked(false);setPlanNote("")},[tank.id]);
+ useEffect(()=>{setSelected(null);setQuestion("");setAskedQuestion("");setResolvedQuestion("");setConversationContext("");setStage(0);setScopeBlocked(false);setPlanNote("")},[tank.id]);
  useEffect(()=>{if(typeof window==="undefined")return;const key="tank-intelligence-session-greeting-v2";if(sessionStorage.getItem(key))return;const timer=window.setTimeout(()=>{setGreeting(true);sessionStorage.setItem(key,"1")},650);const hide=window.setTimeout(()=>setGreeting(false),8000);return()=>{window.clearTimeout(timer);window.clearTimeout(hide)}},[]);
 
  function go(pageKey:AquaAIPage){setOpen(false);onNavigate?.(pageKey as AppPage);}
  function outOfScope(q:string){return /(مباراة|كرة قدم|سياسة|انتخابات|رئيس|طقس|رسالة رسمية|ايميل|إيميل|برمجة|كود|سيرة ذاتية|سيارة|football|match|politic|election|weather|email|resume|code|programming|car\b)/i.test(q);}
- function ask(prompt:string,id:string|null=null){const clean=prompt.trim();if(!clean)return;setSelected(id);setAskedQuestion(clean);setQuestion("");setStage(1);setPlanNote("");setScopeBlocked(outOfScope(clean));}
+ function ask(prompt:string,id:string|null=null){const clean=prompt.trim();if(!clean)return;const resolved=resolveAquaFollowup(clean,conversationContext);setSelected(id);setAskedQuestion(clean);setResolvedQuestion(resolved);setConversationContext(resolved);setQuestion("");setStage(1);setPlanNote("");setScopeBlocked(outOfScope(clean));}
  function submit(e:FormEvent){e.preventDefault();ask(question,null);}
- function resetConversation(){setSelected(null);setQuestion("");setAskedQuestion("");setStage(0);setScopeBlocked(false);setPlanNote("");}
+ function resetConversation(){setSelected(null);setQuestion("");setAskedQuestion("");setResolvedQuestion("");setStage(0);setScopeBlocked(false);setPlanNote("");}
  function createPlan(){
   if(!active)return;
   if(currentPlan){setPlanNote(lang==="ar"?"في خطة متابعة نشطة حالياً. خلصها أو قيّم نتيجتها قبل إنشاء خطة جديدة.":"An action plan is already active. Complete or review it before creating another.");return;}
@@ -82,6 +83,7 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
      </>}
 
     {!scopeBlocked&&active&&<div className="ai-followups">{stage<2&&<button className="btn" onClick={()=>setStage(2)}>{lang==="ar"?"ليش؟ أعطيني السبب":"Why? Show me the reason"}</button>}{stage<3&&<button className="btn" onClick={()=>setStage(3)}>{lang==="ar"?"شو أعمل هلق؟":"What should I do now?"}</button>}{stage<4&&<button className="btn" onClick={()=>setStage(4)}>{lang==="ar"?"على شو بنيت هالحكي؟":"What is this based on?"}</button>}</div>}
+    {!scopeBlocked&&active&&<form className="ai-chat-input ai-followup-input" onSubmit={submit}><input value={question} onChange={e=>setQuestion(e.target.value)} placeholder={lang==="ar"?"اسأل متابعة… مثلاً: طيب ليش؟ شو الحل؟ وإذا ما زبط؟":"Ask a follow-up… e.g. Why? What should I do? What if that fails?"}/><button className="btn primary" type="submit">{lang==="ar"?"متابعة":"Follow up"}</button></form>}
     <button className="btn glass-button ai-new-question" onClick={resetConversation}>＋ {lang==="ar"?"سؤال جديد":"New question"}</button>
    </div>}
 
@@ -90,7 +92,7 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
   </section>}
   <button className="aqua-ai-fish-button" onClick={()=>{setGreeting(false);setOpen(v=>!v)}} aria-label="Local Best AI"><FishMascot state={state}/><span className="aqua-ai-fish-label">Local Best AI</span>{state!=="normal"&&<i className="aqua-ai-alert-dot"/>}</button>
   <style jsx global>{`
-   .conversational-ai{display:flex;flex-direction:column;gap:10px}.ai-conversation-home,.ai-conversation-flow{display:grid;gap:10px}.ai-chat-bubble{border:1px solid rgba(255,255,255,.08);border-radius:17px;padding:12px 13px;display:grid;gap:7px;line-height:1.5}.ai-chat-bubble.assistant{background:linear-gradient(145deg,rgba(45,184,226,.08),rgba(255,255,255,.025));margin-inline-end:24px}.ai-chat-bubble.user{background:rgba(255,255,255,.07);margin-inline-start:34px;justify-items:end}.ai-chat-bubble small{font-size:10px;letter-spacing:.08em;opacity:.62;font-weight:900}.ai-chat-bubble h3,.ai-chat-bubble p{margin:0}.ai-chat-bubble>span{opacity:.78}.ai-choice-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.ai-choice-grid button{min-height:46px;text-align:center}.ai-chat-input{display:grid;grid-template-columns:1fr auto;gap:7px}.ai-chat-input input{min-width:0;border:1px solid rgba(255,255,255,.1);background:rgba(2,15,24,.76);color:inherit;border-radius:13px;padding:11px 12px;outline:none}.ai-chat-input input:focus{border-color:rgba(66,211,255,.5);box-shadow:0 0 0 3px rgba(66,211,255,.08)}.ai-summary-bubble .aqua-ai-answer-head{align-items:flex-start}.ai-summary-bubble .aqua-ai-answer-head h3{font-size:17px}.ai-followups{display:flex;gap:7px;flex-wrap:wrap}.ai-followups .btn{flex:1 1 140px}.ai-new-question{justify-self:start}.conversational-ai .aqua-ai-action{margin-top:4px}.conversational-ai .aqua-ai-evidence{margin:0}.conversational-ai .aqua-ai-learned-block{margin-top:8px}
+   .conversational-ai{display:flex;flex-direction:column;gap:10px}.ai-conversation-home,.ai-conversation-flow{display:grid;gap:10px}.ai-followup-input{margin-top:2px}.ai-chat-bubble{border:1px solid rgba(255,255,255,.08);border-radius:17px;padding:12px 13px;display:grid;gap:7px;line-height:1.5}.ai-chat-bubble.assistant{background:linear-gradient(145deg,rgba(45,184,226,.08),rgba(255,255,255,.025));margin-inline-end:24px}.ai-chat-bubble.user{background:rgba(255,255,255,.07);margin-inline-start:34px;justify-items:end}.ai-chat-bubble small{font-size:10px;letter-spacing:.08em;opacity:.62;font-weight:900}.ai-chat-bubble h3,.ai-chat-bubble p{margin:0}.ai-chat-bubble>span{opacity:.78}.ai-choice-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.ai-choice-grid button{min-height:46px;text-align:center}.ai-chat-input{display:grid;grid-template-columns:1fr auto;gap:7px}.ai-chat-input input{min-width:0;border:1px solid rgba(255,255,255,.1);background:rgba(2,15,24,.76);color:inherit;border-radius:13px;padding:11px 12px;outline:none}.ai-chat-input input:focus{border-color:rgba(66,211,255,.5);box-shadow:0 0 0 3px rgba(66,211,255,.08)}.ai-summary-bubble .aqua-ai-answer-head{align-items:flex-start}.ai-summary-bubble .aqua-ai-answer-head h3{font-size:17px}.ai-followups{display:flex;gap:7px;flex-wrap:wrap}.ai-followups .btn{flex:1 1 140px}.ai-new-question{justify-self:start}.conversational-ai .aqua-ai-action{margin-top:4px}.conversational-ai .aqua-ai-evidence{margin:0}.conversational-ai .aqua-ai-learned-block{margin-top:8px}
    @media(max-width:560px){.ai-chat-bubble.assistant{margin-inline-end:10px}.ai-chat-bubble.user{margin-inline-start:20px}.ai-choice-grid{grid-template-columns:1fr 1fr}.ai-chat-input{grid-template-columns:1fr}.ai-chat-input .btn{width:100%}.ai-followups{display:grid;grid-template-columns:1fr}.ai-followups .btn{width:100%}}
   `}</style>
  </div>;
