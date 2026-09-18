@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
 import { bioload,chemistryAgeDays,chemistryHealth,maintenanceHealth,parameterScore,tankHealth,tankHealthTrend } from "@/domain/health";
 import { tankStateView } from "@/domain/tankIntelligence";
+import { chemistryGuidance } from "@/domain/chemistryGuidance";
 import { useAquaStore } from "@/store/useAquaStore";
 
 type HealthTone="excellent"|"stable"|"watch"|"stressed"|"critical";
@@ -76,6 +77,7 @@ export function DashboardHealthPulse(){
     const equipmentWarnings=tank.equipment.filter(item=>item.status==="warning"||item.status==="service");
     const livestockWarnings=tank.livestock.filter(item=>item.health==="watch"||item.health==="treatment");
     const activeAcclimation=(tank.acclimationSessions??[]).some(session=>session.status!=="completed");
+    const chemistryAdvice=chemistryGuidance(tank);
 
     const chemistryIssues=latest?Object.entries(catalog).flatMap(([key,meta])=>{
       const value=latest.values[key];
@@ -108,16 +110,32 @@ export function DashboardHealthPulse(){
 
     if(state.band==="critical"){
       if(criticalEquipment)actions.push({ar:`تدخل فوري: افحص ${criticalEquipment.name} واستمرارية دوران الماء/الحرارة قبل أي خطوة ثانية.`,en:`Immediate action: check ${criticalEquipment.name} and water circulation/temperature before anything else.`,focus:"equipment",urgent:true});
+      else if(chemistryAdvice.dataIssues.length){
+        const issue=chemistryAdvice.dataIssues[0];
+        actions.push({ar:`تدخل فوري: ${issue.actionAr}`,en:`Immediate action: ${issue.actionEn}`,focus:"chemistry",urgent:true});
+      }
       else if(!latest||chemistryIssues.length)actions.push({ar:"تدخل فوري: أعد قياس القيم غير الطبيعية الآن وتأكد من النتيجة قبل أي تصحيح كبير أو جرعة إضافية.",en:"Immediate action: retest abnormal values now and confirm them before any large correction or extra dosing.",focus:"chemistry",urgent:true});
     }
 
     if(!latest)actions.push({ar:"سجّل فحص كيمياء كامل الآن؛ ما في قراءة حديثة يمكن الاعتماد عليها.",en:"Log a complete chemistry test now; there is no current reading to rely on.",focus:"chemistry",urgent:state.band==="critical"});
     else if(age>7)actions.push({ar:`أعد فحص الكيمياء اليوم؛ آخر قراءة عمرها ${Math.floor(age)} يوم.`,en:`Retest chemistry today; the latest reading is ${Math.floor(age)} days old.`,focus:"chemistry",urgent:state.band==="critical"});
 
-    if(chemistryIssues.length){
-      const issue=chemistryIssues[0];
-      actions.push({ar:`راجع ${issue.key} أولاً: القراءة ${compactNumber(issue.value)} والمجال المثالي ${compactNumber(issue.ideal[0])}–${compactNumber(issue.ideal[1])}. عدّل عامل واحد فقط وراقب الاستجابة.`,en:`Review ${issue.key} first: current ${compactNumber(issue.value)}, ideal ${compactNumber(issue.ideal[0])}–${compactNumber(issue.ideal[1])}. Change one factor at a time and watch the response.`,focus:"chemistry",urgent:state.band==="critical"&&issue.score<=25});
+    if(chemistryAdvice.dataIssues.length){
+      const issue=chemistryAdvice.dataIssues[0];
+      if(!actions.some(action=>action.ar.includes(issue.actionAr))){
+        actions.push({ar:issue.actionAr,en:issue.actionEn,focus:"chemistry",urgent:true});
+      }
     }
+
+    chemistryAdvice.problems
+      .filter(issue=>!issue.suspectedFormat)
+      .slice(0,2)
+      .forEach(issue=>actions.push({
+        ar:`${issue.titleAr}: ${issue.actionAr}`,
+        en:`${issue.titleEn}: ${issue.actionEn}`,
+        focus:"chemistry",
+        urgent:state.band==="critical"&&issue.level==="danger"
+      }));
 
     if(overdue.length)actions.push({ar:`أنجز مهمة الصيانة الأقرب: ${overdue[0].title} ثم حدّث سجلها.`,en:`Complete the nearest maintenance task: ${overdue[0].titleEn||overdue[0].title}, then update its log.`,focus:"maintenance"});
     if(equipmentWarnings.length&&!criticalEquipment)actions.push({ar:`افحص ${equipmentWarnings[0].name} لأنه مسجّل كجهاز يحتاج انتباهاً/صيانة.`,en:`Check ${equipmentWarnings[0].name}; it is marked for attention/service.`,focus:"equipment"});
@@ -129,7 +147,7 @@ export function DashboardHealthPulse(){
 
     const attentionCount=state.drivers.filter(driver=>driver.level==="warn"||driver.level==="danger").length;
     const primaryReason=state.drivers.find(driver=>driver.level==="danger"||driver.level==="warn")??state.drivers[0];
-    return {age,chemistryIssues,chemistryTrends,latestActivity,actions:actions.slice(0,4),attentionCount,primaryReason};
+    return {age,chemistryIssues,chemistryAdvice,chemistryTrends,latestActivity,actions:actions.slice(0,4),attentionCount,primaryReason};
   },[tank,state]);
 
   useEffect(()=>{
