@@ -4,6 +4,7 @@ import { tankMood,biologicalMemory,proactivePredictions,eventChemistryLinks } fr
 import { learnedTankSignals,tankBaselines } from "./tankPatterns";
 import { analyzeNutrients } from "./nutrientEngine";
 import { tankEnergy } from "./equipmentIntelligence";
+import { chemistryGuidance } from "./chemistryGuidance";
 
 export function buildAquaAIContext(tank:Tank){
  const vision=((tank as any).visionAssessments??[]).slice(0,5);
@@ -15,7 +16,7 @@ export function buildAquaAIContext(tank:Tank){
   state:tankStateView(tank),
   mood:tankMood(tank),
   forecast:tankForecast(tank),
-  chemistry:{latest:tank.chemistry[0]??null,recent:tank.chemistry.slice(0,10),baselines:tankBaselines(tank),predictions:proactivePredictions(tank),nutrients:analyzeNutrients(tank)},
+  chemistry:{latest:tank.chemistry[0]??null,recent:tank.chemistry.slice(0,10),baselines:tankBaselines(tank),predictions:proactivePredictions(tank),nutrients:analyzeNutrients(tank),guidance:chemistryGuidance(tank)},
   learnedSignals:learnedTankSignals(tank),
   biologicalMemory:biologicalMemory(tank),
   eventLinks:eventChemistryLinks(tank),
