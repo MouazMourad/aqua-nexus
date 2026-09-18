@@ -14,18 +14,18 @@ function SwipeTankCard({tank,selected,onSelect,onEdit,onDelete}:{tank:Tank;selec
  function move(e:React.PointerEvent<HTMLDivElement>){if(startX.current===null)return;const dx=e.clientX-startX.current;if(Math.abs(dx)>5)moved.current=true;setOffset(Math.max(-104,Math.min(104,dx)))}
  function up(){
   const dx=offset;startX.current=null;setOffset(0);
-  if(dx>=72){onDelete();return}
+  if(dx>=72){if(!tank.isTraining)onDelete();return}
   if(dx<=-72){onEdit();return}
   if(!moved.current)onSelect();
  }
  return <div className="tank-swipe-shell">
-  <div className="tank-swipe-action tank-swipe-delete" aria-hidden="true"><b>🗑</b><span>{lang==="ar"?"حذف":"Delete"}</span></div>
+  <div className="tank-swipe-action tank-swipe-delete" aria-hidden="true"><b>{tank.isTraining?"🔒":"🗑"}</b><span>{tank.isTraining?(lang==="ar"?"محمي":"Protected"):(lang==="ar"?"حذف":"Delete")}</span></div>
   <div className="tank-swipe-action tank-swipe-edit" aria-hidden="true"><b>✎</b><span>{lang==="ar"?"تعديل":"Edit"}</span></div>
   <div className={`tank-card tank-swipe-card ${selected?"selected":""}`} style={{transform:`translateX(${offset}px)`}} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={()=>{startX.current=null;setOffset(0)}}>
-   <div className="tank-type-badge">{tank.type==="marine"?tr(lang,"marine"):tr(lang,"freshwater")}</div><h3>{tank.name}</h3>
+   <div className="tank-type-badge">{tank.isTraining?`${lang==="ar"?"تدريب":"Training"} • `:""}{tank.type==="marine"?tr(lang,"marine"):tr(lang,"freshwater")}</div><h3>{tank.isTraining?(lang==="ar"?(tank.type==="marine"?"حوض التدريب البحري":"حوض التدريب النهري"):(tank.type==="marine"?"Marine Training Tank":"Freshwater Training Tank")):tank.name}</h3>
    <div className="tank-card-stats"><span><small>{tr(lang,"systemVolume")}</small><b>{tank.systemVolumeLiters} L</b></span><span><small>{tr(lang,"status")}</small><b>{statusText(lang,tank.status)}</b></span><span><small>{tr(lang,"equipment")}</small><b>{tank.equipment.length}</b></span></div>
    <div className="tank-dim-line">{tank.display.length} × {tank.display.width} × {tank.display.height} cm</div>
-   <div className="tank-swipe-hint">{lang==="ar"?"← تعديل   •   حذف →":"← Edit   •   Delete →"}</div>
+   <div className="tank-swipe-hint">{tank.isTraining?(lang==="ar"?"← تعديل   •   🔒 حوض تدريبي محمي":"← Edit   •   🔒 Protected training tank"):(lang==="ar"?"← تعديل   •   حذف →":"← Edit   •   Delete →")}</div>
   </div>
  </div>
 }
@@ -53,7 +53,7 @@ export function TanksPage({tanks,selectedTankId,onSelect}:{tanks:Tank[];selected
   setEditTarget(null);
  }
  function confirmDelete(){
-  if(!deleteTarget)return;
+  if(!deleteTarget||deleteTarget.isTraining){setDeleteTarget(null);return;}
   const id=deleteTarget.id;deleteTank(id);setDeleteTarget(null);
   if(id===selectedTankId){const remaining=tanks.find(t=>t.id!==id);if(remaining)onSelect(remaining.id)}
  }
