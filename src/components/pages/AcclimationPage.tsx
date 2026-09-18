@@ -55,6 +55,21 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const allowedCats:Cat[]=tank.type==="marine"?["fish","invert","coral","plant"]:["fish","invert","plant"];
  const choices=useMemo(()=>lib.filter((x:any)=>{const c=String(x.cat).toLowerCase(),m=c==="fish"?"fish":c==="coral"?"coral":c==="invert"?"invert":c==="plant"?"plant":"other";return m===category}),[category,tank.type]);
  const chosen:any=choices.find(x=>x.id===selected);
+ const releasePlan=useMemo(()=>{
+  const ordered=[...(active?.items??[])].sort((a,b)=>{
+   const delta=releasePriority(a)-releasePriority(b);
+   if(delta!==0)return delta;
+   return (a.nameEn||a.name).localeCompare(b.nameEn||b.name);
+  });
+  const batchSize=suggestedBatchSize(ordered.length);
+  const totalBatches=Math.max(1,Math.ceil(ordered.length/batchSize));
+  return ordered.map((item,index)=>({item,order:index+1,batch:Math.floor(index/batchSize)+1,totalBatches}));
+ },[active?.items]);
+ const batchSummary=useMemo(()=>Array.from({length:releasePlan[0]?.totalBatches??0},(_,i)=>{
+  const batch=i+1,items=releasePlan.filter(x=>x.batch===batch).map(x=>x.item);
+  const sensitive=items.filter(x=>x.sensitivity==="sensitive"||x.health==="stressed"||x.health==="critical"||x.health==="watch").length;
+  return {batch,count:items.length,sensitive};
+ }),[releasePlan]);
  const step=active?.wizardStep??1;
  useEffect(()=>{const id=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(id)},[]);
  useEffect(()=>{
