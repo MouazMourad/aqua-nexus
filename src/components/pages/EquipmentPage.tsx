@@ -14,7 +14,7 @@ const kinds:EquipmentKind[]=["lighting","waveMaker","overflow","skimmer","return
 
 export function EquipmentPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
- const [open,setOpen]=useState(false),[details,setDetails]=useState<string|null>(null),[name,setName]=useState(""),[kind,setKind]=useState<EquipmentKind>("lighting"),[location,setLocation]=useState<string>("display"),[brand,setBrand]=useState(""),[model,setModel]=useState(""),[days,setDays]=useState(90),[power,setPower]=useState(0),[hours,setHours]=useState(0);
+ const [open,setOpen]=useState(false),[details,setDetails]=useState<string|null>(null),[name,setName]=useState(""),[kind,setKind]=useState<EquipmentKind>("lighting"),[location,setLocation]=useState<string>("display"),[brand,setBrand]=useState(""),[model,setModel]=useState(""),[days,setDays]=useState(90),[power,setPower]=useState(0),[hours,setHours]=useState(0),[ratedVolume,setRatedVolume]=useState(0),[flowLph,setFlowLph]=useState(0);
  const visualDevices=tank.equipment;
  const e=tank.equipment.find(x=>x.id===details);
  const profile=e?equipmentProfile(e.kind):null;
@@ -26,8 +26,8 @@ export function EquipmentPage({tank}:{tank:Tank}) {
  function add(){
   const similar=tank.equipment.filter(x=>x.location==="display"&&x.kind===kind).length;
   const displayPosition=location==="display"?defaultDisplayPosition(kind,similar,similar+1):undefined;
-  patch(tank.id,t=>({...t,equipment:[...t.equipment,{id:uid("eq"),name:name||kind,kind,brand,model,location:location as any,installedAt:today(),lastServiceAt:today(),serviceIntervalDays:days,status:"on",displayPosition,overflowPlumbingMode:kind==="overflow"?"combined":undefined,powerWatts:power>0?power:undefined,hoursPerDay:hours>0?Math.min(24,hours):undefined}]}));
-  setOpen(false);setName("");setBrand("");setModel("");setPower(0);setHours(0);
+  patch(tank.id,t=>({...t,equipment:[...t.equipment,{id:uid("eq"),name:name||kind,kind,brand,model,location:location as any,installedAt:today(),lastServiceAt:today(),serviceIntervalDays:days,status:"on",displayPosition,overflowPlumbingMode:kind==="overflow"?"combined":undefined,powerWatts:power>0?power:undefined,hoursPerDay:hours>0?Math.min(24,hours):undefined,ratedVolumeLiters:ratedVolume>0?ratedVolume:undefined,flowLph:flowLph>0?flowLph:undefined}]}));
+  setOpen(false);setName("");setBrand("");setModel("");setPower(0);setHours(0);setRatedVolume(0);setFlowLph(0);
  }
  const service=(id:string)=>patch(tank.id,t=>({...t,equipment:t.equipment.map(x=>x.id===id?{...x,lastServiceAt:today(),status:"on"}:x)}));
  const remove=(id:string)=>patch(tank.id,t=>({...t,equipment:t.equipment.filter(x=>x.id!==id)}));
@@ -78,9 +78,9 @@ export function EquipmentPage({tank}:{tank:Tank}) {
     <label className="field"><span>{tr(lang,"model")}</span><input value={model} onChange={e=>setModel(e.target.value)}/></label>
     <label className="field"><span>{tr(lang,"serviceInterval")}</span><input type="number" value={days} onChange={e=>setDays(Number(e.target.value))}/></label>
     <label className="field"><span>{bi(lang,"القدرة W","Power W")}</span><input type="number" min="0" value={power||""} onChange={e=>setPower(Number(e.target.value))}/></label>
-    <label className="field"><span>{bi(lang,"ساعات التشغيل / يوم","Hours / day")}</span><input type="number" min="0" max="24" step=".1" value={hours||""} onChange={e=>setHours(Number(e.target.value))}/></label>
+    <label className="field"><span>{bi(lang,"ساعات التشغيل / يوم","Hours / day")}</span><input type="number" min="0" max="24" step=".1" value={hours||""} onChange={e=>setHours(Number(e.target.value))}/></label><label className="field"><span>{bi(lang,"التدفق L/h","Flow L/h")}</span><input type="number" min="0" value={flowLph||""} onChange={e=>setFlowLph(Number(e.target.value))}/></label><label className="field"><span>{bi(lang,"الحجم المصنف L","Rated volume L")}</span><input type="number" min="0" value={ratedVolume||""} onChange={e=>setRatedVolume(Number(e.target.value))}/></label>
    </div>
-   <div className="inline-alert info">{bi(lang,"الموقع المقترح يتغير تلقائياً حسب نوع الجهاز ويمكنك تعديله قبل الحفظ. قيم الطاقة اختيارية ويمكن إضافتها لاحقاً.","A suggested location is selected by device type and can be changed before saving. Energy values are optional and can be added later.")}</div>
+   <div className="inline-alert info">{bi(lang,"الموقع المقترح يتغير تلقائياً حسب نوع الجهاز. أدخل Flow L/h للمضخات وRated Volume للأجهزة المصنفة بالحجم؛ Aqua Nexus يستخدمها لمقارنة التجهيزات بحجم الحوض والحمل الحيوي ضمن الصحة العامة.","The suggested location changes by device type. Enter Flow L/h for pumps and Rated Volume for volume-rated equipment; Aqua Nexus uses these to compare equipment against tank size and bioload in overall health.")}</div>
    <div className="modal-actions"><button className="btn" onClick={()=>setOpen(false)}>{tr(lang,"cancel")}</button><button className="btn primary" onClick={add}>{tr(lang,"save")}</button></div>
   </Modal>
 
@@ -94,7 +94,7 @@ export function EquipmentPage({tank}:{tank:Tank}) {
       <label className="field"><span>{tr(lang,"status")}</span><select value={e.status} onChange={ev=>updateDevice(e.id,x=>({...x,status:ev.target.value}))}><option value="on">on</option><option value="off">off</option><option value="service">service</option><option value="warning">warning</option></select></label>
       <label className="field"><span>{tr(lang,"serviceInterval")}</span><input type="number" value={e.serviceIntervalDays??90} onChange={ev=>updateDevice(e.id,x=>({...x,serviceIntervalDays:Number(ev.target.value)}))}/></label>
       <label className="field"><span>{bi(lang,"القدرة W","Power W")}</span><input type="number" min="0" value={e.powerWatts??""} onChange={ev=>updateDevice(e.id,x=>({...x,powerWatts:Number(ev.target.value)}))}/></label>
-      <label className="field"><span>{bi(lang,"متوسط التشغيل ساعة/يوم","Average hours/day")}</span><input type="number" min="0" max="24" step=".1" value={e.hoursPerDay??""} onChange={ev=>updateDevice(e.id,x=>({...x,hoursPerDay:Math.min(24,Number(ev.target.value))}))}/></label>
+      <label className="field"><span>{bi(lang,"متوسط التشغيل ساعة/يوم","Average hours/day")}</span><input type="number" min="0" max="24" step=".1" value={e.hoursPerDay??""} onChange={ev=>updateDevice(e.id,x=>({...x,hoursPerDay:Math.min(24,Number(ev.target.value))}))}/></label><label className="field"><span>{bi(lang,"التدفق L/h","Flow L/h")}</span><input type="number" min="0" value={e.flowLph??""} onChange={ev=>updateDevice(e.id,x=>({...x,flowLph:Number(ev.target.value)||undefined}))}/></label><label className="field"><span>{bi(lang,"الحجم المصنف L","Rated volume L")}</span><input type="number" min="0" value={e.ratedVolumeLiters??""} onChange={ev=>updateDevice(e.id,x=>({...x,ratedVolumeLiters:Number(ev.target.value)||undefined}))}/></label>
     </div>
 
     {(e.powerWatts||0)>0&&(e.hoursPerDay||0)>0&&(()=>{const en=deviceEnergy(e,price);return <div className="summary-strip" style={{marginTop:12}}><div className="summary"><small>{bi(lang,"يومياً","Daily")}</small><b>{en.dailyKwh.toFixed(2)} kWh</b></div><div className="summary"><small>{bi(lang,"شهرياً","Monthly")}</small><b>{en.monthlyKwh.toFixed(1)} kWh</b></div><div className="summary"><small>{bi(lang,"التكلفة","Cost")}</small><b>{price>0?`${en.monthlyCost.toFixed(2)} ${currency}`:"—"}</b></div></div>})()}
