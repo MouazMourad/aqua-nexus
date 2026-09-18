@@ -2034,3 +2034,136 @@ button:disabled{opacity:.45;cursor:not-allowed}
   font-size:8px;
   line-height:1.5;
 }
+
+
+/* ===== Chemistry diagnosis + next actions ===== */
+.chemistry-health-summary{min-width:0}
+.chemistry-health-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+.chemistry-health-band{
+  flex:0 0 auto;
+  padding:6px 8px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.07);
+  font-size:8px;
+  font-weight:900;
+}
+.chemistry-health-band.good{color:#9bf0c8;border-color:rgba(91,224,167,.22);background:rgba(91,224,167,.07)}
+.chemistry-health-band.warn{color:#ffd995;border-color:rgba(255,201,99,.24);background:rgba(255,201,99,.07)}
+.chemistry-health-band.danger{color:#ffb3ba;border-color:rgba(255,112,122,.28);background:rgba(255,112,122,.08)}
+.chemistry-data-alert b{display:block;margin-bottom:4px}
+.chemistry-data-alert p{margin:5px 0 0}
+.chemistry-data-alert strong{font-size:8px;color:#ffd6da}
+
+.chemistry-guidance,.chemistry-actions{
+  background:
+    radial-gradient(circle at 88% 0%,rgba(var(--theme-rgb),.075),transparent 32%),
+    linear-gradient(180deg,rgba(7,31,44,.90),rgba(4,22,31,.95));
+}
+.chemistry-guidance-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+.chemistry-guidance-head small{
+  display:block;
+  font-size:7px;
+  letter-spacing:.13em;
+  color:var(--accent);
+  font-weight:900;
+}
+.chemistry-guidance-head h2{
+  margin:3px 0 4px;
+  font-size:17px;
+}
+.chemistry-guidance-head>span{
+  flex:0 0 auto;
+  padding:6px 8px;
+  border-radius:999px;
+  border:1px solid rgba(var(--theme-rgb),.17);
+  background:rgba(var(--theme-rgb),.055);
+  color:#bcecf1;
+  font-size:8px;
+}
+.chemistry-issue-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:8px;
+  margin-top:11px;
+}
+.chemistry-issue{
+  width:100%;
+  min-width:0;
+  display:grid;
+  grid-template-columns:50px minmax(0,1fr) 18px;
+  gap:9px;
+  align-items:center;
+  padding:10px;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:13px;
+  background:rgba(255,255,255,.025);
+  color:inherit;
+  text-align:start;
+}
+.chemistry-issue.danger{border-color:rgba(255,112,122,.28);background:rgba(255,112,122,.045)}
+.chemistry-issue.warn{border-color:rgba(255,201,99,.24);background:rgba(255,201,99,.035)}
+.chemistry-issue.info{border-color:rgba(66,215,231,.18);background:rgba(66,215,231,.025)}
+.chemistry-issue-score{
+  width:50px;height:42px;
+  display:grid;place-items:center;
+  border-radius:11px;
+  background:rgba(2,16,23,.65);
+  font-size:13px;
+  font-weight:950;
+}
+.chemistry-issue b{font-size:10px}
+.chemistry-issue p{
+  margin:3px 0 0;
+  color:var(--muted);
+  font-size:8px;
+  line-height:1.5;
+}
+.chemistry-issue-arrow{font-size:18px;color:var(--accent)}
+
+.chemistry-action-list{display:grid;gap:7px;margin-top:11px}
+.chemistry-action-row{
+  display:grid;
+  grid-template-columns:32px minmax(0,1fr) auto;
+  gap:9px;
+  align-items:center;
+  padding:10px;
+  border:1px solid rgba(255,255,255,.055);
+  border-radius:12px;
+  background:rgba(255,255,255,.022);
+}
+.chemistry-action-row.danger{border-color:rgba(255,112,122,.24)}
+.chemistry-action-row.warn{border-color:rgba(255,201,99,.20)}
+.chemistry-action-rank{
+  width:32px;height:32px;
+  display:grid;place-items:center;
+  border-radius:10px;
+  background:rgba(var(--theme-rgb),.08);
+  color:var(--accent);
+  font-weight:950;
+}
+.chemistry-action-row b{font-size:10px}
+.chemistry-action-row p{
+  margin:3px 0 0;
+  font-size:8px;
+  line-height:1.55;
+  color:var(--muted);
+}
+.chemistry-action-row .btn{font-size:8px;white-space:nowrap}
+
+@media(max-width:720px){
+  .chemistry-guidance-head{flex-direction:column}
+  .chemistry-issue-grid{grid-template-columns:1fr}
+  .chemistry-action-row{grid-template-columns:28px minmax(0,1fr)}
+  .chemistry-action-rank{width:28px;height:28px}
+  .chemistry-action-row .btn{grid-column:1/-1;width:100%}
+}
