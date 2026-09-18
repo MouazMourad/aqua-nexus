@@ -10,6 +10,7 @@ import type { EquipmentKind,Tank,TankStatus,TankType } from "@/domain/types";
 import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
 import { tr,bi } from "@/i18n";
 import { uid,nowISO } from "@/lib/appUtils";
+import { systemHealth } from "@/domain/systemHealth";
 
 const equipOptions: {kind:EquipmentKind;ar:string;en:string}[] = [
  {kind:"lighting",ar:"إضاءة",en:"Lighting"},
@@ -28,6 +29,7 @@ export function AquaDashboard() {
  const realTanks=tanks.filter(t=>!t.isTraining);
  const selectedTank=tanks.find(t=>t.id===selectedTankId)??realTanks[0]??trainingTanks[0];
  const tank=(trainingPreviewId?trainingTanks.find(t=>t.id===trainingPreviewId):undefined)??selectedTank;
+ const system=tank?systemHealth(tank):null;
  const showOnboarding=realTanks.length===0&&!trainingPreviewId;
 
  useEffect(()=>{
@@ -228,6 +230,7 @@ export function AquaDashboard() {
    <MainNav active={page} onChange={setPage} lang={language}/>
   </header>
   {page==="dashboard"&&tank.isTraining&&<TrainingCoach tank={tank} onNavigate={setPage}/>}
+  {system&&system.compatibilityAudit.issues.length>0&&<div className={`tank-attention-banner compatibility-global-banner ${system.compatibilityAudit.level==="danger"?"danger":"warn"}`}><div><b>⚠ {language==="ar"?"تعارض مستمر بين كائنات الحوض":"Persistent livestock compatibility conflict"}</b><span>{language==="ar"?system.compatibilityAudit.issues[0].ar:system.compatibilityAudit.issues[0].en}{system.compatibilityAudit.issues.length>1?(language==="ar"?` • +${system.compatibilityAudit.issues.length-1} ملاحظة أخرى`:` • +${system.compatibilityAudit.issues.length-1} more`):""}</span></div><button className="btn" onClick={()=>setPage("livestock")}>{language==="ar"?"مراجعة التوافق":"Review compatibility"}</button></div>}
   <PageRouter page={page} tank={tank} tanks={tanks} selectedTankId={selectedTankId} onSelectTank={id=>{handleSelectTank(id);setPage("dashboard")}} onNavigate={setPage}/>
 
   <AquaAIAssistant tank={tank} page={page} onNavigate={setPage}/>
