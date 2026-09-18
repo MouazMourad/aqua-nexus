@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import type { Tank } from "@/domain/types";
-import { chemistryHealth,maintenanceHealth,tankHealth } from "@/domain/health";
+import { chemistryHealth,maintenanceHealth } from "@/domain/health";
+import { systemHealth } from "@/domain/systemHealth";
 import { tankMood } from "@/domain/tankLearning";
 import { tankStateView } from "@/domain/tankIntelligence";
 import { useAquaStore } from "@/store/useAquaStore";
@@ -14,7 +15,7 @@ function roundRect(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,h:num
 function drawCard(tank:Tank,lang:"ar"|"en"){
   const c=document.createElement("canvas");c.width=1080;c.height=1350;
   const ctx=c.getContext("2d");if(!ctx)return null;
-  const state=tankStateView(tank),mood=tankMood(tank),health=tankHealth(tank),chem=chemistryHealth(tank),maint=maintenanceHealth(tank);
+  const state=tankStateView(tank),mood=tankMood(tank),system=systemHealth(tank),health=system.score,chem=chemistryHealth(tank),maint=maintenanceHealth(tank);
   const g=ctx.createLinearGradient(0,0,1080,1350);g.addColorStop(0,"#03121c");g.addColorStop(.55,"#062a37");g.addColorStop(1,"#041820");ctx.fillStyle=g;ctx.fillRect(0,0,1080,1350);
   ctx.fillStyle="rgba(70,225,210,.08)";ctx.beginPath();ctx.arc(890,190,260,0,Math.PI*2);ctx.fill();
   ctx.fillStyle="#dffcff";ctx.font="700 54px system-ui, sans-serif";ctx.textAlign=lang==="ar"?"right":"left";ctx.direction=lang==="ar"?"rtl":"ltr";ctx.fillText("Aqua Nexus",lang==="ar"?970:110,105);
@@ -26,7 +27,7 @@ function drawCard(tank:Tank,lang:"ar"|"en"){
   ctx.font="800 40px system-ui, sans-serif";ctx.fillStyle="#71e3cc";ctx.fillText(lang==="ar"?mood.ar:mood.en,540,600);
   ctx.font="500 24px system-ui, sans-serif";ctx.fillStyle="#b9dce0";ctx.fillText(lang==="ar"?mood.noteAr:mood.noteEn,540,642,800);
   const metrics=[
-    [lang==="ar"?"الصحة":"Health",health],
+    [lang==="ar"?"صحة النظام":"System Health",health],
     [lang==="ar"?"الكيمياء":"Chemistry",chem],
     [lang==="ar"?"الصيانة":"Maintenance",maint]
   ] as const;
