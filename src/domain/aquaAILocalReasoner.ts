@@ -6,6 +6,7 @@ import { tankStateView } from "./tankIntelligence";
 import { eventChemistryLinks, proactivePredictions } from "./tankLearning";
 import { learnedTankSignals, repeatedResponsePatterns, tankBaselines } from "./tankPatterns";
 import { analyzeNutrients } from "./nutrientEngine";
+import { systemHealth } from "./systemHealth";
 
 export type LocalReasoningLevel="good"|"info"|"warn"|"danger";
 export type LocalReasoningConfidence="low"|"medium"|"high";
@@ -64,6 +65,7 @@ function topicRelevant(intent:AquaQuestionIntent,topic:string){return intent.top
 
 export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasoningResult{
  const guide=chemistryGuidance(tank),state=tankStateView(tank),bio=bioload(tank),nutrients=analyzeNutrients(tank);
+ const system=systemHealth(tank);
  const age=chemistryAgeDays(tank);
  const today=new Date().toISOString().slice(0,10);
  const signals:LocalReasoningSignal[]=[];
@@ -72,6 +74,7 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
  const broadQuestion=explicitTopics.length===0||intent.topics.includes("general");
  const chemistryRelevant=broadQuestion||intent.topics.includes("chemistry")||intent.params.length>0;
  const livestockRelevant=broadQuestion||intent.topics.includes("livestock");
+ const equipmentRelevant=broadQuestion||intent.topics.includes("equipment")||intent.topics.includes("maintenance");
  const pushSignal=(x:LocalReasoningSignal)=>{if(!signals.some(s=>s.id===x.id))signals.push(x);};
  const pushAction=(x:LocalReasoningAction)=>{if(!actions.some(a=>a.id===x.id))actions.push(x);};
 
@@ -127,6 +130,24 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
  if(age>7&&chemistryRelevant){
   pushSignal({id:"stale-chemistry",level:"warn",confidence:"high",source:"data",score:70,ar:`آخر فحص كيميائي عمره ${Math.floor(age)} يوم، لذلك جزء من الاستنتاجات يحتاج قراءة أحدث.`,en:`The latest chemistry test is ${Math.floor(age)} days old, so part of the reasoning needs fresher data.`});
   pushAction({id:"retest-chemistry",priority:88,level:"warn",page:"chemistry",ar:"أعد فحص الكيمياء قبل اتخاذ قرار كبير.",en:"Retest chemistry before making a major decision.",whyAr:"القراءات القديمة تقلل الثقة بالقرار الحالي.",whyEn:"Stale readings reduce confidence in the current decision.",recheckAr:"أعد التحليل مباشرة بعد تسجيل القراءة الجديدة.",recheckEn:"Re-run the analysis immediately after logging the new reading."});
+ }
+
+ if(equipmentRelevant){
+  for(const x of system.equipmentAudit.issues.slice(0,4)){
+   pushSignal({id:`equipment-audit-${x.id}`,level:x.level==="danger"?"danger":"warn",confidence:"high",source:"equipment",score:x.level==="danger"?95:74,ar:`كفاية التجهيزات ${system.equipment}%: ${x.ar}`,en:`Equipment adequacy ${system.equipment}%: ${x.en}`});
+   if(x.recommendationAr||x.recommendationEn)pushAction({id:`equipment-audit-action-${x.id}`,priority:x.level==="danger"?93:72,level:x.level==="danger"?"danger":"warn",page:"equipment",ar:x.recommendationAr||"راجع التجهيزات الحالية.",en:x.recommendationEn||"Review current equipment.",whyAr:x.ar,whyEn:x.en,recheckAr:"بعد إضافة/تعديل الجهاز، حدّث السعة أو التدفق وأعد تقييم صحة النظام.",recheckEn:"After adding/changing equipment, update capacity or flow and reassess system health."});
+  }
+  for(const x of system.equipmentAudit.suggestions.filter(x=>x.level==="warn").slice(0,2)){
+   pushSignal({id:`equipment-suggest-${x.id}`,level:"warn",confidence:"medium",source:"equipment",score:62,ar:x.ar,en:x.en});
+   if(x.recommendationAr||x.recommendationEn)pushAction({id:`equipment-suggest-action-${x.id}`,priority:58,level:"warn",page:"equipment",ar:x.recommendationAr||x.ar,en:x.recommendationEn||x.en,whyAr:x.ar,whyEn:x.en,recheckAr:"بعد الإضافة أو تحديث المواصفات، راقب أثرها على الحمل والكيمياء والاستقرار.",recheckEn:"After adding/updating specs, monitor the effect on load, chemistry and stability."});
+  }
+ }
+
+ if(livestockRelevant&&system.compatibilityAudit.issues.length){
+  for(const x of system.compatibilityAudit.issues.slice(0,4)){
+   pushSignal({id:`compatibility-${x.ar}`,level:x.level==="danger"?"danger":"warn",confidence:"high",source:"livestock",score:x.level==="danger"?97:76,ar:`تعارض كائنات: ${x.ar}`,en:`Livestock compatibility issue: ${x.en}`});
+  }
+  pushAction({id:"compatibility-review",priority:96,level:system.compatibilityAudit.level==="danger"?"danger":"warn",page:"livestock",ar:"راجع تعارضات الكائنات قبل أي إضافة جديدة وحدد إن كان يلزم فصل/إعادة توزيع أحدها.",en:"Review livestock conflicts before any new addition and decide whether separation or relocation is needed.",whyAr:"التوافق الحالي جزء من صحة النظام، مو مجرد ملاحظة عند إضافة كائن جديد.",whyEn:"Current compatibility is part of system health, not only a check when adding new livestock.",recheckAr:"بعد أي تغيير أعد تدقيق التوافق والحمل الحيوي.",recheckEn:"After any change, rerun compatibility and bioload checks."});
  }
 
  const criticalEquipment=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
@@ -250,7 +271,7 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
  const summaryEn=top.level==="danger"?`There is a clear first priority: ${top.en}`:top.level==="warn"?`The tank needs targeted attention: ${top.en}`:`Main current signal: ${top.en}`;
  const confidence=confidenceFromEvidence(tank,signals.length);
  const patternCount=repeatedResponsePatterns(tank).length;
- const evidenceAr=[`${tank.chemistry.length} قراءات كيميائية`,`${tank.timeline.length} أحداث`,`${tank.livestock.length} سجلات كائنات`,`${tank.equipment.length} أجهزة`,`${patternCount} أنماط متكررة متعلمة`];
- const evidenceEn=[`${tank.chemistry.length} chemistry readings`,`${tank.timeline.length} events`,`${tank.livestock.length} livestock records`,`${tank.equipment.length} equipment records`,`${patternCount} learned repeated patterns`];
+ const evidenceAr=[`صحة النظام ${system.score}%`,`الكيمياء ${system.chemistry}% • الصيانة ${system.maintenance}% • الحمل الحيوي ${system.bioload}%`,`التجهيزات ${system.equipment}% • التوافق ${system.compatibility}%`,`${tank.chemistry.length} قراءات كيميائية`,`${tank.timeline.length} أحداث`,`${tank.livestock.length} سجلات كائنات`,`${tank.equipment.length} أجهزة`,`${patternCount} أنماط متكررة متعلمة`];
+ const evidenceEn=[`System health ${system.score}%`,`Chemistry ${system.chemistry}% • maintenance ${system.maintenance}% • bioload ${system.bioload}%`,`Equipment ${system.equipment}% • compatibility ${system.compatibility}%`,`${tank.chemistry.length} chemistry readings`,`${tank.timeline.length} events`,`${tank.livestock.length} livestock records`,`${tank.equipment.length} equipment records`,`${patternCount} learned repeated patterns`];
  return {summaryAr,summaryEn,signals:signals.slice(0,8),actions:actions.slice(0,6),evidenceAr,evidenceEn,confidence,mentionedLivestock,mentionedEquipment};
 }
