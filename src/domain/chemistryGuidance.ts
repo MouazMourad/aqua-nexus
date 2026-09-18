@@ -27,8 +27,8 @@ function direction(value:number,min:number,max:number){
 }
 
 function fmt(n:number){
-  if(Math.abs(n)<0.1&&n!==0)return n.toFixed(3).replace(/0+$/,"").replace(/\\.$/,"");
-  if(Math.abs(n)<10)return n.toFixed(3).replace(/0+$/,"").replace(/\\.$/,"");
+  if(Math.abs(n)<0.1&&n!==0)return n.toFixed(3).replace(/0+$/,"").replace(/\.$/,"");
+  if(Math.abs(n)<10)return n.toFixed(3).replace(/0+$/,"").replace(/\.$/,"");
   return String(Number(n.toFixed(2)));
 }
 
