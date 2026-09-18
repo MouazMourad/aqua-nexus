@@ -102,21 +102,7 @@ export function AquaDashboard() {
   addTank(newTank);setOpen(false);resetWizard();setPage("dashboard");
  }
 
- if(!tank) return <main className="app-shell"><button className="btn primary" onClick={()=>setOpen(true)}>{tr(language,"addTank")}</button></main>;
-
- const themeClass=tank.type==="marine"?"theme-marine":"theme-freshwater";
- return <main className={`app-shell ${themeClass}`} dir={language==="ar"?"rtl":"ltr"}>
-  {attention.length>0&&<div className="tank-attention-banner"><div><b>🔔 {language==="ar"?"متابعة مطلوبة":"Follow-up needed"}</b><span>{language==="ar"?`مرّ أكثر من أسبوع بدون متابعة: ${attention.join("، ")}`:`More than a week without a check-in: ${attention.join(", ")}`}</span></div><div className="attention-actions"><button className="btn primary" onClick={enablePhoneReminders}>{language==="ar"?"تفعيل تنبيهات الهاتف":"Enable phone alerts"}</button><button className="icon-btn" onClick={()=>setAttention([])}>×</button></div></div>}
-  {reminderNote&&<div className="toast-note">{reminderNote}</div>}
-  <header className="topbar topbar-v12 interactive-header"><div className="brand"><div className="brand-mark">AN</div><div><strong>Aqua Nexus 3D</strong><small>{tr(language,"brand")}</small></div></div>
-   <div className="top-actions"><select className="select" value={selectedTankId} onChange={e=>handleSelectTank(e.target.value)}>{tanks.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select><button className="btn" onClick={()=>setLanguage(language==="ar"?"en":"ar")}>{language==="ar"?"EN":"AR"}</button><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(language,"addTank")}</button></div>
-   <MainNav active={page} onChange={setPage} lang={language}/>
-  </header>
-  <PageRouter page={page} tank={tank} tanks={tanks} selectedTankId={selectedTankId} onSelectTank={id=>{handleSelectTank(id);setPage("dashboard")}} onNavigate={setPage}/>
-
-  <AquaAIAssistant tank={tank} page={page} onNavigate={setPage}/>
-
-  <Modal open={open} title={tr(language,"smartSetup")} onClose={()=>setOpen(false)}>
+ const wizardModal=(\n  <Modal open={open} title={tr(language,"smartSetup")} onClose={()=>setOpen(false)}>
    <div className="wizard-step-label"><b>{step}. {wizardSteps[step-1]}</b><span>{step}/7</span></div>
    <div className="wizard-progress"><i style={{width:`${step/7*100}%`}}/></div>
 
@@ -155,6 +141,72 @@ export function AquaDashboard() {
    </div>}
 
    <div className="modal-actions">{step>1&&<button className="btn" onClick={()=>setStep(step-1)}>{tr(language,"back")}</button>}{step<7?<button className="btn primary" onClick={()=>setStep(step+1)}>{tr(language,"next")}</button>:<button className="btn primary" onClick={create}>{tr(language,"finish")}</button>}</div>
-  </Modal>
+  </Modal>\n );\n\n if(!tank) return <main className="app-shell empty-tank-shell" dir={language==="ar"?"rtl":"ltr"}>
+  <header className="empty-tank-topbar">
+   <div className="brand"><div className="brand-mark">AN</div><div><strong>Aqua Nexus 3D</strong><small>{tr(language,"brand")}</small></div></div>
+   <button className="btn empty-language-btn" onClick={()=>setLanguage(language==="ar"?"en":"ar")}>{language==="ar"?"EN":"AR"}</button>
+  </header>
+
+  <section className="empty-tank-state" aria-labelledby="empty-tank-title">
+   <div className="empty-tank-visual" aria-hidden="true">
+    <div className="empty-tank-glass">
+     <span className="empty-bubble bubble-one"/>
+     <span className="empty-bubble bubble-two"/>
+     <span className="empty-bubble bubble-three"/>
+     <span className="empty-water-line"/>
+     <span className="empty-fish">◇</span>
+    </div>
+   </div>
+   <small className="eyebrow-mini">AQUA NEXUS • SMART SETUP</small>
+   <h1 id="empty-tank-title">{language==="ar"?"ابدأ أول حوض لديك":"Create your first aquarium"}</h1>
+   <p>{language==="ar"?"لا يوجد أي حوض مضاف حالياً. أنشئ حوضك الأول وابدأ المتابعة، الفحوصات، الصيانة والذاكرة الذكية من مكان واحد.":"No aquarium is added yet. Create your first tank and start tracking tests, maintenance, history and smart insights in one place."}</p>
+   <button className="btn primary empty-tank-cta" onClick={()=>{resetWizard();setOpen(true)}}>+ {tr(language,"addTank")}</button>
+   <span className="empty-tank-note">{language==="ar"?"سيتم فتح معالج الإعداد الذكي خطوة بخطوة.":"The Smart Setup Wizard will guide you step by step."}</span>
+  </section>
+
+  {wizardModal}
+
+  <style jsx>{`
+   .empty-tank-shell{min-height:100dvh;display:flex;flex-direction:column;position:relative;overflow:hidden;background:
+    radial-gradient(circle at 50% 18%,rgba(31,211,205,.14),transparent 34%),
+    radial-gradient(circle at 22% 82%,rgba(0,119,182,.12),transparent 30%),
+    linear-gradient(180deg,#062533 0%,#031c28 52%,#041b25 100%)}
+   .empty-tank-shell:before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 15%,rgba(255,255,255,.025) 48%,transparent 70%)}
+   .empty-tank-topbar{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:18px clamp(18px,4vw,42px);border-bottom:1px solid rgba(255,255,255,.06)}
+   .empty-language-btn{min-width:56px}
+   .empty-tank-state{position:relative;z-index:1;flex:1;width:min(680px,calc(100% - 34px));margin:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:48px 0 72px}
+   .empty-tank-visual{width:150px;height:150px;display:grid;place-items:center;margin-bottom:24px;border-radius:42px;background:radial-gradient(circle,rgba(42,222,210,.14),rgba(42,222,210,.03) 58%,transparent 70%);filter:drop-shadow(0 22px 40px rgba(0,0,0,.22))}
+   .empty-tank-glass{position:relative;width:112px;height:82px;border:2px solid rgba(109,237,228,.56);border-radius:16px 16px 22px 22px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(13,100,120,.08));box-shadow:inset 0 0 28px rgba(54,219,213,.06),0 0 28px rgba(35,214,207,.08)}
+   .empty-water-line{position:absolute;left:7px;right:7px;top:28px;height:1px;background:linear-gradient(90deg,transparent,rgba(102,235,225,.75),transparent);box-shadow:0 0 12px rgba(102,235,225,.45)}
+   .empty-fish{position:absolute;left:46px;top:43px;font-size:25px;line-height:1;color:#73eadf;transform:rotate(-8deg);text-shadow:0 0 14px rgba(115,234,223,.5)}
+   .empty-bubble{position:absolute;border:1px solid rgba(126,236,229,.7);border-radius:50%}
+   .bubble-one{width:7px;height:7px;left:29px;top:17px}.bubble-two{width:5px;height:5px;left:38px;top:10px}.bubble-three{width:4px;height:4px;right:24px;top:20px}
+   .empty-tank-state h1{margin:8px 0 10px;font-size:clamp(30px,6vw,46px);letter-spacing:-.025em}
+   .empty-tank-state p{max-width:590px;margin:0 0 24px;font-size:clamp(14px,2.4vw,17px);line-height:1.8;opacity:.72}
+   .empty-tank-cta{min-width:210px;min-height:52px;padding-inline:26px;font-size:16px;font-weight:850;border-radius:16px;box-shadow:0 14px 34px rgba(0,207,193,.2)}
+   .empty-tank-note{margin-top:12px;font-size:12px;opacity:.48}
+   @media(max-width:620px){
+    .empty-tank-topbar{padding:14px 16px}.empty-tank-topbar .brand small{display:none}
+    .empty-tank-state{width:calc(100% - 28px);padding:28px 0 58px}
+    .empty-tank-visual{width:132px;height:132px;margin-bottom:18px}
+    .empty-tank-state h1{font-size:30px}.empty-tank-state p{font-size:14px;line-height:1.7;margin-bottom:20px}
+    .empty-tank-cta{width:min(290px,100%)}
+   }
+  `}</style>
+ </main>;
+
+ const themeClass=tank.type==="marine"?"theme-marine":"theme-freshwater";
+ return <main className={`app-shell ${themeClass}`} dir={language==="ar"?"rtl":"ltr"}>
+  {attention.length>0&&<div className="tank-attention-banner"><div><b>🔔 {language==="ar"?"متابعة مطلوبة":"Follow-up needed"}</b><span>{language==="ar"?`مرّ أكثر من أسبوع بدون متابعة: ${attention.join("، ")}`:`More than a week without a check-in: ${attention.join(", ")}`}</span></div><div className="attention-actions"><button className="btn primary" onClick={enablePhoneReminders}>{language==="ar"?"تفعيل تنبيهات الهاتف":"Enable phone alerts"}</button><button className="icon-btn" onClick={()=>setAttention([])}>×</button></div></div>}
+  {reminderNote&&<div className="toast-note">{reminderNote}</div>}
+  <header className="topbar topbar-v12 interactive-header"><div className="brand"><div className="brand-mark">AN</div><div><strong>Aqua Nexus 3D</strong><small>{tr(language,"brand")}</small></div></div>
+   <div className="top-actions"><select className="select" value={selectedTankId} onChange={e=>handleSelectTank(e.target.value)}>{tanks.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select><button className="btn" onClick={()=>setLanguage(language==="ar"?"en":"ar")}>{language==="ar"?"EN":"AR"}</button><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(language,"addTank")}</button></div>
+   <MainNav active={page} onChange={setPage} lang={language}/>
+  </header>
+  <PageRouter page={page} tank={tank} tanks={tanks} selectedTankId={selectedTankId} onSelectTank={id=>{handleSelectTank(id);setPage("dashboard")}} onNavigate={setPage}/>
+
+  <AquaAIAssistant tank={tank} page={page} onNavigate={setPage}/>
+
+  {wizardModal}
  </main>;
 }
