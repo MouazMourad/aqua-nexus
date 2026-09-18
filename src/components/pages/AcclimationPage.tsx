@@ -395,6 +395,27 @@ export function AcclimationPage({tank}:{tank:Tank}) {
 
   {step>=5&&<>
    {timerAlerts.length>0&&<div className="acclimation-alert-stack full-span">{timerAlerts.map(a=><div className={`acclimation-timer-alert ${soundFamily(a.lane)}`} key={a.id}><span>{a.lane==="fish"?"🐠":a.lane==="coral"?"🪸":a.lane==="plant"||a.lane==="macroalgae"?"🌿":a.lane==="emergency"?"🚨":a.lane==="global"?"⏱":"🦐"}</span><b>{a.message}</b><button onClick={()=>setTimerAlerts(v=>v.filter(x=>x.id!==a.id))}>×</button></div>)}</div>}
+   <section className="card panel full-span acclimation-live-guide">
+    <div className="acclimation-live-guide-head"><div><small>LIVE WORKFLOW</small><h2>{bi(lang,"مراحل الإقلمة","Acclimation stages")}</h2></div><span>{bi(lang,`المرحلة الحالية ${acclimationGuide.stage}/5`,`Current stage ${acclimationGuide.stage}/5`)}</span></div>
+    <div className="acclimation-phase-rail">
+     {[
+      {ar:"موازنة الحرارة",en:"Temperature",ico:"🌡️"},
+      {ar:"النقل للأوعية",en:"Containers",ico:"🪣"},
+      {ar:"التنقيط المتوازي",en:"Parallel drip",ico:"💧"},
+      {ar:"الفحص النهائي",en:"Final check",ico:"🔎"},
+      {ar:"التنزيل والتوثيق",en:"Release & log",ico:"✅"}
+     ].map((p,i)=>{const n=i+1;return <div key={n} className={`acclimation-phase ${n===acclimationGuide.stage?"active":n<acclimationGuide.stage?"past":""}`}><span>{p.ico}</span><b>{n}. {lang==="ar"?p.ar:p.en}</b></div>})}
+    </div>
+    <div className={`acclimation-now ${acclimationGuide.tone}`}>
+     <div className="acclimation-now-icon">{acclimationGuide.stage===1?"🌡️":acclimationGuide.stage===2?"🪣":acclimationGuide.stage===3?"⏱️":acclimationGuide.stage===4?"🔎":"✅"}</div>
+     <div className="acclimation-now-copy"><small>{bi(lang,"شو تعمل هلق؟","What should you do now?")}</small><h3>{acclimationGuide.title}</h3><p>{acclimationGuide.detail}</p>{emergencyItems.length>0&&<em>🚨 {bi(lang,`انتبه: في ${emergencyItems.length} كائن/مجموعة بالمسار الاستثنائي السريع بالتوازي.`,`Attention: ${emergencyItems.length} item/group is running in the rapid exception track in parallel.`)}</em>}</div>
+     <div className="acclimation-now-actions">
+      {!active.floatConfirmed&&active.floatStatus==="ready"&&<button className="btn good" onClick={()=>floatAction("done")}>✓ {bi(lang,"تأكيد انتهاء موازنة الحرارة","Confirm temperature stage")}</button>}
+      {active.floatConfirmed&&acclimationGuide.stage===2&&releaseLanes.map(lane=>{const runtime=laneRuntime(lane);return !runtime.completed&&!runtime.started&&runtime.items.some((i:AcclimationItem)=>i.status==="waiting")?<button key={lane.key} className="btn primary" onClick={()=>startLaneBatch(lane.key,runtime.currentBatch)}>{releaseLaneIcon(lane.key)} {bi(lang,`ابدأ ${releaseLaneLabel(lang,lane.key)} — دفعة ${runtime.currentBatch}`,`Start ${releaseLaneLabel(lang,lane.key)} — Batch ${runtime.currentBatch}`)}</button>:null})}
+      {acclimationGuide.stage===4&&releaseLanes.map(lane=>{const runtime=laneRuntime(lane);return runtime.items.some((i:AcclimationItem)=>i.status==="ready")?<button key={lane.key} className="btn good" onClick={()=>setExpandedLanes(v=>({...v,[lane.key]:true}))}>{releaseLaneIcon(lane.key)} {bi(lang,`افتح ${releaseLaneLabel(lang,lane.key)} للفحص`,`Open ${releaseLaneLabel(lang,lane.key)} for inspection`)}</button>:null})}
+     </div>
+    </div>
+   </section>
    {emergencyItems.length>0&&<div className="acclimation-emergency full-span">🚨 <b>{bi(lang,"مسار استثنائي سريع يعمل بالتوازي","Rapid exception track running in parallel")}</b> — {emergencyItems.map(x=>lang==="ar"?x.name:(x.nameEn||x.name)).join(", ")}</div>}
    <div className="acclimation-metrics full-span"><div className="card metric"><small>{bi(lang,"الحوض","Tank")}</small><b>{tank.name}</b></div><div className="card metric"><small>{bi(lang,"العناصر","Items")}</small><b>{active.items.length}</b></div><div className="card metric"><small>{bi(lang,"التقدم","Progress")}</small><b>{done}/{active.items.length}</b><div className="progress"><i style={{width:`${pct}%`}}/></div></div><div className="card metric"><small>{bi(lang,"الحالة","Status")}</small><b>{pct===100?bi(lang,"مكتمل","Complete"):bi(lang,"قيد الإقلمة","Acclimating")}</b></div></div>
    <section className="card panel full-span acclimation-stage"><div className="section-title"><div><small>1</small><h2>{bi(lang,"موازنة حرارة الأكياس المغلقة","Global sealed-bag temperature equalization")}</h2></div><span className={`status ${active.floatStatus}`}>{acclimationStatusLabel(lang,active.floatStatus)}</span></div><div className="stage-timer">{fmt(floatRem)}</div><p className="note">{bi(lang,"يمكن وضع الأكياس المغلقة معاً. لا تفتحها قبل تأكيد انتهاء هذه المرحلة.","All sealed bags can float together. Do not open them before confirming this stage.")}</p><div className="acclimation-actions">{active.floatStatus==="running"&&<button className="btn" onClick={()=>floatAction("pause")}>{bi(lang,"إيقاف","Pause")}</button>}{active.floatStatus==="paused"&&<button className="btn primary" onClick={()=>floatAction("resume")}>{bi(lang,"استئناف","Resume")}</button>}<button className="btn" onClick={()=>floatAction("plus5")}>+5</button><button className="btn" onClick={()=>floatAction("plus15")}>+15</button>{(active.floatStatus==="ready"||active.floatStatus==="paused"||active.floatStatus==="running")&&<button className="btn good" onClick={()=>floatAction("done")}>{bi(lang,"تأكيد انتهاء المرحلة","Confirm stage complete")}</button>}</div></section>
