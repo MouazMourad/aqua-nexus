@@ -10,6 +10,7 @@ import { parseAquaQuestion,type AquaQuestionIntent,type AquaQuestionParam } from
 import { reasonLocally } from "./aquaAILocalReasoner";
 import { compatibilityCheck } from "./compatibility";
 import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
+import { answerAquaQuery } from "./aquaAIQueryEngine";
 
 export type AquaAIConfidence="low"|"medium"|"high";
 export type AquaAIPage="dashboard"|"chemistry"|"maintenance"|"equipment"|"livestock"|"timeline"|"dosing"|"quarantine"|"emergency"|"rodi"|"journal"|"acclimation";
@@ -468,62 +469,15 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   const meta=metaAnswer(question);if(meta)return meta;
   const q=(question||"").trim().toLowerCase();
   const intent=parseAquaQuestion(question);
-  const localReasoning=reasonLocally(tank,intent);
+
+  // High-specificity handlers stay explicit; every normal aquarium question
+  // is planned generically by domain + operation, so one signal cannot hijack unrelated topics.
   if(intent.params.length>1)return multiParameterAnswer(tank,intent.params);
   if(intent.params.length===1)return parameterAnswer(tank,intent.params[0] as Param);
   if(intent.mode==="canAdd")return stockingReadinessAnswer(tank,question);
   if(intent.mode==="waterChange")return waterChangeAnswer(tank);
   if(intent.mode==="forecast")return forecastAnswer(tank);
-  if(intent.asksAboutBioload)return bioloadAnswer(tank);
-  if(intent.topics.includes("chemistry")&&(intent.mode==="status"||intent.mode==="general"))return chemistryOverviewAnswer(tank);
-  if(intent.topics.includes("maintenance")&&(intent.mode==="status"||intent.mode==="general"))return maintenanceAnswer(tank);
-  if(intent.topics.includes("equipment")&&(intent.mode==="status"||intent.mode==="general"))return equipmentAnswer(tank);
-  if(intent.topics.includes("livestock")&&(intent.mode==="status"||intent.mode==="general"))return livestockAnswer(tank);
-  if(intent.mode==="status"&&intent.topics.includes("general"))return systemOverviewAnswer(tank);
-  if(intent.mode==="why"||intent.mode==="action"||intent.mode==="status"||intent.mode==="trend"||intent.mode==="compare"||intent.mode==="dose")return reasoningAnswer(tank,intent);
-  if(localReasoning.mentionedLivestock.length||localReasoning.mentionedEquipment.length)return reasoningAnswer(tank,intent);
-  if(intent.topics.includes("maintenance"))return maintenanceAnswer(tank);
-  if(intent.topics.includes("livestock"))return livestockAnswer(tank);
-  if(intent.topics.includes("emergency"))return emergencyAnswer(tank);
-  if(intent.topics.includes("rodi"))return rodiAnswer(tank);
-  if(intent.topics.includes("equipment"))return equipmentAnswer(tank);
   if(/ذاكر|history|memory|لماذا حدث|شو صار بعد|بعد ما|اثر|أثر|event|حدث/.test(q))return memoryAnswer(tank);
 
-  const mood=tankMood(tank),state=tankStateView(tank),forecast=tankForecast(tank),pred=proactivePredictions(tank)[0],memory=biologicalMemory(tank)[0],nutrients=analyzeNutrients(tank),insights=smartInsights(tank);
-  const reasoned=reasonLocally(tank,intent);
-  const chemistry=chemistryGuidance(tank);
-  const today=new Date().toISOString().slice(0,10);
-  const due=tank.maintenance.filter(x=>!x.done&&(!x.nextDue||x.nextDue<=today));
-  const bio=Math.round(bioload(tank).ratio*100);
-  const action=nextBestAction(tank);
-  const chemProblemAr=chemistry.problems.slice(0,3).map(x=>x.suspectedFormat?`مشكلة بيانات: ${x.reasonAr} ${x.actionAr}`:`${x.reasonAr} الإجراء المقترح: ${x.actionAr}`);
-  const chemProblemEn=chemistry.problems.slice(0,3).map(x=>x.suspectedFormat?`Data issue: ${x.reasonEn} ${x.actionEn}`:`${x.reasonEn} Suggested action: ${x.actionEn}`);
-  const detailsAr=[
-    `مزاج الحوض: ${mood.ar}. ${mood.noteAr}`,
-    `الحالة ${state.score}% • الكيمياء ${chemistry.health}% • الصيانة ${maintenanceHealth(tank)}% • الحمل الحيوي ${bio}%.`,
-    ...chemProblemAr,
-    `توقع 7 أيام: ${forecast.projected7d}% (${forecast.direction}).`,
-    pred?.ar||"لا يوجد تنبؤ استهلاك كيميائي قوي بما يكفي حالياً.",
-    memory?`من ذاكرة الحوض: ${memory.ar}`:(insights[0]?.ar||"لا توجد إشارة حرجة إضافية حالياً."),
-    nutrients.signals.find(x=>x.level!=="good")?.ar||"توازن NO3/PO4 لا يعطي إشارة خطر واضحة حالياً."
-  ];
-  const detailsEn=[
-    `Tank mood: ${mood.en}. ${mood.noteEn}`,
-    `State ${state.score}% • chemistry ${chemistry.health}% • maintenance ${maintenanceHealth(tank)}% • bioload ${bio}%.`,
-    ...chemProblemEn,
-    `7-day outlook: ${forecast.projected7d}% (${forecast.direction}).`,
-    pred?.en||"There is not yet a strong enough chemistry depletion forecast.",
-    memory?`From tank memory: ${memory.en}`:(insights[0]?.en||"No additional critical signal is detected."),
-    nutrients.signals.find(x=>x.level!=="good")?.en||"NO3/PO4 balance is not showing a clear risk signal right now."
-  ];
-  return {
-    titleAr:q?"تحليل Aqua AI للحوض":"ملخص Aqua AI الحي",
-    titleEn:q?"Aqua AI tank analysis":"Live Aqua AI summary",
-    summaryAr:reasoned.summaryAr,
-    summaryEn:reasoned.summaryEn,
-    detailsAr,detailsEn,
-    evidenceAr:[...reasoned.evidenceAr,`الواجهة الحالية: ${page}`],
-    evidenceEn:[...reasoned.evidenceEn,`Current section: ${page}`],
-    confidence:reasoned.confidence,action:reasoned.actions[0]?{page:reasoned.actions[0].page as AquaAIPage,ar:reasoned.actions[0].ar,en:reasoned.actions[0].en}:action
-  };
+  return answerAquaQuery(tank,intent);
 }
