@@ -3,7 +3,7 @@ import { useMemo,useState } from "react";
 import type { LivestockItem,Tank } from "@/domain/types";
 import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
 import { bioload } from "@/domain/health";
-import { compatibilityCheck } from "@/domain/compatibility";
+import { auditTankCompatibility,compatibilityCheck } from "@/domain/compatibility";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,categoryText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -14,6 +14,7 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
  const [open,setOpen]=useState(false),[category,setCategory]=useState<LivestockItem["category"]>("fish"),[selected,setSelected]=useState(""),[custom,setCustom]=useState(""),[qty,setQty]=useState(1),[riskConfirmed,setRiskConfirmed]=useState(false);
  const b=bioload(tank);
+ const audit=useMemo(()=>auditTankCompatibility(tank),[tank]);
  const library:any[]=LIVESTOCK_LIBRARY.filter((x:any)=>x.type===tank.type);
  const list=useMemo(()=>library.filter((x:any)=>{
    const c=String(x.cat).toLowerCase();
@@ -43,6 +44,12 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
    <h3>{tr(lang,"bioload")}</h3>
    <b className="big-number">{Math.round(b.ratio*100)}%</b>
    <span className={`status ${b.status==="high"||b.status==="danger"?"warn":""}`}>{tr(lang,b.status)}</span>
+  </div>
+
+  <div className="card panel full-span">
+   <div className="module-head"><div><small className="eyebrow-mini">SYSTEM COMPATIBILITY</small><h3>{lang==="ar"?"توافق الكائنات الحالية":"Current livestock compatibility"}</h3></div><span className={`status ${audit.level==="danger"?"danger":audit.level==="warn"?"warn":""}`}>{audit.score}%</span></div>
+   {audit.issues.length?<div className="compat-issues">{audit.issues.map((x,i)=><div key={i} className={`inline-alert ${x.level}`}>{lang==="ar"?x.ar:x.en}</div>)}</div>:<div className="inline-alert good">✓ {lang==="ar"?"ما في تعارض معروف ضمن الكائنات المسجلة حالياً.":"No known conflict is detected among currently registered livestock."}</div>}
+   <p className="note">{lang==="ar"?"هالفحص مستمر على كل الموجود بالحوض، مو بس وقت إضافة كائن جديد، ونتيجته تدخل بالصحة العامة وبـ Local Best AI.":"This audit continuously checks existing livestock, not only new additions, and feeds overall health and Local Best AI."}</p>
   </div>
 
   <div className="card panel full-span">
