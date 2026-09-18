@@ -267,7 +267,7 @@ export interface AcclimationSession {
   id: string;
   startedAt: string;
   completedAt?: string;
-  status: "setup" | "floating" | "drip" | "release" | "completed";
+  status: "setup" | "floating" | "transfer" | "drip" | "release" | "completed";
   wizardStep?: number;
   categories?: ("fish" | "coral" | "invert" | "plant" | "other")[];
   tankSalinity?: number;
@@ -281,6 +281,11 @@ export interface AcclimationSession {
   floatStartedAt?: string;
   floatRemainingMs?: number;
   floatEndAt?: number | null;
+  bucketStatus?: "waiting" | "running" | "paused" | "ready" | "done";
+  bucketStartedAt?: string;
+  bucketRemainingMs?: number;
+  bucketEndAt?: number | null;
+  dripStartedAt?: string;
   preflight?: Record<string, boolean>;
   items: AcclimationItem[];
   events: AcclimationEvent[];
