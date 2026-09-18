@@ -241,6 +241,37 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   const status=items.some((i:AcclimationItem)=>i.status==="acclimating")?"running":items.some((i:AcclimationItem)=>i.status==="paused")?"paused":items.length&&items.every((i:AcclimationItem)=>i.status==="ready")?"ready":"waiting";
   return{completed:false,currentBatch,batchEntries,items,started,timer,status};
  }
+ function batchRuntime(batch:any){
+  const allItems=batch.entries.map((e:any)=>e.item).filter((i:AcclimationItem)=>!i.emergency);
+  const remainingItems=allItems.filter((i:AcclimationItem)=>!["added","deferred"].includes(i.status));
+  const allAdded=allItems.length>0&&allItems.every((i:AcclimationItem)=>i.status==="added");
+  const complete=remainingItems.length===0;
+  const started=Boolean(active?.dripStartedAt);
+  const timer=remainingItems.length?Math.max(...remainingItems.map((i:AcclimationItem)=>started?remaining(i,now):batch.plannedMinutes*60000)):0;
+  const status=allAdded?"done":remainingItems.some((i:AcclimationItem)=>i.status==="acclimating")?"running":remainingItems.some((i:AcclimationItem)=>i.status==="paused")?"paused":remainingItems.length&&remainingItems.every((i:AcclimationItem)=>i.status==="ready")?"ready":"waiting";
+  return{allItems,remainingItems,allAdded,complete,started,timer,status};
+ }
+ function bucketAction(action:"pause"|"resume"|"done"){
+  if(!active)return;
+  let s={...active},r=s.bucketRemainingMs??5*60000;
+  if(s.bucketStatus==="running"&&s.bucketEndAt)r=Math.max(0,s.bucketEndAt-Date.now());
+  if(action==="pause")s={...s,bucketStatus:"paused",bucketRemainingMs:r,bucketEndAt:null};
+  if(action==="resume")s={...s,bucketStatus:"running",bucketRemainingMs:r,bucketEndAt:Date.now()+r};
+  if(action==="done")s={...s,bucketStatus:"done",bucketRemainingMs:0,bucketEndAt:null};
+  saveSession(s);
+ }
+ function startAllDripBatches(){
+  if(!active||!active.floatConfirmed||active.bucketStatus!=="done")return;
+  unlockAudio();
+  const started=Date.now();
+  const durationByItem=new Map<string,number>();
+  releaseBatches.forEach(batch=>batch.entries.forEach((entry:any)=>durationByItem.set(entry.item.id,batch.plannedMinutes*60000)));
+  saveSession({...active,status:"drip",dripStartedAt:nowISO(),items:active.items.map(item=>{
+   if(item.emergency||["added","deferred"].includes(item.status))return item;
+   const duration=durationByItem.get(item.id)??itemDuration(item);
+   return{...item,status:"acclimating" as const,startedAt:nowISO(),remainingMs:duration,endAt:started+duration};
+  }),events:[ev("بدأ التنقيط لجميع الدفعات بالتوازي، وكل دفعة تعمل بعداد مستقل.","Parallel drip acclimation started for all batches; every batch now has an independent timer."),...active.events]});
+ }
  function startLaneBatch(laneKey:string,batch:number){
   if(!active||!active.floatConfirmed)return;
   const lane=releaseLanes.find(x=>x.key===laneKey);if(!lane)return;
