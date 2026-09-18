@@ -84,6 +84,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const [timerAlerts,setTimerAlerts]=useState<{id:string;lane:string;batch?:number;message:string}[]>([]);
  const [exceptionPickerOpen,setExceptionPickerOpen]=useState(false);
  const [selectedExceptionIds,setSelectedExceptionIds]=useState<string[]>([]);
+ const [exceptionBoxExpanded,setExceptionBoxExpanded]=useState(false);
  const audioCtxRef=useRef<AudioContext|null>(null);
  const notifiedTimersRef=useRef<Set<string>>(new Set());
  const lib:any[]=LIVESTOCK_LIBRARY.filter((x:any)=>x.type===tank.type);
@@ -121,6 +122,8 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   return{id:`${lane.key}-${meta.batch}`,lane:lane.key,batch:meta.batch,totalBatches:lane.totalBatches,entries,plannedMinutes};
  })),[releaseLanes]);
  const emergencyItems=useMemo(()=>[...(active?.items??[])].filter(i=>i.emergency&&!["added","deferred"].includes(i.status)),[active?.items]);
+ const exceptionAllItems=useMemo(()=>[...(active?.items??[])].filter(i=>i.emergency),[active?.items]);
+ const exceptionPendingItems=useMemo(()=>exceptionAllItems.filter(i=>!["added","deferred"].includes(i.status)),[exceptionAllItems]);
  const exceptionCandidates=useMemo(()=>[...(active?.items??[])].filter(i=>!i.emergency&&!["added","deferred"].includes(i.status)),[active?.items]);
  const step=active?.wizardStep??1;
  const acclimationGuide=useMemo(()=>{
@@ -199,14 +202,21 @@ export function AcclimationPage({tank}:{tank:Tank}) {
     if(runtime.allAdded)setExpandedBatches(v=>({...v,[batch.id]:false}));
    }
   }
-  for(const item of emergencyItems){
-   if(item.status!=="ready"||!item.startedAt)continue;
-   const key=`${active.id}:emergency:${item.id}`;
-   if(notifiedTimersRef.current.has(key))continue;
-   notifiedTimersRef.current.add(key);
-   pushTimerAlert("emergency",undefined,lang==="ar"?item.name:(item.nameEn||item.name));
+  if(exceptionAllItems.length){
+   const runtime=exceptionBoxRuntime();
+   const readyToTransfer=runtime.remainingItems.length>0&&runtime.remainingItems.every((i:AcclimationItem)=>i.status==="ready");
+   if(readyToTransfer){
+    const signature=exceptionAllItems.map(i=>i.id).sort().join(".");
+    const key=`${active.id}:exception-box:${signature}`;
+    if(!notifiedTimersRef.current.has(key)){
+     notifiedTimersRef.current.add(key);
+     setTimerAlerts(prev=>[{id:uid("alert"),lane:"emergency",message:bi(lang,"انتهى عداد صندوق الاستثناءات — افتح الصندوق وافحص الكائنات ثم انقلها إلى الحوض.","Exception Box timer finished — open the box, inspect the livestock, then transfer them to the tank.")},...prev].slice(0,5));
+     playTimerSound("emergency");
+     setExceptionBoxExpanded(true);
+    }
+   }
   }
- },[active?.items,active?.floatStatus,active?.bucketStatus,active?.dripStartedAt,releaseBatches,emergencyItems,step,lang]);
+ },[active?.items,active?.floatStatus,active?.bucketStatus,active?.dripStartedAt,releaseBatches,emergencyItems,exceptionAllItems,step,lang]);
 
  function ev(ar:string,en:string){return{id:uid("ace"),timestamp:nowISO(),textAr:ar,textEn:en}}
  function unlockAudio(){
@@ -272,6 +282,15 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   const timer=remainingItems.length?Math.max(...remainingItems.map((i:AcclimationItem)=>started?remaining(i,now):batch.plannedMinutes*60000)):0;
   const status=allAdded?"done":remainingItems.some((i:AcclimationItem)=>i.status==="acclimating")?"running":remainingItems.some((i:AcclimationItem)=>i.status==="paused")?"paused":remainingItems.length&&remainingItems.every((i:AcclimationItem)=>i.status==="ready")?"ready":"waiting";
   return{allItems,remainingItems,allAdded,complete,started,timer,status};
+ }
+ function exceptionBoxRuntime(){
+  const allItems=exceptionAllItems;
+  const remainingItems=exceptionPendingItems;
+  const allAdded=allItems.length>0&&allItems.every((i:AcclimationItem)=>i.status==="added");
+  const started=allItems.some((i:AcclimationItem)=>Boolean(i.startedAt));
+  const timer=remainingItems.length?Math.max(...remainingItems.map((i:AcclimationItem)=>remaining(i,now))):0;
+  const status=allAdded?"done":remainingItems.some((i:AcclimationItem)=>i.status==="emergency")?"running":remainingItems.some((i:AcclimationItem)=>i.status==="paused")?"paused":remainingItems.length&&remainingItems.every((i:AcclimationItem)=>i.status==="ready")?"ready":"waiting";
+  return{allItems,remainingItems,allAdded,started,timer,status};
  }
  function bucketAction(action:"start"|"pause"|"resume"|"done"){
   if(!active)return;
@@ -361,13 +380,14 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   const ids=new Set(selectedExceptionIds);
   const started=Date.now();
   const selectedItems=active.items.filter(x=>ids.has(x.id));
+  const sharedRapid=Math.max(...selectedItems.map(x=>emergencyDuration(x)),5*60000);
   saveSession({...active,items:active.items.map(x=>{
    if(!ids.has(x.id))return x;
-   const rapid=emergencyDuration(x);
-   return{...x,emergency:true,status:"emergency" as const,startedAt:nowISO(),remainingMs:rapid,endAt:started+rapid,readyAt:undefined};
-  }),events:[ev(`تم نقل ${selectedItems.length} كائن/مجموعة إلى صندوق الاستثناءات وبدأ التنقيط السريع.`,`Moved ${selectedItems.length} item/group(s) to the exception box and started rapid drip acclimation.`),...active.events]});
+   return{...x,emergency:true,status:"emergency" as const,startedAt:nowISO(),remainingMs:sharedRapid,endAt:started+sharedRapid,readyAt:undefined};
+  }),events:[ev(`تم نقل ${selectedItems.length} كائن/مجموعة إلى صندوق الاستثناءات وبدأ عداد تنقيط سريع موحد لمدة ${Math.round(sharedRapid/60000)} دقيقة.`,`Moved ${selectedItems.length} item/group(s) to the exception box and started one shared rapid drip timer for ${Math.round(sharedRapid/60000)} minutes.`),...active.events]});
   setSelectedExceptionIds([]);
   setExceptionPickerOpen(false);
+  setExceptionBoxExpanded(false);
  }
  function markAdded(item:AcclimationItem){if(!active)return;const catalog:any=lib.find((x:any)=>x.id===item.libraryId);if(catalog){const check=compatibilityCheck(tank,catalog,item.quantity);if(check.level==="danger"&&!window.confirm(lang==="ar"?"يوجد تحذير توافق/حمل بيولوجي قوي. هل تريد متابعة الإدخال رغم ذلك؟":"A strong compatibility/bioload warning exists. Continue anyway?"))return;}
   const livestock:LivestockItem={id:uid("live"),libraryId:item.libraryId,name:item.name,nameEn:item.nameEn,category:item.category,quantity:item.quantity,health:item.health==="critical"||item.health==="stressed"?"watch":"good",load:catalog?.load??1,addedAt:today()};const nextItems=active.items.map(x=>x.id===item.id?{...x,status:"added" as const,addedAt:nowISO()}:x);const allDone=nextItems.every(x=>x.status==="added"||x.status==="deferred");patch(tank.id,t=>({...t,acclimationSessions:[{...active,status:allDone?"completed":"release",completedAt:allDone?nowISO():undefined,items:nextItems,events:[ev(`تم إدخال ${item.name} إلى الحوض بدون ماء الشحنة.`,`Transferred ${item.nameEn||item.name} to the aquarium without shipping water.`),...active.events]},...(t.acclimationSessions??[]).filter(x=>x.id!==active.id)],livestock:[...t.livestock,livestock],timeline:[{id:uid("ev"),timestamp:nowISO(),type:"acclimation",textAr:`اكتملت أقلمة ${item.name} وتم إدخاله.`,textEn:`Acclimation completed for ${item.nameEn||item.name}.`},...t.timeline]}));
