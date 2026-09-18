@@ -80,6 +80,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const [now,setNow]=useState(Date.now());
  const [category,setCategory]=useState<Cat>("fish"),[selected,setSelected]=useState(""),[custom,setCustom]=useState(""),[qty,setQty]=useState(1),[drip,setDrip]=useState(15),[interval,setIntervalMin]=useState(15),[placement,setPlacement]=useState(""),[notes,setNotes]=useState(""),[health,setHealth]=useState<AcclimationItem["health"]>("unknown"),[temperament,setTemperament]=useState<"peaceful"|"semi"|"aggressive">("peaceful"),[sensitivity,setSensitivity]=useState<"normal"|"sensitive"|"hardy">("normal"),[subtype,setSubtype]=useState(""),[imageData,setImageData]=useState(""),[importNote,setImportNote]=useState("");
  const [expandedLanes,setExpandedLanes]=useState<Record<string,boolean>>({});
+ const [expandedBatches,setExpandedBatches]=useState<Record<string,boolean>>({});
  const [timerAlerts,setTimerAlerts]=useState<{id:string;lane:string;batch?:number;message:string}[]>([]);
  const audioCtxRef=useRef<AudioContext|null>(null);
  const notifiedTimersRef=useRef<Set<string>>(new Set());
@@ -88,7 +89,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const choices=useMemo(()=>lib.filter((x:any)=>{const c=String(x.cat).toLowerCase(),m=c==="fish"?"fish":c==="coral"?"coral":c==="invert"?"invert":c==="plant"?"plant":"other";return m===category}),[category,tank.type]);
  const chosen:any=choices.find(x=>x.id===selected);
  const releaseLanes=useMemo(()=>{
-  const normal=[...(active?.items??[])].filter(i=>!i.emergency);
+  const normal=[...(active?.items??[])];
   const preferred=["fish","crustacean","snail","echinoderm","worm","coral","macroalgae","plant","invert","other"];
   const keys=[...new Set(normal.map(releaseLaneKey))].sort((a,b)=>preferred.indexOf(a)-preferred.indexOf(b));
   return keys.map(key=>{
@@ -109,6 +110,14 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   });
  },[active?.items]);
  const releasePlan=useMemo(()=>releaseLanes.flatMap(x=>x.entries),[releaseLanes]);
+ const releaseBatches=useMemo(()=>releaseLanes.flatMap(lane=>lane.batches.map(meta=>{
+  const entries=lane.entries.filter(x=>x.batch===meta.batch);
+  const items=entries.map(x=>x.item);
+  const baseMinutes=Math.max(1,...items.map(i=>Math.max(1,i.dripMinutes||1)));
+  const releaseGap=Math.max(0,...items.map(i=>Math.max(0,i.intervalMinutes||0)));
+  const plannedMinutes=Math.max(1,baseMinutes+Math.max(0,meta.batch-1)*releaseGap);
+  return{id:`${lane.key}-${meta.batch}`,lane:lane.key,batch:meta.batch,totalBatches:lane.totalBatches,entries,plannedMinutes};
+ })),[releaseLanes]);
  const emergencyItems=useMemo(()=>[...(active?.items??[])].filter(i=>i.emergency&&!["added","deferred"].includes(i.status)),[active?.items]);
  const step=active?.wizardStep??1;
  const acclimationGuide=useMemo(()=>{
@@ -145,6 +154,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
     return i;
   })};
   if(active.floatStatus==="running"&&active.floatEndAt&&active.floatEndAt<=now){changed=true;next={...next,floatStatus:"ready",floatEndAt:null,floatRemainingMs:0};}
+  if(active.bucketStatus==="running"&&active.bucketEndAt&&active.bucketEndAt<=now){changed=true;next={...next,bucketStatus:"ready",bucketEndAt:null,bucketRemainingMs:0};}
   if(changed)saveSession(next,false);
  },[now]);
  useEffect(()=>{
@@ -241,7 +251,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   saveSession({...active,items:active.items.map(x=>ids.has(x.id)?{...x,status:"acclimating" as const,startedAt:nowISO(),remainingMs:x.remainingMs??itemDuration(x),endAt:start+(x.remainingMs??itemDuration(x))}:x),events:[ev(`بدأت الدفعة ${batch} من مسار ${releaseLaneLabel("ar",laneKey)}.`,`Started Batch ${batch} of the ${releaseLaneLabel("en",laneKey)} lane.`),...active.events]});
  }
  function saveSession(s:AcclimationSession,withLog=true){patch(tank.id,t=>({...t,acclimationSessions:[s,...(t.acclimationSessions??[]).filter(x=>x.id!==s.id)]}));}
- function newSession(){const s:AcclimationSession={id:uid("acs"),startedAt:nowISO(),status:"setup",wizardStep:1,categories:[],tankSalinity:tank.type==="marine"?1.025:undefined,bagSalinity:tank.type==="marine"?1.020:undefined,temperature:25,existingNotes:"",coralDipEnabled:false,coralDipMinutes:10,floatConfirmed:false,floatStatus:"waiting",floatRemainingMs:15*60000,preflight:{},items:[],events:[ev("بدأت جلسة أقلمة جديدة.","New acclimation session started.")]};saveSession(s);}
+ function newSession(){const s:AcclimationSession={id:uid("acs"),startedAt:nowISO(),status:"setup",wizardStep:1,categories:[],tankSalinity:tank.type==="marine"?1.025:undefined,bagSalinity:tank.type==="marine"?1.020:undefined,temperature:25,existingNotes:"",coralDipEnabled:false,coralDipMinutes:10,floatConfirmed:false,floatStatus:"waiting",floatRemainingMs:15*60000,bucketStatus:"waiting",bucketRemainingMs:5*60000,preflight:{},items:[],events:[ev("بدأت جلسة أقلمة جديدة.","New acclimation session started.")]};saveSession(s);}
  function sessionPatch(p:Partial<AcclimationSession>){if(!active)return;saveSession({...active,...p});}
  function setStep(n:number){sessionPatch({wizardStep:n})}
  function toggleCat(c:Cat){if(!active)return;const cats=active.categories??[];sessionPatch({categories:cats.includes(c)?cats.filter(x=>x!==c):[...cats,c]});}
@@ -262,7 +272,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   if(action==="pause")s={...s,floatStatus:"paused",floatRemainingMs:r,floatEndAt:null};
   if(action==="resume")s={...s,floatStatus:"running",floatEndAt:Date.now()+r};
   if(action==="plus5"||action==="plus15"){const add=(action==="plus5"?5:15)*60000;s={...s,floatRemainingMs:r+add,floatEndAt:s.floatStatus==="running"?Date.now()+r+add:null,floatStatus:s.floatStatus==="ready"?"paused":s.floatStatus};}
-  if(action==="done")s={...s,floatConfirmed:true,floatStatus:"done",floatRemainingMs:0,floatEndAt:null,status:"drip",events:[ev("تم تأكيد انتهاء موازنة الحرارة.","Temperature equalization confirmed complete."),...s.events]};
+  if(action==="done"){const bucketMs=5*60000;s={...s,floatConfirmed:true,floatStatus:"done",floatRemainingMs:0,floatEndAt:null,status:"transfer",bucketStatus:"running",bucketStartedAt:nowISO(),bucketRemainingMs:bucketMs,bucketEndAt:Date.now()+bucketMs,events:[ev("تم تأكيد موازنة الحرارة وبدأت مرحلة نقل الكائنات إلى الأوعية لمدة 5 دقائق.","Temperature equalization confirmed; the 5-minute transfer-to-containers stage started."),...s.events]};}
   saveSession(s);
  }
  function updateItem(id:string,fn:(x:AcclimationItem)=>AcclimationItem){if(!active)return;saveSession({...active,items:active.items.map(x=>x.id===id?fn(x):x)});}
