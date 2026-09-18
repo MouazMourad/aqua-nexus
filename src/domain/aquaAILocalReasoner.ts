@@ -74,6 +74,14 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
  const mentionedLivestock=tank.livestock.filter(x=>containsName(intent.raw,x.name)||containsName(intent.raw,x.nameEn)).map(x=>x.id);
  const mentionedEquipment=tank.equipment.filter(x=>containsName(intent.raw,x.name)||containsName(intent.raw,x.brand)||containsName(intent.raw,x.model)).map(x=>x.id);
 
+ for(const item of tank.livestock.filter(x=>mentionedLivestock.includes(x.id))){
+  const age=item.addedAt?Math.max(0,Math.floor((Date.now()-new Date(item.addedAt).getTime())/86400000)):undefined;
+  pushSignal({id:`mentioned-livestock-${item.id}`,level:item.health==="treatment"?"danger":item.health==="watch"?"warn":"good",confidence:"high",source:"livestock",score:item.health==="treatment"?94:item.health==="watch"?74:38,ar:`${item.name}: العدد ${item.quantity} • الحالة ${item.health==="good"?"جيدة":item.health==="watch"?"مراقبة":"علاج"}${age!==undefined?` • موجود بالحوض منذ ${age} يوم`:""}.`,en:`${item.nameEn||item.name}: quantity ${item.quantity} • status ${item.health}${age!==undefined?` • in tank for ${age} day(s)`:""}.`});
+ }
+ for(const item of tank.equipment.filter(x=>mentionedEquipment.includes(x.id))){
+  pushSignal({id:`mentioned-equipment-${item.id}`,level:item.status==="warning"?"warn":item.status==="service"?"warn":"good",confidence:"high",source:"equipment",score:item.status==="warning"||item.status==="service"?76:36,ar:`${item.name}: الحالة ${item.status}${item.brand?` • ${item.brand}`:""}${item.model?` ${item.model}`:""}.`,en:`${item.name}: status ${item.status}${item.brand?` • ${item.brand}`:""}${item.model?` ${item.model}`:""}.`});
+ }
+
  for(const issue of guide.dataIssues){
   if(!relevantParam(intent,issue.key)&&intent.topics.includes("chemistry")===false)continue;
   pushSignal({id:`data-${issue.key}`,level:"danger",confidence:"high",source:"data",score:100,ar:issue.reasonAr,en:issue.reasonEn});
