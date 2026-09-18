@@ -27,6 +27,24 @@ function subtypeLabel(lang:"ar"|"en",v?:string){
  const en:any={crustacean:"Crustaceans",snail:"Snails",echinoderm:"Urchin / Starfish",worm:"Worms",macroalgae:"Macroalgae"};
  return v?((lang==="ar"?ar:en)[v]||v):"";
 }
+function acclimationStatusLabel(lang:"ar"|"en",v?:string){
+ const ar:any={waiting:"بانتظار البدء",running:"قيد التشغيل",paused:"متوقف مؤقتاً",ready:"جاهز للفحص",done:"مكتمل",acclimating:"قيد الإقلمة",added:"تم التنزيل",deferred:"مؤجل",emergency:"استثنائي"};
+ const en:any={waiting:"Waiting",running:"Running",paused:"Paused",ready:"Ready for check",done:"Done",acclimating:"Acclimating",added:"Added",deferred:"Deferred",emergency:"Emergency"};
+ return (lang==="ar"?ar:en)[v||""]||v||"";
+}
+function releasePriority(i:AcclimationItem){
+ const health:any={critical:-25,stressed:-14,watch:-10,fair:-5,unknown:0,good:3};
+ const sensitivity:any={sensitive:0,normal:12,hardy:22};
+ const temperament:any={peaceful:0,semi:18,aggressive:36};
+ const category:any={fish:0,invert:6,coral:10,plant:12,other:14};
+ return (health[i.health]??0)+(sensitivity[i.sensitivity||"normal"]??12)+(temperament[i.temperament||"peaceful"]??0)+(category[i.category]??14);
+}
+function suggestedBatchSize(total:number){
+ if(total>24)return 6;
+ if(total>12)return 5;
+ if(total>8)return 4;
+ return Math.max(1,total);
+}
 
 export function AcclimationPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
