@@ -111,6 +111,32 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const releasePlan=useMemo(()=>releaseLanes.flatMap(x=>x.entries),[releaseLanes]);
  const emergencyItems=useMemo(()=>[...(active?.items??[])].filter(i=>i.emergency&&!["added","deferred"].includes(i.status)),[active?.items]);
  const step=active?.wizardStep??1;
+ const acclimationGuide=useMemo(()=>{
+  const items=active?.items??[];
+  const ready=items.filter(i=>i.status==="ready");
+  const running=items.filter(i=>i.status==="acclimating"||i.status==="emergency");
+  const waiting=items.filter(i=>i.status==="waiting");
+  const completed=items.filter(i=>i.status==="added"||i.status==="deferred");
+  if(!active)return{stage:1,title:"",detail:"",tone:"info" as const};
+  if(!active.floatConfirmed){
+   if(active.floatStatus==="ready")return{stage:1,title:bi(lang,"أكد انتهاء موازنة الحرارة","Confirm temperature equalization"),detail:bi(lang,"العداد انتهى. تأكد أن حرارة الأكياس قريبة من حرارة الحوض، ثم اضغط «تأكيد انتهاء المرحلة». أبقِ الأكياس مغلقة حتى التأكيد.","The timer is finished. Confirm bag temperature is close to tank temperature, then tap “Confirm stage complete.” Keep bags sealed until then."),tone:"ready" as const};
+   return{stage:1,title:bi(lang,"اترك الأكياس مغلقة وانتظر العداد","Keep bags sealed and wait for the timer"),detail:bi(lang,"حالياً المطلوب فقط موازنة الحرارة. لا تفتح الأكياس ولا تبدأ التنقيط قبل تأكيد انتهاء هذه المرحلة.","Right now, only temperature equalization is required. Do not open bags or start dripping before this stage is confirmed."),tone:"info" as const};
+  }
+  if(ready.length){
+   const names=ready.slice(0,3).map(i=>lang==="ar"?i.name:(i.nameEn||i.name)).join("، ");
+   return{stage:4,title:bi(lang,"افحص الكائنات الجاهزة الآن","Inspect the ready livestock now"),detail:bi(lang,`${ready.length} مجموعة جاهزة للفحص${names?`: ${names}`:""}. راجع التنفس/الاستجابة والحالة والملوحة عند الحاجة، ثم انقل الكائن فقط بدون ماء الشحنة إذا كان مستقراً.`,`${ready.length} group(s) are ready for inspection${names?`: ${names}`:""}. Check breathing/response, condition, and salinity when relevant, then transfer the animal only—without shipping water—if stable.`),tone:"ready" as const};
+  }
+  if(running.length){
+   return{stage:3,title:bi(lang,"راقب العدادات — الإقلمة تعمل بالتوازي","Monitor the timers — acclimation is running in parallel"),detail:bi(lang,`${running.length} مجموعة قيد الإقلمة الآن. لا تحتاج أن تنتظر نوعاً لينتهي قبل الآخر؛ راقب كل مسار، وسيصلك تنبيه وصوت خاص عند انتهاء عداده.`,`${running.length} group(s) are acclimating now. One category does not need to wait for another; monitor each lane and you will get a distinct alert and sound when its timer finishes.`),tone:"running" as const};
+  }
+  if(waiting.length){
+   return{stage:2,title:bi(lang,"ابدأ الدفعات الحالية للمسارات الجاهزة","Start the current batches for the ready lanes"),detail:bi(lang,"انتهت موازنة الحرارة. انقل كل مجموعة إلى وعائها المخصص وابدأ دفعة الأسماك والقشريات والمرجان وغيرها بالتوازي حسب المسارات الظاهرة أدناه.","Temperature equalization is complete. Move each group to its dedicated container and start the current fish, crustacean, coral, and other batches in parallel using the lanes below."),tone:"action" as const};
+  }
+  if(items.length&&completed.length===items.length){
+   return{stage:5,title:bi(lang,"اكتملت جلسة الإقلمة","Acclimation session complete"),detail:bi(lang,"تمت معالجة كل المجموعات. راجع سجل الإدخال وتأكد أن الكائنات المنقولة موثقة بالمكان والحالة الصحيحة.","All groups have been processed. Review the input register and confirm transferred livestock is documented with the correct placement and condition."),tone:"done" as const};
+  }
+  return{stage:5,title:bi(lang,"راجع الحالة الحالية","Review the current state"),detail:bi(lang,"راجع المسارات والتنبيهات أدناه وحدد المجموعة التالية التي تحتاج فحصاً أو نقلاً.","Review the lanes and alerts below and identify the next group needing inspection or transfer."),tone:"info" as const};
+ },[active?.items,active?.floatConfirmed,active?.floatStatus,lang]);
  useEffect(()=>{const id=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(id)},[]);
  useEffect(()=>{
   if(!active)return;
