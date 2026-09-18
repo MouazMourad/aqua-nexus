@@ -29,7 +29,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const [now,setNow]=useState(Date.now());
  const [category,setCategory]=useState<Cat>("fish"),[selected,setSelected]=useState(""),[custom,setCustom]=useState(""),[qty,setQty]=useState(1),[drip,setDrip]=useState(15),[interval,setIntervalMin]=useState(15),[placement,setPlacement]=useState(""),[notes,setNotes]=useState(""),[health,setHealth]=useState<AcclimationItem["health"]>("unknown"),[temperament,setTemperament]=useState<"peaceful"|"semi"|"aggressive">("peaceful"),[sensitivity,setSensitivity]=useState<"normal"|"sensitive"|"hardy">("normal"),[subtype,setSubtype]=useState(""),[imageData,setImageData]=useState(""),[importNote,setImportNote]=useState("");
  const lib:any[]=LIVESTOCK_LIBRARY.filter((x:any)=>x.type===tank.type);
- const allowedCats:Cat[]=tank.type==="marine"?["fish","invert","coral"]:["fish","invert","plant"];
+ const allowedCats:Cat[]=tank.type==="marine"?["fish","invert","coral","plant"]:["fish","invert","plant"];
  const choices=useMemo(()=>lib.filter((x:any)=>{const c=String(x.cat).toLowerCase(),m=c==="fish"?"fish":c==="coral"?"coral":c==="invert"?"invert":c==="plant"?"plant":"other";return m===category}),[category,tank.type]);
  const chosen:any=choices.find(x=>x.id===selected);
  const step=active?.wizardStep??1;
@@ -93,7 +93,6 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   const aliases:Record<string,Cat>={fish:"fish",fishes:"fish",coral:"coral",corals:"coral",invert:"invert",invertebrate:"invert",invertebrates:"invert",shrimp:"invert",plant:"plant",plants:"plant",other:"other"};
   const result=aliases[value]??null;
   if(!result)return null;
-  if(tank.type==="marine"&&result==="plant")return null;
   if(tank.type==="freshwater"&&result==="coral")return null;
   return result;
  }
