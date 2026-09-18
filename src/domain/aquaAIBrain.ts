@@ -5,6 +5,7 @@ import { tankForecast, tankStateView } from "./tankIntelligence";
 import { biologicalMemory, eventChemistryLinks, proactivePredictions, tankMood } from "./tankLearning";
 import { analyzeNutrients } from "./nutrientEngine";
 import { tankEnergy } from "./equipmentIntelligence";
+import { chemistryGuidance } from "./chemistryGuidance";
 
 export type AquaAIConfidence="low"|"medium"|"high";
 export type AquaAIPage="dashboard"|"chemistry"|"maintenance"|"equipment"|"livestock"|"timeline"|"dosing"|"quarantine"|"emergency"|"rodi"|"journal";
@@ -74,6 +75,9 @@ function ageDays(timestamp?:string){
 export function nextBestAction(tank:Tank):AquaAIAction{
   const activeEmergency=(tank.emergencySessions??[]).some(x=>x.status==="active");
   if(activeEmergency)return {page:"emergency",ar:"أكمل بروتوكول الطوارئ النشط",en:"Continue the active emergency protocol"};
+  const chemistry=chemistryGuidance(tank);
+  if(chemistry.dataIssues.length){const issue=chemistry.dataIssues[0];return {page:"chemistry",ar:issue.actionAr,en:issue.actionEn};}
+  if(chemistry.problems.length){const issue=chemistry.problems[0];return {page:"chemistry",ar:`${issue.titleAr}: ${issue.actionAr}`,en:`${issue.titleEn}: ${issue.actionEn}`};}
   const today=new Date().toISOString().slice(0,10);
   const overdue=tank.maintenance.filter(x=>!x.done&&(!x.nextDue||x.nextDue<=today));
   const oldChem=tank.chemistry[0]?Math.floor((Date.now()-new Date(tank.chemistry[0].timestamp).getTime())/DAY):999;
@@ -89,6 +93,7 @@ export function nextBestAction(tank:Tank):AquaAIAction{
 
 function parameterAnswer(tank:Tank,param:Param):AquaAIAnswer{
   const current=latestValue(tank,param),previous=previousValue(tank,param);
+  const guidance=chemistryGuidance(tank).all.find(x=>x.key===param);
   const prediction=proactivePredictions(tank).find(x=>x.parameter===param);
   const links=eventChemistryLinks(tank).filter(x=>x.chemistryChanges.some(c=>c.parameter===param)).slice(0,2);
   const doses=tank.dosing.filter((x:any)=>String(x.parameter||"").toLowerCase()===param.toLowerCase()).slice(0,3);
@@ -111,11 +116,12 @@ function parameterAnswer(tank:Tank,param:Param):AquaAIAnswer{
     detailsAr.push(`يوجد ${doses.length} تسجيل جرعة حديثة لـ ${param} ضمن السجل المتاح.`);
     detailsEn.push(`${doses.length} recent ${param} dose log(s) are available in the visible history.`);
   }
+  if(guidance){detailsAr.unshift(guidance.reasonAr);detailsAr.push(`الإجراء المقترح: ${guidance.actionAr}`);detailsEn.unshift(guidance.reasonEn);detailsEn.push(`Suggested action: ${guidance.actionEn}`);}
   if(!detailsAr.length){detailsAr.push(`لا توجد بيانات كافية عن ${param} لهذا الحوض حتى الآن.`);detailsEn.push(`There is not enough ${param} data for this tank yet.`);}
   return {
     titleAr:`تحليل ${param} لهذا الحوض`,titleEn:`${param} analysis for this tank`,
-    summaryAr:prediction?`يوجد نمط قابل للقياس لـ ${param} ويمكن استخدامه للتنبؤ المبكر.`:`يمكن وصف اتجاه ${param} حالياً، لكن التنبؤ الشخصي يتحسن مع المزيد من القراءات.`,
-    summaryEn:prediction?`There is a measurable ${param} pattern that can support an early forecast.`:`I can describe the current ${param} direction; personalized forecasting improves with more readings.`,
+    summaryAr:guidance?(guidance.suspectedFormat?`في قراءة ${param} مشكلة تنسيق محتملة ويجب تصحيح البيانات قبل تعديل الحوض.`:`${guidance.reasonAr} ${guidance.actionAr}`):(prediction?`يوجد نمط قابل للقياس لـ ${param} ويمكن استخدامه للتنبؤ المبكر.`:`يمكن وصف اتجاه ${param} حالياً، لكن التنبؤ الشخصي يتحسن مع المزيد من القراءات.`),
+    summaryEn:guidance?(guidance.suspectedFormat?`The ${param} reading may be misformatted; correct the data before changing the tank.`:`${guidance.reasonEn} ${guidance.actionEn}`):(prediction?`There is a measurable ${param} pattern that can support an early forecast.`:`I can describe the current ${param} direction; personalized forecasting improves with more readings.`),
     detailsAr,detailsEn,
     evidenceAr:[`${tank.chemistry.length} قراءة كيميائية`,`${links.length} ارتباط حدث قريب`,`${doses.length} جرعات مسجلة`],
     evidenceEn:[`${tank.chemistry.length} chemistry readings`,`${links.length} nearby event link(s)`,`${doses.length} logged doses`],
@@ -232,13 +238,17 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   if(/جهاز|معدات|equipment|pump|light|skimmer|heater|طاقة|كهرب|energy|cost/.test(q))return equipmentAnswer(tank);
 
   const mood=tankMood(tank),state=tankStateView(tank),forecast=tankForecast(tank),pred=proactivePredictions(tank)[0],memory=biologicalMemory(tank)[0],nutrients=analyzeNutrients(tank),insights=smartInsights(tank);
+  const chemistry=chemistryGuidance(tank);
   const today=new Date().toISOString().slice(0,10);
   const due=tank.maintenance.filter(x=>!x.done&&(!x.nextDue||x.nextDue<=today));
   const bio=Math.round(bioload(tank).ratio*100);
   const action=nextBestAction(tank);
+  const chemProblemAr=chemistry.problems.slice(0,3).map(x=>x.suspectedFormat?`مشكلة بيانات: ${x.reasonAr} ${x.actionAr}`:`${x.reasonAr} الإجراء المقترح: ${x.actionAr}`);
+  const chemProblemEn=chemistry.problems.slice(0,3).map(x=>x.suspectedFormat?`Data issue: ${x.reasonEn} ${x.actionEn}`:`${x.reasonEn} Suggested action: ${x.actionEn}`);
   const detailsAr=[
     `مزاج الحوض: ${mood.ar}. ${mood.noteAr}`,
-    `الحالة ${state.score}% • الكيمياء ${chemistryHealth(tank)}% • الصيانة ${maintenanceHealth(tank)}% • الحمل الحيوي ${bio}%.`,
+    `الحالة ${state.score}% • الكيمياء ${chemistry.health}% • الصيانة ${maintenanceHealth(tank)}% • الحمل الحيوي ${bio}%.`,
+    ...chemProblemAr,
     `توقع 7 أيام: ${forecast.projected7d}% (${forecast.direction}).`,
     pred?.ar||"لا يوجد تنبؤ استهلاك كيميائي قوي بما يكفي حالياً.",
     memory?`من ذاكرة الحوض: ${memory.ar}`:(insights[0]?.ar||"لا توجد إشارة حرجة إضافية حالياً."),
@@ -246,7 +256,8 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   ];
   const detailsEn=[
     `Tank mood: ${mood.en}. ${mood.noteEn}`,
-    `State ${state.score}% • chemistry ${chemistryHealth(tank)}% • maintenance ${maintenanceHealth(tank)}% • bioload ${bio}%.`,
+    `State ${state.score}% • chemistry ${chemistry.health}% • maintenance ${maintenanceHealth(tank)}% • bioload ${bio}%.`,
+    ...chemProblemEn,
     `7-day outlook: ${forecast.projected7d}% (${forecast.direction}).`,
     pred?.en||"There is not yet a strong enough chemistry depletion forecast.",
     memory?`From tank memory: ${memory.en}`:(insights[0]?.en||"No additional critical signal is detected."),
