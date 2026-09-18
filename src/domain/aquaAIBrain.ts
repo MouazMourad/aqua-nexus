@@ -250,10 +250,11 @@ function equipmentAnswer(tank:Tank):AquaAIAnswer{
 function reasoningAnswer(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswer{
  const reasoning=reasonLocally(tank,intent);
  const firstAction=reasoning.actions[0];
+ const topSignal=reasoning.signals[0];
  const titleMap:Record<string,[string,string]>={
   why:["تحليل الأسباب المحتملة","Likely-cause analysis"],
   action:["أفضل خطوة الآن","Best next action"],
-  status:["حالة الحوض الآن","Current tank state"],
+  status:[intent.asksAboutBioload?"حالة الحمل الحيوي الآن":"حالة الحوض الآن",intent.asksAboutBioload?"Current bioload status":"Current tank state"],
   trend:["تحليل الاتجاه","Trend analysis"],
   compare:["مقارنة القراءات والتغيرات","Reading & change comparison"],
   forecast:["التوقع المحلي","Local forecast"],
@@ -263,11 +264,27 @@ function reasoningAnswer(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswer{
  const title=titleMap[intent.mode]||titleMap.general;
  const detailSignals=reasoning.signals.slice(0,6);
  const actionDetails=reasoning.actions.slice(0,3);
+ let summaryAr=reasoning.summaryAr,summaryEn=reasoning.summaryEn;
+ if((intent.mode==="action"||intent.mode==="dose")&&firstAction){
+  summaryAr=`${firstAction.ar} السبب: ${firstAction.whyAr}`;
+  summaryEn=`${firstAction.en} Why: ${firstAction.whyEn}`;
+ }else if(intent.mode==="why"&&topSignal){
+  summaryAr=`السبب الأقرب حسب بيانات الحوض: ${topSignal.ar}`;
+  summaryEn=`Most likely explanation from tank data: ${topSignal.en}`;
+ }else if(intent.mode==="status"&&topSignal){
+  summaryAr=topSignal.ar;
+  summaryEn=topSignal.en;
+ }
+ const detailsAr=(intent.mode==="action"||intent.mode==="dose")
+  ?[...actionDetails.map((x,i)=>`${i+1}. ${x.ar} — ليش: ${x.whyAr} — راقب بعدها: ${x.recheckAr}`),...detailSignals.slice(0,3).map(x=>x.ar)]
+  :[...detailSignals.map(x=>x.ar),...actionDetails.map((x,i)=>`${i+1}. ${x.ar} — ليش: ${x.whyAr} — راقب بعدها: ${x.recheckAr}`)];
+ const detailsEn=(intent.mode==="action"||intent.mode==="dose")
+  ?[...actionDetails.map((x,i)=>`${i+1}. ${x.en} — Why: ${x.whyEn} — Recheck: ${x.recheckEn}`),...detailSignals.slice(0,3).map(x=>x.en)]
+  :[...detailSignals.map(x=>x.en),...actionDetails.map((x,i)=>`${i+1}. ${x.en} — Why: ${x.whyEn} — Recheck: ${x.recheckEn}`)];
  return {
   titleAr:title[0],titleEn:title[1],
-  summaryAr:reasoning.summaryAr,summaryEn:reasoning.summaryEn,
-  detailsAr:[...detailSignals.map(x=>x.ar),...actionDetails.map((x,i)=>`${i+1}. ${x.ar} — ليش: ${x.whyAr} — راقب بعدها: ${x.recheckAr}`)],
-  detailsEn:[...detailSignals.map(x=>x.en),...actionDetails.map((x,i)=>`${i+1}. ${x.en} — Why: ${x.whyEn} — Recheck: ${x.recheckEn}`)],
+  summaryAr,summaryEn,
+  detailsAr,detailsEn,
   evidenceAr:reasoning.evidenceAr,evidenceEn:reasoning.evidenceEn,
   confidence:reasoning.confidence,
   action:firstAction?{page:firstAction.page as AquaAIPage,ar:firstAction.ar,en:firstAction.en}:undefined
