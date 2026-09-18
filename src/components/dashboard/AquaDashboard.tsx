@@ -21,15 +21,19 @@ const equipOptions: {kind:EquipmentKind;ar:string;en:string}[] = [
 ];
 
 export function AquaDashboard() {
- const state=useAquaStore(),{tanks,selectedTankId,selectTank,language,setLanguage,addTank}=state,[page,setPage]=useState<AppPage>("dashboard"),[open,setOpen]=useState(false),[attention,setAttention]=useState<string[]>([]),[reminderNote,setReminderNote]=useState("");
+ const state=useAquaStore(),{tanks,selectedTankId,selectTank,language,setLanguage,addTank}=state,[page,setPage]=useState<AppPage>("dashboard"),[open,setOpen]=useState(false),[attention,setAttention]=useState<string[]>([]),[reminderNote,setReminderNote]=useState(""),[trainingPreviewId,setTrainingPreviewId]=useState<string|null>(null);
  const reminderChecked=useRef(false);
- const tank=tanks.find(t=>t.id===selectedTankId)??tanks[0];
+ const trainingTanks=tanks.filter(t=>t.isTraining);
+ const realTanks=tanks.filter(t=>!t.isTraining);
+ const selectedTank=tanks.find(t=>t.id===selectedTankId)??realTanks[0]??trainingTanks[0];
+ const tank=(trainingPreviewId?trainingTanks.find(t=>t.id===trainingPreviewId):undefined)??selectedTank;
+ const showOnboarding=realTanks.length===0&&!trainingPreviewId;
 
  useEffect(()=>{
   if(reminderChecked.current||!tank||typeof window==="undefined")return;
   reminderChecked.current=true;
   const now=Date.now(),week=7*86400000;
-  const stale=tanks.filter(t=>{
+  const stale=tanks.filter(t=>!t.isTraining).filter(t=>{
    const raw=localStorage.getItem(`aqua-nexus-last-visit:${t.id}`);
    if(!raw){localStorage.setItem(`aqua-nexus-last-visit:${t.id}`,String(now));return false;}
    const last=Number(raw);
@@ -54,7 +58,9 @@ export function AquaDashboard() {
  }
 
  function handleSelectTank(id:string){
-  if(typeof window!=="undefined") localStorage.setItem(`aqua-nexus-last-visit:${id}`,String(Date.now()));
+  const next=tanks.find(t=>t.id===id);
+  if(typeof window!=="undefined"&&!next?.isTraining) localStorage.setItem(`aqua-nexus-last-visit:${id}`,String(Date.now()));
+  setTrainingPreviewId(next?.isTraining?id:null);
   selectTank(id);
  }
 
@@ -99,7 +105,7 @@ export function AquaDashboard() {
    maintenance:maintenanceDone?[weeklyTask,{id:uid("task"),title:"تنظيف وفحص النظام",titleEn:"Inspect and clean system",cadence:"weekly",done:false,nextDue:new Date(Date.now()+7*86400000).toISOString().slice(0,10)}]:[weeklyTask],
    livestock:[],inventory:[],timeline:[{id:uid("ev"),timestamp:nowISO(),type:"setup",textAr:"تم إنشاء الحوض عبر معالج الإعداد الذكي.",textEn:"Tank created using the Smart Setup Wizard."}],photos:[],feeding:[],dosing:[],doserChannels:[],quarantine:[],expenses:[],waterChanges:[],rodi:[],createdAt:nowISO()
   };
-  addTank(newTank);setOpen(false);resetWizard();setPage("dashboard");
+  addTank(newTank);setTrainingPreviewId(null);setOpen(false);resetWizard();setPage("dashboard");
  }
 
  const wizardModal=(
@@ -145,7 +151,7 @@ export function AquaDashboard() {
   </Modal>
  );
 
- if(!tank) return <main className="app-shell empty-tank-shell" dir={language==="ar"?"rtl":"ltr"}>
+ if(showOnboarding||!tank) return <main className="app-shell empty-tank-shell" dir={language==="ar"?"rtl":"ltr"}>
   <header className="empty-tank-topbar">
    <div className="brand"><div className="brand-mark">AN</div><div><strong>Aqua Nexus 3D</strong><small>{tr(language,"brand")}</small></div></div>
    <button className="btn empty-language-btn" onClick={()=>setLanguage(language==="ar"?"en":"ar")}>{language==="ar"?"EN":"AR"}</button>
@@ -163,9 +169,20 @@ export function AquaDashboard() {
    </div>
    <small className="eyebrow-mini">AQUA NEXUS • SMART SETUP</small>
    <h1 id="empty-tank-title">{language==="ar"?"ابدأ أول حوض لديك":"Create your first aquarium"}</h1>
-   <p>{language==="ar"?"لا يوجد أي حوض مضاف حالياً. أنشئ حوضك الأول وابدأ المتابعة، الفحوصات، الصيانة والذاكرة الذكية من مكان واحد.":"No aquarium is added yet. Create your first tank and start tracking tests, maintenance, history and smart insights in one place."}</p>
+   <p>{language==="ar"?"ما عندك حوض شخصي مضاف حالياً. أنشئ حوضك الأول لتبدأ المتابعة، الفحوصات، الصيانة والذاكرة الذكية.":"You do not have a personal aquarium yet. Create your first tank to start tracking tests, maintenance, history and smart insights."}</p>
    <button className="btn primary empty-tank-cta" onClick={()=>{resetWizard();setOpen(true)}}>+ {tr(language,"addTank")}</button>
    <span className="empty-tank-note">{language==="ar"?"سيتم فتح معالج الإعداد الذكي خطوة بخطوة.":"The Smart Setup Wizard will guide you step by step."}</span>
+
+   <div className="training-entry">
+    <div className="training-entry-title"><span/><b>{language==="ar"?"أو استكشف المنصة بحوض تدريبي":"Or explore with a training aquarium"}</b><span/></div>
+    <div className="training-entry-grid">
+     {trainingTanks.map(t=><button key={t.id} className="training-entry-card" onClick={()=>{handleSelectTank(t.id);setPage("dashboard")}}>
+      <span className="training-entry-icon">{t.type==="marine"?"🌊":"🌿"}</span>
+      <span><b>{language==="ar"?(t.type==="marine"?"حوض تدريب بحري":"حوض تدريب نهري"):(t.type==="marine"?"Marine Training Tank":"Freshwater Training Tank")}</b><small>{language==="ar"?"صحة 100% • بيانات تدريبية محمية":"100% health • protected training data"}</small></span>
+      <strong>→</strong>
+     </button>)}
+    </div>
+   </div>
   </section>
 
   {wizardModal}
@@ -189,12 +206,14 @@ export function AquaDashboard() {
    .empty-tank-state p{max-width:590px;margin:0 0 24px;font-size:clamp(14px,2.4vw,17px);line-height:1.8;opacity:.72}
    .empty-tank-cta{min-width:210px;min-height:52px;padding-inline:26px;font-size:16px;font-weight:850;border-radius:16px;box-shadow:0 14px 34px rgba(0,207,193,.2)}
    .empty-tank-note{margin-top:12px;font-size:12px;opacity:.48}
+   .training-entry{width:min(620px,100%);margin-top:30px}.training-entry-title{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:12px;opacity:.64}.training-entry-title span{height:1px;flex:1;background:rgba(255,255,255,.1)}
+   .training-entry-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.training-entry-card{border:1px solid rgba(94,225,216,.16);background:rgba(255,255,255,.035);color:inherit;border-radius:16px;padding:13px 14px;display:grid;grid-template-columns:38px 1fr 18px;align-items:center;gap:10px;text-align:start;cursor:pointer;transition:.18s ease}.training-entry-card:hover{transform:translateY(-1px);border-color:rgba(94,225,216,.36);background:rgba(77,220,211,.07)}.training-entry-icon{width:38px;height:38px;display:grid;place-items:center;border-radius:12px;background:rgba(63,210,202,.09)}.training-entry-card b,.training-entry-card small{display:block}.training-entry-card small{margin-top:3px;font-size:10px;opacity:.55}.training-entry-card strong{opacity:.5}
    @media(max-width:620px){
     .empty-tank-topbar{padding:14px 16px}.empty-tank-topbar .brand small{display:none}
     .empty-tank-state{width:calc(100% - 28px);padding:28px 0 58px}
     .empty-tank-visual{width:132px;height:132px;margin-bottom:18px}
     .empty-tank-state h1{font-size:30px}.empty-tank-state p{font-size:14px;line-height:1.7;margin-bottom:20px}
-    .empty-tank-cta{width:min(290px,100%)}
+    .empty-tank-cta{width:min(290px,100%)}.training-entry{margin-top:24px}.training-entry-grid{grid-template-columns:1fr}.training-entry-card{width:100%}
    }
   `}</style>
  </main>;
