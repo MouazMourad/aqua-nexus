@@ -352,7 +352,24 @@ function actionAnswer(tank:Tank):AquaAIAnswer{
    evidenceAr:[`${guide.health}% صحة كيمياء`,`حالة النظام ${state.score}%`],evidenceEn:[`${guide.health}% chemistry health`,`System state ${state.score}%`],confidence:confidence(tank),action
   };
 }
+function metaAnswer(question:string):AquaAIAnswer|undefined{
+ const q=normText(question);
+ if(/(?:^|\s)(شو اسمك|اسمك شو|مين انت|من انت|مين حضرتك|who are you|what is your name|what s your name)(?:$|\s)/i.test(q)){
+  return {
+   titleAr:"أنا Local Best AI 🐠",titleEn:"I’m Local Best AI 🐠",
+   summaryAr:"أنا المساعد الذكي المحلي داخل Aqua Nexus، اختصاصي حوضك وبياناته فقط. بفهم الكيمياء والكائنات والمعدات والصيانة والأقلمة وبساعدك تاخد قرار أوضح بدون ما أطلع برا عالم الأحواض.",
+   summaryEn:"I’m the local intelligence inside Aqua Nexus. I focus only on your aquarium and its data: chemistry, livestock, equipment, maintenance and acclimation.",
+   detailsAr:["اسمي Local Best AI.","أشتغل على بيانات الحوض الحالي داخل Aqua Nexus.","إذا سألتني عن شي برا الأحواض برجعك للمي بطريقة محترمة ومضحكة 😄"],
+   detailsEn:["My name is Local Best AI.","I work from the current tank data inside Aqua Nexus.","If you ask about something outside aquariums, I’ll steer you back to the tank with a little humor 😄"],
+   evidenceAr:["تعريف المساعد المحلي"],evidenceEn:["Local assistant identity"],
+   confidence:"high"
+  };
+ }
+ return undefined;
+}
+
 export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer{
+  const meta=metaAnswer(question);if(meta)return meta;
   const q=(question||"").trim().toLowerCase();
   const intent=parseAquaQuestion(question);
   const localReasoning=reasonLocally(tank,intent);
