@@ -6,10 +6,11 @@ import { biologicalMemory, eventChemistryLinks, proactivePredictions, tankMood }
 import { analyzeNutrients } from "./nutrientEngine";
 import { tankEnergy } from "./equipmentIntelligence";
 import { chemistryGuidance } from "./chemistryGuidance";
-import { parseAquaQuestion,type AquaQuestionParam } from "./aquaAIIntent";
+import { parseAquaQuestion,type AquaQuestionIntent,type AquaQuestionParam } from "./aquaAIIntent";
+import { reasonLocally } from "./aquaAILocalReasoner";
 
 export type AquaAIConfidence="low"|"medium"|"high";
-export type AquaAIPage="dashboard"|"chemistry"|"maintenance"|"equipment"|"livestock"|"timeline"|"dosing"|"quarantine"|"emergency"|"rodi"|"journal";
+export type AquaAIPage="dashboard"|"chemistry"|"maintenance"|"equipment"|"livestock"|"timeline"|"dosing"|"quarantine"|"emergency"|"rodi"|"journal"|"acclimation";
 
 export interface AquaAIAction {
   page:AquaAIPage;
@@ -226,6 +227,32 @@ function equipmentAnswer(tank:Tank):AquaAIAnswer{
   return {titleAr:"ذكاء المعدات والطاقة",titleEn:"Equipment & energy intelligence",summaryAr:warnings.length?"هناك أجهزة يجب فحصها قبل أن تتحول إلى مشكلة في الحوض.":"لا يوجد تحذير جهاز مباشر حالياً، ويمكن أيضاً مراقبة أثر الطاقة والتكلفة.",summaryEn:warnings.length?"Some devices need attention before they become a tank problem.":"No device is directly flagged right now; I can also track energy and cost impact.",detailsAr,detailsEn,evidenceAr:[`${energy.configured} جهاز ببيانات طاقة`],evidenceEn:[`${energy.configured} device(s) with energy data`],confidence:energy.configured>=2?"medium":"low",action:{page:"equipment",ar:"افتح إدارة المعدات",en:"Open equipment management"}};
 }
 
+function reasoningAnswer(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswer{
+ const reasoning=reasonLocally(tank,intent);
+ const firstAction=reasoning.actions[0];
+ const titleMap:Record<string,[string,string]>={
+  why:["تحليل الأسباب المحتملة","Likely-cause analysis"],
+  action:["أفضل خطوة الآن","Best next action"],
+  status:["حالة الحوض الآن","Current tank state"],
+  trend:["تحليل الاتجاه","Trend analysis"],
+  compare:["مقارنة القراءات والتغيرات","Reading & change comparison"],
+  forecast:["التوقع المحلي","Local forecast"],
+  dose:["قرار الجرعة","Dosing decision"],
+  general:["تحليل الحوض","Tank analysis"]
+ };
+ const title=titleMap[intent.mode]||titleMap.general;
+ const detailSignals=reasoning.signals.slice(0,6);
+ const actionDetails=reasoning.actions.slice(0,3);
+ return {
+  titleAr:title[0],titleEn:title[1],
+  summaryAr:reasoning.summaryAr,summaryEn:reasoning.summaryEn,
+  detailsAr:[...detailSignals.map(x=>x.ar),...actionDetails.map((x,i)=>`${i+1}. ${x.ar} — ليش: ${x.whyAr} — راقب بعدها: ${x.recheckAr}`)],
+  detailsEn:[...detailSignals.map(x=>x.en),...actionDetails.map((x,i)=>`${i+1}. ${x.en} — Why: ${x.whyEn} — Recheck: ${x.recheckEn}`)],
+  evidenceAr:reasoning.evidenceAr,evidenceEn:reasoning.evidenceEn,
+  confidence:reasoning.confidence,
+  action:firstAction?{page:firstAction.page as AquaAIPage,ar:firstAction.ar,en:firstAction.en}:undefined
+ };
+}
 function multiParameterAnswer(tank:Tank,params:AquaQuestionParam[]):AquaAIAnswer{
   const guidance=chemistryGuidance(tank);
   const rows=params.map(param=>guidance.all.find(x=>x.key===param)).filter(Boolean) as NonNullable<ReturnType<typeof chemistryGuidance>["all"][number]>[];
@@ -289,12 +316,14 @@ function actionAnswer(tank:Tank):AquaAIAnswer{
 export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer{
   const q=(question||"").trim().toLowerCase();
   const intent=parseAquaQuestion(question);
+  const localReasoning=reasonLocally(tank,intent);
   if(intent.params.length>1)return multiParameterAnswer(tank,intent.params);
   if(intent.params.length===1)return parameterAnswer(tank,intent.params[0] as Param);
   if(intent.mode==="canAdd")return stockingReadinessAnswer(tank);
   if(intent.mode==="waterChange")return waterChangeAnswer(tank);
-  if(intent.mode==="action")return actionAnswer(tank);
   if(intent.mode==="forecast")return forecastAnswer(tank);
+  if(intent.mode==="why"||intent.mode==="action"||intent.mode==="status"||intent.mode==="trend"||intent.mode==="compare"||intent.mode==="dose")return reasoningAnswer(tank,intent);
+  if(localReasoning.mentionedLivestock.length||localReasoning.mentionedEquipment.length)return reasoningAnswer(tank,intent);
   if(intent.topics.includes("maintenance"))return maintenanceAnswer(tank);
   if(intent.topics.includes("livestock"))return livestockAnswer(tank);
   if(intent.topics.includes("emergency"))return emergencyAnswer(tank);
@@ -303,6 +332,7 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   if(/ذاكر|history|memory|لماذا حدث|شو صار بعد|بعد ما|اثر|أثر|event|حدث/.test(q))return memoryAnswer(tank);
 
   const mood=tankMood(tank),state=tankStateView(tank),forecast=tankForecast(tank),pred=proactivePredictions(tank)[0],memory=biologicalMemory(tank)[0],nutrients=analyzeNutrients(tank),insights=smartInsights(tank);
+  const reasoned=reasonLocally(tank,intent);
   const chemistry=chemistryGuidance(tank);
   const today=new Date().toISOString().slice(0,10);
   const due=tank.maintenance.filter(x=>!x.done&&(!x.nextDue||x.nextDue<=today));
@@ -331,11 +361,11 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   return {
     titleAr:q?"تحليل Aqua AI للحوض":"ملخص Aqua AI الحي",
     titleEn:q?"Aqua AI tank analysis":"Live Aqua AI summary",
-    summaryAr:`${tank.name} حالياً ${mood.ar}. أهم خطوة مقترحة: ${action.ar}.`,
-    summaryEn:`${tank.name} is currently ${mood.en}. Best next step: ${action.en}.`,
+    summaryAr:reasoned.summaryAr,
+    summaryEn:reasoned.summaryEn,
     detailsAr,detailsEn,
-    evidenceAr:[`${tank.chemistry.length} قراءات`,`${recentEvents(tank).length} أحداث / 14 يوماً`,`${due.length} مهام مستحقة`, `الواجهة الحالية: ${page}`],
-    evidenceEn:[`${tank.chemistry.length} readings`,`${recentEvents(tank).length} events / 14d`,`${due.length} due tasks`,`Current section: ${page}`],
-    confidence:confidence(tank),action
+    evidenceAr:[...reasoned.evidenceAr,`الواجهة الحالية: ${page}`],
+    evidenceEn:[...reasoned.evidenceEn,`Current section: ${page}`],
+    confidence:reasoned.confidence,action:reasoned.actions[0]?{page:reasoned.actions[0].page as AquaAIPage,ar:reasoned.actions[0].ar,en:reasoned.actions[0].en}:action
   };
 }
