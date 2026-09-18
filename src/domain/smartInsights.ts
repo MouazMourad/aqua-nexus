@@ -4,6 +4,7 @@ import { analyzeNutrients } from "./nutrientEngine";
 import { mediaPredictions } from "./mediaPredictor";
 import { learnedTankSignals } from "./tankPatterns";
 import { proactivePredictions } from "./tankLearning";
+import { systemHealth } from "./systemHealth";
 
 export interface SmartInsight {
   level: "info"|"good"|"warn"|"danger";
@@ -21,6 +22,7 @@ export function smartInsights(tank: Tank): SmartInsight[] {
   const media = mediaPredictions(tank);
   const learned = learnedTankSignals(tank);
   const predictions = proactivePredictions(tank);
+  const system=systemHealth(tank);
   const latestVision:any=((tank as any).visionAssessments??[])[0];
   const activePlan:any=((tank as any).aiActionPlans??[]).find((x:any)=>x.status==="active");
 
@@ -28,6 +30,9 @@ export function smartInsights(tank: Tank): SmartInsight[] {
   if (trend === "declining") out.push({level:"danger",ar:"اتجاه صحة الحوض يتراجع مقارنة بالقراءة السابقة.",en:"Tank health is declining compared with the previous reading."});
   if (trend === "improving") out.push({level:"good",ar:"اتجاه صحة الحوض يتحسن مقارنة بالقراءة السابقة.",en:"Tank health is improving compared with the previous reading."});
   if (bio.ratio > 1) out.push({level:"warn",ar:"الحمل البيولوجي مرتفع بالنسبة لحجم النظام الحالي.",en:"Biological load is high for the current system volume."});
+  if(system.compatibilityAudit.issues.length){const x=system.compatibilityAudit.issues[0];out.unshift({level:x.level==="danger"?"danger":"warn",ar:`تعارض كائنات مستمر: ${x.ar}`,en:`Persistent livestock compatibility issue: ${x.en}`});}
+  if(system.equipmentAudit.issues.length){const x=system.equipmentAudit.issues[0];out.push({level:x.level==="danger"?"danger":"warn",ar:`كفاية التجهيزات ${system.equipment}%: ${x.ar}${x.recommendationAr?` ${x.recommendationAr}`:""}`,en:`Equipment adequacy ${system.equipment}%: ${x.en}${x.recommendationEn?` ${x.recommendationEn}`:""}`});}
+  else if(system.equipmentAudit.suggestions.some(x=>x.level==="warn")){const x=system.equipmentAudit.suggestions.find(x=>x.level==="warn")!;out.push({level:"warn",ar:`اقتراح تجهيز مرتبط بحالة النظام: ${x.ar} ${x.recommendationAr||""}`,en:`System-linked equipment suggestion: ${x.en} ${x.recommendationEn||""}`});}
 
   if(latestVision?.triage){
     const v=latestVision.triage;
