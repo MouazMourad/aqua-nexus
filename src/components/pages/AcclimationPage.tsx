@@ -424,6 +424,10 @@ export function AcclimationPage({tank}:{tank:Tank}) {
 
  const cats=active.categories??[];
  const floatRem=active.floatStatus==="running"&&active.floatEndAt?Math.max(0,active.floatEndAt-now):(active.floatRemainingMs??15*60000);
+ const bucketRem=active.bucketStatus==="running"&&active.bucketEndAt?Math.max(0,active.bucketEndAt-now):(active.bucketRemainingMs??5*60000);
+ const batchStates=releaseBatches.map(batch=>({batch,runtime:batchRuntime(batch)}));
+ const runningBatchTimes=batchStates.filter(x=>!x.runtime.complete&&x.runtime.timer>0).map(x=>x.runtime.timer);
+ const nearestBatchRem=runningBatchTimes.length?Math.min(...runningBatchTimes):0;
  const done=active.items.filter(x=>x.status==="added").length,pct=active.items.length?Math.round(done/active.items.length*100):0;
  const selectedCats=cats.length?cats:allowedCats;
  return <section className="page-grid acclimation-page">
