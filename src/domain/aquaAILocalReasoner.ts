@@ -68,6 +68,10 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
  const today=new Date().toISOString().slice(0,10);
  const signals:LocalReasoningSignal[]=[];
  const actions:LocalReasoningAction[]=[];
+ const explicitTopics=intent.topics.filter(x=>x!=="general");
+ const broadQuestion=explicitTopics.length===0||intent.topics.includes("general");
+ const chemistryRelevant=broadQuestion||intent.topics.includes("chemistry")||intent.params.length>0;
+ const livestockRelevant=broadQuestion||intent.topics.includes("livestock");
  const pushSignal=(x:LocalReasoningSignal)=>{if(!signals.some(s=>s.id===x.id))signals.push(x);};
  const pushAction=(x:LocalReasoningAction)=>{if(!actions.some(a=>a.id===x.id))actions.push(x);};
 
@@ -83,12 +87,13 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
  }
 
  for(const issue of guide.dataIssues){
-  if(!relevantParam(intent,issue.key)&&intent.topics.includes("chemistry")===false)continue;
+  if(!chemistryRelevant)continue;
+  if(!relevantParam(intent,issue.key))continue;
   pushSignal({id:`data-${issue.key}`,level:"danger",confidence:"high",source:"data",score:100,ar:issue.reasonAr,en:issue.reasonEn});
   pushAction({id:`fix-data-${issue.key}`,priority:100,level:"danger",page:"chemistry",ar:issue.actionAr,en:issue.actionEn,whyAr:"لأن أي تصحيح للحوض مبني على قراءة مكتوبة بصيغة خاطئة ممكن يكون أسوأ من عدم التصحيح.",whyEn:"A physical correction based on a misformatted reading can be worse than no correction.",recheckAr:"بعد تصحيح الإدخال أعد حساب صحة الكيمياء قبل أي جرعة أو تغيير كبير.",recheckEn:"After correcting the entry, recalculate chemistry health before any dose or major change."});
  }
 
- if(topicRelevant(intent,"chemistry")||intent.params.length){
+ if(chemistryRelevant){
   for(const issue of guide.problems.filter(x=>!x.suspectedFormat)){
    if(!relevantParam(intent,issue.key))continue;
    const level:LocalReasoningLevel=issue.level==="danger"?"danger":"warn";
@@ -98,6 +103,7 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
  }
 
  const latest=tank.chemistry[0]?.values??{};
+ if(chemistryRelevant){
  const val=(key:string)=>typeof latest[key]==="number"&&Number.isFinite(latest[key])?Number(latest[key]):undefined;
  const kh=val("KH"),ca=val("Ca"),mg=val("Mg"),no3=val("NO3"),po4=val("PO4"),nh3=val("NH3"),no2=val("NO2"),ph=val("pH");
  if(tank.type==="marine"&&kh!==undefined&&ca!==undefined&&kh<7.5&&ca>460){
@@ -117,7 +123,8 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
  if(ph!==undefined&&ph>=8&&ph<=8.3&&kh!==undefined&&kh<7.5&&tank.type==="marine"){
   pushSignal({id:"relation-ph-kh",level:"info",confidence:"high",source:"chemistry",score:44,ar:`pH طبيعي (${ph}) رغم أن KH منخفض (${kh})؛ لا يوجد سبب لمطاردة pH حالياً.`,en:`pH is normal (${ph}) even though KH is low (${kh}); there is no reason to chase pH right now.`});
  }
- if(age>7&&(topicRelevant(intent,"chemistry")||intent.topics.includes("general"))){
+ }
+ if(age>7&&chemistryRelevant){
   pushSignal({id:"stale-chemistry",level:"warn",confidence:"high",source:"data",score:70,ar:`آخر فحص كيميائي عمره ${Math.floor(age)} يوم، لذلك جزء من الاستنتاجات يحتاج قراءة أحدث.`,en:`The latest chemistry test is ${Math.floor(age)} days old, so part of the reasoning needs fresher data.`});
   pushAction({id:"retest-chemistry",priority:88,level:"warn",page:"chemistry",ar:"أعد فحص الكيمياء قبل اتخاذ قرار كبير.",en:"Retest chemistry before making a major decision.",whyAr:"القراءات القديمة تقلل الثقة بالقرار الحالي.",whyEn:"Stale readings reduce confidence in the current decision.",recheckAr:"أعد التحليل مباشرة بعد تسجيل القراءة الجديدة.",recheckEn:"Re-run the analysis immediately after logging the new reading."});
  }
@@ -136,7 +143,19 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
   pushAction({id:"maintenance-action",priority:62,level:"warn",page:"maintenance",ar:`ابدأ بمهمة الصيانة الأعلى تأثيراً: ${overdue[0].title}.`,en:`Start with the highest-impact due task: ${overdue[0].titleEn||overdue[0].title}.`,whyAr:"تأخر الصيانة ممكن يفسر جزءاً من تراجع الاستقرار أو تراكم المغذيات.",whyEn:"Delayed maintenance can contribute to reduced stability or nutrient accumulation.",recheckAr:"بعد التنفيذ حدّث المهمة وراقب القراءة التالية.",recheckEn:"After completion, update the task and watch the next reading."});
  }
 
- if((bio.status==="high"||bio.status==="danger")&&(topicRelevant(intent,"livestock")||intent.topics.includes("general"))){
+ if(intent.asksAboutBioload&&livestockRelevant){
+  const level:LocalReasoningLevel=bio.status==="danger"?"danger":bio.status==="high"?"warn":bio.status==="good"?"good":"info";
+  const labelAr=bio.status==="danger"?"خطر":bio.status==="high"?"مرتفع":bio.status==="good"?"جيد":"منخفض";
+  const labelEn=bio.status==="danger"?"danger":bio.status==="high"?"high":bio.status==="good"?"good":"low";
+  pushSignal({id:"bioload-status",level,confidence:"high",source:"bioload",score:96,ar:`الحمل الحيوي الحالي حوالي ${Math.round(bio.ratio*100)}% من القدرة التقديرية، وتصنيفه ${labelAr}. الحمل المحسوب ${Number(bio.load.toFixed(1))} مقابل قدرة تقديرية ${Number((tank.systemVolumeLiters/35).toFixed(1))} وحدة حمل.`,en:`Current bioload is about ${Math.round(bio.ratio*100)}% of estimated capacity and is classified as ${labelEn}. Calculated load is ${Number(bio.load.toFixed(1))} versus an estimated capacity of ${Number((tank.systemVolumeLiters/35).toFixed(1))} load units.`});
+  if(bio.status==="danger"||bio.status==="high"){
+   pushAction({id:"bioload-focused-action",priority:95,level:bio.status==="danger"?"danger":"warn",page:"livestock",ar:"لا تضيف كائنات جديدة حالياً؛ راجع التغذية وكفاءة الفلترة وNO3/PO4 ثم خفف الحمل أو حسّن القدرة قبل أي إضافة.",en:"Do not add new livestock now; review feeding, filtration capacity and NO3/PO4, then reduce load or improve capacity before another addition.",whyAr:"الحمل الحيوي المرتفع يقلل هامش الأمان ويرفع الضغط على الفلترة والمغذيات.",whyEn:"High bioload reduces the safety margin and increases pressure on filtration and nutrients.",recheckAr:"أعد تقييم الحمل الحيوي مع NO3/PO4 بعد الاستقرار.",recheckEn:"Reassess bioload together with NO3/PO4 after stabilization."});
+  }else{
+   pushAction({id:"bioload-focused-action",priority:65,level:"good",page:"livestock",ar:"الحمل الحالي لا يحتاج تخفيف بحد ذاته. حافظ على الإضافات تدريجية وراقب NO3/PO4 بعد أي إضافة جديدة.",en:"The current load does not need reduction by itself. Keep additions gradual and monitor NO3/PO4 after any new livestock.",whyAr:"النسبة الحالية ضمن هامش مقبول حسب تقدير النظام.",whyEn:"The current ratio is within the system's acceptable estimated margin.",recheckAr:"راجع الحمل الحيوي بعد كل إضافة جديدة أو تغير واضح بالمغذيات.",recheckEn:"Recheck bioload after each new addition or a clear nutrient change."});
+  }
+ }
+
+ if(!intent.asksAboutBioload&&(bio.status==="high"||bio.status==="danger")&&livestockRelevant){
   pushSignal({id:"bioload",level:bio.status==="danger"?"danger":"warn",confidence:"high",source:"bioload",score:bio.status==="danger"?92:68,ar:`الحمل الحيوي حوالي ${Math.round(bio.ratio*100)}% وهو ${bio.status==="danger"?"مرتفع جداً":"مرتفع"}.`,en:`Bioload is about ${Math.round(bio.ratio*100)}% and is ${bio.status==="danger"?"very high":"high"}.`});
   pushAction({id:"bioload-action",priority:bio.status==="danger"?90:66,level:bio.status==="danger"?"danger":"warn",page:"livestock",ar:"أوقف إضافة كائنات جديدة مؤقتاً وراجع كفاءة الفلترة والتغذية.",en:"Pause new livestock additions and review filtration capacity and feeding.",whyAr:"الحمل الحيوي المرتفع يقلل هامش الأمان عند أي تغير كيميائي أو عطل.",whyEn:"High bioload reduces the safety margin during chemistry shifts or equipment failures.",recheckAr:"أعد تقييم NO3/PO4 والحمل الحيوي بعد الاستقرار.",recheckEn:"Reassess NO3/PO4 and bioload after stabilization."});
  }
@@ -188,6 +207,7 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
  }
 
  for(const s of learnedTankSignals(tank)){
+  if(!chemistryRelevant)continue;
   if(intent.mode!=="why"&&intent.mode!=="trend"&&intent.mode!=="status")continue;
   pushSignal({id:s.id,level:s.level==="warn"?"warn":s.level==="good"?"good":"info",confidence:"medium",source:"learning",score:s.level==="warn"?48:28,ar:s.ar,en:s.en});
  }
@@ -195,7 +215,7 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
  const nutrientSignals=nutrients.signals.filter(x=>x.level!=="good");
  for(let i=0;i<nutrientSignals.length;i++){
   const s=nutrientSignals[i];
-  if(!(topicRelevant(intent,"chemistry")||intent.topics.includes("general")))continue;
+  if(!chemistryRelevant)continue;
   pushSignal({id:`nutrient-${i}`,level:s.level==="danger"?"danger":s.level==="warn"?"warn":"info",confidence:"high",source:"nutrients",score:55,ar:s.ar,en:s.en});
  }
 
