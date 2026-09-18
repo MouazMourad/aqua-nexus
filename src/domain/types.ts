@@ -36,6 +36,10 @@ export interface Equipment {
   overflowReturnPosition?: DisplayEquipmentPosition;
   powerWatts?: number;
   hoursPerDay?: number;
+  /** Manufacturer-rated aquarium/system volume, when applicable (e.g. skimmer/filter). */
+  ratedVolumeLiters?: number;
+  /** Nominal water flow in liters/hour for pumps, wavemakers, filters, etc. */
+  flowLph?: number;
 }
 
 export interface EnergySettings {
