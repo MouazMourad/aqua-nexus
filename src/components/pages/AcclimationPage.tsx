@@ -123,6 +123,67 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  },[now]);
 
  function ev(ar:string,en:string){return{id:uid("ace"),timestamp:nowISO(),textAr:ar,textEn:en}}
+ function unlockAudio(){
+  if(typeof window==="undefined")return;
+  const AudioCtor=window.AudioContext||(window as any).webkitAudioContext;
+  if(!AudioCtor)return;
+  if(!audioCtxRef.current)audioCtxRef.current=new AudioCtor();
+  if(audioCtxRef.current.state==="suspended")audioCtxRef.current.resume().catch(()=>{});
+ }
+ function soundFamily(lane:string){
+  if(lane==="fish")return "fish";
+  if(lane==="coral")return "coral";
+  if(lane==="plant"||lane==="macroalgae")return "plant";
+  if(lane==="emergency")return "emergency";
+  return "invert";
+ }
+ function playTimerSound(lane:string){
+  unlockAudio();
+  const ctx=audioCtxRef.current;if(!ctx)return;
+  const family=soundFamily(lane);
+  const patterns:any={
+   fish:[[880,0,.11],[1120,.16,.11],[880,.32,.13]],
+   invert:[[520,0,.09],[390,.13,.09],[520,.26,.12]],
+   coral:[[660,0,.16],[660,.22,.16],[820,.46,.18]],
+   plant:[[440,0,.13],[554,.18,.13],[659,.36,.18]],
+   emergency:[[980,0,.12],[620,.16,.12],[980,.32,.12],[620,.48,.16]]
+  };
+  const gain=ctx.createGain();gain.connect(ctx.destination);gain.gain.setValueAtTime(.0001,ctx.currentTime);
+  for(const [freq,delay,dur] of patterns[family]){
+   const osc=ctx.createOscillator();osc.type=family==="invert"?"square":family==="coral"?"sine":"triangle";osc.frequency.value=freq;osc.connect(gain);
+   const t=ctx.currentTime+delay;gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(.12,t+.015);gain.gain.exponentialRampToValueAtTime(.0001,t+dur);osc.start(t);osc.stop(t+dur+.02);
+  }
+ }
+ function pushTimerAlert(lane:string,batch?:number,emergencyName?:string){
+  const name=emergencyName||(lane==="emergency"?bi(lang,"المسار الاستثنائي","Exception track"):releaseLaneLabel(lang,lane));
+  const message=emergencyName
+   ?bi(lang,`انتهى عداد الإقلمة الاستثنائية لـ ${emergencyName} — جاهز للفحص النهائي.`,`Rapid exception timer finished for ${emergencyName} — ready for final check.`)
+   :bi(lang,`انتهى عداد ${name}${batch?` — الدفعة ${batch}`:""} وأصبحت جاهزة للفحص.`,`${name}${batch?` — Batch ${batch}`:""} timer finished and is ready for inspection.`);
+  setTimerAlerts(prev=>[{id:uid("alert"),lane,batch,message},...prev].slice(0,5));
+  playTimerSound(lane);
+  try{if("vibrate" in navigator)(navigator as any).vibrate(lane==="emergency"?[220,90,220,90,300]:[160,80,160]);}catch{}
+  try{if("Notification" in window&&Notification.permission==="granted")new Notification("Aqua Nexus",{body:message});}catch{}
+ }
+ function laneRuntime(lane:any){
+  const unfinished=lane.entries.filter((e:any)=>!["added","deferred"].includes(e.item.status));
+  if(!unfinished.length)return{completed:true,currentBatch:lane.totalBatches,batchEntries:[],items:[],started:false,timer:0,status:"done"};
+  const currentBatch=Math.min(...unfinished.map((e:any)=>e.batch));
+  const batchEntries=lane.entries.filter((e:any)=>e.batch===currentBatch);
+  const items=batchEntries.map((e:any)=>e.item).filter((i:AcclimationItem)=>!["added","deferred"].includes(i.status));
+  const started=items.some((i:AcclimationItem)=>Boolean(i.startedAt)||["acclimating","paused","ready"].includes(i.status));
+  const timer=items.length?Math.max(...items.map((i:AcclimationItem)=>started?remaining(i,now):itemDuration(i))):0;
+  const status=items.some((i:AcclimationItem)=>i.status==="acclimating")?"running":items.some((i:AcclimationItem)=>i.status==="paused")?"paused":items.length&&items.every((i:AcclimationItem)=>i.status==="ready")?"ready":"waiting";
+  return{completed:false,currentBatch,batchEntries,items,started,timer,status};
+ }
+ function startLaneBatch(laneKey:string,batch:number){
+  if(!active||!active.floatConfirmed)return;
+  const lane=releaseLanes.find(x=>x.key===laneKey);if(!lane)return;
+  const ids=new Set(lane.entries.filter(x=>x.batch===batch&&x.item.status==="waiting").map(x=>x.item.id));
+  if(!ids.size)return;
+  unlockAudio();
+  const start=Date.now();
+  saveSession({...active,items:active.items.map(x=>ids.has(x.id)?{...x,status:"acclimating" as const,startedAt:nowISO(),remainingMs:x.remainingMs??itemDuration(x),endAt:start+(x.remainingMs??itemDuration(x))}:x),events:[ev(`بدأت الدفعة ${batch} من مسار ${releaseLaneLabel("ar",laneKey)}.`,`Started Batch ${batch} of the ${releaseLaneLabel("en",laneKey)} lane.`),...active.events]});
+ }
  function saveSession(s:AcclimationSession,withLog=true){patch(tank.id,t=>({...t,acclimationSessions:[s,...(t.acclimationSessions??[]).filter(x=>x.id!==s.id)]}));}
  function newSession(){const s:AcclimationSession={id:uid("acs"),startedAt:nowISO(),status:"setup",wizardStep:1,categories:[],tankSalinity:tank.type==="marine"?1.025:undefined,bagSalinity:tank.type==="marine"?1.020:undefined,temperature:25,existingNotes:"",coralDipEnabled:false,coralDipMinutes:10,floatConfirmed:false,floatStatus:"waiting",floatRemainingMs:15*60000,preflight:{},items:[],events:[ev("بدأت جلسة أقلمة جديدة.","New acclimation session started.")]};saveSession(s);}
  function sessionPatch(p:Partial<AcclimationSession>){if(!active)return;saveSession({...active,...p});}
@@ -149,12 +210,13 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   saveSession(s);
  }
  function updateItem(id:string,fn:(x:AcclimationItem)=>AcclimationItem){if(!active)return;saveSession({...active,items:active.items.map(x=>x.id===id?fn(x):x)});}
- function startDrip(id:string){updateItem(id,x=>({...x,status:"acclimating",startedAt:nowISO(),endAt:Date.now()+(x.remainingMs??itemDuration(x)),remainingMs:x.remainingMs??itemDuration(x)}));}
+ function startDrip(id:string){unlockAudio();updateItem(id,x=>({...x,status:"acclimating",startedAt:nowISO(),endAt:Date.now()+(x.remainingMs??itemDuration(x)),remainingMs:x.remainingMs??itemDuration(x)}));}
  function itemAction(id:string,action:"pause"|"resume"|"plus5"|"plus15"|"ready"|"defer"){
   updateItem(id,x=>{let r=remaining(x,Date.now()),n={...x};if(action==="pause")n={...n,status:"paused",remainingMs:r,endAt:null};if(action==="resume")n={...n,status:n.emergency?"emergency":"acclimating",endAt:Date.now()+r,remainingMs:r};if(action==="plus5"||action==="plus15"){const add=(action==="plus5"?5:15)*60000;n={...n,remainingMs:r+add,endAt:(n.status==="acclimating"||n.status==="emergency")?Date.now()+r+add:null,status:n.status==="ready"?"paused":n.status};}if(action==="ready")n={...n,status:"ready",remainingMs:0,endAt:null,readyAt:nowISO()};if(action==="defer")n={...n,status:"deferred",endAt:null};return n;});
  }
  function startEmergency(id:string){
   if(!active)return;
+  unlockAudio();
   const item=active.items.find(x=>x.id===id);if(!item)return;
   const label=lang==="ar"?item.name:(item.nameEn||item.name);
   if(typeof window!=="undefined"&&!window.confirm(lang==="ar"?`نقل ${label} إلى المسار الاستثنائي السريع؟ سيخرج من خطة الدفعات العامة ويبدأ عداداً مستقلاً بالتوازي معها.`:`Move ${label} to the rapid exception track? It will leave the normal batch plan and run independently in parallel.`))return;
