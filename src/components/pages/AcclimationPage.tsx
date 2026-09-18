@@ -1,5 +1,5 @@
 "use client";
-import { useEffect,useMemo,useState } from "react";
+import { useEffect,useMemo,useRef,useState } from "react";
 import type { AcclimationItem,AcclimationSession,LivestockItem,Tank } from "@/domain/types";
 import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
 import { useAquaStore } from "@/store/useAquaStore";
@@ -79,6 +79,10 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const sessions=tank.acclimationSessions??[],active=sessions.find(s=>s.status!=="completed");
  const [now,setNow]=useState(Date.now());
  const [category,setCategory]=useState<Cat>("fish"),[selected,setSelected]=useState(""),[custom,setCustom]=useState(""),[qty,setQty]=useState(1),[drip,setDrip]=useState(15),[interval,setIntervalMin]=useState(15),[placement,setPlacement]=useState(""),[notes,setNotes]=useState(""),[health,setHealth]=useState<AcclimationItem["health"]>("unknown"),[temperament,setTemperament]=useState<"peaceful"|"semi"|"aggressive">("peaceful"),[sensitivity,setSensitivity]=useState<"normal"|"sensitive"|"hardy">("normal"),[subtype,setSubtype]=useState(""),[imageData,setImageData]=useState(""),[importNote,setImportNote]=useState("");
+ const [expandedLanes,setExpandedLanes]=useState<Record<string,boolean>>({});
+ const [timerAlerts,setTimerAlerts]=useState<{id:string;lane:string;batch?:number;message:string}[]>([]);
+ const audioCtxRef=useRef<AudioContext|null>(null);
+ const notifiedTimersRef=useRef<Set<string>>(new Set());
  const lib:any[]=LIVESTOCK_LIBRARY.filter((x:any)=>x.type===tank.type);
  const allowedCats:Cat[]=tank.type==="marine"?["fish","invert","coral","plant"]:["fish","invert","plant"];
  const choices=useMemo(()=>lib.filter((x:any)=>{const c=String(x.cat).toLowerCase(),m=c==="fish"?"fish":c==="coral"?"coral":c==="invert"?"invert":c==="plant"?"plant":"other";return m===category}),[category,tank.type]);
