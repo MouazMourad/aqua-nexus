@@ -3,8 +3,9 @@ import type { Tank } from "@/domain/types";
 const now = new Date().toISOString();
 
 export const demoMarineTank: Tank = {
-  id: "reef-01",
-  name: "الرئيسي",
+  id: "training-marine",
+  name: "Marine Training Tank",
+  isTraining: true,
   type: "marine",
   status: "established",
   ageMonths: 30,
@@ -35,13 +36,13 @@ export const demoMarineTank: Tank = {
   ],
   chemistry: [{
     timestamp: now,
-    values: { temperature:25.2,pH:8.0,salinity:1.024,KH:7.1,Ca:430,Mg:1300,NO3:10,PO4:0.08,NH3:0 }
+    values: { temperature:25,pH:8.1,salinity:1.025,KH:8,Ca:430,Mg:1300,NO3:10,PO4:0.08,NH3:0 }
   }],
   maintenance: [
     { id:"m1", title:"فحص السكيمر", titleEn:"Inspect skimmer", cadence:"weekly", done:true, lastDone:"2026-09-12", nextDue:"2026-09-19" },
     { id:"m2", title:"تنظيف الجرابات", titleEn:"Clean filter socks", cadence:"weekly", done:true, lastDone:"2026-09-12", nextDue:"2026-09-19" },
     { id:"m3", title:"فحص مضخة الرجوع", titleEn:"Inspect return pump", cadence:"monthly", done:true, lastDone:"2026-09-01", nextDue:"2026-10-01" },
-    { id:"m4", title:"حصاد التيرف", titleEn:"Harvest turf scrubber", cadence:"weekly", done:false, nextDue:"2026-09-15" },
+    { id:"m4", title:"حصاد التيرف", titleEn:"Harvest turf scrubber", cadence:"weekly", done:true, lastDone:"2026-09-18", nextDue:"2026-09-25" },
     { id:"m5", title:"تنظيف واجهة الحوض", titleEn:"Clean display glass", cadence:"weekly", done:true, lastDone:"2026-09-12", nextDue:"2026-09-19" }
   ],
   livestock: [
@@ -73,8 +74,9 @@ export const demoMarineTank: Tank = {
 
 export const demoFreshwaterTank: Tank = {
   ...demoMarineTank,
-  id:"fresh-01",
-  name:"Planted 300",
+  id:"training-freshwater",
+  name:"Freshwater Training Tank",
+  isTraining:true,
   type:"freshwater",
   display:{ length:100,width:50,height:60,displacementPercent:15,grossLiters:300,netLiters:255 },
   systemVolumeLiters:330,
