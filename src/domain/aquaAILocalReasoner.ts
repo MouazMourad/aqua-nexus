@@ -177,11 +177,13 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
   pushAction({id:"acclimation-change-gate",priority:78,level:"warn",page:"acclimation",ar:"أثناء الأقلمة لا تعمل عدة تصحيحات كبيرة مع بعض؛ نفذ فقط الإجراء الضروري الأعلى أولوية ثم راقب.",en:"During acclimation, avoid several major corrections at once; perform only the highest-priority necessary action, then observe.",whyAr:"الكائنات الجديدة تحت إجهاد انتقال وأي تغييرات متعددة بتصعّب معرفة سبب الاستجابة.",whyEn:"New livestock is already under transition stress, and multiple changes make the response harder to interpret.",recheckAr:"أعد تقييم الكيمياء وسلوك الكائنات بعد انتهاء الأقلمة.",recheckEn:"Reassess chemistry and livestock behavior after acclimation."});
  }
  for(const p of proactivePredictions(tank)){
+  if(!chemistryRelevant)continue;
   if(!(intent.mode==="forecast"||intent.mode==="trend"||relevantParam(intent,p.parameter)))continue;
   pushSignal({id:p.id,level:p.level==="danger"?"danger":p.level==="warn"?"warn":"info",confidence:p.confidence,source:"trend",score:p.level==="danger"?82:p.level==="warn"?60:35,ar:p.ar,en:p.en});
  }
 
  for(const baseline of tankBaselines(tank)){
+  if(!chemistryRelevant)continue;
   if(baseline.status==="within"&&baseline.consumptionState!=="faster")continue;
   if(!relevantParam(intent,baseline.parameter))continue;
   const ar=baseline.consumptionState==="faster"
@@ -195,12 +197,14 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
 
  const links=eventChemistryLinks(tank);
  for(const link of links){
+  if(!chemistryRelevant)continue;
   if(intent.params.length&&!link.chemistryChanges.some(c=>intent.params.includes(c.parameter as any)))continue;
   if(intent.mode!=="why"&&intent.mode!=="compare"&&intent.mode!=="trend")continue;
   pushSignal({id:link.id,level:link.level==="danger"?"danger":link.level==="warn"?"warn":"info",confidence:"medium",source:"history",score:48,ar:`ارتباط زمني محتمل: ${link.ar}`,en:`Possible temporal association: ${link.en}`});
  }
 
  for(const p of repeatedResponsePatterns(tank)){
+  if(!chemistryRelevant)continue;
   if(intent.params.length&&!intent.params.includes(p.parameter as any))continue;
   if(intent.mode!=="why"&&intent.mode!=="trend"&&intent.mode!=="forecast")continue;
   pushSignal({id:p.id,level:"info",confidence:p.confidence,source:"learning",score:p.confidence==="high"?52:40,ar:p.ar,en:p.en});
@@ -219,7 +223,7 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
   pushSignal({id:`nutrient-${i}`,level:s.level==="danger"?"danger":s.level==="warn"?"warn":"info",confidence:"high",source:"nutrients",score:55,ar:s.ar,en:s.en});
  }
 
- if(intent.mode==="compare"&&tank.chemistry.length>=2){
+ if(chemistryRelevant&&intent.mode==="compare"&&tank.chemistry.length>=2){
   const a=tank.chemistry[0],b=tank.chemistry[1];
   const keys=[...new Set([...Object.keys(a.values),...Object.keys(b.values)])];
   for(const key of keys){
