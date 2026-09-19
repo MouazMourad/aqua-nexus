@@ -1,5 +1,5 @@
 "use client";
-import { useMemo,useState } from "react";
+import { useMemo,useRef,useState } from "react";
 import type { FilterMediaItem,SumpChamber,Tank } from "@/domain/types";
 import { AquariumScene } from "@/components/three/AquariumScene";
 import { useAquaStore } from "@/store/useAquaStore";
@@ -18,6 +18,7 @@ export function SumpPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),[edit,setEdit]=useState<string|null>(null),c=tank.sump.chambers.find(x=>x.id===edit);
  const [draft,setDraft]=useState<any>(null);
  const [drag,setDrag]=useState<{id:string;mode:"move"|"resize";startX:number;startY:number;orig:SumpChamber;preview:SumpChamber}|null>(null);
+ const dragRef=useRef<{id:string;mode:"move"|"resize";startX:number;startY:number;orig:SumpChamber;preview:SumpChamber}|null>(null);
  const [dimensionPolicy,setDimensionPolicy]=useState<"scale"|"keep">("scale");
  const [mediaOpen,setMediaOpen]=useState(false),[mediaName,setMediaName]=useState(""),[mediaKind,setMediaKind]=useState<FilterMediaItem["kind"]>("gfo"),[mediaAmount,setMediaAmount]=useState(100),[mediaLife,setMediaLife]=useState(30),[mediaChamber,setMediaChamber]=useState(tank.sump.chambers[0]?.id??"");
  const mediaPredictions=useMemo(()=>(tank.filterMedia??[]).map(item=>({item,p:predictMediaLife(tank,item)})),[tank]);
@@ -38,18 +39,20 @@ export function SumpPage({tank}:{tank:Tank}) {
  const save=()=>{if(!edit||!draft)return;patch(tank.id,t=>({...t,sump:{...t.sump,chambers:t.sump.chambers.map(x=>x.id===edit?draft:x)}}));setEdit(null)};
  const patchChamber=(id:string,p:Partial<SumpChamber>)=>patch(tank.id,t=>({...t,sump:{...t.sump,chambers:t.sump.chambers.map(ch=>ch.id===id?{...ch,...p}:ch)}}));
  const clamp=(v:number,min:number,max:number)=>Math.max(min,Math.min(max,v));
- const beginDrag=(ev:any,ch:SumpChamber,mode:"move"|"resize")=>{ev.stopPropagation();(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);setDrag({id:ch.id,mode,startX:ev.clientX,startY:ev.clientY,orig:{...ch},preview:{...ch}})};
+ const syncDrag=(next:{id:string;mode:"move"|"resize";startX:number;startY:number;orig:SumpChamber;preview:SumpChamber}|null)=>{dragRef.current=next;setDrag(next)};
+ const beginDrag=(ev:any,ch:SumpChamber,mode:"move"|"resize")=>{ev.stopPropagation();(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);syncDrag({id:ch.id,mode,startX:ev.clientX,startY:ev.clientY,orig:{...ch},preview:{...ch}})};
  const moveDrag=(ev:any)=>{
-  if(!drag)return;
+  const current=dragRef.current;
+  if(!current)return;
   const rect=(ev.currentTarget as HTMLElement).getBoundingClientRect();
-  const dx=(ev.clientX-drag.startX)/Math.max(1,rect.width)*tank.sump.dimensions.length;
-  const dy=(ev.clientY-drag.startY)/Math.max(1,rect.height)*tank.sump.dimensions.width;
-  const preview=drag.mode==="move"
-   ?{...drag.orig,x:clamp(drag.orig.x+dx,0,Math.max(0,tank.sump.dimensions.length-drag.orig.length)),y:clamp(drag.orig.y+dy,0,Math.max(0,tank.sump.dimensions.width-drag.orig.width))}
-   :{...drag.orig,length:clamp(drag.orig.length+dx,5,Math.max(5,tank.sump.dimensions.length-drag.orig.x)),width:clamp(drag.orig.width+dy,5,Math.max(5,tank.sump.dimensions.width-drag.orig.y))};
-  setDrag(current=>current?{...current,preview}:current);
+  const dx=(ev.clientX-current.startX)/Math.max(1,rect.width)*tank.sump.dimensions.length;
+  const dy=(ev.clientY-current.startY)/Math.max(1,rect.height)*tank.sump.dimensions.width;
+  const preview=current.mode==="move"
+   ?{...current.orig,x:clamp(current.orig.x+dx,0,Math.max(0,tank.sump.dimensions.length-current.orig.length)),y:clamp(current.orig.y+dy,0,Math.max(0,tank.sump.dimensions.width-current.orig.width))}
+   :{...current.orig,length:clamp(current.orig.length+dx,5,Math.max(5,tank.sump.dimensions.length-current.orig.x)),width:clamp(current.orig.width+dy,5,Math.max(5,tank.sump.dimensions.width-current.orig.y))};
+  syncDrag({...current,preview});
  };
- const endDrag=()=>{if(drag)patchChamber(drag.id,drag.preview);setDrag(null)};
+ const endDrag=()=>{const current=dragRef.current;if(current)patchChamber(current.id,current.preview);syncDrag(null)};
 
  function addMedia(){
   const item:FilterMediaItem={id:uid("media"),name:mediaName.trim()||({gfo:"GFO",activatedCarbon:"Activated Carbon",other:"Filter Media"} as const)[mediaKind],kind:mediaKind,amountGrams:Math.max(1,mediaAmount),installedAt:today(),referenceLifeDays:Math.max(1,mediaLife),chamberId:mediaChamber||undefined};
