@@ -6,7 +6,7 @@ import { useAquaStore } from "@/store/useAquaStore";
 import { systemHealthTrend } from "@/domain/systemHealth";
 import { tankIntelligenceCore } from "@/domain/intelligenceCore";
 import { aquaAIAnswer,type AquaAIAnswer,type AquaAIPage } from "@/domain/aquaAIBrain";
-import { parseAquaQuestion,resolveAquaFollowup } from "@/domain/aquaAIIntent";
+import { parseAquaQuestion,resolveAquaFollowup,type AquaConversationTurn } from "@/domain/aquaAIIntent";
 import { tankMood } from "@/domain/tankLearning";
 import { learnedTankSignals } from "@/domain/tankPatterns";
 import { createActionPlan,evaluatePlanOutcome,type AquaActionPlan } from "@/domain/actionPlanEngine";
@@ -20,7 +20,7 @@ type InsightView={id:string;labelAr:string;labelEn:string;promptAr:string;prompt
 
 export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;onNavigate?:(page:AppPage)=>void}){
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
- const [open,setOpen]=useState(false),[selected,setSelected]=useState<string|null>(null),[question,setQuestion]=useState(""),[askedQuestion,setAskedQuestion]=useState(""),[resolvedQuestion,setResolvedQuestion]=useState(""),[conversationContext,setConversationContext]=useState(""),[stage,setStage]=useState(0),[scopeBlocked,setScopeBlocked]=useState(false),[greeting,setGreeting]=useState(false),[planNote,setPlanNote]=useState("");
+ const [open,setOpen]=useState(false),[selected,setSelected]=useState<string|null>(null),[question,setQuestion]=useState(""),[askedQuestion,setAskedQuestion]=useState(""),[resolvedQuestion,setResolvedQuestion]=useState(""),[conversationContext,setConversationContext]=useState(""),[conversationHistory,setConversationHistory]=useState<AquaConversationTurn[]>([]),[stage,setStage]=useState(0),[scopeBlocked,setScopeBlocked]=useState(false),[greeting,setGreeting]=useState(false),[planNote,setPlanNote]=useState("");
  const core=useMemo(()=>tankIntelligenceCore(tank),[tank]);
  const health=core.health,trend=systemHealthTrend(tank),alerts=core.alerts,mood=tankMood(tank);
  const hasDanger=alerts.some(x=>x.level==="danger"),hasWarning=alerts.some(x=>x.level==="warn");
@@ -35,7 +35,7 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
  ];
  const active=useMemo(()=>askedQuestion&&!scopeBlocked?aquaAIAnswer(resolvedQuestion||askedQuestion,tank,page):null,[askedQuestion,resolvedQuestion,scopeBlocked,tank,page]);
 
- useEffect(()=>{setSelected(null);setQuestion("");setAskedQuestion("");setResolvedQuestion("");setConversationContext("");setStage(0);setScopeBlocked(false);setPlanNote("")},[tank.id]);
+ useEffect(()=>{setSelected(null);setQuestion("");setAskedQuestion("");setResolvedQuestion("");setConversationContext("");setConversationHistory([]);setStage(0);setScopeBlocked(false);setPlanNote("")},[tank.id]);
  useEffect(()=>{if(typeof window==="undefined")return;const key="tank-intelligence-session-greeting-v2";if(sessionStorage.getItem(key))return;const timer=window.setTimeout(()=>{setGreeting(true);sessionStorage.setItem(key,"1")},650);const hide=window.setTimeout(()=>setGreeting(false),8000);return()=>{window.clearTimeout(timer);window.clearTimeout(hide)}},[]);
 
  function go(pageKey:AquaAIPage){setOpen(false);onNavigate?.(pageKey as AppPage);}
@@ -66,9 +66,9 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
   ];
   return (lang==="ar"?ar:en)[seed];
  }
- function ask(prompt:string,id:string|null=null){const clean=prompt.trim();if(!clean)return;const resolved=resolveAquaFollowup(clean,conversationContext);setSelected(id);setAskedQuestion(clean);setResolvedQuestion(resolved);setConversationContext(resolved);setQuestion("");setStage(1);setPlanNote("");setScopeBlocked(outOfScope(resolved));}
+ function ask(prompt:string,id:string|null=null){const clean=prompt.trim();if(!clean)return;const resolved=resolveAquaFollowup(clean,conversationContext,conversationHistory);const parsed=parseAquaQuestion(resolved);setConversationHistory(h=>[...h.slice(-5),{question:clean,resolved,mode:parsed.mode,topics:parsed.topics,params:parsed.params}]);setSelected(id);setAskedQuestion(clean);setResolvedQuestion(resolved);setConversationContext(resolved);setQuestion("");setStage(1);setPlanNote("");setScopeBlocked(outOfScope(resolved));}
  function submit(e:FormEvent){e.preventDefault();ask(question,null);}
- function resetConversation(){setSelected(null);setQuestion("");setAskedQuestion("");setResolvedQuestion("");setStage(0);setScopeBlocked(false);setPlanNote("");}
+ function resetConversation(){setSelected(null);setQuestion("");setAskedQuestion("");setResolvedQuestion("");setConversationContext("");setConversationHistory([]);setStage(0);setScopeBlocked(false);setPlanNote("");}
  function createPlan(){
   if(!active)return;
   if(currentPlan){setPlanNote(lang==="ar"?"في خطة متابعة نشطة حالياً. خلصها أو قيّم نتيجتها قبل إنشاء خطة جديدة.":"An action plan is already active. Complete or review it before creating another.");return;}
