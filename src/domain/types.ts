@@ -148,6 +148,20 @@ export interface LivestockItem {
   lastObservedAt?: string;
 }
 
+export interface LivestockExitEvent {
+  id:string;
+  timestamp:string;
+  livestockId:string;
+  name:string;
+  nameEn?:string;
+  category:LivestockItem["category"];
+  quantity:number;
+  reason:"death"|"sold"|"transferred"|"returned"|"removed"|"unknown";
+  bodyRemoved?:boolean;
+  symptoms?:string;
+  notes?:string;
+}
+
 export interface InventoryItem {
   id: string;
   presetId?: string;
@@ -435,6 +449,7 @@ export interface Tank {
   chemistry: ChemistryReading[];
   maintenance: MaintenanceTask[];
   livestock: LivestockItem[];
+  livestockExits?: LivestockExitEvent[];
   inventory: InventoryItem[];
   timeline: TimelineEvent[];
   intelligenceEvents?: IntelligenceEvent[];
