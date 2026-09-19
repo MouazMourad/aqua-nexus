@@ -5,7 +5,7 @@ export type TankStatus = "new" | "cycling" | "established";
 export type EquipmentKind =
   | "lighting" | "waveMaker" | "skimmer" | "returnPump" | "filterSock"
   | "rollerFilter" | "reactor" | "heater" | "doser" | "uv" | "ozone"
-  | "ato" | "refugiumLight" | "turfScrubber" | "probe" | "overflow" | "other";
+  | "ato" | "refugiumLight" | "turfScrubber" | "probe" | "overflow" | "co2" | "other";
 
 export interface DimensionsCm { length: number; width: number; height: number; }
 
@@ -73,6 +73,9 @@ export interface Equipment {
   failures?: EquipmentFailureEvent[];
   consumables?: EquipmentConsumable[];
   postActionCheckAt?: string;
+  co2Mode?: "lowTech" | "injected";
+  co2CylinderRemainingPercent?: number;
+  co2DropChecker?: "blue" | "green" | "yellow" | "unknown";
 }
 
 export interface EnergySettings {
