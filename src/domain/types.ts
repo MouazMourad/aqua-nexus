@@ -160,6 +160,57 @@ export interface InventoryItem {
   minimum: number;
 }
 
+export type IntelligenceEventKind = "fact"|"observation"|"action"|"omission"|"outcome";
+export type IntelligenceEventDomain = "chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|"waterChange"|"rodi"|"quarantine"|"emergency"|"acclimation"|"system";
+export interface IntelligenceEvent {
+  id:string;
+  timestamp:string;
+  kind:IntelligenceEventKind;
+  domain:IntelligenceEventDomain;
+  verb:string;
+  entityType?:string;
+  entityId?:string;
+  parameter?:string;
+  value?:number|string|boolean|null;
+  unit?:string;
+  confidence?:number;
+  sourceId?:string;
+  sourcePage?:string;
+  textAr:string;
+  textEn:string;
+  metadata?:Record<string,string|number|boolean|null>;
+}
+
+export type GuidanceActionStatus = "suggested"|"ready"|"blocked"|"in_progress"|"done"|"awaiting_verification"|"verified"|"resolved";
+export interface GuidanceAction {
+  id:string;
+  dedupeKey:string;
+  createdAt:string;
+  updatedAt:string;
+  sourceEventIds:string[];
+  domain:IntelligenceEventDomain;
+  entityType?:string;
+  entityId?:string;
+  parameter?:string;
+  level:"info"|"warn"|"danger";
+  priority:number;
+  confidence:number;
+  status:GuidanceActionStatus;
+  page:string;
+  titleAr:string;
+  titleEn:string;
+  reasonAr:string;
+  reasonEn:string;
+  resourcePresetId?:string;
+  blockedReasonAr?:string;
+  blockedReasonEn?:string;
+  dueAt?:string;
+  executedAt?:string;
+  verifyAfter?:string;
+  verifiedAt?:string;
+  outcome?:"improved"|"stable"|"worse"|"unknown";
+}
+
 export interface TimelineEvent {
   id: string;
   timestamp: string;
@@ -376,6 +427,8 @@ export interface Tank {
   livestock: LivestockItem[];
   inventory: InventoryItem[];
   timeline: TimelineEvent[];
+  intelligenceEvents?: IntelligenceEvent[];
+  guidanceActions?: GuidanceAction[];
   healthSnapshots?: HealthSnapshot[];
   photos: JournalPhoto[];
   feeding: FeedingLog[];
