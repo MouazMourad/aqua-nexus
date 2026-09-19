@@ -7,6 +7,7 @@ import { chemistryAgeDays,chemistryHealth,maintenanceHealth } from "@/domain/hea
 import { healthTimeline,tankStateView } from "@/domain/tankIntelligence";
 import { useAquaStore } from "@/store/useAquaStore";
 import { nowISO,uid } from "@/lib/appUtils";
+import { systemAlerts } from "@/domain/alertEngine";
 
 type GoalKey="stability"|"chemistry"|"maintenance"|"confidence";
 type RiskItem={key:string;page:AppPage;level:"danger"|"warn";ar:string;en:string};
@@ -119,11 +120,24 @@ export function DashboardCommandLayer(){
      ? {ar:"كل قياس وحدث جديد يقوّي ذاكرة الحوض ودقة التحليل.",en:"Each new reading and event strengthens tank memory and analysis."}
      : {ar:"البيانات الحالية كافية لتقييم موثوق نسبياً.",en:"Current data supports a reasonably confident assessment."};
 
-  const risks:RiskItem[]=[];
-  if(activeEmergency.length)risks.push({key:"emergency",page:"emergency",level:"danger",ar:`حالة طارئة نشطة: ${activeEmergency[0].titleAr}`,en:`Active emergency: ${activeEmergency[0].titleEn}`});
-  if(treatment.length||activeQuarantine.length)risks.push({key:"disease",page:"diseases",level:"danger",ar:treatment.length?`يوجد ${treatment.length} كائن بحالة علاج/مرض مسجلة.`:`يوجد علاج أو حجر صحي نشط بالحوض.`,en:treatment.length?`${treatment.length} livestock item(s) are in treatment.`:`An active treatment/quarantine case is running.`});
-  if(chemAge>10)risks.push({key:"chemistry",page:"chemistry",level:"warn",ar:`آخر فحص كيميائي منذ ${Math.floor(chemAge)} يوم — يجب تحديث القياسات.`,en:`Last chemistry test was ${Math.floor(chemAge)} days ago — readings should be refreshed.`});
-  if(overdue.length||maint<70)risks.push({key:"maintenance",page:"maintenance",level:"warn",ar:overdue.length?`${overdue.length} مهمة صيانة متأخرة — صحة الصيانة ${maint}%.`:`صحة الصيانة منخفضة (${maint}%).`,en:overdue.length?`${overdue.length} overdue maintenance task(s) — maintenance health ${maint}%.`:`Maintenance health is low (${maint}%).`});
+  // The dashboard alarm is the single safety surface: consume the shared
+  // alert engine instead of maintaining a smaller, dashboard-only rule set.
+  // Info-level follow-up stays in Today/Insights; the alarm is reserved for
+  // conditions that need attention or action.
+  const alertPageFallback:Record<string,AppPage>={
+   chemistry:"chemistry",maintenance:"maintenance",equipment:"equipment",
+   livestock:"livestock",inventory:"inventory",quarantine:"quarantine",
+   emergency:"emergency",acclimation:"acclimation",system:"dashboard"
+  };
+  const risks:RiskItem[]=systemAlerts(tank)
+   .filter(alert=>alert.level==="danger"||alert.level==="warn")
+   .map(alert=>({
+    key:alert.id,
+    page:(alert.actionPage as AppPage|undefined)??alertPageFallback[alert.domain]??"dashboard",
+    level:alert.level,
+    ar:alert.ar,
+    en:alert.en
+   }));
 
   const today:{page:AppPage;ar:string;en:string;icon:string}[]=[];
   if(chemAge>7)today.push({page:"chemistry",icon:"⚗",ar:`تحديث فحص الكيمياء — آخر فحص منذ ${Math.floor(chemAge)} يوم`,en:`Refresh chemistry — last test ${Math.floor(chemAge)} days ago`});
