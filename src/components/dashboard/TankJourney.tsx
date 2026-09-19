@@ -82,7 +82,10 @@ export function TankJourney({tank}:{tank:Tank}){
  const avg=Math.round(visiblePoints.reduce((s,p)=>s+p.score,0)/Math.max(1,visiblePoints.length));
  const selected=visiblePoints.find(x=>x.id===selectedId)||current;
  const photos=tank.photos.filter(p=>{const t=new Date(p.timestamp).getTime();return t>=startMs&&t<=now;});
- const events=tank.timeline.filter(e=>{const t=new Date(e.timestamp).getTime();return t>=startMs&&t<=now;}).slice(0,100);
+ const events=[...tank.timeline,...(tank.intelligenceEvents??[]).map(e=>({id:`core-${e.id}`,timestamp:e.timestamp,type:`core:${e.domain}:${e.verb}`,textAr:e.textAr,textEn:e.textEn}))]
+  .filter(e=>{const t=new Date(e.timestamp).getTime();return t>=startMs&&t<=now;})
+  .sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime())
+  .filter((e,i,all)=>all.findIndex(x=>x.timestamp===e.timestamp&&x.textAr===e.textAr&&x.textEn===e.textEn)===i).slice(0,100);
  const selectedEvent=events.find(e=>e.id===selectedEventId);
 
  const nearestScore=(timestamp:string)=>{
