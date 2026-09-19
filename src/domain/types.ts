@@ -354,6 +354,9 @@ export interface WaterChangeLog {
   salinity?: number;
   temperature?: number;
   notes?: string;
+  saltInventoryItemId?: string;
+  saltQuantityUsed?: number;
+  rodiBatchId?: string;
 }
 
 export interface RODILog {
