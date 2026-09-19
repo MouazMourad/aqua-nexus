@@ -109,14 +109,23 @@ export function answerAquaQuery(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswe
  const signals=reasoned.signals.filter(x=>plan.crossDomain||plan.allowedSources.includes(x.source));
  const actions=reasoned.actions.filter(x=>plan.crossDomain||actionDomain(x.page)===plan.primary||plan.secondary.includes(actionDomain(x.page)));
  const topSignal=signals[0],topAction=actions[0];
+ const noLivestock=tank.livestock.length===0;
+ const noChemistry=tank.chemistry.length===0;
+ const insufficientForAdd=plan.operation==="canAdd"&&(noLivestock||noChemistry);
  let summaryAr=snap.ar,summaryEn=snap.en;
- if(plan.operation==="why"){
+ if(insufficientForAdd){
+  const missingAr=[noLivestock?"الكائنات الحالية":null,noChemistry?"قراءات الكيمياء الحديثة":null].filter(Boolean).join(" و");
+  const missingEn=[noLivestock?"current livestock":null,noChemistry?"recent chemistry readings":null].filter(Boolean).join(" and ");
+  summaryAr=`ما في بيانات كافية حتى أقول إن إضافة كائن جديد آمنة. ناقصني ${missingAr}. أي نسبة توافق/حمل ظاهرة مع سجل فارغ ليست موافقة على الإضافة.`;
+  summaryEn=`There is not enough evidence to say a new livestock addition is safe. Missing: ${missingEn}. Any compatibility/bioload percentage shown with an empty record is not approval to add livestock.`;
+ }
+ if(!insufficientForAdd&&plan.operation==="why"){
   summaryAr=topSignal?`السبب الأقرب حسب بيانات ${domainTitle(plan.primary,"ar")}: ${topSignal.ar}`:`ما عندي حالياً دليل كافي يحدد سبب واضح ضمن ${domainTitle(plan.primary,"ar")}.`;
   summaryEn=topSignal?`Most likely explanation from ${domainTitle(plan.primary,"en")} data: ${topSignal.en}`:`There is not enough evidence yet to identify a clear cause in ${domainTitle(plan.primary,"en")}.`;
- }else if(plan.operation==="action"||plan.operation==="dose"){
+ }else if(!insufficientForAdd&&(plan.operation==="action"||plan.operation==="dose")){
   summaryAr=topAction?`${topAction.ar} السبب: ${topAction.whyAr}`:`ما في إجراء تصحيحي واضح مطلوب ضمن ${domainTitle(plan.primary,"ar")} حالياً.`;
   summaryEn=topAction?`${topAction.en} Why: ${topAction.whyEn}`:`No clear corrective action is required in ${domainTitle(plan.primary,"en")} right now.`;
- }else if(plan.operation==="trend"||plan.operation==="compare"){
+ }else if(!insufficientForAdd&&(plan.operation==="trend"||plan.operation==="compare")){
   summaryAr=topSignal?`أهم اتجاه ظاهر: ${topSignal.ar}`:snap.ar;
   summaryEn=topSignal?`Main visible trend: ${topSignal.en}`:snap.en;
  }
@@ -125,8 +134,8 @@ export function answerAquaQuery(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswe
  return {
   titleAr:`${domainTitle(plan.primary,"ar")} — ${suffixAr}`,titleEn:`${domainTitle(plan.primary,"en")} — ${suffixEn}`,
   summaryAr,summaryEn,
-  detailsAr:[...snap.dar,...signals.slice(0,4).map(x=>x.ar),...actions.slice(0,2).map(x=>`الإجراء: ${x.ar} — راقب بعدها: ${x.recheckAr}`)].filter((x,i,a)=>x&&a.indexOf(x)===i),
-  detailsEn:[...snap.den,...signals.slice(0,4).map(x=>x.en),...actions.slice(0,2).map(x=>`Action: ${x.en} — Recheck: ${x.recheckEn}`)].filter((x,i,a)=>x&&a.indexOf(x)===i),
+  detailsAr:[...(insufficientForAdd?["سجّل الكائنات الموجودة وآخر فحص كيميائي أولاً؛ بعدها أعيد تقييم الجاهزية والتوافق والحمل الحيوي."]:snap.dar),...signals.slice(0,4).map(x=>x.ar),...actions.slice(0,2).map(x=>`الإجراء: ${x.ar} — راقب بعدها: ${x.recheckAr}`)].filter((x,i,a)=>x&&a.indexOf(x)===i),
+  detailsEn:[...(insufficientForAdd?["Log the current livestock and a recent chemistry test first; then I can reassess readiness, compatibility and bioload."]:snap.den),...signals.slice(0,4).map(x=>x.en),...actions.slice(0,2).map(x=>`Action: ${x.en} — Recheck: ${x.recheckEn}`)].filter((x,i,a)=>x&&a.indexOf(x)===i),
   evidenceAr:[...snap.ear,...reasoned.evidenceAr.slice(0,3)],evidenceEn:[...snap.een,...reasoned.evidenceEn.slice(0,3)],
   confidence:reasoned.confidence,
   action:topAction?{page:topAction.page as AquaAIPage,ar:topAction.ar,en:topAction.en}:undefined
