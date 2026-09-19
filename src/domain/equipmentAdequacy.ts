@@ -1,4 +1,5 @@
 import type { EquipmentKind,Tank } from "./types";
+import { equipmentReliability } from "./equipmentLifecycle";
 
 export type EquipmentAdequacyLevel="good"|"info"|"warn"|"danger";
 export type EquipmentSystemProfile="marine-fish"|"marine-reef"|"freshwater"|"freshwater-planted";
@@ -24,6 +25,10 @@ export interface EquipmentAdequacyResult{
   capacityScore:number;
   statusScore:number;
   dataConfidence:number;
+  reliabilityScore:number;
+  lifecycleScore:number;
+  redundancyScore:number;
+  consumablesScore:number;
   profile:EquipmentSystemProfile;
   basisAr:string;
   basisEn:string;
@@ -150,16 +155,19 @@ export function equipmentAdequacy(tank:Tank):EquipmentAdequacyResult{
     }
   }
 
+  const reliability=equipmentReliability(tank);
+  for(const x of reliability.issues){if(!issues.some(i=>i.id===x.id))issues.push(x);}
+  for(const x of reliability.suggestions){if(!suggestions.some(i=>i.id===x.id))suggestions.push(x);}
   const capacityScore=capacityScores.length?clamp(capacityScores.reduce((a,b)=>a+b,0)/capacityScores.length):70;
   const dataConfidence=expectedSizing?clamp(knownSizing/expectedSizing*100):0;
   const sizingCoverage=dataConfidence;
   presenceScore=clamp(presenceScore);statusScore=clamp(statusScore);
-  // 100% now requires presence + verified sizing/capacity + healthy device status.
-  let score=clamp(presenceScore*.45+capacityScore*.40+statusScore*.15);
+  // 100% now requires presence + verified sizing + healthy condition + lifecycle/redundancy readiness.
+  let score=clamp(presenceScore*.30+capacityScore*.30+statusScore*.15+reliability.score*.25);
   if(dataConfidence<50)score=Math.min(score,86);
   if(dataConfidence===0&&capacityScores.length)score=Math.min(score,82);
   const level=levelFromScore(score);
-  const basisAr=`${Math.round(score)}% = وجود التجهيزات ${presenceScore}% ×45% + ملاءمة القدرة/الحجم ${capacityScore}% ×40% + حالة الأجهزة ${statusScore}% ×15%. ثقة بيانات السعة ${dataConfidence}%.`;
-  const basisEn=`${Math.round(score)}% = equipment presence ${presenceScore}% ×45% + sizing/capacity ${capacityScore}% ×40% + device condition ${statusScore}% ×15%. Capacity-data confidence ${dataConfidence}%.`;
-  return {score,level,issues,suggestions,sizingCoverage,checked,presenceScore,capacityScore,statusScore,dataConfidence,profile,basisAr,basisEn};
+  const basisAr=`${Math.round(score)}% = وجود الأساسيات ${presenceScore}% ×30% + القدرة/الحجم ${capacityScore}% ×30% + حالة الأجهزة ${statusScore}% ×15% + الاعتمادية/العمر/الاحتياط ${reliability.score}% ×25%. ثقة بيانات السعة ${dataConfidence}%.`;
+  const basisEn=`${Math.round(score)}% = core presence ${presenceScore}% ×30% + sizing/capacity ${capacityScore}% ×30% + device condition ${statusScore}% ×15% + lifecycle/redundancy readiness ${reliability.score}% ×25%. Capacity-data confidence ${dataConfidence}%.`;
+  return {score,level,issues,suggestions,sizingCoverage,checked,presenceScore,capacityScore,statusScore,dataConfidence,reliabilityScore:reliability.score,lifecycleScore:reliability.lifecycleScore,redundancyScore:reliability.redundancyScore,consumablesScore:reliability.consumablesScore,profile,basisAr,basisEn};
 }
