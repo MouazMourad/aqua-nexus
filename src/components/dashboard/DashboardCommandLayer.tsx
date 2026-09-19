@@ -7,7 +7,7 @@ import { chemistryAgeDays,chemistryHealthAssessment,maintenanceHealth } from "@/
 import { healthTimeline,tankStateView } from "@/domain/tankIntelligence";
 import { useAquaStore } from "@/store/useAquaStore";
 import { nowISO,uid } from "@/lib/appUtils";
-import { systemAlerts } from "@/domain/alertEngine";
+import { tankIntelligenceCore } from "@/domain/intelligenceCore";
 
 type GoalKey="stability"|"chemistry"|"maintenance"|"confidence";
 type RiskItem={key:string;page:AppPage;level:"danger"|"warn";ar:string;en:string};
@@ -94,7 +94,8 @@ export function DashboardCommandLayer(){
 
  const data=useMemo(()=>{
   if(!tank)return null;
-  const state=tankStateView(tank),chemistry=chemistryHealthAssessment(tank),chem=chemistry.score,maint=maintenanceHealth(tank),chemAge=chemistryAgeDays(tank);
+  const core=tankIntelligenceCore(tank);
+  const state=core.state,chemistry=core.chemistry,chem=chemistry.score,maint=core.maintenance,chemAge=chemistryAgeDays(tank);
   const now=Date.now();
   const overdue=tank.maintenance.filter(x=>!x.done&&x.nextDue&&new Date(x.nextDue).getTime()<now);
   const equipment=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
@@ -103,10 +104,7 @@ export function DashboardCommandLayer(){
   const activeEmergency=(tank.emergencySessions??[]).filter(x=>x.status==="active");
   const activeQuarantine=tank.quarantine.filter(x=>x.status==="active");
 
-  let confidence=chemistry.score===null?Math.min(55,chemistry.dataConfidence):chemistry.dataConfidence;
-  if((tank.healthSnapshots?.length??0)<3)confidence-=10;
-  if(overdue.length)confidence-=Math.min(12,overdue.length*3);
-  confidence=clamp(Math.max(0,confidence));
+  const confidence=core.dataConfidence;
 
   const confidenceTip=chemAge>10
    ? {ar:"ابدأ بفحص كيميائي جديد؛ آخر فحص تجاوز 10 أيام.",en:"Start with a new chemistry test; the last one is over 10 days old."}
@@ -125,14 +123,14 @@ export function DashboardCommandLayer(){
    livestock:"livestock",inventory:"inventory",quarantine:"quarantine",
    emergency:"emergency",acclimation:"acclimation",system:"dashboard"
   };
-  const risks:RiskItem[]=systemAlerts(tank)
-   .filter(alert=>alert.level==="danger"||alert.level==="warn")
-   .map(alert=>({
-    key:alert.id,
-    page:(alert.actionPage as AppPage|undefined)??alertPageFallback[alert.domain]??"dashboard",
-    level:alert.level,
-    ar:alert.ar,
-    en:alert.en
+  const risks:RiskItem[]=core.actions
+   .filter(action=>action.level==="danger"||action.level==="warn")
+   .map(action=>({
+    key:action.id,
+    page:(action.page as AppPage|undefined)??alertPageFallback[action.domain]??"dashboard",
+    level:action.level,
+    ar:action.ar,
+    en:action.en
    }));
 
   const today:{page:AppPage;ar:string;en:string;icon:string;priority:number}[]=[];
