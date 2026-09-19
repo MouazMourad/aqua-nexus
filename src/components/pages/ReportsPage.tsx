@@ -9,11 +9,12 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { downloadText,today } from "@/lib/appUtils";
 import { systemAlerts } from "@/domain/alertEngine";
 import { unifiedInventory } from "@/domain/inventoryIntelligence";
+import { tankIntelligenceCore } from "@/domain/intelligenceCore";
 
 export function ReportsPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),state=useAquaStore();
  const recurring=tank.maintenance.filter(x=>x.cadence!=="once"),now=today();
- const sys=systemHealth(tank),alerts=systemAlerts(tank),stock=unifiedInventory(tank);
+ const core=tankIntelligenceCore(tank),sys=core.health,alerts=core.alerts,stock=unifiedInventory(tank);
  const overdue=recurring.filter(x=>maintenanceEffectiveState(x,now).overdue);
  const upcoming=recurring.filter(x=>!maintenanceEffectiveState(x,now).completed&&!maintenanceEffectiveState(x,now).overdue);
  const chemAge=Math.floor(chemistryAgeDays(tank));
