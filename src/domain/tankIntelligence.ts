@@ -1,5 +1,5 @@
 import type { HealthSnapshot, Tank, TimelineEvent } from "./types";
-import { bioload, chemistryAgeDays, chemistryHealth, chemistryHistoryScore, maintenanceHealth } from "./health";
+import { bioload, chemistryAgeDays, chemistryHealthAssessment, chemistryHistoryScore, maintenanceHealth } from "./health";
 import { systemHealth } from "./systemHealth";
 import { chemistryGuidance } from "./chemistryGuidance";
 
@@ -35,7 +35,7 @@ export interface HealthTimelinePoint {
 
 export interface TankForecast {
   current: number;
-  projected7d: number;
+  projected7d: number | null;
   direction: "improving" | "stable" | "declining";
   confidence: "low" | "medium" | "high";
   ar: string;
@@ -90,7 +90,7 @@ export function tankStateView(tank:Tank):TankStateView {
   const band=stateBand(score);
   const text=bandText(band);
   const drivers:StateDriver[]=[];
-  const chem=chemistryHealth(tank),maint=maintenanceHealth(tank),age=chemistryAgeDays(tank),bio=bioload(tank);
+  const chemAssessment=chemistryHealthAssessment(tank),chem=chemAssessment.score,maint=maintenanceHealth(tank),age=chemistryAgeDays(tank),bio=bioload(tank);
   const system=systemHealth(tank);
   const chemGuide=chemistryGuidance(tank);
   const overdue=tank.maintenance.filter(x=>!x.done&&x.nextDue&&x.nextDue<new Date().toISOString().slice(0,10));
@@ -102,7 +102,8 @@ export function tankStateView(tank:Tank):TankStateView {
     drivers.push({level:"danger",ar:`مشكلة بيانات كيميائية: ${issue.reasonAr}`,en:`Chemistry data issue: ${issue.reasonEn}`});
   }
 
-  if(chem<60)drivers.push({level:"danger",ar:`الكيمياء هي العامل الأضعف حالياً (${chem}%).`,en:`Chemistry is currently the weakest driver (${chem}%).`});
+  if(chem===null)drivers.push({level:"warn",ar:"لا توجد بيانات كيميائية مقاسة كافية لتقييم الحالة.",en:"There is not enough measured chemistry data to assess the state."});
+  else if(chem<60)drivers.push({level:"danger",ar:`الكيمياء هي العامل الأضعف حالياً (${chem}%).`,en:`Chemistry is currently the weakest driver (${chem}%).`});
   else if(chem<80)drivers.push({level:"warn",ar:`الكيمياء تحتاج متابعة (${chem}%).`,en:`Chemistry needs attention (${chem}%).`});
   else drivers.push({level:"good",ar:`الكيمياء ضمن حالة جيدة (${chem}%).`,en:`Chemistry is in good condition (${chem}%).`});
 
@@ -149,28 +150,22 @@ function nearestEvent(tank:Tank,timestamp:string,maxHours=48){
 }
 
 function estimatedPoints(tank:Tank):HealthTimelinePoint[]{
-  const system=systemHealth(tank);
-  const maint=maintenanceHealth(tank);
-  return tank.chemistry.map((reading,index)=>{
-    const chem=chemistryHistoryScore(tank,index)??50;
-    const score=clamp(Math.round(
-      chem*.30+
-      maint*.15+
-      system.bioload*.15+
-      system.equipment*.20+
-      system.compatibility*.15+
-      system.livestock*.05
-    ));
+  // Historical estimates must not be recomputed from today's equipment,
+  // livestock or maintenance state. A chemistry-only estimate is explicitly
+  // marked estimated; real HealthSnapshots remain the authoritative history.
+  return tank.chemistry.filter(reading=>!reading.usingDefaults).map((reading,index)=>{
+    const originalIndex=tank.chemistry.indexOf(reading);
+    const chem=chemistryHistoryScore(tank,originalIndex)??0;
     const event=nearestEvent(tank,reading.timestamp);
     return {
       id:`chem-${index}-${reading.timestamp}`,
       timestamp:reading.timestamp,
-      score,
+      score:chem,
       chemistry:chem,
-      maintenance:maint,
+      maintenance:0,
       source:"estimated" as const,
-      reasonAr:event?.textAr||"قراءة كيمياء مسجلة",
-      reasonEn:event?.textEn||"Logged chemistry reading",
+      reasonAr:event?.textAr||"تقدير تاريخي من قراءة كيمياء مقاسة",
+      reasonEn:event?.textEn||"Historical estimate from a measured chemistry reading",
       delta:0,
       event
     };
@@ -223,31 +218,36 @@ export function healthTimeline(tank:Tank):HealthTimelinePoint[]{
 export function tankForecast(tank:Tank):TankForecast {
   const points=healthTimeline(tank);
   const current=tankStateScore(tank);
-  let dailySlope=0;
-  let spanDays=0;
-  if(points.length>=2){
-    const sample=points.slice(-6);
-    const first=sample[0],last=sample[sample.length-1];
-    spanDays=Math.max(1,(new Date(last.timestamp).getTime()-new Date(first.timestamp).getTime())/DAY);
-    dailySlope=(last.score-first.score)/spanDays;
+  const real=points.filter(x=>x.source==="snapshot");
+  const evidence=real.length>=2?real:points;
+  let dailySlope=0,spanDays=0;
+  if(evidence.length>=2){
+    const sample=evidence.slice(-6),first=sample[0],last=sample[sample.length-1];
+    spanDays=Math.max(0,(new Date(last.timestamp).getTime()-new Date(first.timestamp).getTime())/DAY);
+    if(spanDays>0)dailySlope=(last.score-first.score)/spanDays;
+  }
+  const sufficient=evidence.length>=3&&spanDays>=2;
+  if(!sufficient){
+    return {current,projected7d:null,direction:"stable",confidence:"low",
+      ar:"لا يوجد تاريخ كافٍ لإعطاء توقع رقمي موثوق لـ7 أيام.",
+      en:"There is not enough history for a reliable numeric 7-day forecast."};
   }
   dailySlope=Math.max(-2,Math.min(2,dailySlope));
-  let projected=clamp(Math.round(current+dailySlope*7));
-  if(points.length<2)projected=current;
+  const projected=clamp(Math.round(current+dailySlope*7));
   const direction=projected>=current+4?"improving":projected<=current-4?"declining":"stable";
-  const confidence:TankForecast["confidence"]=points.length>=5&&spanDays>=7?"high":points.length>=3?"medium":"low";
-  const view=tankStateView(tank);
-  const main=view.drivers.find(x=>x.level==="danger"||x.level==="warn");
+  const realSpan=real.length>=2?(new Date(real.at(-1)!.timestamp).getTime()-new Date(real[0].timestamp).getTime())/DAY:0;
+  const confidence:TankForecast["confidence"]=real.length>=5&&realSpan>=7?"high":real.length>=3?"medium":"low";
+  const view=tankStateView(tank),main=view.drivers.find(x=>x.level==="danger"||x.level==="warn");
   const ar=direction==="declining"
     ? `إذا استمر النمط الحالي، قد تنتقل حالة الحوض من ${current}% إلى نحو ${projected}% خلال 7 أيام.${main?` العامل الأهم: ${main.ar}`:""}`
     : direction==="improving"
       ? `المسار الحالي إيجابي؛ التقدير بعد 7 أيام نحو ${projected}% مقابل ${current}% الآن.`
-      : `الحوض يسير ضمن مسار مستقر؛ التقدير بعد 7 أيام نحو ${projected}% مقابل ${current}% الآن.`;
+      : `المسار الحالي مستقر ضمن البيانات المتاحة؛ التقدير بعد 7 أيام نحو ${projected}% مقابل ${current}% الآن.`;
   const en=direction==="declining"
     ? `If the current pattern continues, tank state may move from ${current}% to about ${projected}% within 7 days.${main?` Main driver: ${main.en}`:""}`
     : direction==="improving"
       ? `The current path is positive; the 7-day estimate is about ${projected}% versus ${current}% now.`
-      : `The tank is on a stable path; the 7-day estimate is about ${projected}% versus ${current}% now.`;
+      : `The current path is stable within the available evidence; the 7-day estimate is about ${projected}% versus ${current}% now.`;
   return {current,projected7d:projected,direction,confidence,ar,en};
 }
 
