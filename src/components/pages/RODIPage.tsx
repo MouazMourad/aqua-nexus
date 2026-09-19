@@ -1,15 +1,20 @@
 "use client";
-import { useState } from "react";
+import { useMemo,useState } from "react";
 import type { Tank } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
-import { tr } from "@/i18n";
+import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { uid,nowISO } from "@/lib/appUtils";
+import { rodiIntelligence } from "@/domain/rodiIntelligence";
+
 export function RODIPage({tank}:{tank:Tank}) {
- const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),[tin,setTin]=useState(150),[tout,setTout]=useState(0),[liters,setLiters]=useState(20);
- const add=()=>patch(tank.id,t=>({...t,rodi:[{id:uid("ro"),timestamp:nowISO(),tdsIn:tin,tdsOut:tout,liters},...t.rodi]}));
- return <section className="page-grid"><PageHeader eyebrow="RO/DI" title={tr(lang,"rodi")}/>
- <div className="card panel"><div className="form-grid"><label className="field"><span>{tr(lang,"tdsIn")}</span><input type="number" value={tin} onChange={e=>setTin(Number(e.target.value))}/></label><label className="field"><span>{tr(lang,"tdsOut")}</span><input type="number" value={tout} onChange={e=>setTout(Number(e.target.value))}/></label><label className="field"><span>{tr(lang,"producedLiters")}</span><input type="number" value={liters} onChange={e=>setLiters(Number(e.target.value))}/></label></div><button className="btn primary" onClick={add}>{tr(lang,"logBatch")}</button></div>
- <div className="card panel"><div className="history-list">{tank.rodi.map(x=><div className="history-row" key={x.id}><b>{x.liters} L • TDS {x.tdsIn} → {x.tdsOut}</b><span>{new Date(x.timestamp).toLocaleString()}</span></div>)}</div></div>
+ const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),[tin,setTin]=useState(150),[tout,setTout]=useState(0),[liters,setLiters]=useState(20),[waste,setWaste]=useState(60),[minutes,setMinutes]=useState(60),[psi,setPsi]=useState(0);
+ const intel=useMemo(()=>rodiIntelligence(tank),[tank]);
+ const add=()=>{const ts=nowISO();patch(tank.id,t=>({...t,rodi:[{id:uid("ro"),timestamp:ts,tdsIn:tin,tdsOut:tout,liters,wasteLiters:waste||undefined,productionMinutes:minutes||undefined,sourcePressurePsi:psi||undefined},...t.rodi],timeline:[{id:uid("ev"),timestamp:ts,type:"rodi",textAr:`تم تسجيل دفعة RO/DI: TDS ${tin} → ${tout}, إنتاج ${liters}L.`,textEn:`RO/DI batch logged: TDS ${tin} → ${tout}, ${liters} L produced.`},...t.timeline]}))};
+ const liveRejection=tin>0?(1-tout/tin)*100:0,eff=(liters+waste)>0?liters/(liters+waste)*100:0,rate=minutes>0?liters/(minutes/60):0;
+ return <section className="page-grid"><PageHeader eyebrow="RO/DI INTELLIGENCE" title={tr(lang,"rodi")}/>
+ <div className="card panel full-span"><div className="module-head"><div><h3>{bi(lang,"صحة منظومة RO/DI","RO/DI system health")}</h3></div><span className={`status ${intel.status==="danger"?"danger":intel.status==="watch"?"warn":""}`}>{intel.status}</span></div><div className="summary-strip"><div className="summary"><small>{bi(lang,"رفض الممبرين","Membrane rejection")}</small><b>{intel.rejection===null?"—":`${intel.rejection.toFixed(1)}%`}</b></div><div className="summary"><small>{bi(lang,"كفاءة الماء","Water efficiency")}</small><b>{intel.efficiency===null?"—":`${intel.efficiency.toFixed(1)}%`}</b></div><div className="summary"><small>{bi(lang,"اتجاه TDS الخارج","Output TDS trend")}</small><b>{intel.trend}</b></div></div>{intel.notes.map((x,i)=><div className="inline-alert info" key={i}>{x}</div>)}</div>
+ <div className="card panel"><div className="form-grid"><label className="field"><span>{tr(lang,"tdsIn")}</span><input type="number" value={tin} onChange={e=>setTin(Number(e.target.value))}/></label><label className="field"><span>{tr(lang,"tdsOut")}</span><input type="number" value={tout} onChange={e=>setTout(Number(e.target.value))}/></label><label className="field"><span>{tr(lang,"producedLiters")}</span><input type="number" value={liters} onChange={e=>setLiters(Number(e.target.value))}/></label><label className="field"><span>{bi(lang,"ماء الرفض L","Waste water L")}</span><input type="number" value={waste} onChange={e=>setWaste(Number(e.target.value))}/></label><label className="field"><span>{bi(lang,"وقت الإنتاج بالدقائق","Production minutes")}</span><input type="number" value={minutes} onChange={e=>setMinutes(Number(e.target.value))}/></label><label className="field"><span>{bi(lang,"ضغط المصدر PSI","Source pressure PSI")}</span><input type="number" value={psi||""} onChange={e=>setPsi(Number(e.target.value))}/></label></div><div className="summary-strip"><div className="summary"><small>{bi(lang,"رفض مباشر","Live rejection")}</small><b>{liveRejection.toFixed(1)}%</b></div><div className="summary"><small>{bi(lang,"كفاءة","Efficiency")}</small><b>{eff.toFixed(1)}%</b></div><div className="summary"><small>{bi(lang,"إنتاجية","Production rate")}</small><b>{rate.toFixed(1)} L/h</b></div></div><button className="btn primary" onClick={add}>{tr(lang,"logBatch")}</button></div>
+ <div className="card panel"><div className="history-list">{tank.rodi.map(x=><div className="history-row" key={x.id}><b>{x.liters} L • TDS {x.tdsIn} → {x.tdsOut}</b><span>{new Date(x.timestamp).toLocaleString()}</span><small>{x.wasteLiters!==undefined?`Waste ${x.wasteLiters} L`:""} {x.productionMinutes?`• ${x.productionMinutes} min`:""} {x.sourcePressurePsi?`• ${x.sourcePressurePsi} PSI`:""}</small></div>)}</div></div>
  </section>;
 }

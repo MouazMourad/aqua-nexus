@@ -137,6 +137,9 @@ export interface LivestockItem {
   health: "good" | "watch" | "treatment";
   load?: number;
   addedAt?: string;
+  notes?: string;
+  sizeCm?: number;
+  lastObservedAt?: string;
 }
 
 export interface InventoryItem {
@@ -271,6 +274,9 @@ export interface RODILog {
   tdsIn: number;
   tdsOut: number;
   liters: number;
+  wasteLiters?: number;
+  productionMinutes?: number;
+  sourcePressurePsi?: number;
 }
 
 export interface AcclimationItem {
