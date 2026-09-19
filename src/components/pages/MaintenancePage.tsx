@@ -65,6 +65,8 @@ export function MaintenancePage({tank}:{tank:Tank}) {
  return <section className="page-grid maintenance-page">
   <PageHeader eyebrow="MAINTENANCE" title={tr(lang,"maintenance")} actions={<><button className="btn print-maintenance-btn" onClick={()=>window.print()}>🖨 {tr(lang,"printMaintenance")}</button><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(lang,"addTask")}</button></>}/>
 
+  {tank.maintenance.length===0&&<div className="inline-alert info full-span"><div><b>✓ {bi(lang,"مو لازم تبني جدول صيانة كامل من الصفر.","You do not need to build a full maintenance schedule from scratch.")}</b><p>{bi(lang,"Aqua Nexus بيضيف مهام تلقائياً من المعدات والأحداث المهمة. أضف مهمة يدوية فقط إذا عندك روتين خاص غير موجود، وابدأ بتنفيذ المهام المستحقة بدل محاولة تعبئة كلشي.","Aqua Nexus creates tasks automatically from equipment and important events. Add a manual task only for a routine that is not already covered, and focus first on due tasks rather than filling everything in.")}</p></div></div>}
+
   <div className="maintenance-print-header print-only full-span">
     <h1>Aqua Nexus — {tr(lang,"maintenancePlan")}</h1>
     <div className="print-meta"><span><b>{tr(lang,"name")}:</b> {tank.name}</span><span><b>{tr(lang,"systemVolume")}:</b> {tank.systemVolumeLiters} L</span><span><b>{tr(lang,"generatedOn")}:</b> {new Date().toLocaleDateString()}</span><span><b>{tr(lang,"maintenanceHealth")}:</b> {maintenanceHealth(tank)}%</span></div>
