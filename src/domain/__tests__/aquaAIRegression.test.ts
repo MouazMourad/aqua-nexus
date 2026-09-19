@@ -10,6 +10,10 @@ import { chemistryHealthAssessment } from "@/domain/health";
 import { latestParameterSample,validateChemistryValue,validateDosingTarget,weeklyChemistryCoverage } from "@/domain/chemistryDataQuality";
 import { rodiIntelligence } from "@/domain/rodiIntelligence";
 import { sumpIntelligence } from "@/domain/sumpIntelligence";
+import { stockingReadiness } from "@/domain/stockingReadiness";
+import { auditTankCompatibility } from "@/domain/compatibility";
+import { tankStateView } from "@/domain/tankIntelligence";
+import { systemHealthTrend } from "@/domain/systemHealth";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -108,6 +112,53 @@ describe("Chemistry safety and measurement integrity",()=>{
   it("blocks dosing targets outside the safe profile range",()=>{const t=structuredClone(demoMarineTank);expect(validateDosingTarget(t,"KH",20).blocked).toBe(true);expect(validateDosingTarget(t,"KH",8).blocked).toBe(false);});
 });
 
+
+describe("Release-candidate safety consistency",()=>{
+  it("uses one readiness decision for missing chemistry evidence",()=>{
+    const t=structuredClone(demoMarineTank);t.chemistry=[];
+    const r=stockingReadiness(t);
+    expect(r.state).toBe("insufficient_evidence");
+    expect(r.canProceed).toBe(false);
+    expect(r.missingEvidenceAr.length).toBeGreaterThan(0);
+  });
+  it("blocks stocking when chemistry has a hard safety violation",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.chemistry=[{timestamp:new Date().toISOString(),values:{salinity:1.025,pH:8.1,KH:8,Ca:430,Mg:1300,NO3:10,PO4:.08,NH3:.5},confidence:"high",source:"manual"}];
+    const r=stockingReadiness(t);
+    expect(r.state).toBe("not_now");
+    expect(r.blockersAr.join(" ")).toMatch(/NH3|الكيمياء/);
+  });
+  it("never calls a chemically critical tank stable",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.chemistry=[{timestamp:new Date().toISOString(),values:{salinity:1.025,pH:8.1,KH:8,Ca:430,Mg:1300,NO3:10,PO4:.08,NH3:.5},confidence:"high",source:"manual"}];
+    expect(tankStateView(t).band).toBe("critical");
+  });
+  it("reports compatibility coverage for manually entered species",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.livestock=[...t.livestock,{id:"manual-x",name:"Unknown species",category:"fish",quantity:1,health:"good",load:1}];
+    const a=auditTankCompatibility(t);
+    expect(a.verifiedCoverage).toBeLessThan(100);
+    expect(a.knownCount).toBeLessThan(a.totalCount);
+  });
+  it("ignores snapshot bursts when calculating trend",()=>{
+    const t=structuredClone(demoMarineTank);
+    const now=Date.now();
+    t.healthSnapshots=[
+      {id:"n",timestamp:new Date(now).toISOString(),score:90,chemistry:90,maintenance:90,state:"excellent",reasonAr:"",reasonEn:""},
+      {id:"p",timestamp:new Date(now-5*60000).toISOString(),score:70,chemistry:70,maintenance:70,state:"watch",reasonAr:"",reasonEn:""}
+    ];
+    expect(systemHealthTrend(t)).toBe("unknown");
+  });
+  it("uses separated snapshots for a meaningful trend",()=>{
+    const t=structuredClone(demoMarineTank);
+    const now=Date.now();
+    t.healthSnapshots=[
+      {id:"n",timestamp:new Date(now).toISOString(),score:90,chemistry:90,maintenance:90,state:"excellent",reasonAr:"",reasonEn:""},
+      {id:"p",timestamp:new Date(now-24*3600000).toISOString(),score:80,chemistry:80,maintenance:80,state:"stable",reasonAr:"",reasonEn:""}
+    ];
+    expect(systemHealthTrend(t)).toBe("improving");
+  });
+});
 
 describe("Aqua AI expert evaluation matrix",()=>{
  const routing=[
