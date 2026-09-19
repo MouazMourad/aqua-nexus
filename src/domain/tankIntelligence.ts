@@ -2,6 +2,7 @@ import type { HealthSnapshot, Tank, TimelineEvent } from "./types";
 import { bioload, chemistryAgeDays, chemistryHealthAssessment, chemistryHistoryScore, maintenanceHealth } from "./health";
 import { systemHealth } from "./systemHealth";
 import { chemistryGuidance } from "./chemistryGuidance";
+import { maintenanceEffectiveState } from "./maintenanceSchedule";
 
 export type TankStateBand = "excellent" | "stable" | "watch" | "stressed" | "critical";
 
@@ -93,7 +94,8 @@ export function tankStateView(tank:Tank):TankStateView {
   const chemAssessment=chemistryHealthAssessment(tank),chem=chemAssessment.score,maint=maintenanceHealth(tank),age=chemistryAgeDays(tank),bio=bioload(tank);
   const system=systemHealth(tank);
   const chemGuide=chemistryGuidance(tank);
-  const overdue=tank.maintenance.filter(x=>!x.done&&x.nextDue&&x.nextDue<new Date().toISOString().slice(0,10));
+  const atDate=new Date().toISOString().slice(0,10);
+  const overdue=tank.maintenance.filter(x=>maintenanceEffectiveState(x,atDate).overdue);
   const equipment=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
   const livestock=tank.livestock.filter(x=>x.health==="watch"||x.health==="treatment");
 
