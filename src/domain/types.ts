@@ -182,7 +182,7 @@ export interface InventoryItem {
 }
 
 export type IntelligenceEventKind = "fact"|"observation"|"action"|"omission"|"outcome";
-export type IntelligenceEventDomain = "chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|"waterChange"|"rodi"|"quarantine"|"emergency"|"acclimation"|"system";
+export type IntelligenceEventDomain = "chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|"waterChange"|"rodi"|"quarantine"|"emergency"|"acclimation"|"sump"|"journal"|"expense"|"system";
 export interface IntelligenceEvent {
   id:string;
   timestamp:string;
