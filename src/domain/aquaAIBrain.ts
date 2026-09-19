@@ -33,6 +33,14 @@ export interface AquaAIAnswer {
   evidenceAr:string[];
   evidenceEn:string[];
   confidence:AquaAIConfidence;
+  /** Evidence required for this answer but not currently available. */
+  missingEvidenceAr?:string[];
+  missingEvidenceEn?:string[];
+  /** Keeps observed facts separate from interpretations/recommendations. */
+  factsAr?:string[];
+  factsEn?:string[];
+  inferencesAr?:string[];
+  inferencesEn?:string[];
   action?:AquaAIAction;
 }
 
