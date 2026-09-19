@@ -180,9 +180,9 @@ export function DashboardCommandLayer(){
 
  if(!tank||!data||page!=="dashboard"||!mount)return null;
 
- const goalDefs:Record<GoalKey,{ar:string;en:string;value:number}>={
+ const goalDefs:Record<GoalKey,{ar:string;en:string;value:number|null}>={
   stability:{ar:"تثبيت صحة الحوض",en:"Stabilize tank health",value:data.state.score},
-  chemistry:{ar:"تثبيت الكيمياء",en:"Stabilize chemistry",value:data.chem??0},
+  chemistry:{ar:"تثبيت الكيمياء",en:"Stabilize chemistry",value:data.chem},
   maintenance:{ar:"رفع انتظام الصيانة",en:"Improve maintenance",value:data.maint},
   confidence:{ar:"رفع ثقة البيانات",en:"Improve data confidence",value:data.confidence}
  };
@@ -214,10 +214,10 @@ export function DashboardCommandLayer(){
 
   <section className="aqua-command-center card panel">
    <div className="command-head"><div><small className="eyebrow-mini">AQUA NEXUS • TODAY</small><h3>{language==="ar"?"شو عليّ اليوم؟":"What needs attention today?"}</h3></div><span className={`confidence-pill ${data.confidence<60?"bad":data.confidence<80?"watch":"good"}`}>{language==="ar"?"ثقة التقييم":"Confidence"} <b>{data.confidence}%</b></span></div>
-   <div className="today-actions">{data.today.length?data.today.slice(0,3).map((x,i)=><button key={i} onClick={()=>navigate(x.page)}><span>{x.icon}</span><b>{language==="ar"?x.ar:x.en}</b><i>›</i></button>):data.risks.length?<div className="today-clear">✓ <b>{language==="ar"?"ما في مهام مجدولة ضرورية اليوم، لكن في تنبيهات لازم تنتبهلها بالأعلى.":"No scheduled tasks are required today, but there are alerts above that need your attention."}</b></div>:<div className="today-clear">✓ <b>{language==="ar"?"ما في إجراء ضروري اليوم":"No action is required today"}</b></div>}</div>
+   <div className="today-actions">{data.today.length?data.today.slice(0,3).map((x,i)=><button key={i} onClick={()=>navigate(x.page)}><span>{x.icon}</span><b>{language==="ar"?x.ar:x.en}</b><i>›</i></button>):<div className="today-clear">✓ <b>{language==="ar"?"ما في مهام مجدولة ضرورية اليوم.":"No scheduled tasks are required today."}</b></div>}</div>\n   {data.risks.length>0&&<div className="today-alert-reminder">⚠ <b>{language==="ar"?`لكن عندك ${data.risks.length} تنبيه بالأعلى لازم تنتبهله${data.risks.length>1?"ن":""}.`:`You still have ${data.risks.length} alert${data.risks.length===1?"":"s"} above that need attention.`}</b></div>}
    <div className="command-grid">
     <article className="command-card"><small>{language==="ar"?"ثقة Aqua Nexus بالحالة":"State confidence"}</small><b className="command-big">{data.confidence}%</b><p>{language==="ar"?data.confidenceTip.ar:data.confidenceTip.en}</p><button className="text-btn" onClick={()=>navigate(data.chemAge>7?"chemistry":"maintenance")}>{language==="ar"?"حسّن الثقة":"Improve confidence"} ›</button></article>
-    <article className="command-card"><small>{language==="ar"?"هدف الحوض الحالي":"Current tank goal"}</small><select value={goal} onChange={e=>saveGoal(e.target.value as GoalKey)}>{Object.entries(goalDefs).map(([key,x])=><option value={key} key={key}>{language==="ar"?x.ar:x.en}</option>)}</select><b className="command-big">{goalDef.value}%</b><div className="goal-track"><i style={{width:`${goalDef.value}%`}}/></div><p>{language==="ar"?"الهدف يبقى مثبتاً لهذا الحوض حتى تغيّره.":"This goal stays pinned to this tank until you change it."}</p></article>
+    <article className="command-card"><small>{language==="ar"?"هدف الحوض الحالي":"Current tank goal"}</small><select value={goal} onChange={e=>saveGoal(e.target.value as GoalKey)}>{Object.entries(goalDefs).map(([key,x])=><option value={key} key={key}>{language==="ar"?x.ar:x.en}</option>)}</select><b className="command-big">{goalDef.value===null?"N/A":`${goalDef.value}%`}</b><div className="goal-track"><i style={{width:`${goalDef.value??0}%`}}/></div><p>{language==="ar"?"الهدف يبقى مثبتاً لهذا الحوض حتى تغيّره.":"This goal stays pinned to this tank until you change it."}</p></article>
     <article className="command-card"><small>{language==="ar"?"أثر آخر تغيير مسجل":"After the last recorded change"}</small><b className={`command-big ${data.change>0?"up":data.change<0?"down":""}`}>{data.change>0?`+${data.change}`:data.change} {language==="ar"?"نقطة":"pts"}</b><p>{data.latestEvent?(language==="ar"?data.latestEvent.textAr:data.latestEvent.textEn):(language==="ar"?"لا يوجد حدث حديث كافٍ للمقارنة.":"No recent event is available for comparison.")}</p><small>{language==="ar"?"هذا ارتباط زمني وليس إثبات سبب مباشر.":"This is a time association, not proof of causation."}</small></article>
    </div>
 
