@@ -209,6 +209,9 @@ export interface GuidanceAction {
   verifyAfter?:string;
   verifiedAt?:string;
   outcome?:"improved"|"stable"|"worse"|"unknown";
+  verificationEventId?:string;
+  resolvedReasonAr?:string;
+  resolvedReasonEn?:string;
 }
 
 export interface TimelineEvent {
@@ -254,6 +257,13 @@ export interface DosingLog {
   target?: number;
   ml: number;
   chamberMaterial?: string;
+  material?: string;
+  inventoryItemId?: string;
+  reason?: string;
+  sourceReadingTimestamp?: string;
+  plannedSteps?: number;
+  stepIndex?: number;
+  verifyAfter?: string;
 }
 
 export interface DoserChannel {
