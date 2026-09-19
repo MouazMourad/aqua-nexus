@@ -98,23 +98,9 @@ function quantityFromQuestion(question:string){
 }
 
 export function nextBestAction(tank:Tank):AquaAIAction{
-  const activeEmergency=(tank.emergencySessions??[]).some(x=>x.status==="active");
-  if(activeEmergency)return {page:"emergency",ar:"أكمل بروتوكول الطوارئ النشط",en:"Continue the active emergency protocol"};
-  const chemistry=chemistryGuidance(tank);
-  if(chemistry.dataIssues.length){const issue=chemistry.dataIssues[0];return {page:"chemistry",ar:issue.actionAr,en:issue.actionEn};}
   const core=tankIntelligenceCore(tank);
-  const alerts=core.alerts;
-  const critical=alerts.find(x=>x.level==="danger"&&x.actionPage);
-  if(critical?.actionPage)return {page:critical.actionPage as AquaAIPage,ar:critical.ar,en:critical.en};
-  const oldChem=tank.chemistry[0]?Math.floor((Date.now()-new Date(tank.chemistry[0].timestamp).getTime())/DAY):999;
-  if(oldChem>7)return {page:"chemistry",ar:"سجّل فحصاً كيميائياً جديداً",en:"Log a fresh chemistry test"};
-  const pred=proactivePredictions(tank)[0];
-  if(pred&&pred.days<=5&&["KH","Ca","Mg"].includes(pred.parameter))return {page:"dosing",ar:`راجع جرعة ${pred.parameter} قبل الوصول إلى الحد الأدنى`,en:`Review ${pred.parameter} dosing before the lower boundary`};
-  const today=new Date().toISOString().slice(0,10);
-  const overdue=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).overdue);
-  if(overdue.length)return {page:"maintenance",ar:`أنجز ${overdue.length} مهمة صيانة متأخرة`,en:`Complete ${overdue.length} overdue maintenance task(s)`};
-  const warning=alerts.find(x=>x.level==="warn"&&x.actionPage);
-  if(warning?.actionPage)return {page:warning.actionPage as AquaAIPage,ar:warning.ar,en:warning.en};
+  const primary=core.actions[0];
+  if(primary)return {page:primary.page as AquaAIPage,ar:primary.ar,en:primary.en};
   return {page:"dashboard",ar:"استمر بالمراقبة وسجّل أي تغير مهم",en:"Keep monitoring and log meaningful changes"};
 }
 
