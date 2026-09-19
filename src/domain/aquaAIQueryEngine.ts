@@ -5,17 +5,15 @@ import { buildAquaAIQueryPlan,type AquaAIQueryPlan,type AquaDomain } from "./aqu
 import { reasonLocally } from "./aquaAILocalReasoner";
 import { chemistryGuidance } from "./chemistryGuidance";
 import { bioload,maintenanceHealth } from "./health";
-import { tankStateView } from "./tankIntelligence";
+import { tankIntelligenceCore } from "./intelligenceCore";
 import { tankMood } from "./tankLearning";
 import { analyzeNutrients } from "./nutrientEngine";
 import { tankEnergy } from "./equipmentIntelligence";
 import { answerSpecialOperation } from "./aquaAIOperationAnswers";
-import { systemHealth } from "./systemHealth";
 import { unifiedInventory } from "./inventoryIntelligence";
 import { feedingIntelligence } from "./feedingIntelligence";
 import { rodiIntelligence } from "./rodiIntelligence";
 import { sumpIntelligence } from "./sumpIntelligence";
-import { systemAlerts } from "./alertEngine";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
 
 function actionDomain(page:string):AquaDomain{
@@ -44,15 +42,16 @@ function domainTitle(domain:AquaDomain,lang:"ar"|"en"){
 }
 
 function snapshot(tank:Tank,plan:AquaAIQueryPlan){
- const guide=chemistryGuidance(tank),bio=bioload(tank),state=tankStateView(tank),maint=maintenanceHealth(tank);
- const system=systemHealth(tank);
+ const core=tankIntelligenceCore(tank);
+ const guide=chemistryGuidance(tank),bio=core.bioload,state=core.state,maint=core.maintenance;
+ const system=core.health;
  const today=new Date().toISOString().slice(0,10);
  const due=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).due);
  const warnings=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
  const watch=tank.livestock.filter(x=>x.health==="watch"||x.health==="treatment");
  const activeAcc=(tank.acclimationSessions??[]).filter(x=>x.status!=="completed");
  const lastRodi=tank.rodi[0],lastWater=tank.waterChanges[0];
- const energy=tankEnergy(tank),nutrients=analyzeNutrients(tank),mood=tankMood(tank),stock=unifiedInventory(tank),feeding=feedingIntelligence(tank),rodiIntel=rodiIntelligence(tank),sumpIntel=sumpIntelligence(tank),alerts=systemAlerts(tank);
+ const energy=tankEnergy(tank),nutrients=analyzeNutrients(tank),mood=tankMood(tank),stock=unifiedInventory(tank),feeding=feedingIntelligence(tank),rodiIntel=rodiIntelligence(tank),sumpIntel=sumpIntelligence(tank),alerts=core.alerts;
  switch(plan.primary){
   case "chemistry":{
    const top=guide.problems.slice(0,4);
