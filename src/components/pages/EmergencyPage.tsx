@@ -29,7 +29,7 @@ export function EmergencyPage({tank}:{tank:Tank}) {
   const titleEn=`Emergency: ${e.en}`;
   patch(tank.id,t=>({...t,
    emergencySessions:[{id:sessionId,scenarioId:selected,titleAr:e.ar,titleEn:e.en,startedAt:ts,completedSteps:[],status:"active"},...(t.emergencySessions??[])],
-   maintenance:[{id:uid("task"),title:titleAr,titleEn,cadence:"once",done:false,nextDue:today(),manual:true},...t.maintenance],
+   maintenance:[{id:uid("task"),title:titleAr,titleEn,cadence:"once",done:false,nextDue:today(),manual:true,sourceDomain:"emergency",sourceId:sessionId},...t.maintenance],
    timeline:[{id:uid("ev"),timestamp:ts,type:"emergency",textAr:`تم بدء بروتوكول طوارئ: ${e.ar}.`,textEn:`Emergency protocol started: ${e.en}.`},...t.timeline]
   }));
  }
@@ -48,9 +48,9 @@ export function EmergencyPage({tank}:{tank:Tank}) {
   if(!active||completed.length<steps.length)return;
   const ts=nowISO();
   patch(tank.id,t=>({...t,
-   emergencySessions:(t.emergencySessions??[]).map(s=>s.id===active.id?{...s,status:"completed",completedAt:ts}:s),
-   maintenance:t.maintenance.map(task=>task.title===`طوارئ: ${e.ar}`||task.titleEn===`Emergency: ${e.en}`?{...task,done:true,lastDone:today()}:task),
-   timeline:[{id:uid("ev"),timestamp:ts,type:"emergency",textAr:`اكتمل بروتوكول الطوارئ: ${e.ar}.`,textEn:`Emergency protocol completed: ${e.en}.`},...t.timeline]
+   emergencySessions:(t.emergencySessions??[]).map(s=>s.id===active.id?{...s,status:"completed",completedAt:ts,outcome:"unknown",verifyAfter:new Date(Date.now()+6*3600000).toISOString()}:s),
+   maintenance:t.maintenance.map(task=>task.sourceDomain==="emergency"&&task.sourceId===active.id?{...task,done:true,lastDone:today()}:task),
+   timeline:[{id:uid("ev"),timestamp:ts,type:"emergency",textAr:`اكتمل تنفيذ بروتوكول الطوارئ: ${e.ar}. يلزم التحقق من استقرار الحوض.`,textEn:`Emergency protocol execution completed: ${e.en}. Tank stability still requires verification.`},...t.timeline]
   }));
  }
 
@@ -69,7 +69,7 @@ export function EmergencyPage({tank}:{tank:Tank}) {
    <div className="summary-strip" style={{margin:"12px 0"}}><div className="summary"><small>{bi(lang,"التقدم","Progress")}</small><b>{progress}%</b></div><div className="summary"><small>{bi(lang,"الخطوات المكتملة","Completed")}</small><b>{completed.length}/{steps.length}</b></div><div className="summary"><small>{bi(lang,"بدأ","Started")}</small><b>{new Date(active.startedAt).toLocaleTimeString()}</b></div></div>
    <div className="response-steps">{steps.map((s,i)=><button type="button" key={i} className={`task-row ${completed.includes(i)?"done":""}`} onClick={()=>toggleStep(i)} style={{width:"100%",textAlign:lang==="ar"?"right":"left"}}><span className={`check-dot ${completed.includes(i)?"done":""}`}>{completed.includes(i)?"✓":i+1}</span><div><b>{s}</b></div></button>)}</div>
    <div className="inline-alert warn" style={{marginTop:12}}><b>{tr(lang,"avoid")}:</b> {lang==="ar"?e.avoidAr:e.avoidEn}</div>
-   <div className="emergency-actions"><button className="btn good" onClick={completeProtocol} disabled={completed.length<steps.length}>✓ {bi(lang,"إنهاء البروتوكول وتسجيل التعافي","Complete protocol & log recovery")}</button></div>
+   <div className="emergency-actions"><button className="btn good" onClick={completeProtocol} disabled={completed.length<steps.length}>✓ {bi(lang,"إنهاء تنفيذ البروتوكول وبدء التحقق","Complete protocol & start verification")}</button></div>
   </>}
   {!active&&<><ol className="response-steps">{steps.map((s:string,i:number)=><li key={i}>{s}</li>)}</ol><div className="inline-alert warn"><b>{tr(lang,"avoid")}:</b> {lang==="ar"?e.avoidAr:e.avoidEn}</div></>}
  </>}</div>
