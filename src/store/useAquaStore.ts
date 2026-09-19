@@ -6,8 +6,8 @@ import type { AquaState, ChemistryReading, Equipment, HealthSnapshot, Language, 
 import { demoMarineTank, demoFreshwaterTank } from "@/data/demoTank";
 import { liters, round1 } from "@/lib/units";
 import { defaultDisplayPosition } from "@/lib/displayLayout";
-import { chemistryHealth, maintenanceHealth } from "@/domain/health";
-import { stateBand, tankStateScore } from "@/domain/tankIntelligence";
+import { chemistryHealthAssessment, maintenanceHealth } from "@/domain/health";
+import { tankStateScore,tankStateView } from "@/domain/tankIntelligence";
 import { tankIntelligenceCore } from "@/domain/intelligenceCore";
 import { deriveIntelligenceEvents,mergeIntelligenceEvents,reconcileGuidanceActions } from "@/domain/eventIntelligence";
 
@@ -107,9 +107,9 @@ function withHealthSnapshot(before:Tank,after:Tank):Tank{
     id:`hs-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
     timestamp,
     score,
-    chemistry:chemistryHealth(after),
+    chemistry:chemistryHealthAssessment(after).score,
     maintenance:maintenanceHealth(after),
-    state:stateBand(score),
+    state:tankStateView(after).band,
     reasonAr:reason.ar,
     reasonEn:reason.en,
     relatedEventId:reason.eventId
@@ -222,13 +222,21 @@ export const useAquaStore = create<AquaStore>()(
     }),
     {
       name:"aqua-nexus-3d-v1",
-      version:8,
-      migrate:(persisted:any)=>{
+      version:9,
+      migrate:(persisted:any,fromVersion:number)=>{
         const p=persisted??{};
-        // v8 intentionally starts clean: previous prototype tanks are removed and
-        // replaced by the two protected training tanks. New real tanks created
-        // after this migration are preserved on future reloads.
-        return {...p,selectedTankId:demoMarineTank.id,tanks:canonicalTrainingTanks()};
+        // Release migrations are non-destructive. Preserve real tanks and add/
+        // normalize protected training tanks around them.
+        if(typeof window!=="undefined"&&fromVersion<9){
+          try{
+            const key="aqua-nexus-pre-v9-backup";
+            if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(p));
+          }catch{}
+        }
+        const tanks=withCanonicalTraining(Array.isArray(p.tanks)?p.tanks:[]);
+        const requested=tanks.find(t=>t.id===p.selectedTankId);
+        const firstReal=tanks.find(t=>!t.isTraining);
+        return {...p,tanks,selectedTankId:requested?.id??firstReal?.id??demoMarineTank.id};
       },
       merge:(persisted:any,current)=>{
         const p=persisted??{};
