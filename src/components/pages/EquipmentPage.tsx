@@ -1,5 +1,5 @@
 "use client";
-import { useEffect,useMemo,useState } from "react";
+import { useEffect,useMemo,useRef,useState } from "react";
 import type { DisplayEquipmentPosition,EquipmentKind,Tank } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
@@ -17,6 +17,7 @@ const kinds:EquipmentKind[]=["lighting","waveMaker","overflow","skimmer","return
 export function EquipmentPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
  const [open,setOpen]=useState(false),[details,setDetails]=useState<string|null>(null),[name,setName]=useState(""),[kind,setKind]=useState<EquipmentKind>("lighting"),[location,setLocation]=useState<string>("display"),[brand,setBrand]=useState(""),[model,setModel]=useState(""),[days,setDays]=useState(90),[power,setPower]=useState(0),[hours,setHours]=useState(0),[ratedVolume,setRatedVolume]=useState(0),[flowLph,setFlowLph]=useState(0),[par,setPar]=useState(0),[coverageLength,setCoverageLength]=useState(0),[coverageWidth,setCoverageWidth]=useState(0),[failureNote,setFailureNote]=useState(""),[advancedPosition,setAdvancedPosition]=useState(false),[positionPreview,setPositionPreview]=useState<{id:string;position:DisplayEquipmentPosition}|null>(null);
+ const positionPreviewRef=useRef<{id:string;position:DisplayEquipmentPosition}|null>(null);
  const visualDevices=tank.equipment;
  const e=tank.equipment.find(x=>x.id===details);
  const activeDisplayPosition=e?(positionPreview?.id===e.id?positionPreview.position:(e.displayPosition??defaultDisplayPosition(e.kind,0,1))):undefined;
@@ -41,22 +42,26 @@ export function EquipmentPage({tank}:{tank:Tank}) {
  function updateDevice(id:string, updater:(x:any)=>any){patch(tank.id,t=>({...t,equipment:t.equipment.map(x=>x.id===id?updater(x):x)}));}
  function setLocationLive(id:string,loc:string){updateDevice(id,x=>({...x,location:loc,displayPosition:loc==="display"?(x.displayPosition??defaultDisplayPosition(x.kind,0,1)):x.displayPosition}));}
  function posPatch(id:string,p:Partial<DisplayEquipmentPosition>){updateDevice(id,x=>({...x,displayPosition:{...defaultDisplayPosition(x.kind,0,1),...(x.displayPosition??{}),...p}}));}
+ function setTouchPreview(next:{id:string;position:DisplayEquipmentPosition}|null){
+  positionPreviewRef.current=next;
+  setPositionPreview(next);
+ }
  function touchPosition(id:string,kind:EquipmentKind,plane:"top"|"front",ev:any){
   const rect=(ev.currentTarget as HTMLElement).getBoundingClientRect();
   const px=Math.max(0,Math.min(1,(ev.clientX-rect.left)/Math.max(1,rect.width)));
   const py=Math.max(0,Math.min(1,(ev.clientY-rect.top)/Math.max(1,rect.height)));
   const device=tank.equipment.find(x=>x.id===id);
-  const current=positionPreview?.id===id?positionPreview.position:{...defaultDisplayPosition(kind,0,1),...(device?.displayPosition??{})};
+  const current=positionPreviewRef.current?.id===id?positionPreviewRef.current.position:{...defaultDisplayPosition(kind,0,1),...(device?.displayPosition??{})};
   const next=plane==="top"
    ?{...current,xPct:2+px*96,zPct:2+py*96}
    :{...current,xPct:2+px*96,yPct:kind==="lighting"?145-py*43:95-py*90};
-  setPositionPreview({id,position:next});
+  setTouchPreview({id,position:next});
  }
  function commitTouchPosition(id:string){
-  if(positionPreview?.id!==id)return;
-  const next=positionPreview.position;
-  updateDevice(id,x=>({...x,displayPosition:next}));
-  setPositionPreview(null);
+  const preview=positionPreviewRef.current;
+  if(preview?.id!==id)return;
+  updateDevice(id,x=>({...x,displayPosition:preview.position}));
+  setTouchPreview(null);
  }
  function returnPosPatch(id:string,p:Partial<DisplayEquipmentPosition>){
   updateDevice(id,x=>({...x,overflowReturnPosition:{...resolvedOverflowReturnPosition({...x,overflowPlumbingMode:"separate"},0,1),...(x.overflowReturnPosition??{}),...p}}));
@@ -160,11 +165,11 @@ export function EquipmentPage({tank}:{tank:Tank}) {
     {e.location==="display"&&<div className="display-position-editor">
       <div className="module-head"><div><h4>{e.kind==="overflow"?bi(lang,"موضع الأوفر فلو / نزول الماء","Overflow / Drain Position"):bi(lang,"حرّك الجهاز باللمس","Place device by touch")}</h4><p className="note">{bi(lang,"اسحب بإصبعك أو اضغط بالمكان المطلوب. الأرقام تنحفظ بالخلف تلقائياً، والضبط الرقمي موجود ضمن Advanced.","Drag or tap where you want the device. Coordinates are stored automatically; numeric fine tuning stays under Advanced.")}</p></div><button className="btn" onClick={()=>setAdvancedPosition(v=>!v)}>{advancedPosition?bi(lang,"إخفاء Advanced","Hide Advanced"):bi(lang,"Advanced","Advanced")}</button></div>
       <div className="touch-position-grid">
-        <div><small>{bi(lang,"من الأعلى — يمين/يسار + أمام/خلف","Top view — left/right + front/back")}</small><div className="touch-position-pad" onPointerDown={ev=>{(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);touchPosition(e.id,e.kind,"top",ev)}} onPointerMove={ev=>{if(positionPreview?.id===e.id)touchPosition(e.id,e.kind,"top",ev)}} onPointerUp={()=>commitTouchPosition(e.id)} onPointerCancel={()=>setPositionPreview(null)}>
+        <div><small>{bi(lang,"من الأعلى — يمين/يسار + أمام/خلف","Top view — left/right + front/back")}</small><div className="touch-position-pad" onPointerDown={ev=>{(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);touchPosition(e.id,e.kind,"top",ev)}} onPointerMove={ev=>{if(positionPreviewRef.current?.id===e.id)touchPosition(e.id,e.kind,"top",ev)}} onPointerUp={()=>commitTouchPosition(e.id)} onPointerCancel={()=>setTouchPreview(null)}>
           <span className="touch-grid-line v one"/><span className="touch-grid-line v two"/><span className="touch-grid-line h one"/><span className="touch-grid-line h two"/>
           <i className="touch-device-dot" style={{left:`${activeDisplayPosition?.xPct??defaultDisplayPosition(e.kind).xPct}%`,top:`${activeDisplayPosition?.zPct??defaultDisplayPosition(e.kind).zPct}%`}}>⚙</i>
         </div></div>
-        <div><small>{bi(lang,"من الأمام — يمين/يسار + ارتفاع","Front view — left/right + height")}</small><div className="touch-position-pad front" onPointerDown={ev=>{(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);touchPosition(e.id,e.kind,"front",ev)}} onPointerMove={ev=>{if(positionPreview?.id===e.id)touchPosition(e.id,e.kind,"front",ev)}} onPointerUp={()=>commitTouchPosition(e.id)} onPointerCancel={()=>setPositionPreview(null)}>
+        <div><small>{bi(lang,"من الأمام — يمين/يسار + ارتفاع","Front view — left/right + height")}</small><div className="touch-position-pad front" onPointerDown={ev=>{(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);touchPosition(e.id,e.kind,"front",ev)}} onPointerMove={ev=>{if(positionPreviewRef.current?.id===e.id)touchPosition(e.id,e.kind,"front",ev)}} onPointerUp={()=>commitTouchPosition(e.id)} onPointerCancel={()=>setTouchPreview(null)}>
           <span className="touch-grid-line v one"/><span className="touch-grid-line v two"/><span className="touch-grid-line h one"/><span className="touch-grid-line h two"/>
           <i className="touch-device-dot" style={{left:`${activeDisplayPosition?.xPct??defaultDisplayPosition(e.kind).xPct}%`,top:`${e.kind==="lighting"?Math.max(0,Math.min(100,(145-(activeDisplayPosition?.yPct??defaultDisplayPosition(e.kind).yPct))/43*100)):Math.max(0,Math.min(100,(95-(activeDisplayPosition?.yPct??defaultDisplayPosition(e.kind).yPct))/90*100))}%`}}>⚙</i>
         </div></div>
