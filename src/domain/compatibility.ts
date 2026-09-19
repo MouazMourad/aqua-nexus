@@ -1,6 +1,7 @@
 import type { LivestockItem, Tank } from "./types";
 import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
 import { bioload } from "./health";
+import { equipmentAdequacy } from "./equipmentAdequacy";
 
 export type CompatibilityLevel = "good" | "warn" | "danger";
 
@@ -101,6 +102,7 @@ export function compatibilityCheck(
 
   const candidateTags=tags(candidate);
   const candidateCategory=mappedCategory(candidate?.cat);
+  const equipment=equipmentAdequacy(tank);
   const hasCorals=tank.livestock.some(x=>x.category==="coral");
   const hasInverts=tank.livestock.some(x=>x.category==="invert");
   const hasPlants=tank.livestock.some(x=>x.category==="plant");
@@ -208,6 +210,25 @@ export function compatibilityCheck(
       ar:"يوجد احتمال عدوانية أو نزاع إقليمي مع الأسماك الحالية.",
       en:"There is a possible territorial/aggression conflict with current fish."
     });
+  }
+
+  // A new organism is not "ready" if the current life-support system is materially inadequate.
+  const equipmentDanger=equipment.issues.filter(x=>x.level==="danger");
+  if(equipmentDanger.length){
+    issues.push({
+      level:"danger",
+      ar:`جاهزية التجهيزات غير كافية للإضافة حالياً: ${equipmentDanger[0].ar}`,
+      en:`Equipment readiness is not sufficient for an addition right now: ${equipmentDanger[0].en}`
+    });
+  } else if(equipment.score<75){
+    issues.push({
+      level:"warn",
+      ar:`كفاية التجهيزات الحالية ${equipment.score}%؛ الأفضل معالجة النقص أو استكمال بيانات القدرة قبل زيادة الحمل.`,
+      en:`Current equipment adequacy is ${equipment.score}%; address gaps or complete capacity data before increasing load.`
+    });
+  }
+  if((candidateCategory==="coral"||candidateCategory==="plant")&&equipment.issues.some(x=>x.id==="missing-light"||x.id==="light-under")){
+    issues.push({level:"danger",ar:"الكائن الضوئي الجديد يحتاج إنارة مثبتة الكفاية قبل الإضافة.",en:"The new photosynthetic organism requires verified adequate lighting before addition."});
   }
 
   if(projectedStatus==="high"){
