@@ -13,7 +13,7 @@ export function QuarantinePage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
  const [organism,setOrganism]=useState(""),[subjectId,setSubjectId]=useState(""),[reason,setReason]=useState(""),[plan,setPlan]=useState("");
  const [volume,setVolume]=useState(Math.max(20,Math.round(tank.systemVolumeLiters*.12)));
- const [product,setProduct]=useState(""),[labelDose,setLabelDose]=useState(0),[intervalHours,setIntervalHours]=useState(24),[totalDoses,setTotalDoses]=useState(1);
+ const [product,setProduct]=useState(""),[labelDose,setLabelDose]=useState(0),[intervalHours,setIntervalHours]=useState(24),[totalDoses,setTotalDoses]=useState(1),[medInventoryId,setMedInventoryId]=useState("");
  const calculatedDose=useMemo(()=>labelDose>0&&volume>0?labelDose*(volume/100):0,[labelDose,volume]);
 
  function add(){
@@ -23,7 +23,7 @@ export function QuarantinePage({tank}:{tank:Tank}) {
   const nextDoseAt=treatment?ts:undefined;
   patch(tank.id,t=>({...t,
    livestock:subjectId?t.livestock.map(x=>x.id===subjectId?{...x,health:"treatment" as const,lastObservedAt:ts}:x):t.livestock,
-   quarantine:[{id:uid("q"),livestockId:subjectId||undefined,organism:organism.trim(),reason:reason.trim(),plan:plan.trim(),start:today(),status:"active",quarantineVolumeLiters:volume,treatmentProduct:product.trim()||undefined,labelDoseMlPer100L:labelDose||undefined,intervalHours:intervalHours||undefined,totalDoses:Math.max(1,totalDoses),dosesGiven:0,nextDoseAt},...t.quarantine],
+   quarantine:[{id:uid("q"),livestockId:subjectId||undefined,organism:organism.trim(),reason:reason.trim(),plan:plan.trim(),start:today(),status:"active",quarantineVolumeLiters:volume,treatmentProduct:product.trim()||undefined,labelDoseMlPer100L:labelDose||undefined,intervalHours:intervalHours||undefined,totalDoses:Math.max(1,totalDoses),dosesGiven:0,nextDoseAt,medicationInventoryItemId:medInventoryId||undefined,medicationUnit:medInventoryId?t.inventory.find(i=>i.id===medInventoryId)?.unit:undefined,medicationQuantityPerDose:medInventoryId?calculatedDose:undefined},...t.quarantine],
    timeline:[{id:uid("ev"),timestamp:ts,type:"quarantine",textAr:`بدأ الحجر الصحي لـ ${organism.trim()}${treatment?` مع خطة علاج ${product.trim()}`:""}.`,textEn:`Quarantine started for ${organism.trim()}${treatment?` with ${product.trim()} treatment plan`:""}.`},...t.timeline]
   }));
   setOrganism("");setSubjectId("");setReason("");setPlan("");setProduct("");setLabelDose(0);setTotalDoses(1);
@@ -38,8 +38,12 @@ export function QuarantinePage({tank}:{tank:Tank}) {
   const more=dosesGiven<total;
   const nextDoseAt=more?addHoursISO(q.intervalHours??24):undefined;
   const ts=nowISO();
+  const inv=q.medicationInventoryItemId?tank.inventory.find(i=>i.id===q.medicationInventoryItemId):undefined;
+  const consume=q.medicationQuantityPerDose??dose;
+  if(inv&&inv.quantity<consume)return;
   patch(tank.id,t=>({...t,
-   quarantine:t.quarantine.map(x=>x.id===id?{...x,dosesGiven,lastDoseAt:ts,nextDoseAt}:x),
+   inventory:inv?t.inventory.map(i=>i.id===inv.id?{...i,quantity:Math.max(0,i.quantity-consume)}:i):t.inventory,
+   quarantine:t.quarantine.map(x=>x.id===id?{...x,dosesGiven,lastDoseAt:ts,nextDoseAt,responseObservedAt:undefined}:x),
    maintenance:more?[...t.maintenance,{id:uid("task"),title:`جرعة حجر: ${q.treatmentProduct} — ${q.organism}`,titleEn:`Quarantine dose: ${q.treatmentProduct} — ${q.organism}`,cadence:"once",done:false,nextDue:dateOnly(nextDoseAt),manual:true}]:t.maintenance,
    timeline:[{id:uid("ev"),timestamp:ts,type:"quarantine-dose",textAr:`تم تسجيل جرعة ${dose.toFixed(2)} mL من ${q.treatmentProduct} لـ ${q.organism} (${dosesGiven}/${total}) حسب ملصق المنتج.`,textEn:`Logged ${dose.toFixed(2)} mL of ${q.treatmentProduct} for ${q.organism} (${dosesGiven}/${total}) using the product-label rate.`},...t.timeline]
   }));
@@ -65,7 +69,7 @@ export function QuarantinePage({tank}:{tank:Tank}) {
    <label className="field"><span>{bi(lang,"اسم المنتج / الدواء","Product / medication")}</span><input value={product} onChange={e=>setProduct(e.target.value)}/></label>
    <label className="field"><span>{bi(lang,"جرعة الملصق mL لكل 100L","Label dose mL per 100L")}</span><input type="number" min="0" step="any" value={labelDose||""} onChange={e=>setLabelDose(Number(e.target.value))}/></label>
    <label className="field"><span>{bi(lang,"الفاصل بين الجرعات (ساعة)","Dose interval (hours)")}</span><input type="number" min="1" value={intervalHours} onChange={e=>setIntervalHours(Number(e.target.value))}/></label>
-   <label className="field"><span>{bi(lang,"عدد الجرعات المخطط","Planned doses")}</span><input type="number" min="1" max="60" value={totalDoses} onChange={e=>setTotalDoses(Number(e.target.value))}/></label>
+   <label className="field"><span>{bi(lang,"عدد الجرعات المخطط","Planned doses")}</span><input type="number" min="1" max="60" value={totalDoses} onChange={e=>setTotalDoses(Number(e.target.value))}/></label><label className="field"><span>{bi(lang,"ربط الدواء بالمخزون (اختياري)","Link medication to inventory (optional)")}</span><select value={medInventoryId} onChange={e=>setMedInventoryId(e.target.value)}><option value="">—</option>{tank.inventory.map(i=><option key={i.id} value={i.id}>{i.name} • {i.quantity} {i.unit}</option>)}</select></label>
    <label className="field full-field"><span>{tr(lang,"plan")}</span><textarea value={plan} onChange={e=>setPlan(e.target.value)}/></label>
   </div>
   {product&&labelDose>0&&<div className="summary-strip" style={{marginTop:12}}><div className="summary"><small>{bi(lang,"الجرعة المحسوبة من الملصق","Label-scaled dose")}</small><b>{calculatedDose.toFixed(2)} mL</b></div><div className="summary"><small>{bi(lang,"حجم الحجر","Quarantine volume")}</small><b>{volume} L</b></div><div className="summary"><small>{bi(lang,"كل","Every")}</small><b>{intervalHours} h</b></div></div>}
