@@ -17,7 +17,7 @@ export function buildAquaAIContext(tank:Tank){
  const plans=((tank as any).aiActionPlans??[]).slice(0,5);
  const core=tankIntelligenceCore(tank);
  return {
-  schemaVersion:1,
+  schemaVersion:2,
   generatedAt:new Date().toISOString(),
   tank:{id:tank.id,name:tank.name,type:tank.type,status:tank.status,ageMonths:tank.ageMonths,systemVolumeLiters:tank.systemVolumeLiters},
   state:core.state,
@@ -46,6 +46,7 @@ export function buildAquaAIContext(tank:Tank){
   emergencySessions:(tank.emergencySessions??[]).slice(0,10),
   visualAssessments:vision,
   aiActionPlans:plans,
+  outcomeLearning:plans.filter((x:any)=>x.status==="completed").map((x:any)=>({id:x.id,question:x.question,titleAr:x.titleAr,titleEn:x.titleEn,baselineScore:x.baselineScore,outcomeScore:x.outcomeScore,outcome:x.outcome,completedAt:x.completedAt})).slice(0,20),
   recentTimeline:tank.timeline.slice(0,30),
   safety:{visionDiagnosisMode:"probabilistic-only",causalityMode:"temporal-association-not-proof",medicationRule:"follow-product-label-and-quarantine-context"}
  };
