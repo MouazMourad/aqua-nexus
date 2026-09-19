@@ -7,7 +7,7 @@ import { SafeAquariumScene } from "@/components/three/SafeAquariumScene";
 import { EquipmentPanel } from "@/components/panels/EquipmentPanel";
 import { TankHealthShareCard } from "@/components/dashboard/TankHealthShareCard";
 import { TankJourney } from "@/components/dashboard/TankJourney";
-import { bioload,chemistryAgeDays,chemistryHealth,maintenanceHealth } from "@/domain/health";
+import { bioload,chemistryAgeDays,chemistryHealthAssessment,maintenanceHealth } from "@/domain/health";
 import { systemHealth,systemHealthTrend } from "@/domain/systemHealth";
 import { smartInsights } from "@/domain/smartInsights";
 import { tankContextStats,tankForecast,tankStateView } from "@/domain/tankIntelligence";
@@ -24,7 +24,7 @@ const LAYOUT_KEY="aqua-dashboard-layout-v3";
 
 export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:AppPage)=>void}) {
  const lang=useAquaStore(s=>s.language);
- const ch=chemistryHealth(tank),mh=maintenanceHealth(tank),trend=systemHealthTrend(tank),bio=bioload(tank);
+ const chemistry=chemistryHealthAssessment(tank),ch=chemistry.score,mh=maintenanceHealth(tank),trend=systemHealthTrend(tank),bio=bioload(tank);
  const system=systemHealth(tank),th=system.score;
  const insights=smartInsights(tank),state=tankStateView(tank),forecast=tankForecast(tank),context=tankContextStats(tank);
  const mood=tankMood(tank),predictions=proactivePredictions(tank),memory=biologicalMemory(tank);
@@ -91,17 +91,17 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
  };
 
  const summary:Record<ModuleId,{value:string;note:string;level?:string}>={
-  chemistry:{value:`${ch}%`,note:lang==="ar"?`آخر فحص منذ ${Math.floor(age)} يوم`:`Last test ${Math.floor(age)}d ago`,level:age>7?"warn":"good"},
+  chemistry:{value:ch===null?"N/A":`${ch}%`,note:ch===null?(lang==="ar"?"لا توجد قياسات كافية":"Not enough measured data"):(lang==="ar"?`آخر فحص منذ ${Math.floor(age)} يوم • ثقة ${chemistry.dataConfidence}%`:`Last test ${Math.floor(age)}d ago • confidence ${chemistry.dataConfidence}%`),level:ch===null||chemistry.critical||age>7?"warn":"good"},
   maintenance:{value:`${mh}%`,note:lang==="ar"?(due.length?`${due.length} مهام مستحقة`:"لا مهام متأخرة"):(due.length?`${due.length} due task(s)`:"nothing overdue"),level:mh<70||due.length?"warn":"good"},
   bioload:{value:`${Math.round(bio.ratio*100)}%`,note:livestockSummary,level:bio.status==="danger"||bio.status==="high"?"warn":"good"},
-  forecast:{value:`${forecast.projected7d}%`,note:lang==="ar"?forecast.ar:forecast.en,level:forecast.direction==="declining"?"warn":"good"},
+  forecast:{value:forecast.projected7d===null?"N/A":`${forecast.projected7d}%`,note:lang==="ar"?forecast.ar:forecast.en,level:forecast.projected7d===null||forecast.direction==="declining"?"warn":"good"},
   intelligence:{value:state.score+"%",note:insights[0]?(lang==="ar"?insights[0].ar:insights[0].en):(lang==="ar"?"لا إشارة حرجة إضافية":"No extra critical signal"),level:state.band},
   digitalTwin:{value:"3D",note:lang==="ar"?"يفتح عند الطلب فقط":"Loads on demand"},
   equipment:{value:`${system.equipment}%`,note:lang==="ar"?(system.equipmentAudit.issues[0]?.ar||system.equipmentAudit.suggestions[0]?.ar||`${tank.equipment.length} تجهيزات مسجلة`):(system.equipmentAudit.issues[0]?.en||system.equipmentAudit.suggestions[0]?.en||`${tank.equipment.length} devices registered`),level:system.equipment<75?"warn":"good"},
   predictions:{value:String(predictions.length),note:lang==="ar"?"توقعات متاحة":"available forecasts"},
   memory:{value:String(memory.length),note:lang==="ar"?"روابط متعلمة من تاريخ الحوض":"learned history links"},
   context:{value:String(context.feedings7d),note:lang==="ar"?"تغذيات خلال 7 أيام":"feedings in 7 days"},
-  journey:{value:tank.photos.length?`📷 ${tank.photos.length}`:`〽 ${journeyPoints}`,note:lang==="ar"?`من ${journeyStart} حتى اليوم`:`${journeyStart} → today`,level:trend==="declining"?"warn":"good"}
+  journey:{value:tank.photos.length?`📷 ${tank.photos.length}`:`〽 ${journeyPoints}`,note:trend==="unknown"?(lang==="ar"?"تاريخ غير كافٍ لتحديد الاتجاه":"Not enough history for a trend"):(lang==="ar"?`من ${journeyStart} حتى اليوم`:`${journeyStart} → today`),level:trend==="declining"||trend==="unknown"?"warn":"good"}
  };
 
  const visibleOrder=order.filter(x=>!hidden.includes(x));
