@@ -1,5 +1,5 @@
 import type { Tank } from "./types";
-import { bioload,chemistryHealth,maintenanceHealth } from "./health";
+import { bioload,chemistryHealthAssessment,maintenanceHealth } from "./health";
 import { auditTankCompatibility } from "./compatibility";
 import { equipmentAdequacy } from "./equipmentAdequacy";
 
@@ -15,6 +15,9 @@ export interface SystemHealthResult{
   score:number;
   components:SystemHealthComponent[];
   chemistry:number;
+  chemistryKnown:boolean;
+  chemistryCritical:boolean;
+  chemistryDataConfidence:number;
   maintenance:number;
   bioload:number;
   equipment:number;
@@ -46,7 +49,8 @@ export function livestockHealthScore(tank:Tank){
 }
 
 export function systemHealth(tank:Tank):SystemHealthResult{
-  const chemistry=chemistryHealth(tank);
+  const chemistryAssessment=chemistryHealthAssessment(tank);
+  const chemistry=chemistryAssessment.score??0;
   const maintenance=maintenanceHealth(tank);
   const bio=bioloadHealthScore(tank);
   const equipmentAudit=equipmentAdequacy(tank);
@@ -61,10 +65,12 @@ export function systemHealth(tank:Tank):SystemHealthResult{
     {key:"compatibility",score:compatibilityAudit.score,weight:.15,ar:"توافق الكائنات",en:"Livestock compatibility"},
     {key:"livestock",score:livestock,weight:.05,ar:"حالة الكائنات",en:"Livestock condition"}
   ];
-  const score=clamp(components.reduce((s,x)=>s+x.score*x.weight,0));
+  const activeComponents=components.filter(x=>x.key!=="chemistry"||chemistryAssessment.score!==null);
+  const activeWeight=activeComponents.reduce((s,x)=>s+x.weight,0)||1;
+  const score=clamp(activeComponents.reduce((s,x)=>s+x.score*x.weight,0)/activeWeight);
   return {
     score,components,
-    chemistry,maintenance,bioload:bio,equipment:equipmentAudit.score,
+    chemistry,chemistryKnown:chemistryAssessment.score!==null,chemistryCritical:chemistryAssessment.critical,chemistryDataConfidence:chemistryAssessment.dataConfidence,maintenance,bioload:bio,equipment:equipmentAudit.score,
     compatibility:compatibilityAudit.score,livestock,
     equipmentAudit,compatibilityAudit
   };

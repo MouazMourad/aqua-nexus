@@ -1,6 +1,6 @@
 import type { ChemistryReading, Tank } from "./types";
-import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
 import { chemistryCatalogForTank } from "./chemistryProfile";
+import { chemistryDataConfidence,latestParameterSample } from "./chemistryDataQuality";
 import { recurringMaintenanceHealth } from "./maintenanceSchedule";
 
 export function parameterScore(value: number | null | undefined, meta: any) {
@@ -41,24 +41,28 @@ export function chemistryReadingScore(tank:Tank, reading?:ChemistryReading) {
   return result;
 }
 
-export function chemistryHealth(tank: Tank) {
-  let result=chemistryReadingScore(tank,tank.chemistry[0]);
-  if(result===null)return 50;
-
-  const age = chemistryAgeDays(tank);
-  // Weekly chemistry measurement is mandatory:
-  // after day 7 reduce 3 points/day, capped at -30.
-  if (age > 7) result -= Math.min(30, Math.round((age - 7) * 3));
-  return Math.max(0, result);
+export function chemistryHealthAssessment(tank:Tank){
+  const cfg:any=chemistryCatalogForTank(tank);let weighted=0,totalWeight=0;const criticalKeys:string[]=[],measuredKeys:string[]=[];
+  for(const [key,meta] of Object.entries(cfg) as [string,any][]){const sample=latestParameterSample(tank,key);if(!sample)continue;measuredKeys.push(key);const s=parameterScore(sample.value,meta);if(s===null)continue;const weight=Number(meta.weight||1);weighted+=s*weight;totalWeight+=weight;if(sample.value<meta.safe[0]||sample.value>meta.safe[1])criticalKeys.push(key);}
+  const score=totalWeight?Math.round(weighted/totalWeight):null,data=chemistryDataConfidence(tank);
+  const level=score===null?"unknown":criticalKeys.length?"critical":score<60?"danger":score<80?"warn":"good";
+  return {score,level,critical:criticalKeys.length>0,criticalKeys,measuredKeys,dataConfidence:data.score,coverage:data.coverage,freshness:data.freshness,staleKeys:data.staleKeys,missingKeys:data.missingKeys,lowConfidenceKeys:data.lowConfidenceKeys,reliable:score!==null&&data.score>=70&&criticalKeys.length===0} as const;
 }
+
+/** Legacy numeric accessor. Prefer chemistryHealthAssessment() for UI and safety decisions. */
+export function chemistryHealth(tank: Tank) {return chemistryHealthAssessment(tank).score ?? 0;}
+
 
 export function maintenanceHealth(tank: Tank) {
   return recurringMaintenanceHealth(tank.maintenance);
 }
 
 export function tankHealth(tank: Tank) {
-  return Math.round(chemistryHealth(tank) * .7 + maintenanceHealth(tank) * .3);
+  const chemistry=chemistryHealthAssessment(tank);
+  if(chemistry.score===null)return maintenanceHealth(tank);
+  return Math.round(chemistry.score*.7+maintenanceHealth(tank)*.3);
 }
+
 
 export function chemistryHistoryScore(tank: Tank, readingIndex = 0) {
   return chemistryReadingScore(tank,tank.chemistry[readingIndex]);

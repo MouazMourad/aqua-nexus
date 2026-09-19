@@ -24,10 +24,8 @@ export function systemAlerts(tank:Tank):SystemAlert[]{
   const system=systemHealth(tank);
   const today=new Date().toISOString().slice(0,10);
 
-  if(guide.ageDays>7){
-    pushUnique(out,{id:"chem-stale",level:guide.ageDays>14?"danger":"warn",domain:"chemistry",ar:`آخر فحص كيمياء عمره ${Math.floor(guide.ageDays)} يوم.`,en:`Latest chemistry test is ${Math.floor(guide.ageDays)} days old.`,actionPage:"chemistry"});
-  }
-  for(const x of guide.dataIssues.slice(0,3)){
+  if(guide.health===null)pushUnique(out,{id:"chem-unknown",level:"warn",domain:"chemistry",ar:"بيانات الكيمياء غير كافية لتحديد Chemistry Health موثوق.",en:"Chemistry data is insufficient for a reliable Chemistry Health state.",actionPage:"chemistry"});
+  for(const x of guide.dataIssues.slice(0,5)){
     pushUnique(out,{id:`chem-data-${x.key}`,level:"warn",domain:"chemistry",ar:x.reasonAr,en:x.reasonEn,actionPage:"chemistry"});
   }
   for(const x of guide.problems.slice(0,6)){

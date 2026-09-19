@@ -1,7 +1,7 @@
 import type { Tank } from "./types";
-import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
 import { chemistryCatalogForTank } from "./chemistryProfile";
-import { chemistryAgeDays, chemistryHealth, parameterScore } from "./health";
+import { latestParameterSample,parameterFreshnessDays } from "./chemistryDataQuality";
+import { chemistryHealthAssessment, parameterScore } from "./health";
 
 export type ChemistryAdviceLevel = "good" | "info" | "warn" | "danger";
 
@@ -19,6 +19,7 @@ export interface ChemistryAdviceItem {
   actionAr: string;
   actionEn: string;
   suspectedFormat?: { ar: string; en: string; normalized?: number };
+  timestamp?:string; ageDays?:number; freshnessDays?:number; stale?:boolean; confidence?:"high"|"medium"|"low";
 }
 
 function direction(value:number,min:number,max:number){
@@ -75,12 +76,12 @@ function genericAction(tank:Tank,key:string,dir:"low"|"high"|"ideal"){
 
 export function chemistryGuidance(tank:Tank){
   const cfg:any=chemistryCatalogForTank(tank);
-  const latest=tank.chemistry[0]?.values??{};
   const items:ChemistryAdviceItem[]=[];
 
   Object.entries(cfg).forEach(([key,meta]:[string,any])=>{
-    const raw=latest[key];
-    const value=typeof raw==="number"&&!Number.isNaN(raw)?raw:null;
+    const sample=latestParameterSample(tank,key);
+    const value=sample?.value??null;
+    const freshnessDays=parameterFreshnessDays(tank,key);
     const score=parameterScore(value,meta);
     const ideal:[number,number]=[meta.ideal[0],meta.ideal[1]];
     const safe:[number,number]=[meta.safe[0],meta.safe[1]];
@@ -98,7 +99,7 @@ export function chemistryGuidance(tank:Tank){
     }
 
     if(value===null){
-      items.push({key,level:"info",score:null,current:null,ideal,safe,titleAr:meta.label,titleEn:meta.label,reasonAr:"لا توجد قراءة حالية لهذا العامل.",reasonEn:"No current reading is available for this parameter.",actionAr:"سجّل قراءة قبل اتخاذ قرار مبني على هذا العامل.",actionEn:"Record a reading before making a decision based on this parameter."});
+      items.push({key,level:"info",score:null,current:null,ideal,safe,titleAr:meta.label,titleEn:meta.label,reasonAr:"لا توجد قراءة فعلية لهذا العامل.",reasonEn:"No measured value exists for this parameter.",actionAr:"سجّل قراءة فعلية قبل اتخاذ قرار مبني عليه.",actionEn:"Record an actual measurement before making a decision based on it.",freshnessDays});
       return;
     }
 
@@ -126,7 +127,7 @@ export function chemistryGuidance(tank:Tank){
       reasonEn:suspectedFormat?reasonEn+" "+suspectedFormat.en:reasonEn,
       actionAr:suspectedFormat?"صحح تنسيق القراءة أولاً ثم أعد تقييم الكيمياء قبل أي تعديل فعلي في الحوض.":action.ar,
       actionEn:suspectedFormat?"Correct the recorded value format first, then reassess chemistry before making a real tank adjustment.":action.en,
-      suspectedFormat
+      suspectedFormat,timestamp:sample?.timestamp,ageDays:sample?.ageDays,freshnessDays,stale:Boolean(sample&&sample.ageDays>freshnessDays),confidence:sample?.confidence
     });
   });
 
@@ -137,30 +138,16 @@ export function chemistryGuidance(tank:Tank){
     return (a.score??101)-(b.score??101);
   });
 
-  const readingConfidence=tank.chemistry[0]?.confidence;
-  const confidenceIssues=readingConfidence==="low"
-    ? items.filter(x=>x.current!==null).map(x=>({
-        ...x,
-        level:"warn" as const,
-        reasonAr:`ثقة آخر قراءة منخفضة؛ قيمة ${x.titleAr} لا يجب استخدامها لقرار تصحيحي قبل إعادة القياس.`,
-        reasonEn:`The latest reading has low confidence; ${x.titleEn} should not drive a corrective action until it is retested.`,
-        actionAr:"أعد القياس بأداة/كيت موثوق قبل الجرعات أو التعديلات التصحيحية.",
-        actionEn:"Retest with a reliable kit/device before corrective dosing or adjustments."
-      }))
-    : [];
   const problems=items.filter(x=>x.level==="danger"||x.level==="warn"||x.suspectedFormat);
-  const dataIssues=[...items.filter(x=>Boolean(x.suspectedFormat)),...confidenceIssues];
-  const age=chemistryAgeDays(tank);
-  const health=chemistryHealth(tank);
-  const agePenalty=age>7?Math.min(30,Math.round((age-7)*3)):0;
-
+  const dataIssues=items.filter(x=>x.suspectedFormat||x.stale||x.confidence==="low").map(x=>{
+    if(x.suspectedFormat)return x;
+    if(x.confidence==="low")return {...x,level:"warn" as const,reasonAr:`ثقة آخر قراءة لـ ${x.titleAr} منخفضة؛ لا تعتمد عليها لقرار تصحيحي.`,reasonEn:`Latest ${x.titleEn} reading has low confidence and should not drive corrective action.`,actionAr:"أعد القياس بأداة/كيت موثوق.",actionEn:"Retest with a reliable kit/device."};
+    return {...x,level:"warn" as const,reasonAr:`قراءة ${x.titleAr} عمرها ${Math.floor(x.ageDays??0)} يوم بينما حد حداثتها المرجعي ${x.freshnessDays} يوم.`,reasonEn:`${x.titleEn} reading is ${Math.floor(x.ageDays??0)} days old; its reference freshness window is ${x.freshnessDays} day(s).`,actionAr:"أعد قياس هذا العامل قبل الاعتماد عليه في قرار حالي.",actionEn:"Retest this parameter before relying on it for a current decision."};
+  });
+  const assessment=chemistryHealthAssessment(tank),health=assessment.score;
   return {
-    health,ageDays:age,agePenalty,problems,dataIssues,all:items,
-    headlineAr:readingConfidence==="low"
-      ?"آخر قراءة ثقتها منخفضة؛ أعد الفحص قبل أي جرعة أو تعديل تصحيحي."
-      :problems.length?"صحة الكيمياء "+health+"% لأن "+problems.length+" عامل/عوامل تحتاج انتباه.":"صحة الكيمياء "+health+"% والقيم الحالية ضمن وضع جيد.",
-    headlineEn:readingConfidence==="low"
-      ?"The latest chemistry reading has low confidence; retest before corrective dosing or adjustments."
-      :problems.length?"Chemistry health is "+health+"% because "+problems.length+" parameter(s) need attention.":"Chemistry health is "+health+"% and current values are in good condition."
+    health,ageDays:items.filter(x=>x.ageDays!==undefined).reduce((m,x)=>Math.min(m,x.ageDays??999),999),agePenalty:0,dataConfidence:assessment.dataConfidence,coverage:assessment.coverage,freshness:assessment.freshness,critical:assessment.critical,criticalKeys:assessment.criticalKeys,problems,dataIssues,all:items,
+    headlineAr:health===null?"لا توجد بيانات كافية لإعطاء Chemistry Health موثوق.":assessment.critical?`يوجد عامل حرج خارج المجال الآمن (${assessment.criticalKeys.join("، ")}) حتى لو كان المتوسط ${health}%.`:assessment.dataConfidence<70?`Chemistry Health = ${health}% لكن ثقة البيانات ${assessment.dataConfidence}%؛ لا تعتبر الرقم حالة مؤكدة قبل تحديث القياسات.`:problems.length?`Chemistry Health = ${health}% لأن ${problems.length} عامل/عوامل تحتاج انتباه.`:`Chemistry Health = ${health}% والقيم المقاسة الحالية ضمن وضع جيد.`,
+    headlineEn:health===null?"There is not enough measured data to provide a reliable Chemistry Health score.":assessment.critical?`A critical parameter is outside its safe range (${assessment.criticalKeys.join(", ")}) even though the average is ${health}%.`:assessment.dataConfidence<70?`Chemistry Health = ${health}%, but data confidence is only ${assessment.dataConfidence}%; do not treat the number as a confirmed current state until readings are refreshed.`:problems.length?`Chemistry Health = ${health}% because ${problems.length} parameter(s) need attention.`:`Chemistry Health = ${health}% and the measured values are in good condition.`
   };
 }
