@@ -184,7 +184,7 @@ export function answerSpecialOperation(tank:Tank,intent:AquaQuestionIntent,plan:
   const procedure=procedureAnswer(tank,intent);
   if(procedure)return procedure;
  }
- if(plan.operation==="when"&&(plan.primary==="maintenance"||plan.primary==="equipment"))return maintenanceWhenAnswer(tank,intent);
+ if((plan.operation==="when"||(plan.operation==="list"&&plan.primary==="maintenance"))&&(plan.primary==="maintenance"||plan.primary==="equipment"))return maintenanceWhenAnswer(tank,intent);
  if(plan.operation==="latest")return latestTankAnswer(tank,plan);
  if(plan.operation==="list"||plan.operation==="count")return listOrCountAnswer(tank,plan);
  return undefined;
