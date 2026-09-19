@@ -472,7 +472,10 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   // is planned generically by domain + operation, so one signal cannot hijack unrelated topics.
   if(intent.params.length>1)return multiParameterAnswer(tank,intent.params);
   if(intent.params.length===1)return parameterAnswer(tank,intent.params[0] as Param);
-  if(intent.mode==="canAdd")return stockingReadinessAnswer(tank,question);
+  if(intent.mode==="canAdd"){
+    if(tank.chemistry.length===0)return {titleAr:"جاهزية إضافة كائنات",titleEn:"Livestock addition readiness",summaryAr:"ما في بيانات كافية حتى أعتبر الحوض جاهز للإضافة.",summaryEn:"There is not enough evidence to consider the tank ready for an addition.",detailsAr:["سجّل قراءات كيمياء حديثة أولاً ثم أعد تقييم الجاهزية."],detailsEn:["Log recent chemistry readings first, then reassess readiness."],evidenceAr:[],evidenceEn:[],missingEvidenceAr:["قراءات كيمياء حديثة"],missingEvidenceEn:["recent chemistry readings"],factsAr:["لا توجد قراءات كيمياء مسجلة."],factsEn:["No chemistry readings are logged."],inferencesAr:["لا يمكن إثبات الجاهزية من غياب البيانات."],inferencesEn:["Readiness cannot be established from missing data."],confidence:"low",action:{page:"chemistry",ar:"سجّل قراءات الكيمياء",en:"Log chemistry readings"}};
+    return stockingReadinessAnswer(tank,question);
+  }
   if(intent.mode==="whatIf")return answerAquaQuery(tank,intent);
   if(intent.mode==="waterChange")return waterChangeAnswer(tank);
   if(intent.mode==="forecast")return forecastAnswer(tank);
