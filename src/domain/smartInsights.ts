@@ -1,5 +1,5 @@
 import type { Tank } from "./types";
-import { chemistryAgeDays, chemistryHealth, tankHealthTrend, bioload } from "./health";
+import { chemistryAgeDays, chemistryHealthAssessment, tankHealthTrend, bioload } from "./health";
 import { analyzeNutrients } from "./nutrientEngine";
 import { mediaPredictions } from "./mediaPredictor";
 import { learnedTankSignals } from "./tankPatterns";
@@ -72,7 +72,7 @@ export function smartInsights(tank: Tank): SmartInsight[] {
 }
 
 export function forecastTank(tank: Tank) {
-  const chem = chemistryHealth(tank),trend = tankHealthTrend(tank),nutrients = analyzeNutrients(tank);
+  const chem = chemistryHealthAssessment(tank).score,trend = tankHealthTrend(tank),nutrients = analyzeNutrients(tank);
   const nutrientRisk = ["both-depleted","phosphate-depleted","nitrate-depleted","elevated"].includes(nutrients.state);
   const mediaRisk=mediaPredictions(tank).some(x=>x.prediction.state==="replace");
   const emergencyActive=(tank.emergencySessions??[]).some(x=>x.status==="active");
@@ -81,7 +81,7 @@ export function forecastTank(tank: Tank) {
   const urgentVision=((tank as any).visionAssessments??[])[0]?.triage?.level==="urgent";
 
   if (emergencyActive) return {ar:"التوقع غير مستقر حالياً لأن بروتوكول طوارئ ما يزال نشطاً. أكمل خطوات الاستجابة ثم أعد تقييم الكيمياء والمعدات قبل الاعتماد على توقع 7 أيام.",en:"Forecast is temporarily unstable because an emergency protocol is still active. Complete the response and recheck chemistry/equipment before relying on the 7-day outlook."};
-  if (trend==="declining" || chem<60 || nutrientRisk || mediaRisk || learnedRisk || nearPrediction || urgentVision) return {ar:"إذا استمر الاتجاه الحالي فهناك احتمال تراجع إضافي خلال 7 أيام. ابدأ بالفحوص والمهام المتأخرة، راجع نمط الحوض الشخصي وأي تقييم بصري حديث وميديا الفلترة، وصحح أي اختلال تدريجياً دون تغييرات حادة.",en:"If the current trend continues, further decline is possible within 7 days. Start with overdue tests and maintenance, review the tank's personalized pattern, recent visual assessment and filter media, then correct imbalances gradually without abrupt changes."};
+  if (trend==="declining" || (chem!==null&&chem<60) || nutrientRisk || mediaRisk || learnedRisk || nearPrediction || urgentVision) return {ar:"إذا استمر الاتجاه الحالي فهناك احتمال تراجع إضافي خلال 7 أيام. ابدأ بالفحوص والمهام المتأخرة، راجع نمط الحوض الشخصي وأي تقييم بصري حديث وميديا الفلترة، وصحح أي اختلال تدريجياً دون تغييرات حادة.",en:"If the current trend continues, further decline is possible within 7 days. Start with overdue tests and maintenance, review the tank's personalized pattern, recent visual assessment and filter media, then correct imbalances gradually without abrupt changes."};
   if (trend==="improving") return {ar:"الاتجاه الحالي إيجابي، ومع استمرار الصيانة والفحوص الأسبوعية واستقرار NO3/PO4 وميديا الفلترة يُتوقع بقاء النظام مستقراً أو تحسنه.",en:"The current trend is positive. With regular maintenance, weekly testing, stable NO3/PO4 and healthy filter media, the system is expected to remain stable or improve."};
   return {ar:"التوقع الحالي مستقر، بشرط استمرار الصيانة الأسبوعية وعدم تأخير قياسات الكيمياء أو السماح للمغذيات بالوصول إلى الصفر ومراجعة ميديا الفلترة عند اقتراب عمرها المتوقع.",en:"The current forecast is stable, provided weekly maintenance and chemistry testing stay on schedule, nutrients do not bottom out, and filter media is reviewed near its estimated end of life."};
 }
