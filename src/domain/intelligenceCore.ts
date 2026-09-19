@@ -6,8 +6,6 @@ import { systemAlerts } from "./alertEngine";
 import { smartInsights } from "./smartInsights";
 import { healthTimeline,tankForecast,tankStateView } from "./tankIntelligence";
 import { proactivePredictions,biologicalMemory } from "./tankLearning";
-import { chemistryGuidance } from "./chemistryGuidance";
-import { unifiedInventory } from "./inventoryIntelligence";
 
 export type IntelligenceDomain =
  "chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|
@@ -76,33 +74,6 @@ export function tankIntelligenceCore(tank:Tank):TankIntelligenceCore{
  const memory=biologicalMemory(tank);
  const maint=maintenanceHealth(tank);
  const bio=bioload(tank);
- const stock=unifiedInventory(tank);
- const chemistryGuide=chemistryGuidance(tank);
-
- const pageByDomain:Record<IntelligenceDomain,string>={
-  chemistry:"chemistry",maintenance:"maintenance",
-  equipment:"equipment",livestock:"livestock",inventory:"inventory",dosing:"dosing",feeding:"feeding",
-  waterChange:"water-change",rodi:"rodi",quarantine:"quarantine",emergency:"emergency",acclimation:"acclimation",
-  sump:"sump",journal:"journal",expense:"expenses",system:"dashboard"
- };
- const chemistryResource:Record<string,string|undefined>={KH:"khBuffer",Ca:"calcium",Mg:"magnesium",PO4:"phosphateMedia",salinity:"marineSalt"};
- const impacts:CrossPageImpact[]=chemistryGuide.problems.map(problem=>{
-  const resourcePresetId=chemistryResource[problem.key];
-  const resource=resourcePresetId?stock.general.find(x=>tank.inventory.find(i=>i.id===x.id)?.presetId===resourcePresetId):undefined;
-  const resourceAvailable=resourcePresetId?Boolean(resource&&resource.quantity>0):undefined;
-  const sampleConfidence=problem.confidence==="high"?100:problem.confidence==="medium"?70:problem.confidence==="low"?40:55;
-  const scorePenalty=problem.score===null?20:Math.max(0,100-problem.score);
-  const weight=Math.max(1,Math.min(100,Math.round(scorePenalty*(problem.level==="danger"?1.15:.85))));
-  const domains:IntelligenceDomain[]=["chemistry","maintenance"];
-  if(resourcePresetId)domains.push("inventory");
-  return {
-   id:`impact-chem-${problem.key}`,source:"chemistry" as const,domains,
-   level:problem.level==="danger"?"danger" as const:"warn" as const,weight,confidence:sampleConfidence,
-   ar:resourcePresetId&&!resourceAvailable?`${problem.reasonAr} المادة المطلوبة للتصحيح غير متوفرة بالمخزون؛ يلزم تأمينها قبل التنفيذ.`:problem.reasonAr,
-   en:resourcePresetId&&!resourceAvailable?`${problem.reasonEn} The corrective material is not available in inventory; restock it before execution.`:problem.reasonEn,
-   resourcePresetId,resourceAvailable,suggestedPage:resourcePresetId&&!resourceAvailable?"inventory":"maintenance"
-  };
- });
  const guidanceActions:GuidanceAction[]=deriveGuidanceActions(tank);
  const rank={danger:0,warn:1,info:2};
  const openGuidance=guidanceActions.filter(g=>!["resolved","verified"].includes(g.status));
@@ -131,7 +102,7 @@ export function tankIntelligenceCore(tank:Tank):TankIntelligenceCore{
 
  return {
   generatedAt:new Date().toISOString(),health,state,chemistry,maintenance:maint,bioload:bio,
-  alerts,insights,forecast,history,predictions,memory,actions,impacts,guidanceActions,dataConfidence,
+  alerts,insights,forecast,history,predictions,memory,actions,guidanceActions,dataConfidence,
   critical:alerts.some(x=>x.level==="danger")||health.chemistryCritical
  };
 }
