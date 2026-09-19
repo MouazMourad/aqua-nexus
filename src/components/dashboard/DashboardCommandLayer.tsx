@@ -124,7 +124,7 @@ export function DashboardCommandLayer(){
    emergency:"emergency",acclimation:"acclimation",system:"dashboard"
   };
   const risks:RiskItem[]=core.actions
-   .filter(action=>action.level==="danger"||action.level==="warn")
+   .filter((action):action is typeof action & {level:"danger"|"warn"}=>action.level==="danger"||action.level==="warn")
    .map(action=>({
     key:action.id,
     page:(action.page as AppPage|undefined)??alertPageFallback[action.domain]??"dashboard",
