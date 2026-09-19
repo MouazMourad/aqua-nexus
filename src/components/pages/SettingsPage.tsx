@@ -2,7 +2,7 @@
 import { useEffect,useRef,useState } from "react";
 import type { Tank } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
-import { tr } from "@/i18n";
+import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { downloadText,today } from "@/lib/appUtils";
 import { syncPushReminders } from "@/lib/pushNotifications";
@@ -11,6 +11,8 @@ export function SettingsPage({tank}:{tank:Tank}) {
  const state=useAquaStore(),patch=useAquaStore(s=>s.patchTank),del=useAquaStore(s=>s.deleteTank),replace=useAquaStore(s=>s.replaceData),[name,setName]=useState(tank.name),file=useRef<HTMLInputElement>(null),lang=state.language;
  const [notificationState,setNotificationState]=useState<"unknown"|"enabled"|"disabled"|"unsupported"|"busy">("unknown");
  const [notificationNote,setNotificationNote]=useState("");
+ const profile=tank.ecosystemProfile??"auto";
+ const energy=tank.energySettings??{pricePerKwh:0,currency:"USD"};
  const exportBackup=()=>downloadText(`Aqua_Nexus_Backup_${today()}.json`,JSON.stringify({language:state.language,selectedTankId:state.selectedTankId,tanks:state.tanks},null,2));
 
  useEffect(()=>{
@@ -65,6 +67,13 @@ export function SettingsPage({tank}:{tank:Tank}) {
  <div className="card panel"><label className="field"><span>{tr(lang,"language")}</span><select value={lang} onChange={e=>state.setLanguage(e.target.value as any)}><option value="ar">{tr(lang,"arabic")}</option><option value="en">{tr(lang,"english")}</option></select></label><label className="field"><span>{tr(lang,"name")}</span><input value={name} onChange={e=>setName(e.target.value)}/></label><button className="btn primary" onClick={()=>patch(tank.id,{name})}>{tr(lang,"save")}</button><div className="inline-alert good">{tr(lang,"actualTranslationNote")}</div></div>
 
  <div className="card panel">
+  <h3>{bi(lang,"بروفايل الحوض والحسابات","Tank profile & calculations")}</h3>
+  <p className="note">{bi(lang,"البروفايل يؤثر على أهداف الكيمياء ومتطلبات الإنارة/الحركة وتقييم التجهيزات. Auto يستنتج من الكائنات.","The profile affects chemistry targets, lighting/flow requirements and equipment adequacy. Auto infers from livestock.")}</p>
+  <label className="field"><span>{bi(lang,"بروفايل النظام","System profile")}</span><select value={profile} onChange={e=>patch(tank.id,t=>({...t,ecosystemProfile:e.target.value==="auto"?undefined:e.target.value as any}))}><option value="auto">Auto</option>{tank.type==="marine"?<><option value="reef">Reef</option><option value="fishOnly">Fish-only</option></>:<><option value="planted">Planted</option><option value="fishOnly">Fish-only</option></>}</select></label>
+  <div className="form-grid"><label className="field"><span>{bi(lang,"سعر الكهرباء / kWh","Electricity price / kWh")}</span><input type="number" min="0" step="any" value={energy.pricePerKwh} onChange={e=>patch(tank.id,t=>({...t,energySettings:{pricePerKwh:Number(e.target.value),currency:t.energySettings?.currency||"USD"}}))}/></label><label className="field"><span>{tr(lang,"currency")}</span><input value={energy.currency} onChange={e=>patch(tank.id,t=>({...t,energySettings:{pricePerKwh:t.energySettings?.pricePerKwh??0,currency:e.target.value}}))}/></label></div>
+ </div>
+
+ <div className="card panel">
   <h3>🔔 {lang==="ar"?"تنبيهات الهاتف":"Phone notifications"}</h3>
   <p className="note">{lang==="ar"?"تنبيهات عند مرور أكثر من أسبوع بدون متابعة الحوض، أو عندما تصبح حالة الحوض غير مستقرة.":"Alerts when a tank has not been checked for over a week, or when its condition becomes unstable."}</p>
   <div className={`inline-alert ${notificationsEnabled?"good":"warn"}`}>{lang==="ar"?"الحالة":"Status"}: <b>{notificationStatus}</b></div>
@@ -72,6 +81,6 @@ export function SettingsPage({tank}:{tank:Tank}) {
   {notificationState!=="unsupported"&&<button className="btn primary" style={{marginTop:10}} onClick={enableNotifications} disabled={notificationState==="busy"||notificationsEnabled}>{notificationState==="busy"?(lang==="ar"?"جاري التفعيل...":"Enabling..."):notificationsEnabled?(lang==="ar"?"التنبيهات مفعّلة":"Notifications enabled"):(lang==="ar"?"تفعيل التنبيهات":"Enable notifications")}</button>}
  </div>
 
- <div className="card panel"><h3>{tr(lang,"dataSync")}</h3><p className="note">{tr(lang,"localStorageNote")}</p><button className="btn" onClick={exportBackup}>{tr(lang,"export")} JSON</button> <button className="btn" onClick={()=>file.current?.click()}>{tr(lang,"import")}</button><input ref={file} type="file" accept=".json" hidden onChange={e=>importFile(e.target.files?.[0])}/><hr/><button className="btn danger" onClick={()=>{if(confirm(tr(lang,"confirmDeleteTank")))del(tank.id)}}>{tr(lang,"deleteTank")}</button></div>
+ <div className="card panel"><h3>{tr(lang,"dataSync")}</h3><p className="note">{tr(lang,"localStorageNote")}</p><div className="inline-alert info">{bi(lang,"النسخة الحالية Local-first. ملف JSON هو نسخة الاستعادة الكاملة؛ Cloud account/sync يبقى مرحلة SaaS منفصلة ولا يتم ادعاء وجوده قبل بنائه فعلياً.","The current build is local-first. JSON is the full recovery backup; cloud account/sync remains a separate SaaS phase and is not presented as active until actually implemented.")}</div><button className="btn" onClick={exportBackup}>{tr(lang,"export")} JSON</button> <button className="btn" onClick={()=>file.current?.click()}>{tr(lang,"import")}</button><input ref={file} type="file" accept=".json" hidden onChange={e=>importFile(e.target.files?.[0])}/><hr/><button className="btn danger" onClick={()=>{if(confirm(tr(lang,"confirmDeleteTank")))del(tank.id)}}>{tr(lang,"deleteTank")}</button></div>
  </section>;
 }

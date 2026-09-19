@@ -1,5 +1,5 @@
 import type { Tank } from "./types";
-import { bioload, chemistryHealth, maintenanceHealth, tankHealth } from "./health";
+import { bioload, chemistryHealth, maintenanceHealth } from "./health";
 import { smartInsights } from "./smartInsights";
 import { tankForecast, tankStateView } from "./tankIntelligence";
 import { biologicalMemory, eventChemistryLinks, proactivePredictions, tankMood } from "./tankLearning";
@@ -11,6 +11,8 @@ import { reasonLocally } from "./aquaAILocalReasoner";
 import { compatibilityCheck } from "./compatibility";
 import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
 import { answerAquaQuery } from "./aquaAIQueryEngine";
+import { systemAlerts } from "./alertEngine";
+import { maintenanceEffectiveState } from "./maintenanceSchedule";
 
 export type AquaAIConfidence="low"|"medium"|"high";
 export type AquaAIPage="dashboard"|"chemistry"|"maintenance"|"equipment"|"livestock"|"timeline"|"dosing"|"quarantine"|"emergency"|"rodi"|"journal"|"acclimation"|"inventory"|"feeding"|"waterchange"|"expenses"|"sump"|"diseases"|"alerts";
@@ -100,17 +102,18 @@ export function nextBestAction(tank:Tank):AquaAIAction{
   if(activeEmergency)return {page:"emergency",ar:"أكمل بروتوكول الطوارئ النشط",en:"Continue the active emergency protocol"};
   const chemistry=chemistryGuidance(tank);
   if(chemistry.dataIssues.length){const issue=chemistry.dataIssues[0];return {page:"chemistry",ar:issue.actionAr,en:issue.actionEn};}
-  if(chemistry.problems.length){const issue=chemistry.problems[0];return {page:"chemistry",ar:`${issue.titleAr}: ${issue.actionAr}`,en:`${issue.titleEn}: ${issue.actionEn}`};}
-  const today=new Date().toISOString().slice(0,10);
-  const overdue=tank.maintenance.filter(x=>!x.done&&(!x.nextDue||x.nextDue<=today));
+  const alerts=systemAlerts(tank);
+  const critical=alerts.find(x=>x.level==="danger"&&x.actionPage);
+  if(critical?.actionPage)return {page:critical.actionPage,ar:critical.ar,en:critical.en};
   const oldChem=tank.chemistry[0]?Math.floor((Date.now()-new Date(tank.chemistry[0].timestamp).getTime())/DAY):999;
   if(oldChem>7)return {page:"chemistry",ar:"سجّل فحصاً كيميائياً جديداً",en:"Log a fresh chemistry test"};
   const pred=proactivePredictions(tank)[0];
   if(pred&&pred.days<=5&&["KH","Ca","Mg"].includes(pred.parameter))return {page:"dosing",ar:`راجع جرعة ${pred.parameter} قبل الوصول إلى الحد الأدنى`,en:`Review ${pred.parameter} dosing before the lower boundary`};
-  if(overdue.length)return {page:"maintenance",ar:`أنجز ${overdue.length} مهمة صيانة مستحقة`,en:`Complete ${overdue.length} due maintenance task(s)`};
-  const warning=tank.equipment.find(x=>x.status==="warning"||x.status==="service");
-  if(warning)return {page:"equipment",ar:`راجع ${warning.name}`,en:`Review ${warning.name}`};
-  if(tank.quarantine.some(x=>x.status==="active"))return {page:"quarantine",ar:"راجع الحجر أو العلاج النشط",en:"Review the active quarantine/treatment"};
+  const today=new Date().toISOString().slice(0,10);
+  const overdue=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).overdue);
+  if(overdue.length)return {page:"maintenance",ar:`أنجز ${overdue.length} مهمة صيانة متأخرة`,en:`Complete ${overdue.length} overdue maintenance task(s)`};
+  const warning=alerts.find(x=>x.level==="warn"&&x.actionPage);
+  if(warning?.actionPage)return {page:warning.actionPage,ar:warning.ar,en:warning.en};
   return {page:"dashboard",ar:"استمر بالمراقبة وسجّل أي تغير مهم",en:"Keep monitoring and log meaningful changes"};
 }
 
@@ -183,8 +186,8 @@ function forecastAnswer(tank:Tank):AquaAIAnswer{
 
 function maintenanceAnswer(tank:Tank):AquaAIAnswer{
   const today=new Date().toISOString().slice(0,10);
-  const due=tank.maintenance.filter(x=>!x.done&&(!x.nextDue||x.nextDue<=today));
-  const upcoming=tank.maintenance.filter(x=>!x.done&&x.nextDue&&x.nextDue>today).sort((a,b)=>String(a.nextDue).localeCompare(String(b.nextDue))).slice(0,3);
+  const due=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).due);
+  const upcoming=tank.maintenance.filter(x=>!maintenanceEffectiveState(x,today).completed&&x.nextDue&&x.nextDue>today).sort((a,b)=>String(a.nextDue).localeCompare(String(b.nextDue))).slice(0,3);
   return {
     titleAr:"تحليل الصيانة",titleEn:"Maintenance analysis",
     summaryAr:due.length?`هناك ${due.length} مهمة مستحقة تؤثر على حالة الصيانة الحالية.`:"لا توجد مهام متأخرة حالياً.",

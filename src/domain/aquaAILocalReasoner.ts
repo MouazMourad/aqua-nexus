@@ -7,6 +7,12 @@ import { eventChemistryLinks, proactivePredictions } from "./tankLearning";
 import { learnedTankSignals, repeatedResponsePatterns, tankBaselines } from "./tankPatterns";
 import { analyzeNutrients } from "./nutrientEngine";
 import { systemHealth } from "./systemHealth";
+import { systemAlerts } from "./alertEngine";
+import { unifiedInventory } from "./inventoryIntelligence";
+import { rodiIntelligence } from "./rodiIntelligence";
+import { sumpIntelligence } from "./sumpIntelligence";
+import { feedingIntelligence } from "./feedingIntelligence";
+import { maintenanceEffectiveState } from "./maintenanceSchedule";
 
 export type LocalReasoningLevel="good"|"info"|"warn"|"danger";
 export type LocalReasoningConfidence="low"|"medium"|"high";
@@ -66,6 +72,7 @@ function topicRelevant(intent:AquaQuestionIntent,topic:string){return intent.top
 export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasoningResult{
  const guide=chemistryGuidance(tank),state=tankStateView(tank),bio=bioload(tank),nutrients=analyzeNutrients(tank);
  const system=systemHealth(tank);
+ const allAlerts=systemAlerts(tank),stock=unifiedInventory(tank),rodiState=rodiIntelligence(tank),sumpState=sumpIntelligence(tank),feedingState=feedingIntelligence(tank);
  const age=chemistryAgeDays(tank);
  const today=new Date().toISOString().slice(0,10);
  const signals:LocalReasoningSignal[]=[];
@@ -158,7 +165,7 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
   pushAction({id:`equip-action-${item.id}`,priority:critical?98:72,level:critical?"danger":"warn",page:"equipment",ar:`افحص ${item.name} ووظيفته الفعلية الآن.`,en:`Inspect ${item.name} and verify its real operation now.`,whyAr:critical?"لأنه جهاز حرج لاستمرار الدوران/الحرارة/الأمان.":"لأن الجهاز مسجل بحاجة انتباه أو صيانة.",whyEn:critical?"It is critical to circulation, temperature, or system safety.":"The device is logged as needing attention or service.",recheckAr:"بعد الفحص حدّث حالة الجهاز وراقب أثره على الحوض.",recheckEn:"After inspection, update the device status and monitor tank response."});
  }
 
- const overdue=tank.maintenance.filter(x=>!x.done&&x.nextDue&&x.nextDue<=today);
+ const overdue=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).overdue);
  if(overdue.length&&(topicRelevant(intent,"maintenance")||intent.topics.includes("general"))){
   pushSignal({id:"maintenance-overdue",level:maintenanceHealth(tank)<50?"danger":"warn",confidence:"high",source:"maintenance",score:65,ar:`هناك ${overdue.length} مهمة صيانة مستحقة؛ أقربها ${overdue[0].title}.`,en:`There are ${overdue.length} overdue maintenance task(s); first: ${overdue[0].titleEn||overdue[0].title}.`});
   pushAction({id:"maintenance-action",priority:62,level:"warn",page:"maintenance",ar:`ابدأ بمهمة الصيانة الأعلى تأثيراً: ${overdue[0].title}.`,en:`Start with the highest-impact due task: ${overdue[0].titleEn||overdue[0].title}.`,whyAr:"تأخر الصيانة ممكن يفسر جزءاً من تراجع الاستقرار أو تراكم المغذيات.",whyEn:"Delayed maintenance can contribute to reduced stability or nutrient accumulation.",recheckAr:"بعد التنفيذ حدّث المهمة وراقب القراءة التالية.",recheckEn:"After completion, update the task and watch the next reading."});
@@ -197,6 +204,41 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
  if(activeAcclimation.length&&guide.problems.some(x=>x.level==="warn"||x.level==="danger")){
   pushAction({id:"acclimation-change-gate",priority:78,level:"warn",page:"acclimation",ar:"أثناء الأقلمة لا تعمل عدة تصحيحات كبيرة مع بعض؛ نفذ فقط الإجراء الضروري الأعلى أولوية ثم راقب.",en:"During acclimation, avoid several major corrections at once; perform only the highest-priority necessary action, then observe.",whyAr:"الكائنات الجديدة تحت إجهاد انتقال وأي تغييرات متعددة بتصعّب معرفة سبب الاستجابة.",whyEn:"New livestock is already under transition stress, and multiple changes make the response harder to interpret.",recheckAr:"أعد تقييم الكيمياء وسلوك الكائنات بعد انتهاء الأقلمة.",recheckEn:"Reassess chemistry and livestock behavior after acclimation."});
  }
+ // Cross-module operational context: broad/action questions must see the whole aquarium.
+ if(broadQuestion||intent.mode==="action"||intent.mode==="status"){
+  for(const alert of allAlerts.filter(x=>x.level!=="info").slice(0,5)){
+   const source:LocalReasoningSignal["source"]=alert.domain==="equipment"?"equipment":alert.domain==="maintenance"?"maintenance":alert.domain==="livestock"?"livestock":alert.domain==="chemistry"?"chemistry":"data";
+   pushSignal({id:`system-alert-${alert.id}`,level:alert.level,confidence:"high",source,score:alert.level==="danger"?98:72,ar:alert.ar,en:alert.en});
+   if(alert.actionPage)pushAction({id:`system-alert-action-${alert.id}`,priority:alert.level==="danger"?97:70,level:alert.level,page:alert.actionPage,ar:`راجع ${alert.ar}`,en:`Review: ${alert.en}`,whyAr:"هذا التنبيه صادر من محرك التنبيهات الموحد ويؤثر على استقرار النظام.",whyEn:"This comes from the unified alert engine and affects overall system stability.",recheckAr:"بعد معالجة السبب حدّث البيانات وأعد تقييم الصحة العامة.",recheckEn:"After addressing the cause, update the data and reassess overall health."});
+  }
+ }
+ if((broadQuestion||intent.topics.includes("inventory"))&&stock.low.length){
+  const x=stock.low[0];
+  pushSignal({id:"inventory-low",level:x.quantity<=0?"danger":"warn",confidence:"high",source:"data",score:x.quantity<=0?88:64,ar:`المخزون منخفض: ${x.name} (${x.quantity} ${x.unit}، الحد ${x.minimum}).`,en:`Low stock: ${x.nameEn||x.name} (${x.quantity} ${x.unit}, minimum ${x.minimum}).`});
+  pushAction({id:"inventory-restock",priority:x.quantity<=0?82:58,level:x.quantity<=0?"danger":"warn",page:"inventory",ar:`جهّز مخزون ${x.name} قبل ما تحتاجه بطارئ أو صيانة.`,en:`Restock ${x.nameEn||x.name} before it is needed for maintenance or an emergency.`,whyAr:"المستهلك أو القطعة الناقصة ممكن تحول عطل بسيط لمشكلة أكبر.",whyEn:"A missing consumable or spare can turn a minor issue into a larger failure.",recheckAr:"بعد الشراء حدّث الكمية بالمخزون.",recheckEn:"Update stock quantity after restocking."});
+ }
+ if((broadQuestion||intent.topics.includes("rodi"))&&rodiState.status!=="unknown"&&rodiState.status!=="good"){
+  pushSignal({id:"rodi-quality",level:rodiState.status==="danger"?"danger":"warn",confidence:"high",source:"data",score:rodiState.status==="danger"?86:62,ar:`RO/DI يحتاج مراجعة: ${rodiState.notes[0]}`,en:`RO/DI needs review: ${rodiState.notes[0]}`});
+  pushAction({id:"rodi-review",priority:66,level:"warn",page:"rodi",ar:"راجع TDS الخارج ونسبة رفض الممبرين وDI resin قبل تحضير ماء جديد.",en:"Review output TDS, membrane rejection and DI resin before preparing new water.",whyAr:"جودة ماء المصدر تدخل مباشرة بكل تغيير ماء وتعويض.",whyEn:"Source-water quality directly affects every water change and top-off.",recheckAr:"سجل دفعة RO/DI جديدة بعد الصيانة.",recheckEn:"Log a fresh RO/DI batch after service."});
+ }
+ if((broadQuestion||intent.topics.includes("sump"))&&sumpState.enabled&&sumpState.issues.length){
+  pushSignal({id:"sump-safety",level:sumpState.safetyMargin<0?"danger":"warn",confidence:"medium",source:"equipment",score:sumpState.safetyMargin<0?91:61,ar:`السامب يحتاج مراجعة: ${sumpState.issues[0]}`,en:`Sump needs review: ${sumpState.issues[0]}`});
+  pushAction({id:"sump-review",priority:sumpState.safetyMargin<0?89:59,level:sumpState.safetyMargin<0?"danger":"warn",page:"sump",ar:"راجع هندسة السامب وهامش الـFreeboard واختبار فصل الكهرباء.",en:"Review sump geometry, freeboard and a safe power-off test.",whyAr:"هامش الرجوع عند فصل الكهرباء جزء من أمان النظام وليس مجرد شكل السامب.",whyEn:"Drain-back reserve during power loss is a system-safety requirement, not just layout.",recheckAr:"بعد التعديل أعد حساب هامش الأمان وسجل اختبار فصل الكهرباء.",recheckEn:"After changes, recalculate the safety margin and log a power-off test."});
+ }
+ if((broadQuestion||intent.topics.includes("feeding"))&&feedingState.nutrientPressure!=="normal"){
+  pushSignal({id:"feeding-pressure",level:feedingState.nutrientPressure==="high"?"warn":"info",confidence:"medium",source:"nutrients",score:feedingState.nutrientPressure==="high"?67:42,ar:`روتين التغذية لازم ينقرأ مع المغذيات؛ الضغط الحالي ${feedingState.nutrientPressure}.`,en:`Feeding should be interpreted with nutrients; current pressure is ${feedingState.nutrientPressure}.`});
+ }
+ const activeTreatment=tank.quarantine.filter(x=>x.status==="active");
+ if((broadQuestion||intent.topics.includes("quarantine")||intent.topics.includes("diseases"))&&activeTreatment.length){
+  pushSignal({id:"active-treatment",level:"warn",confidence:"high",source:"livestock",score:73,ar:`في ${activeTreatment.length} حالة حجر/علاج نشطة؛ لازم تدخل بحساب الاستقرار قبل أي إضافة أو تغيير كبير.`,en:`${activeTreatment.length} quarantine/treatment case(s) are active and should factor into stability before major changes or additions.`});
+  pushAction({id:"treatment-review",priority:68,level:"warn",page:"quarantine",ar:"راجع حالة العلاج والجرعة/المتابعة القادمة قبل أي تغيير غير ضروري.",en:"Review treatment status and the next dose/follow-up before unrelated major changes.",whyAr:"الكائن تحت العلاج يحتاج بيئة ثابتة وسجل واضح للاستجابة.",whyEn:"Livestock under treatment needs a stable environment and clear response history.",recheckAr:"حدّث نتيجة العلاج وحالة الكائن بعد المتابعة.",recheckEn:"Update treatment outcome and livestock status after follow-up."});
+ }
+ const latestVisual:any=((tank as any).visionAssessments??[])[0];
+ if((broadQuestion||intent.topics.includes("journal")||intent.topics.includes("diseases"))&&latestVisual?.triage&&(latestVisual.triage.level==="urgent"||latestVisual.triage.level==="attention")){
+  pushSignal({id:"visual-latest",level:latestVisual.triage.level==="urgent"?"danger":"warn",confidence:latestVisual.triage.confidence==="medium"?"medium":"low",source:"history",score:latestVisual.triage.level==="urgent"?84:60,ar:`آخر تحليل بصري: ${latestVisual.triage.summaryAr}`,en:`Latest visual assessment: ${latestVisual.triage.summaryEn}`});
+  pushAction({id:"visual-review",priority:latestVisual.triage.level==="urgent"?80:56,level:latestVisual.triage.level==="urgent"?"danger":"warn",page:"journal",ar:"راجع الصورة مع الكيمياء وسلوك الكائن ولا تعتبر الصورة وحدها تشخيصاً نهائياً.",en:"Review the image together with chemistry and behavior; do not treat the image alone as a definitive diagnosis.",whyAr:"التحليل البصري احتمالي وقيمته الأقوى بالمقارنة الزمنية وربطه بسياق الحوض.",whyEn:"Visual analysis is probabilistic and is strongest when compared over time with tank context.",recheckAr:"كرر صورة بنفس الزاوية والإضاءة وسجل تغير الأعراض.",recheckEn:"Repeat a capture with the same angle/light and log symptom changes."});
+ }
+
  for(const p of proactivePredictions(tank)){
   if(!chemistryRelevant)continue;
   if(!(intent.mode==="forecast"||intent.mode==="trend"||relevantParam(intent,p.parameter)))continue;
@@ -271,7 +313,7 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
  const summaryEn=top.level==="danger"?`There is a clear first priority: ${top.en}`:top.level==="warn"?`The tank needs targeted attention: ${top.en}`:`Main current signal: ${top.en}`;
  const confidence=confidenceFromEvidence(tank,signals.length);
  const patternCount=repeatedResponsePatterns(tank).length;
- const evidenceAr=[`صحة النظام ${system.score}%`,`الكيمياء ${system.chemistry}% • الصيانة ${system.maintenance}% • الحمل الحيوي ${system.bioload}%`,`التجهيزات ${system.equipment}% • التوافق ${system.compatibility}%`,`${tank.chemistry.length} قراءات كيميائية`,`${tank.timeline.length} أحداث`,`${tank.livestock.length} سجلات كائنات`,`${tank.equipment.length} أجهزة`,`${patternCount} أنماط متكررة متعلمة`];
- const evidenceEn=[`System health ${system.score}%`,`Chemistry ${system.chemistry}% • maintenance ${system.maintenance}% • bioload ${system.bioload}%`,`Equipment ${system.equipment}% • compatibility ${system.compatibility}%`,`${tank.chemistry.length} chemistry readings`,`${tank.timeline.length} events`,`${tank.livestock.length} livestock records`,`${tank.equipment.length} equipment records`,`${patternCount} learned repeated patterns`];
+ const evidenceAr=[`صحة النظام ${system.score}%`,`الكيمياء ${system.chemistry}% • الصيانة ${system.maintenance}% • الحمل الحيوي ${system.bioload}%`,`التجهيزات ${system.equipment}% • التوافق ${system.compatibility}%`,`${tank.chemistry.length} قراءات كيميائية`,`${tank.timeline.length} أحداث`,`${tank.livestock.length} سجلات كائنات`,`${tank.equipment.length} أجهزة`,`المخزون المنخفض ${stock.low.length}`,`حالات العلاج النشطة ${activeTreatment.length}`,`${patternCount} أنماط متكررة متعلمة`];
+ const evidenceEn=[`System health ${system.score}%`,`Chemistry ${system.chemistry}% • maintenance ${system.maintenance}% • bioload ${system.bioload}%`,`Equipment ${system.equipment}% • compatibility ${system.compatibility}%`,`${tank.chemistry.length} chemistry readings`,`${tank.timeline.length} events`,`${tank.livestock.length} livestock records`,`${tank.equipment.length} equipment records`,`Low-stock items ${stock.low.length}`,`Active treatment cases ${activeTreatment.length}`,`${patternCount} learned repeated patterns`];
  return {summaryAr,summaryEn,signals:signals.slice(0,8),actions:actions.slice(0,6),evidenceAr,evidenceEn,confidence,mentionedLivestock,mentionedEquipment};
 }

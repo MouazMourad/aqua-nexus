@@ -3,6 +3,8 @@ import { demoMarineTank } from "@/data/demoTank";
 import { parseAquaQuestion } from "@/domain/aquaAIIntent";
 import { buildAquaAIQueryPlan } from "@/domain/aquaAIQueryPlan";
 import { aquaAIAnswer } from "@/domain/aquaAIBrain";
+import { completeMaintenanceTask,maintenanceEffectiveState } from "@/domain/maintenanceSchedule";
+import { systemAlerts } from "@/domain/alertEngine";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -47,5 +49,21 @@ describe("Local Best AI behavior regression",()=>{
   it("gives whole-system answer for broad status",()=>{
     const a=aquaAIAnswer("شو وضع الحوض بشكل عام",tank,"dashboard");
     expect(a.summaryAr).toMatch(/الصحة|الحوض|النظام/);
+  });
+});
+
+
+describe("Core system regression",()=>{
+  it("recurring maintenance becomes due again on its next cycle",()=>{
+    const done=completeMaintenanceTask({id:"m1",title:"Test",cadence:"weekly",done:false,nextDue:"2026-09-01"},"2026-09-01");
+    expect(maintenanceEffectiveState(done,"2026-09-02").completed).toBe(true);
+    expect(maintenanceEffectiveState(done,"2026-09-08").due).toBe(true);
+    expect(maintenanceEffectiveState(done,"2026-09-08").completed).toBe(false);
+  });
+  it("unified alerts surface equipment failures",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.equipment=[...t.equipment,{id:"broken-return",name:"Broken Return",kind:"returnPump",location:"external",status:"warning"}];
+    const alerts=systemAlerts(t);
+    expect(alerts.some(x=>x.domain==="equipment")).toBe(true);
   });
 });
