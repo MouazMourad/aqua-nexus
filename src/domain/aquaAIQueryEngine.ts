@@ -112,6 +112,9 @@ export function answerAquaQuery(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswe
  const noLivestock=tank.livestock.length===0;
  const noChemistry=tank.chemistry.length===0;
  const insufficientForAdd=plan.operation==="canAdd"&&(noLivestock||noChemistry);
+ const howTarget=intent.normalized;
+ const specificEquipment=tank.equipment.find(x=>intent.raw.toLowerCase().includes(x.name.toLowerCase()))||tank.equipment.find(x=>howTarget.includes(x.kind.toLowerCase()));
+ const specificMaintenance=specificEquipment?tank.maintenance.filter(x=>x.equipmentId===specificEquipment.id):[];
  let summaryAr=snap.ar,summaryEn=snap.en;
  if(insufficientForAdd){
   const missingAr=[noLivestock?"الكائنات الحالية":null,noChemistry?"قراءات الكيمياء الحديثة":null].filter(Boolean).join(" و");
@@ -119,7 +122,11 @@ export function answerAquaQuery(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswe
   summaryAr=`ما في بيانات كافية حتى أقول إن إضافة كائن جديد آمنة. ناقصني ${missingAr}. أي نسبة توافق/حمل ظاهرة مع سجل فارغ ليست موافقة على الإضافة.`;
   summaryEn=`There is not enough evidence to say a new livestock addition is safe. Missing: ${missingEn}. Any compatibility/bioload percentage shown with an empty record is not approval to add livestock.`;
  }
- if(!insufficientForAdd&&plan.operation==="why"){
+ if(!insufficientForAdd&&plan.operation==="how"&&specificEquipment){
+  const task=specificMaintenance[0];
+  summaryAr=task?`لـ ${specificEquipment.name}: اتبع مهمة الصيانة المسجلة «${task.title}»${task.nextDue?`، وموعدها ${task.nextDue}`:""}. لا أضيف خطوات مصنّع غير موجودة ببيانات الجهاز.`:`عندي ${specificEquipment.name} مسجل، لكن ما عندي تعليمات صيانة خاصة بالموديل. افحص/نظف الجهاز حسب دليل الشركة وسجّل الصيانة؛ ما رح أخترع خطوات غير موثقة.`;
+  summaryEn=task?`For ${specificEquipment.name}: follow the registered maintenance task “${task.titleEn||task.title}”${task.nextDue?`, due ${task.nextDue}`:""}. I will not invent manufacturer-specific steps that are not in the device data.`:`${specificEquipment.name} is registered, but model-specific maintenance instructions are not available. Follow the manufacturer manual and log the service; I will not invent undocumented steps.`;
+ }else if(!insufficientForAdd&&plan.operation==="why"){
   summaryAr=topSignal?`السبب الأقرب حسب بيانات ${domainTitle(plan.primary,"ar")}: ${topSignal.ar}`:`ما عندي حالياً دليل كافي يحدد سبب واضح ضمن ${domainTitle(plan.primary,"ar")}.`;
   summaryEn=topSignal?`Most likely explanation from ${domainTitle(plan.primary,"en")} data: ${topSignal.en}`:`There is not enough evidence yet to identify a clear cause in ${domainTitle(plan.primary,"en")}.`;
  }else if(!insufficientForAdd&&(plan.operation==="action"||plan.operation==="dose")){
