@@ -35,6 +35,11 @@ function actionDomain(page:string):AquaDomain{
  return "system";
 }
 
+function coreHasCritical(tank:Tank){
+ const core=tankIntelligenceCore(tank);
+ return core.actions.some(x=>x.level==="danger");
+}
+
 function domainTitle(domain:AquaDomain,lang:"ar"|"en"){
  const ar:Record<AquaDomain,string>={system:"الوضع العام للحوض",chemistry:"الكيمياء",bioload:"الحمل الحيوي",livestock:"الكائنات",equipment:"المعدات",maintenance:"الصيانة",dosing:"الجرعات",acclimation:"الإقلمة",emergency:"الطوارئ",rodi:"RO/DI وماء المصدر",feeding:"التغذية",water:"تغيير الماء",inventory:"المخزون",expenses:"المصاريف",diseases:"الأمراض",quarantine:"الحجر والعلاج",journal:"الصور والتطور",sump:"السامب"};
  const en:Record<AquaDomain,string>={system:"Overall tank status",chemistry:"Chemistry",bioload:"Bioload",livestock:"Livestock",equipment:"Equipment",maintenance:"Maintenance",dosing:"Dosing",acclimation:"Acclimation",emergency:"Emergency",rodi:"RO/DI & source water",feeding:"Feeding",water:"Water changes",inventory:"Inventory",expenses:"Expenses",diseases:"Diseases",quarantine:"Quarantine & treatment",journal:"Photos & progression",sump:"Sump"};
@@ -111,28 +116,42 @@ export function answerAquaQuery(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswe
  const topSignal=signals[0],topAction=actions[0];
  const noLivestock=tank.livestock.length===0;
  const noChemistry=tank.chemistry.length===0;
- const insufficientForAdd=plan.operation==="canAdd"&&(noLivestock||noChemistry);
+ const latestChem=tank.chemistry[0];
+ const latestChemAgeDays=latestChem?Math.max(0,(Date.now()-new Date(latestChem.timestamp).getTime())/86400000):Infinity;
+ const activeEmergency=(tank.emergencySessions??[]).some(x=>x.status==="active");
+ const activeAcclimation=(tank.acclimationSessions??[]).some(x=>x.status!=="completed");
+ const equipmentWarnings=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
+ const addMissingAr:string[]=[]; const addMissingEn:string[]=[];
+ if(noChemistry){addMissingAr.push("قراءات كيمياء حديثة");addMissingEn.push("recent chemistry readings");}
+ else if(latestChemAgeDays>7){addMissingAr.push("قراءة كيمياء أحدث من 7 أيام");addMissingEn.push("a chemistry reading newer than 7 days");}
+ if(noLivestock){addMissingAr.push("سجل الكائنات الحالية");addMissingEn.push("current livestock record");}
+ const insufficientForAdd=plan.operation==="canAdd"&&addMissingAr.length>0;
+ const addBlockers=plan.operation==="canAdd"&&!insufficientForAdd&&(activeEmergency||activeAcclimation||equipmentWarnings.length>0||coreHasCritical(tank));
  const howTarget=intent.normalized;
  const specificEquipment=tank.equipment.find(x=>intent.raw.toLowerCase().includes(x.name.toLowerCase()))||tank.equipment.find(x=>howTarget.includes(x.kind.toLowerCase()));
  const specificMaintenance=specificEquipment?tank.maintenance.filter(x=>x.sourceEquipmentId===specificEquipment.id):[];
  let summaryAr=snap.ar,summaryEn=snap.en;
  if(insufficientForAdd){
-  const missingAr=[noLivestock?"الكائنات الحالية":null,noChemistry?"قراءات الكيمياء الحديثة":null].filter(Boolean).join(" و");
-  const missingEn=[noLivestock?"current livestock":null,noChemistry?"recent chemistry readings":null].filter(Boolean).join(" and ");
+  const missingAr=addMissingAr.join(" و");
+  const missingEn=addMissingEn.join(" and ");
   summaryAr=`ما في بيانات كافية حتى أقول إن إضافة كائن جديد آمنة. ناقصني ${missingAr}. أي نسبة توافق/حمل ظاهرة مع سجل فارغ ليست موافقة على الإضافة.`;
   summaryEn=`There is not enough evidence to say a new livestock addition is safe. Missing: ${missingEn}. Any compatibility/bioload percentage shown with an empty record is not approval to add livestock.`;
  }
- if(!insufficientForAdd&&plan.operation==="how"&&specificEquipment){
+ if(addBlockers){
+  summaryAr="ما بنصح بإضافة كائن جديد هلق لأن في عامل حالي لازم ينحل أو يتأكد أولاً.";
+  summaryEn="I would not treat the tank as ready for new livestock yet because a current blocker needs resolution or verification first.";
+ }
+ if(!insufficientForAdd&&!addBlockers&&plan.operation==="how"&&specificEquipment){
   const task=specificMaintenance[0];
   summaryAr=task?`لـ ${specificEquipment.name}: اتبع مهمة الصيانة المسجلة «${task.title}»${task.nextDue?`، وموعدها ${task.nextDue}`:""}. لا أضيف خطوات مصنّع غير موجودة ببيانات الجهاز.`:`عندي ${specificEquipment.name} مسجل، لكن ما عندي تعليمات صيانة خاصة بالموديل. افحص/نظف الجهاز حسب دليل الشركة وسجّل الصيانة؛ ما رح أخترع خطوات غير موثقة.`;
   summaryEn=task?`For ${specificEquipment.name}: follow the registered maintenance task “${task.titleEn||task.title}”${task.nextDue?`, due ${task.nextDue}`:""}. I will not invent manufacturer-specific steps that are not in the device data.`:`${specificEquipment.name} is registered, but model-specific maintenance instructions are not available. Follow the manufacturer manual and log the service; I will not invent undocumented steps.`;
- }else if(!insufficientForAdd&&plan.operation==="why"){
+ }else if(!insufficientForAdd&&!addBlockers&&plan.operation==="why"){
   summaryAr=topSignal?`السبب الأقرب حسب بيانات ${domainTitle(plan.primary,"ar")}: ${topSignal.ar}`:`ما عندي حالياً دليل كافي يحدد سبب واضح ضمن ${domainTitle(plan.primary,"ar")}.`;
   summaryEn=topSignal?`Most likely explanation from ${domainTitle(plan.primary,"en")} data: ${topSignal.en}`:`There is not enough evidence yet to identify a clear cause in ${domainTitle(plan.primary,"en")}.`;
- }else if(!insufficientForAdd&&(plan.operation==="action"||plan.operation==="dose")){
+ }else if(!insufficientForAdd&&!addBlockers&&(plan.operation==="action"||plan.operation==="dose")){
   summaryAr=topAction?`${topAction.ar} السبب: ${topAction.whyAr}`:`ما في إجراء تصحيحي واضح مطلوب ضمن ${domainTitle(plan.primary,"ar")} حالياً.`;
   summaryEn=topAction?`${topAction.en} Why: ${topAction.whyEn}`:`No clear corrective action is required in ${domainTitle(plan.primary,"en")} right now.`;
- }else if(!insufficientForAdd&&(plan.operation==="trend"||plan.operation==="compare")){
+ }else if(!insufficientForAdd&&!addBlockers&&(plan.operation==="trend"||plan.operation==="compare")){
   summaryAr=topSignal?`أهم اتجاه ظاهر: ${topSignal.ar}`:snap.ar;
   summaryEn=topSignal?`Main visible trend: ${topSignal.en}`:snap.en;
  }
@@ -144,7 +163,13 @@ export function answerAquaQuery(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswe
   detailsAr:[...(insufficientForAdd?["سجّل الكائنات الموجودة وآخر فحص كيميائي أولاً؛ بعدها أعيد تقييم الجاهزية والتوافق والحمل الحيوي."]:snap.dar),...signals.slice(0,4).map(x=>x.ar),...actions.slice(0,2).map(x=>`الإجراء: ${x.ar} — راقب بعدها: ${x.recheckAr}`)].filter((x,i,a)=>x&&a.indexOf(x)===i),
   detailsEn:[...(insufficientForAdd?["Log the current livestock and a recent chemistry test first; then I can reassess readiness, compatibility and bioload."]:snap.den),...signals.slice(0,4).map(x=>x.en),...actions.slice(0,2).map(x=>`Action: ${x.en} — Recheck: ${x.recheckEn}`)].filter((x,i,a)=>x&&a.indexOf(x)===i),
   evidenceAr:[...snap.ear,...reasoned.evidenceAr.slice(0,3)],evidenceEn:[...snap.een,...reasoned.evidenceEn.slice(0,3)],
-  confidence:reasoned.confidence,
+  confidence:insufficientForAdd?"low":reasoned.confidence,
+  missingEvidenceAr:addMissingAr.length?addMissingAr:undefined,
+  missingEvidenceEn:addMissingEn.length?addMissingEn:undefined,
+  factsAr:[...snap.ear,...reasoned.evidenceAr.slice(0,3)],
+  factsEn:[...snap.een,...reasoned.evidenceEn.slice(0,3)],
+  inferencesAr:signals.slice(0,4).map(x=>x.ar),
+  inferencesEn:signals.slice(0,4).map(x=>x.en),
   action:topAction?{page:topAction.page as AquaAIPage,ar:topAction.ar,en:topAction.en}:undefined
  };
 }
