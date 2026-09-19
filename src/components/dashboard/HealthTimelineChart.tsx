@@ -46,7 +46,7 @@ export function HealthTimelineChart({tank}:{tank:Tank}){
       </div>
       <div className={`forecast-chip ${forecast.direction}`}>
         <small>{lang==="ar"?"توقع 7 أيام":"7-day forecast"}</small>
-        <b>{forecast.projected7d}%</b>
+        <b>{forecast.projected7d===null?"N/A":`${forecast.projected7d}%`}</b>
       </div>
     </div>
 
@@ -57,7 +57,7 @@ export function HealthTimelineChart({tank}:{tank:Tank}){
           <text x={PX-12} y={yAt(v)+4} textAnchor="end" className="health-axis-label">{v}</text>
         </g>)}
         <polyline points={polyline} className="health-history-line"/>
-        {last&&<line x1={xAt(points.length-1)} y1={yAt(last.score)} x2={forecastX} y2={yAt(forecast.projected7d)} className="health-forecast-line"/>}
+        {last&&forecast.projected7d!==null&&<line x1={xAt(points.length-1)} y1={yAt(last.score)} x2={forecastX} y2={yAt(forecast.projected7d)} className="health-forecast-line"/>}
         {points.map((p,i)=>{
           const big=Math.abs(p.delta)>=5;
           const active=selected?.id===p.id;
@@ -67,10 +67,10 @@ export function HealthTimelineChart({tank}:{tank:Tank}){
             {(i===0||i===points.length-1||big)&&<text x={xAt(i)} y={H-7} textAnchor="middle" className="health-date-label">{date(p.timestamp)}</text>}
           </g>;
         })}
-        <g className="forecast-point">
+        {forecast.projected7d!==null&&<g className="forecast-point">
           <circle cx={forecastX} cy={yAt(forecast.projected7d)} r={7} className="health-forecast-point"/>
           <text x={forecastX} y={Math.max(16,yAt(forecast.projected7d)-13)} textAnchor="middle" className="health-forecast-label">{lang==="ar"?"توقع":"Forecast"} {forecast.projected7d}%</text>
-        </g>
+        </g>}
       </svg>
     </div>
 
