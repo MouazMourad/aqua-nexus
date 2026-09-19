@@ -68,8 +68,8 @@ export function chemistryHistoryScore(tank: Tank, readingIndex = 0) {
   return chemistryReadingScore(tank,tank.chemistry[readingIndex]);
 }
 
-export function tankHealthTrend(tank: Tank): "improving"|"stable"|"declining" {
-  if (tank.chemistry.length < 2) return "stable";
+export function tankHealthTrend(tank: Tank): "improving"|"stable"|"declining"|"unknown" {
+  if (tank.chemistry.length < 2) return "unknown";
   const now = chemistryHistoryScore(tank,0) ?? 0;
   const prev = chemistryHistoryScore(tank,1) ?? now;
   const delta = now-prev;
