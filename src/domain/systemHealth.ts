@@ -78,9 +78,19 @@ export function systemHealth(tank:Tank):SystemHealthResult{
 }
 
 export function systemHealthTrend(tank:Tank):"improving"|"stable"|"declining"|"unknown"{
-  const snapshots=(tank.healthSnapshots??[]).filter(x=>Number.isFinite(x.score));
+  const snapshots=(tank.healthSnapshots??[])
+   .filter(x=>Number.isFinite(x.score)&&Number.isFinite(new Date(x.timestamp).getTime()))
+   .slice()
+   .sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime());
   if(snapshots.length<2)return "unknown";
-  const latest=snapshots[0].score,previous=snapshots[1].score;
-  const delta=latest-previous;
+  const latest=snapshots[0],latestTs=new Date(latest.timestamp).getTime();
+  // Ignore bursts of edits that create several snapshots within minutes.
+  // A trend needs a meaningful time separation and stays focused on the last week.
+  const baseline=snapshots.slice(1).find(x=>{
+    const age=latestTs-new Date(x.timestamp).getTime();
+    return age>=12*3600000&&age<=7*86400000;
+  });
+  if(!baseline)return "unknown";
+  const delta=latest.score-baseline.score;
   return delta>=5?"improving":delta<=-5?"declining":"stable";
 }
