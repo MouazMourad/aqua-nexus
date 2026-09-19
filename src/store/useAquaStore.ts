@@ -50,6 +50,7 @@ function normalize(tank: Tank): Tank {
     chemistry:tank.chemistry ?? [],
     maintenance:tank.maintenance ?? [],
     livestock:tank.livestock ?? [],
+    livestockExits:tank.livestockExits ?? [],
     inventory:tank.inventory ?? [],
     timeline:tank.timeline ?? [],
     intelligenceEvents:tank.intelligenceEvents ?? [],
@@ -82,7 +83,7 @@ function changeReason(before:Tank,after:Tank):ChangeReason|null{
   if(after.chemistry.length!==before.chemistry.length)return {ar:"تم تسجيل فحص كيميائي جديد.",en:"A new chemistry test was logged."};
   if(fingerprint(after.maintenance.map(x=>[x.id,x.done,x.nextDue,x.lastDone]))!==fingerprint(before.maintenance.map(x=>[x.id,x.done,x.nextDue,x.lastDone])))return {ar:"تغيرت حالة خطة الصيانة.",en:"The maintenance plan status changed."};
   if(fingerprint(after.equipment.map(x=>[x.id,x.status,x.location]))!==fingerprint(before.equipment.map(x=>[x.id,x.status,x.location])))return {ar:"تغيرت حالة أو إعدادات المعدات.",en:"Equipment status or configuration changed."};
-  if(fingerprint(after.livestock.map(x=>[x.id,x.quantity,x.health]))!==fingerprint(before.livestock.map(x=>[x.id,x.quantity,x.health])))return {ar:"تغيرت كائنات الحوض أو حالتها.",en:"Tank livestock or livestock health changed."};
+  if(fingerprint(after.livestock.map(x=>[x.id,x.quantity,x.health]))!==fingerprint(before.livestock.map(x=>[x.id,x.quantity,x.health]))||after.livestockExits?.length!==before.livestockExits?.length)return {ar:"تغيرت كائنات الحوض أو حالتها.",en:"Tank livestock or livestock health changed."};
   if(fingerprint((after.filterMedia??[]).map(x=>[x.id,x.kind,x.amountGrams,x.installedAt]))!==fingerprint((before.filterMedia??[]).map(x=>[x.id,x.kind,x.amountGrams,x.installedAt])))return {ar:"تغيرت ميديا الفلترة أو تم استبدالها.",en:"Filter media configuration or replacement changed."};
   if(after.waterChanges.length!==before.waterChanges.length)return {ar:"تم تسجيل تغيير ماء.",en:"A water change was logged."};
   if(after.dosing.length!==before.dosing.length)return {ar:"تم تسجيل جرعة جديدة.",en:"A dosing event was logged."};
