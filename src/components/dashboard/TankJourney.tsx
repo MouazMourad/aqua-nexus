@@ -16,7 +16,7 @@ type JourneyPoint={
  id:string;
  timestamp:string;
  score:number;
- chemistry:number;
+ chemistry:number|null;
  maintenance:number;
  delta:number;
  reasonAr:string;
@@ -57,7 +57,7 @@ export function TankJourney({tank}:{tank:Tank}){
   const base:JourneyPoint[]=healthTimeline(tank).map(p=>({...p,source:p.source}));
   const current:JourneyPoint={
    id:"journey-current",timestamp:new Date().toISOString(),score:currentState.score,
-   chemistry:tank.chemistry.length?base[base.length-1]?.chemistry??currentState.score:currentState.score,
+   chemistry:tank.chemistry.some(x=>!x.usingDefaults)?(base[base.length-1]?.chemistry??null):null,
    maintenance:base[base.length-1]?.maintenance??currentState.score,delta:0,
    reasonAr:"الحالة الحالية للحوض",reasonEn:"Current tank state",source:"current"
   };
