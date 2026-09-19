@@ -43,6 +43,7 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
  return <section className="page-grid">
   <PageHeader eyebrow="LIVESTOCK" title={tr(lang,"livestock")} actions={<><button className="btn" onClick={onLibrary}>{tr(lang,"library")}</button><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(lang,"addLivestock")}</button></>}/>
 
+  {tank.livestock.length===0&&<div className="inline-alert info full-span"><div><b>🐠 {lang==="ar"?"ابدأ بإضافة الكائنات الموجودة فعلياً بحوضك.":"Start by adding the livestock that is actually in your tank."}</b><p>{lang==="ar"?"استخدم المكتبة إذا لقيت النوع، لأنها بتعطي البرنامج معلومات أدق عن الحمل الحيوي والتوافق. وإذا النوع مو موجود، فيك تضيفه يدوياً بدون ما تتوقف.":"Use the library when your species is available because it gives Aqua Nexus better bioload and compatibility context. If it is not listed, you can still add it manually."}</p><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(lang,"addLivestock")}</button></div></div>}
   <div className="card panel">
    <h3>{tr(lang,"bioload")}</h3>
    <b className="big-number">{Math.round(b.ratio*100)}%</b>
