@@ -105,10 +105,17 @@ export function tankIntelligenceCore(tank:Tank):TankIntelligenceCore{
  });
  const guidanceActions:GuidanceAction[]=deriveGuidanceActions(tank);
  const rank={danger:0,warn:1,info:2};
- const actions:IntelligenceAction[]=alerts.map(a=>({
-  id:a.id,domain:a.domain,level:a.level,page:a.actionPage??pageByDomain[a.domain],
-  ar:a.ar,en:a.en,priority:rank[a.level]
- })).sort((a,b)=>a.priority-b.priority);
+ const openGuidance=guidanceActions.filter(g=>!["resolved","verified"].includes(g.status));
+ const actionMap=new Map<string,IntelligenceAction>();
+ for(const g of openGuidance){
+  const domain=g.domain as IntelligenceDomain;
+  actionMap.set(g.dedupeKey||g.id,{id:g.id,domain,level:g.level,page:g.page||pageByDomain[domain],ar:g.titleAr,en:g.titleEn,priority:rank[g.level]});
+ }
+ for(const a of alerts){
+  const key=a.id.startsWith("core-")?a.id.slice(5):a.id;
+  if(!actionMap.has(key))actionMap.set(key,{id:a.id,domain:a.domain,level:a.level,page:a.actionPage??pageByDomain[a.domain],ar:a.ar,en:a.en,priority:rank[a.level]});
+ }
+ const actions:IntelligenceAction[]=[...actionMap.values()].sort((a,b)=>a.priority-b.priority);
 
  // Confidence means confidence in the whole decision, not merely a pretty score.
  // Chemistry quality is the strongest measured-data signal; snapshots and domain
