@@ -99,9 +99,13 @@ export function parseAquaQuestion(raw:string):AquaQuestionIntent{
  return {raw,normalized:s,mode,topics,params,asksForReason,asksForAction,asksForRisk,asksAboutBioload,confidence};
 }
 
-export function resolveAquaFollowup(current:string,previous?:string){
+export interface AquaConversationTurn{question:string;resolved:string;mode?:AquaQuestionMode;topics?:AquaQuestionTopic[];params?:AquaQuestionParam[];}
+
+export function resolveAquaFollowup(current:string,previous?:string,history:AquaConversationTurn[]=[]){
  const clean=(current||"").trim();
- if(!clean||!previous?.trim())return clean;
+ if(!clean)return clean;
+ const anchor=[...history].reverse().find(x=>x.resolved?.trim())?.resolved||previous||"";
+ if(!anchor.trim())return clean;
  const n=normalizeArabic(clean);
  const short=n.split(" ").filter(Boolean).length<=5;
  const referential=hasAny(n,[
@@ -109,6 +113,6 @@ export function resolveAquaFollowup(current:string,previous?:string){
  ]);
  const parsed=parseAquaQuestion(clean);
  const standalone=parsed.params.length>0||parsed.topics.some(x=>x!=="general")||["canAdd","whatIf","waterChange","forecast","compare","trend","dose","how","when","latest","list","count"].includes(parsed.mode);
- if((short&&referential)||(!standalone&&referential))return previous+" | follow-up: "+clean;
+ if((short&&referential)||(!standalone&&referential))return anchor+" | follow-up: "+clean;
  return clean;
 }
