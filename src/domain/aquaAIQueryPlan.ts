@@ -84,17 +84,17 @@ export function buildAquaAIQueryPlan(intent:AquaQuestionIntent):AquaAIQueryPlan{
  if(broad)add("system",10);
 
  // Lexical weighting. Strong workflow words beat incidental nouns.
- if(/كيميا|كيمياء|قراءه|chemistry|parameter/.test(s))add("chemistry",6);
+ if(/كيميا|كيمياء|قراءه|قراءات|chemistry|parameter|readings?/.test(s))add("chemistry",10);
  if(/حمل حيوي|الحمل الحيوي|الحمل البيولوجي|bioload|bio load|قدره الحوض|قدرة الحوض/.test(s))add("bioload",12);
  if(/سمك|اسماك|مرجان|كائن|حلزون|قشريات|روبيان|جمبري|livestock|fish|coral|snail|shrimp/.test(s))add("livestock",5);
  if(/جهاز|معدات|مضخه|سكيمر|سخان|اضاءه|فلتر|equipment|pump|skimmer|heater|light/.test(s))add("equipment",5);
- if(/صيانه|تنظيف|موعد|مهمه|اخر صيانه|متى انظف|maintenance|clean|service|due/.test(s))add("maintenance",9);
+ if(/صيانه|صيانة|صيانته|صيانتها|تنظيف|موعد|مهمه|مهمة|اخر صيانه|متى انظف|maintenance|clean|service|due/.test(s))add("maintenance",12);
  if(/جرعه|دوز|all for reef|بيكربونات|مكمل|dose|dosing|supplement/.test(s))add("dosing",9);
  if(/اقلمه|تاقلم|شحنه|تنقيط|acclimation|shipment|drip/.test(s))add("acclimation",10);
  if(/طوار|تسريب|انقطاع|خطر|emergency|leak|power outage/.test(s))add("emergency",11);
  if(/rodi|ro\/di|ماء المصدر|مياه المصدر|فلتر المي|tds/.test(s))add("rodi",10);
  if(/اكل|تغذيه|feeding|feed/.test(s))add("feeding",9);
- if(/تغيير مي|تغيير ماء|بدل مي|water change|change water/.test(s))add("water",11);
+ if(/تغيير مي|تغيير ماء|بدل مي|غير مي|غير ماء|water change|change water/.test(s))add("water",11);
  if(/مخزون|ستوك|stock|inventory|احتياطي|spare|ضايل/.test(s))add("inventory",10);
  if(/مصاريف|تكلفه|كلفه|expense|cost|budget/.test(s))add("expenses",10);
  if(/مرض|امراض|اعراض|disease|symptom|ich|white spot/.test(s))add("diseases",10);
