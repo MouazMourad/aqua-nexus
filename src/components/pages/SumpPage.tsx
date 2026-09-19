@@ -40,7 +40,7 @@ export function SumpPage({tank}:{tank:Tank}) {
  const patchChamber=(id:string,p:Partial<SumpChamber>)=>patch(tank.id,t=>({...t,sump:{...t.sump,chambers:t.sump.chambers.map(ch=>ch.id===id?{...ch,...p}:ch)}}));
  const clamp=(v:number,min:number,max:number)=>Math.max(min,Math.min(max,v));
  const syncDrag=(next:{id:string;mode:"move"|"resize";startX:number;startY:number;orig:SumpChamber;preview:SumpChamber}|null)=>{dragRef.current=next;setDrag(next)};
- const beginDrag=(ev:any,ch:SumpChamber,mode:"move"|"resize")=>{ev.stopPropagation();(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);syncDrag({id:ch.id,mode,startX:ev.clientX,startY:ev.clientY,orig:{...ch},preview:{...ch}})};
+ const beginDrag=(ev:any,ch:SumpChamber,mode:"move"|"resize")=>{ev.stopPropagation();syncDrag({id:ch.id,mode,startX:ev.clientX,startY:ev.clientY,orig:{...ch},preview:{...ch}});try{(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId)}catch{}};
  const moveDrag=(ev:any)=>{
   const current=dragRef.current;
   if(!current)return;
