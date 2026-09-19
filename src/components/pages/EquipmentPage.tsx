@@ -16,7 +16,7 @@ const kinds:EquipmentKind[]=["lighting","waveMaker","overflow","skimmer","return
 
 export function EquipmentPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
- const [open,setOpen]=useState(false),[details,setDetails]=useState<string|null>(null),[name,setName]=useState(""),[kind,setKind]=useState<EquipmentKind>("lighting"),[location,setLocation]=useState<string>("display"),[brand,setBrand]=useState(""),[model,setModel]=useState(""),[days,setDays]=useState(90),[power,setPower]=useState(0),[hours,setHours]=useState(0),[ratedVolume,setRatedVolume]=useState(0),[flowLph,setFlowLph]=useState(0),[par,setPar]=useState(0),[coverageLength,setCoverageLength]=useState(0),[coverageWidth,setCoverageWidth]=useState(0),[failureNote,setFailureNote]=useState("");
+ const [open,setOpen]=useState(false),[details,setDetails]=useState<string|null>(null),[name,setName]=useState(""),[kind,setKind]=useState<EquipmentKind>("lighting"),[location,setLocation]=useState<string>("display"),[brand,setBrand]=useState(""),[model,setModel]=useState(""),[days,setDays]=useState(90),[power,setPower]=useState(0),[hours,setHours]=useState(0),[ratedVolume,setRatedVolume]=useState(0),[flowLph,setFlowLph]=useState(0),[par,setPar]=useState(0),[coverageLength,setCoverageLength]=useState(0),[coverageWidth,setCoverageWidth]=useState(0),[failureNote,setFailureNote]=useState(""),[advancedPosition,setAdvancedPosition]=useState(false);
  const visualDevices=tank.equipment;
  const e=tank.equipment.find(x=>x.id===details);
  const profile=e?equipmentProfile(e.kind):null;
@@ -39,6 +39,13 @@ export function EquipmentPage({tank}:{tank:Tank}) {
  function updateDevice(id:string, updater:(x:any)=>any){patch(tank.id,t=>({...t,equipment:t.equipment.map(x=>x.id===id?updater(x):x)}));}
  function setLocationLive(id:string,loc:string){updateDevice(id,x=>({...x,location:loc,displayPosition:loc==="display"?(x.displayPosition??defaultDisplayPosition(x.kind,0,1)):x.displayPosition}));}
  function posPatch(id:string,p:Partial<DisplayEquipmentPosition>){updateDevice(id,x=>({...x,displayPosition:{...defaultDisplayPosition(x.kind,0,1),...(x.displayPosition??{}),...p}}));}
+ function touchPosition(id:string,kind:EquipmentKind,plane:"top"|"front",ev:any){
+  const rect=(ev.currentTarget as HTMLElement).getBoundingClientRect();
+  const px=Math.max(0,Math.min(1,(ev.clientX-rect.left)/Math.max(1,rect.width)));
+  const py=Math.max(0,Math.min(1,(ev.clientY-rect.top)/Math.max(1,rect.height)));
+  if(plane==="top")posPatch(id,{xPct:2+px*96,zPct:2+py*96});
+  else posPatch(id,{xPct:2+px*96,yPct:kind==="lighting"?145-py*43:95-py*90});
+ }
  function returnPosPatch(id:string,p:Partial<DisplayEquipmentPosition>){
   updateDevice(id,x=>({...x,overflowReturnPosition:{...resolvedOverflowReturnPosition({...x,overflowPlumbingMode:"separate"},0,1),...(x.overflowReturnPosition??{}),...p}}));
  }
@@ -139,39 +146,42 @@ export function EquipmentPage({tank}:{tank:Tank}) {
     </section>
 
     {e.location==="display"&&<div className="display-position-editor">
-      <h4>{e.kind==="overflow"?bi(lang,"موضع الأوفر فلو / نزول الماء","Overflow / Drain Position"):bi(lang,"موضع الجهاز على المجسم","Position on 3D Model")}</h4>
-      <label className="range-field"><span>{e.kind==="overflow"?bi(lang,"نزول X","Drain X"):"X"} {Math.round(e.displayPosition?.xPct??defaultDisplayPosition(e.kind).xPct)}%</span><input type="range" min="2" max="98" value={e.displayPosition?.xPct??defaultDisplayPosition(e.kind).xPct} onChange={ev=>posPatch(e.id,{xPct:Number(ev.target.value)})}/></label>
-      <label className="range-field"><span>{e.kind==="lighting"?bi(lang,"الارتفاع","Height"):e.kind==="overflow"?bi(lang,"نزول Y","Drain Y"):"Y"} {Math.round(e.displayPosition?.yPct??defaultDisplayPosition(e.kind).yPct)}%</span><input type="range" min={e.kind==="lighting"?102:5} max={e.kind==="lighting"?145:95} value={e.displayPosition?.yPct??defaultDisplayPosition(e.kind).yPct} onChange={ev=>posPatch(e.id,{yPct:Number(ev.target.value)})}/></label>
-      <label className="range-field"><span>{e.kind==="overflow"?bi(lang,"نزول Z","Drain Z"):"Z"} {Math.round(e.displayPosition?.zPct??defaultDisplayPosition(e.kind).zPct)}%</span><input type="range" min="2" max="98" value={e.displayPosition?.zPct??defaultDisplayPosition(e.kind).zPct} onChange={ev=>posPatch(e.id,{zPct:Number(ev.target.value)})}/></label>
-      <label className="range-field"><span>{bi(lang,"الدوران","Rotation")} {Math.round(e.displayPosition?.rotationY??defaultDisplayPosition(e.kind).rotationY??0)}°</span><input type="range" min="0" max="359" value={e.displayPosition?.rotationY??defaultDisplayPosition(e.kind).rotationY??0} onChange={ev=>posPatch(e.id,{rotationY:Number(ev.target.value)})}/></label>
-      <label className="range-field"><span>{bi(lang,"الحجم","Scale")} {(e.displayPosition?.scale??1).toFixed(2)}</span><input type="range" min="0.55" max="1.65" step=".05" value={e.displayPosition?.scale??1} onChange={ev=>posPatch(e.id,{scale:Number(ev.target.value)})}/></label>
-      {e.kind==="waveMaker"&&<label className="range-field"><span>{bi(lang,"قوة حركة الماء","Flow Strength")} {Math.round(e.displayPosition?.flowStrength??100)}%</span><input type="range" min="20" max="160" value={e.displayPosition?.flowStrength??100} onChange={ev=>posPatch(e.id,{flowStrength:Number(ev.target.value)})}/></label>}
-
+      <div className="module-head"><div><h4>{e.kind==="overflow"?bi(lang,"موضع الأوفر فلو / نزول الماء","Overflow / Drain Position"):bi(lang,"حرّك الجهاز باللمس","Place device by touch")}</h4><p className="note">{bi(lang,"اسحب بإصبعك أو اضغط بالمكان المطلوب. الأرقام تنحفظ بالخلف تلقائياً، والضبط الرقمي موجود ضمن Advanced.","Drag or tap where you want the device. Coordinates are stored automatically; numeric fine tuning stays under Advanced.")}</p></div><button className="btn" onClick={()=>setAdvancedPosition(v=>!v)}>{advancedPosition?bi(lang,"إخفاء Advanced","Hide Advanced"):bi(lang,"Advanced","Advanced")}</button></div>
+      <div className="touch-position-grid">
+        <div><small>{bi(lang,"من الأعلى — يمين/يسار + أمام/خلف","Top view — left/right + front/back")}</small><div className="touch-position-pad" onPointerDown={ev=>{(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);touchPosition(e.id,e.kind,"top",ev)}} onPointerMove={ev=>{if((ev.buttons&1)===1)touchPosition(e.id,e.kind,"top",ev)}}>
+          <span className="touch-grid-line v one"/><span className="touch-grid-line v two"/><span className="touch-grid-line h one"/><span className="touch-grid-line h two"/>
+          <i className="touch-device-dot" style={{left:`${e.displayPosition?.xPct??defaultDisplayPosition(e.kind).xPct}%`,top:`${e.displayPosition?.zPct??defaultDisplayPosition(e.kind).zPct}%`}}>⚙</i>
+        </div></div>
+        <div><small>{bi(lang,"من الأمام — يمين/يسار + ارتفاع","Front view — left/right + height")}</small><div className="touch-position-pad front" onPointerDown={ev=>{(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);touchPosition(e.id,e.kind,"front",ev)}} onPointerMove={ev=>{if((ev.buttons&1)===1)touchPosition(e.id,e.kind,"front",ev)}}>
+          <span className="touch-grid-line v one"/><span className="touch-grid-line v two"/><span className="touch-grid-line h one"/><span className="touch-grid-line h two"/>
+          <i className="touch-device-dot" style={{left:`${e.displayPosition?.xPct??defaultDisplayPosition(e.kind).xPct}%`,top:`${e.kind==="lighting"?Math.max(0,Math.min(100,(145-(e.displayPosition?.yPct??defaultDisplayPosition(e.kind).yPct))/43*100)):Math.max(0,Math.min(100,(95-(e.displayPosition?.yPct??defaultDisplayPosition(e.kind).yPct))/90*100))}%`}}>⚙</i>
+        </div></div>
+      </div>
+      <div className="touch-rotation-row"><span>{bi(lang,"اتجاه الجهاز","Device direction")} <b>{Math.round(e.displayPosition?.rotationY??defaultDisplayPosition(e.kind).rotationY??0)}°</b></span><button className="btn" onClick={()=>posPatch(e.id,{rotationY:((e.displayPosition?.rotationY??0)-15+360)%360})}>↶ 15°</button><button className="btn" onClick={()=>posPatch(e.id,{rotationY:((e.displayPosition?.rotationY??0)+15)%360})}>15° ↷</button></div>
+      {advancedPosition&&<div className="advanced-position-panel">
+        <label className="range-field"><span>X {Math.round(e.displayPosition?.xPct??defaultDisplayPosition(e.kind).xPct)}%</span><input type="range" min="2" max="98" value={e.displayPosition?.xPct??defaultDisplayPosition(e.kind).xPct} onChange={ev=>posPatch(e.id,{xPct:Number(ev.target.value)})}/></label>
+        <label className="range-field"><span>{e.kind==="lighting"?bi(lang,"الارتفاع","Height"):"Y"} {Math.round(e.displayPosition?.yPct??defaultDisplayPosition(e.kind).yPct)}%</span><input type="range" min={e.kind==="lighting"?102:5} max={e.kind==="lighting"?145:95} value={e.displayPosition?.yPct??defaultDisplayPosition(e.kind).yPct} onChange={ev=>posPatch(e.id,{yPct:Number(ev.target.value)})}/></label>
+        <label className="range-field"><span>Z {Math.round(e.displayPosition?.zPct??defaultDisplayPosition(e.kind).zPct)}%</span><input type="range" min="2" max="98" value={e.displayPosition?.zPct??defaultDisplayPosition(e.kind).zPct} onChange={ev=>posPatch(e.id,{zPct:Number(ev.target.value)})}/></label>
+        <label className="range-field"><span>{bi(lang,"الدوران","Rotation")} {Math.round(e.displayPosition?.rotationY??defaultDisplayPosition(e.kind).rotationY??0)}°</span><input type="range" min="0" max="359" value={e.displayPosition?.rotationY??defaultDisplayPosition(e.kind).rotationY??0} onChange={ev=>posPatch(e.id,{rotationY:Number(ev.target.value)})}/></label>
+        <label className="range-field"><span>{bi(lang,"الحجم","Scale")} {(e.displayPosition?.scale??1).toFixed(2)}</span><input type="range" min="0.55" max="1.65" step=".05" value={e.displayPosition?.scale??1} onChange={ev=>posPatch(e.id,{scale:Number(ev.target.value)})}/></label>
+        {e.kind==="waveMaker"&&<label className="range-field"><span>{bi(lang,"قوة حركة الماء","Flow Strength")} {Math.round(e.displayPosition?.flowStrength??100)}%</span><input type="range" min="20" max="160" value={e.displayPosition?.flowStrength??100} onChange={ev=>posPatch(e.id,{flowStrength:Number(ev.target.value)})}/></label>}
+      </div>}
       {e.kind==="overflow"&&<div className="overflow-plumbing-editor">
         <h4>{bi(lang,"توصيل الأوفر فلو","Overflow Plumbing")}</h4>
-        <label className="field">
-          <span>{bi(lang,"طريقة الصاعد والنازل","Drain / Return Arrangement")}</span>
-          <select value={e.overflowPlumbingMode??"combined"} onChange={ev=>updateDevice(e.id,x=>({...x,overflowPlumbingMode:ev.target.value}))}>
-            <option value="combined">{bi(lang,"الصاعد والنازل ضمن نفس الأوفر فلو","Drain + Return inside same overflow")}</option>
-            <option value="separate">{bi(lang,"النازل بالأوفر فلو والصاعد بمكان منفصل","Drain in overflow + separate return outlet")}</option>
-          </select>
-        </label>
-
-        {(e.overflowPlumbingMode??"combined")==="combined"
-          ? <div className="inline-alert good">{bi(lang,"الصاعد يتحرك تلقائياً مع الأوفر فلو، ويظهر بجانب خط النزول داخل نفس التجميعة.","The return moves automatically with the overflow and stays beside the drain in the same assembly.")}</div>
-          : <div className="return-position-editor">
-              <h4>{bi(lang,"موضع الصاعد إلى الحوض","Return Outlet Position")}</h4>
-              <label className="range-field"><span>{bi(lang,"صاعد X","Return X")} {Math.round(resolvedOverflowReturnPosition(e).xPct)}%</span><input type="range" min="2" max="98" value={resolvedOverflowReturnPosition(e).xPct} onChange={ev=>returnPosPatch(e.id,{xPct:Number(ev.target.value)})}/></label>
-              <label className="range-field"><span>{bi(lang,"صاعد Y","Return Y")} {Math.round(resolvedOverflowReturnPosition(e).yPct)}%</span><input type="range" min="8" max="94" value={resolvedOverflowReturnPosition(e).yPct} onChange={ev=>returnPosPatch(e.id,{yPct:Number(ev.target.value)})}/></label>
-              <label className="range-field"><span>{bi(lang,"صاعد Z","Return Z")} {Math.round(resolvedOverflowReturnPosition(e).zPct)}%</span><input type="range" min="2" max="98" value={resolvedOverflowReturnPosition(e).zPct} onChange={ev=>returnPosPatch(e.id,{zPct:Number(ev.target.value)})}/></label>
-              <label className="range-field"><span>{bi(lang,"اتجاه الصاعد","Return Direction")} {Math.round(resolvedOverflowReturnPosition(e).rotationY??0)}°</span><input type="range" min="0" max="359" value={resolvedOverflowReturnPosition(e).rotationY??0} onChange={ev=>returnPosPatch(e.id,{rotationY:Number(ev.target.value)})}/></label>
-            </div>
-        }
+        <label className="field"><span>{bi(lang,"طريقة الصاعد والنازل","Drain / Return Arrangement")}</span><select value={e.overflowPlumbingMode??"combined"} onChange={ev=>updateDevice(e.id,x=>({...x,overflowPlumbingMode:ev.target.value}))}><option value="combined">{bi(lang,"الصاعد والنازل ضمن نفس الأوفر فلو","Drain + Return inside same overflow")}</option><option value="separate">{bi(lang,"النازل بالأوفر فلو والصاعد بمكان منفصل","Drain in overflow + separate return outlet")}</option></select></label>
+        {(e.overflowPlumbingMode??"combined")==="combined"?<div className="inline-alert good">{bi(lang,"الصاعد يتحرك تلقائياً مع الأوفر فلو.","The return follows the overflow automatically.")}</div>:<div className="return-position-editor"><h4>{bi(lang,"موضع الصاعد — Advanced","Return outlet — Advanced")}</h4><label className="range-field"><span>X {Math.round(resolvedOverflowReturnPosition(e).xPct)}%</span><input type="range" min="2" max="98" value={resolvedOverflowReturnPosition(e).xPct} onChange={ev=>returnPosPatch(e.id,{xPct:Number(ev.target.value)})}/></label><label className="range-field"><span>Y {Math.round(resolvedOverflowReturnPosition(e).yPct)}%</span><input type="range" min="8" max="94" value={resolvedOverflowReturnPosition(e).yPct} onChange={ev=>returnPosPatch(e.id,{yPct:Number(ev.target.value)})}/></label><label className="range-field"><span>Z {Math.round(resolvedOverflowReturnPosition(e).zPct)}%</span><input type="range" min="2" max="98" value={resolvedOverflowReturnPosition(e).zPct} onChange={ev=>returnPosPatch(e.id,{zPct:Number(ev.target.value)})}/></label></div>}
       </div>}
-
-      <div className="inline-alert info">{bi(lang,"أي تعديل يظهر فوراً على المجسم ومسار حركة الماء.","Every adjustment updates the 3D model and water path immediately.")}</div>
+      <div className="inline-alert info">{bi(lang,"أي حركة تتحدث فوراً على المجسم. البرنامج يمنع الموضع من الخروج عن حدود الحوض، ويمكنك استخدام Advanced للضبط الدقيق.","Every move updates the model immediately. Placement is clamped to the tank bounds, with Advanced available for fine tuning.")}</div>
     </div>}
-    <div className="modal-actions"><button className="btn danger" onClick={()=>{remove(e.id);setDetails(null)}}>{tr(lang,"delete")}</button><button className="btn good" onClick={()=>service(e.id)}>{tr(lang,"serviceDone")}</button></div>
+    <div className="modal-actions"><button className="btn danger" onClick={()=>{remove(e.id);setDetails(null)}}>{tr(lang,"delete")}</button><button className="btn good" onClick={()=>service(e.id)}>{tr(lang,"serviceDone")}</button></div><style jsx>{`
+      .touch-position-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.touch-position-grid>div{display:grid;gap:6px}.touch-position-grid small{opacity:.68}
+      .touch-position-pad{position:relative;height:180px;border:1px solid rgba(94,225,216,.24);border-radius:16px;background:linear-gradient(180deg,rgba(48,180,210,.08),rgba(4,25,36,.35));overflow:hidden;touch-action:none;user-select:none}
+      .touch-position-pad.front{background:linear-gradient(180deg,rgba(55,195,225,.06),rgba(4,25,36,.38))}
+      .touch-grid-line{position:absolute;background:rgba(255,255,255,.055);pointer-events:none}.touch-grid-line.v{top:0;bottom:0;width:1px}.touch-grid-line.h{left:0;right:0;height:1px}.touch-grid-line.one.v{left:33.33%}.touch-grid-line.two.v{left:66.66%}.touch-grid-line.one.h{top:33.33%}.touch-grid-line.two.h{top:66.66%}
+      .touch-device-dot{position:absolute;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:rgba(36,213,205,.18);border:2px solid rgba(100,235,225,.7);box-shadow:0 0 18px rgba(52,220,210,.24);font-style:normal;pointer-events:none}
+      .touch-rotation-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}.touch-rotation-row>span{margin-inline-end:auto}.advanced-position-panel{display:grid;gap:8px;margin-top:10px;padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:13px;background:rgba(255,255,255,.025)}
+      @media(max-width:620px){.touch-position-grid{grid-template-columns:1fr}.touch-position-pad{height:150px}}
+    `}</style>
    </>}
   </Modal>
  </section>;
