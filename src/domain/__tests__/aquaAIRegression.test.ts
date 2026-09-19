@@ -14,6 +14,8 @@ import { stockingReadiness } from "@/domain/stockingReadiness";
 import { auditTankCompatibility } from "@/domain/compatibility";
 import { tankStateView } from "@/domain/tankIntelligence";
 import { systemHealthTrend } from "@/domain/systemHealth";
+import { deriveGuidanceActions } from "@/domain/impactEngine";
+import { deriveIntelligenceEvents } from "@/domain/eventIntelligence";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -148,6 +150,20 @@ describe("Release-candidate safety consistency",()=>{
       {id:"p",timestamp:new Date(now-5*60000).toISOString(),score:70,chemistry:70,maintenance:70,state:"watch",reasonAr:"",reasonEn:""}
     ];
     expect(systemHealthTrend(t)).toBe("unknown");
+  });
+  it("keeps recurring overdue maintenance active even when an old done flag remains",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.maintenance=[{id:"cycle",title:"Weekly service",titleEn:"Weekly service",cadence:"weekly",done:true,lastDone:"2020-01-01",nextDue:"2020-01-08"}];
+    const actions=deriveGuidanceActions(t);
+    expect(actions.some(x=>x.dedupeKey==="maintenance:overdue:cycle")).toBe(true);
+  });
+  it("records recurring overdue maintenance as an omission event",()=>{
+    const before=structuredClone(demoMarineTank),after=structuredClone(demoMarineTank);
+    before.maintenance=[];before.intelligenceEvents=[];
+    after.maintenance=[{id:"cycle",title:"Weekly service",titleEn:"Weekly service",cadence:"weekly",done:true,lastDone:"2020-01-01",nextDue:"2020-01-08"}];
+    after.intelligenceEvents=[];
+    const events=deriveIntelligenceEvents(before,after);
+    expect(events.some(x=>x.domain==="maintenance"&&x.kind==="omission"&&x.entityId==="cycle")).toBe(true);
   });
   it("uses separated snapshots for a meaningful trend",()=>{
     const t=structuredClone(demoMarineTank);
