@@ -8,6 +8,8 @@ import { liters, round1 } from "@/lib/units";
 import { defaultDisplayPosition } from "@/lib/displayLayout";
 import { chemistryHealth, maintenanceHealth } from "@/domain/health";
 import { stateBand, tankStateScore } from "@/domain/tankIntelligence";
+import { tankIntelligenceCore } from "@/domain/intelligenceCore";
+import { deriveIntelligenceEvents,mergeIntelligenceEvents,reconcileGuidanceActions } from "@/domain/eventIntelligence";
 
 interface AquaStore extends AquaState {
   setLanguage: (language: Language) => void;
@@ -50,6 +52,8 @@ function normalize(tank: Tank): Tank {
     livestock:tank.livestock ?? [],
     inventory:tank.inventory ?? [],
     timeline:tank.timeline ?? [],
+    intelligenceEvents:tank.intelligenceEvents ?? [],
+    guidanceActions:tank.guidanceActions ?? [],
     healthSnapshots:tank.healthSnapshots ?? [],
     photos:tank.photos ?? [],
     feeding:tank.feeding ?? [],
@@ -167,7 +171,11 @@ export const useAquaStore = create<AquaStore>()(
         tanks:state.tanks.map(t=>{
           if(t.id!==tankId)return t;
           const nextRaw=typeof updater==="function" ? updater(t) : {...t,...updater};
-          const next=normalize(nextRaw);
+          let next=normalize(nextRaw);
+          const events=deriveIntelligenceEvents(t,next);
+          if(events.length)next={...next,intelligenceEvents:mergeIntelligenceEvents(t.intelligenceEvents,events)};
+          const core=tankIntelligenceCore(next);
+          next={...next,guidanceActions:reconcileGuidanceActions(t.guidanceActions,core.guidanceActions)};
           return withHealthSnapshot(t,next);
         })
       })),
@@ -175,7 +183,11 @@ export const useAquaStore = create<AquaStore>()(
       addChemistryReading:(tankId,reading)=>set((state)=>({
         tanks:state.tanks.map(t=>{
           if(t.id!==tankId)return t;
-          const next=normalize({...t,chemistry:[reading,...(t.chemistry??[])]});
+          let next=normalize({...t,chemistry:[reading,...(t.chemistry??[])]});
+          const events=deriveIntelligenceEvents(t,next);
+          next={...next,intelligenceEvents:mergeIntelligenceEvents(t.intelligenceEvents,events)};
+          const core=tankIntelligenceCore(next);
+          next={...next,guidanceActions:reconcileGuidanceActions(t.guidanceActions,core.guidanceActions)};
           return withHealthSnapshot(t,next);
         })
       })),
