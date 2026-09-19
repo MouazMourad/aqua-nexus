@@ -335,7 +335,7 @@ function waterChangeAnswer(tank:Tank):AquaAIAnswer{
   const latest=tank.waterChanges[0];
   const highNutrients=guide.problems.filter(x=>["NO3","PO4","NH3","NO2"].includes(x.key));
   const dataIssue=guide.dataIssues[0];
-  const needs=dataIssue?false:highNutrients.length>0||guide.health<70;
+  const needs=dataIssue?false:highNutrients.length>0||(guide.health!==null&&guide.health<70);
   return {
    titleAr:"هل تغيير الماء هو الخطوة المناسبة؟",titleEn:"Is a water change the right next step?",
    summaryAr:dataIssue?"قبل قرار تغيير الماء صحح القراءة المشكوك فيها أولاً.":needs?"تغيير ماء مناسب قد يكون جزءاً من الحل، لكن لازم يترافق مع معالجة السبب وليس كحل وحيد.":"ما في إشارة حالياً إن تغيير ماء كبير هو أول إجراء لازم.",
