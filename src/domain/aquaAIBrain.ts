@@ -8,7 +8,7 @@ import { tankEnergy } from "./equipmentIntelligence";
 import { chemistryGuidance } from "./chemistryGuidance";
 import { parseAquaQuestion,type AquaQuestionIntent,type AquaQuestionParam } from "./aquaAIIntent";
 import { reasonLocally } from "./aquaAILocalReasoner";
-import { compatibilityCheck } from "./compatibility";
+import { stockingReadiness } from "./stockingReadiness";
 import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
 import { answerAquaQuery } from "./aquaAIQueryEngine";
 import { tankIntelligenceCore } from "./intelligenceCore";
@@ -307,23 +307,46 @@ function multiParameterAnswer(tank:Tank,params:AquaQuestionParam[]):AquaAIAnswer
 }
 
 function stockingReadinessAnswer(tank:Tank,question:string):AquaAIAnswer{
-  const guide=chemistryGuidance(tank),bio=bioload(tank),state=tankStateView(tank);
   const candidate=candidateFromQuestion(question,tank),quantity=quantityFromQuestion(question);
-  const compatibility=candidate?compatibilityCheck(tank,candidate,quantity):null;
-  const activeAcclimation=(tank.acclimationSessions??[]).some(x=>x.status!=="completed");
-  const blocking=guide.problems.filter(x=>x.level==="danger"||x.suspectedFormat);
-  const caution=guide.problems.filter(x=>x.level==="warn"&&!x.suspectedFormat);
-  const canAdd=blocking.length===0&&bio.status!=="danger"&&state.band!=="critical"&&!activeAcclimation&&!(compatibility?.blocked);
-  const detailsAr=[candidate?`الكائن المطلوب: ${candidate.ar||candidate.en} ×${quantity}.`:"ما قدرت أحدد نوع كائن محدد من السؤال، لذلك التقييم عام للحوض.",`حالة الحوض: ${state.score}% (${state.ar}).`,`الحمل الحيوي الحالي: ${Math.round(bio.ratio*100)}%.`,compatibility?`الحمل الحيوي المتوقع بعد الإضافة: ${Math.round(compatibility.projectedRatio*100)}%.`:"",`الكيمياء: ${guide.health}%.`,...(compatibility?.issues??[]).slice(0,5).map(x=>`${x.level==="danger"?"مانع":"تنبيه"} توافق: ${x.ar}`),...(blocking.slice(0,3).map(x=>`مانع محتمل: ${x.reasonAr}`)),...(caution.slice(0,2).map(x=>`تنبيه: ${x.reasonAr}`)),activeAcclimation?"هناك جلسة أقلمة نشطة حالياً؛ الأفضل عدم إضافة كائنات جديدة حتى تنتهي وتستقر الكائنات.":"لا توجد جلسة أقلمة نشطة."].filter(Boolean);
-  const detailsEn=[candidate?`Requested livestock: ${candidate.en||candidate.ar} ×${quantity}.`:"No specific candidate was recognized, so this is a general tank-readiness assessment.",`Tank state: ${state.score}% (${state.en}).`,`Current bioload: ${Math.round(bio.ratio*100)}%.`,compatibility?`Projected bioload after addition: ${Math.round(compatibility.projectedRatio*100)}%.`:"",`Chemistry: ${guide.health}%.`,...(compatibility?.issues??[]).slice(0,5).map(x=>`${x.level==="danger"?"Compatibility blocker":"Compatibility caution"}: ${x.en}`),...(blocking.slice(0,3).map(x=>`Potential blocker: ${x.reasonEn}`)),...(caution.slice(0,2).map(x=>`Caution: ${x.reasonEn}`)),activeAcclimation?"An acclimation session is active; avoid adding more livestock until it is complete and livestock settles.":"No acclimation session is active."].filter(Boolean);
+  const readiness=stockingReadiness(tank,{candidate,quantity,candidateKnown:candidate?true:undefined});
+  const candidateAr=candidate?.ar||candidate?.en,candidateEn=candidate?.en||candidate?.ar;
+  const stateAr=readiness.state==="ready"?"جاهز مبدئياً":readiness.state==="not_now"?"غير مناسب للإضافة الآن":"ما في أدلة كافية للحكم";
+  const stateEn=readiness.state==="ready"?"Provisionally ready":readiness.state==="not_now"?"Not suitable for an addition now":"Not enough evidence to decide";
+  const detailsAr=[
+    candidate?("الكائن المطلوب: "+candidateAr+" ×"+quantity+"."):"التقييم عام للحوض لأن السؤال ما حدد نوع معروف من المكتبة.",
+    ...readiness.factsAr,
+    ...(readiness.compatibility?[("الحمل المتوقع بعد الإضافة: "+Math.round(readiness.compatibility.projectedRatio*100)+"%.")]:[]),
+    ...readiness.blockersAr.map(x=>"مانع: "+x),
+    ...readiness.cautionsAr.map(x=>"تنبيه: "+x)
+  ];
+  const detailsEn=[
+    candidate?("Requested livestock: "+candidateEn+" ×"+quantity+"."):"This is a general tank-readiness assessment because no known library species was identified.",
+    ...readiness.factsEn,
+    ...(readiness.compatibility?[("Projected bioload after addition: "+Math.round(readiness.compatibility.projectedRatio*100)+"%.")]:[]),
+    ...readiness.blockersEn.map(x=>"Blocker: "+x),
+    ...readiness.cautionsEn.map(x=>"Caution: "+x)
+  ];
   return {
    titleAr:"جاهزية إضافة كائنات",titleEn:"Livestock-addition readiness",
-   summaryAr:canAdd?(candidate?`المؤشرات الحالية ما بتبين مانع واضح لإضافة ${candidate.ar||candidate.en} ×${quantity}، مع إدخال تدريجي ومراقبة بعد الإضافة.`:"المؤشرات الحالية لا تظهر مانعاً واضحاً، لكن أضف تدريجياً وراقب الحمل الحيوي والكيمياء بعد الإضافة."):(candidate?`حالياً في مانع أو تنبيه مهم قبل إضافة ${candidate.ar||candidate.en}.`:"حالياً في عوامل لازم تنحل أو تتأكد قبل إضافة كائنات جديدة."),
-   summaryEn:canAdd?(candidate?`Current indicators show no obvious blocker to adding ${candidate.en||candidate.ar} ×${quantity}, with gradual introduction and post-addition monitoring.`:"Current indicators show no obvious blocker, but add gradually and monitor bioload and chemistry afterward."):(candidate?`There is currently a blocker or important caution before adding ${candidate.en||candidate.ar}.`:"There are current factors to resolve or verify before adding new livestock."),
-   detailsAr,detailsEn,evidenceAr:[`${guide.health}% صحة كيمياء`,`${Math.round(bio.ratio*100)}% حمل حيوي`,`حالة النظام ${state.score}%`],evidenceEn:[`${guide.health}% chemistry health`,`${Math.round(bio.ratio*100)}% bioload`,`System state ${state.score}%`],confidence:confidence(tank),action:{page:canAdd?"livestock":"chemistry",ar:canAdd?"افتح الكائنات وخطط للإضافة":"راجع الكيمياء أولاً",en:canAdd?"Open livestock and plan the addition":"Review chemistry first"}
+   summaryAr:readiness.state==="ready"
+    ?(candidate?("المؤشرات الحالية تسمح مبدئياً بإضافة "+candidateAr+" ×"+quantity+"، مع مراعاة التنبيهات والمراقبة بعد الإضافة."):"المؤشرات الحالية تسمح مبدئياً بإضافة كائنات بشكل محافظ مع المراقبة.")
+    :readiness.state==="not_now"
+     ?("القرار الحالي: "+stateAr+". عالج المانع قبل الإضافة.")
+     :("القرار الحالي: "+stateAr+". حدّث البيانات المطلوبة قبل اعتبار الحوض جاهزاً."),
+   summaryEn:readiness.state==="ready"
+    ?(candidate?("Current evidence provisionally supports adding "+candidateEn+" ×"+quantity+", with cautions and post-addition monitoring."):"Current evidence provisionally supports a conservative addition with monitoring.")
+    :readiness.state==="not_now"
+     ?("Current decision: "+stateEn+". Resolve the blocker before adding livestock.")
+     :("Current decision: "+stateEn+". Refresh the required evidence before treating the tank as ready."),
+   detailsAr,detailsEn,
+   evidenceAr:readiness.factsAr,evidenceEn:readiness.factsEn,
+   missingEvidenceAr:readiness.missingEvidenceAr,missingEvidenceEn:readiness.missingEvidenceEn,
+   factsAr:readiness.factsAr,factsEn:readiness.factsEn,
+   inferencesAr:["حالة الجاهزية: "+stateAr+"."],inferencesEn:["Readiness state: "+stateEn+"."],
+   confidence:readiness.state==="insufficient_evidence"?"low":readiness.chemistryConfidence>=75?"high":"medium",
+   action:{page:readiness.state==="ready"?"livestock":readiness.state==="not_now"?"alerts":"chemistry",ar:readiness.state==="ready"?"افتح الكائنات وخطط للإضافة":readiness.state==="not_now"?"راجع الموانع أولاً":"حدّث بيانات الكيمياء",en:readiness.state==="ready"?"Open livestock and plan the addition":readiness.state==="not_now"?"Review blockers first":"Refresh chemistry evidence"}
   };
 }
-
 function waterChangeAnswer(tank:Tank):AquaAIAnswer{
   const guide=chemistryGuidance(tank);
   const latest=tank.waterChanges[0];
@@ -472,10 +495,7 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   // is planned generically by domain + operation, so one signal cannot hijack unrelated topics.
   if(intent.params.length>1)return multiParameterAnswer(tank,intent.params);
   if(intent.params.length===1)return parameterAnswer(tank,intent.params[0] as Param);
-  if(intent.mode==="canAdd"){
-    if(tank.chemistry.length===0)return {titleAr:"جاهزية إضافة كائنات",titleEn:"Livestock addition readiness",summaryAr:"ما في بيانات كافية حتى أعتبر الحوض جاهز للإضافة.",summaryEn:"There is not enough evidence to consider the tank ready for an addition.",detailsAr:["سجّل قراءات كيمياء حديثة أولاً ثم أعد تقييم الجاهزية."],detailsEn:["Log recent chemistry readings first, then reassess readiness."],evidenceAr:[],evidenceEn:[],missingEvidenceAr:["قراءات كيمياء حديثة"],missingEvidenceEn:["recent chemistry readings"],factsAr:["لا توجد قراءات كيمياء مسجلة."],factsEn:["No chemistry readings are logged."],inferencesAr:["لا يمكن إثبات الجاهزية من غياب البيانات."],inferencesEn:["Readiness cannot be established from missing data."],confidence:"low",action:{page:"chemistry",ar:"سجّل قراءات الكيمياء",en:"Log chemistry readings"}};
-    return stockingReadinessAnswer(tank,question);
-  }
+  if(intent.mode==="canAdd")return stockingReadinessAnswer(tank,question);
   if(intent.mode==="whatIf")return answerAquaQuery(tank,intent);
   if(intent.mode==="waterChange")return waterChangeAnswer(tank);
   if(intent.mode==="forecast")return forecastAnswer(tank);
