@@ -332,6 +332,10 @@ export interface QuarantineCase {
   nextDoseAt?: string;
   lastDoseAt?: string;
   notes?: string;
+  medicationInventoryItemId?: string;
+  medicationUnit?: string;
+  medicationQuantityPerDose?: number;
+  responseObservedAt?: string;
 }
 
 export interface EmergencySession {
