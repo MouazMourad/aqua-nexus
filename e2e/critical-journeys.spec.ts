@@ -45,11 +45,11 @@ test("equipment touch placement previews then commits on release",async({page})=
   const box=await pad.boundingBox();
   expect(box).not.toBeNull();
   if(!box)return;
-  await page.mouse.move(box.x+box.width*.35,box.y+box.height*.45);
-  await page.mouse.down();
-  await page.mouse.move(box.x+box.width*.78,box.y+box.height*.22,{steps:5});
-  await page.mouse.up();
+  const pointerId=41;
+  await pad.dispatchEvent("pointerdown",{pointerId,pointerType:"touch",isPrimary:true,buttons:1,clientX:box.x+box.width*.35,clientY:box.y+box.height*.45,bubbles:true});
+  await pad.dispatchEvent("pointermove",{pointerId,pointerType:"touch",isPrimary:true,buttons:1,clientX:box.x+box.width*.78,clientY:box.y+box.height*.22,bubbles:true});
   await expect.poll(()=>dot.getAttribute("style")).not.toBe(before);
+  await pad.dispatchEvent("pointerup",{pointerId,pointerType:"touch",isPrimary:true,buttons:0,clientX:box.x+box.width*.78,clientY:box.y+box.height*.22,bubbles:true});
 });
 
 test("sump chamber touch editor changes geometry without page failure",async({page})=>{
@@ -63,11 +63,11 @@ test("sump chamber touch editor changes geometry without page failure",async({pa
   const box=await chamber.boundingBox();
   expect(box).not.toBeNull();
   if(!box)return;
-  await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
-  await page.mouse.down();
-  await page.mouse.move(box.x+box.width/2+24,box.y+box.height/2+10,{steps:4});
-  await page.mouse.up();
+  const pointerId=42;
+  await chamber.dispatchEvent("pointerdown",{pointerId,pointerType:"touch",isPrimary:true,buttons:1,clientX:box.x+box.width/2,clientY:box.y+box.height/2,bubbles:true});
+  await plan.dispatchEvent("pointermove",{pointerId,pointerType:"touch",isPrimary:true,buttons:1,clientX:box.x+box.width/2+24,clientY:box.y+box.height/2+10,bubbles:true});
   await expect.poll(()=>chamber.getAttribute("style")).not.toBe(before);
+  await plan.dispatchEvent("pointerup",{pointerId,pointerType:"touch",isPrimary:true,buttons:0,clientX:box.x+box.width/2+24,clientY:box.y+box.height/2+10,bubbles:true});
 });
 
 test("setup defaults do not masquerade as stocking evidence",async({page})=>{
