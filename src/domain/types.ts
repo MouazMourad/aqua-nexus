@@ -149,6 +149,10 @@ export interface LivestockItem {
   notes?: string;
   sizeCm?: number;
   lastObservedAt?: string;
+  plantGrowth?: "good" | "slow" | "stalled" | "melting";
+  plantColor?: "normal" | "pale" | "yellow" | "redWeak" | "spots";
+  algaePresent?: boolean;
+  lastTrimmedAt?: string;
 }
 
 export interface LivestockExitEvent {
@@ -444,6 +448,9 @@ export interface Tank {
   type: TankType;
   /** Optional explicit ecosystem profile. When omitted Aqua Nexus infers it from livestock/history/name. */
   ecosystemProfile?: "fishOnly" | "reef" | "planted" | "mixed";
+  plantedMode?: "lowTech" | "highTech";
+  substrateType?: "inert" | "nutrient" | "soil" | "mixed";
+  substrateStartedAt?: string;
   status: TankStatus;
   ageMonths?: number;
   display: DimensionsCm & {
