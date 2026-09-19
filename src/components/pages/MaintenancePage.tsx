@@ -24,6 +24,7 @@ export function MaintenancePage({tank}:{tank:Tank}) {
  const recurring=tasks.filter(x=>x.cadence!=="once");
  const completed=recurring.filter(x=>maintenanceEffectiveState(x).completed).length;
  const pending=recurring.length-completed;
+ const dueNow=tasks.filter(x=>!maintenanceEffectiveState(x).completed&&(!x.nextDue||x.nextDue<=today())).sort((a,b)=>(a.nextDue||"").localeCompare(b.nextDue||"")).slice(0,5);
 
  const done=(id:string)=>{
   if(id==="virtual-chem"){
@@ -66,6 +67,8 @@ export function MaintenancePage({tank}:{tank:Tank}) {
   <PageHeader eyebrow="MAINTENANCE" title={tr(lang,"maintenance")} actions={<><button className="btn print-maintenance-btn" onClick={()=>window.print()}>🖨 {tr(lang,"printMaintenance")}</button><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(lang,"addTask")}</button></>}/>
 
   {tank.maintenance.length===0&&<div className="inline-alert info full-span"><div><b>✓ {bi(lang,"مو لازم تبني جدول صيانة كامل من الصفر.","You do not need to build a full maintenance schedule from scratch.")}</b><p>{bi(lang,"Aqua Nexus بيضيف مهام تلقائياً من المعدات والأحداث المهمة. أضف مهمة يدوية فقط إذا عندك روتين خاص غير موجود، وابدأ بتنفيذ المهام المستحقة بدل محاولة تعبئة كلشي.","Aqua Nexus creates tasks automatically from equipment and important events. Add a manual task only for a routine that is not already covered, and focus first on due tasks rather than filling everything in.")}</p></div></div>}
+
+  {dueNow.length>0&&<div className="card panel full-span"><div className="module-head"><div><small className="eyebrow-mini">TODAY</small><h3>{bi(lang,"المطلوب منك الآن","What needs your attention now")}</h3><p className="note">{bi(lang,"بدل ما تفتش بين كل الجداول، هاي المهام المستحقة أو المتأخرة أولاً.","Instead of scanning every schedule, start with these due or overdue tasks.")}</p></div><span className="status warn">{dueNow.length}</span></div><div className="task-list">{dueNow.map(x=><div className="task-row" key={`due-${x.id}`}><span className="check-dot"></span><div><b>{(lang==="ar"?x.title:(x.titleEn||x.title)).replace("[TRAVEL] ","")}</b><small>{tr(lang,"due")}: {x.nextDue??today()}</small></div><button className="btn good" onClick={()=>done(x.id)}>✓</button></div>)}</div></div>}
 
   <div className="maintenance-print-header print-only full-span">
     <h1>Aqua Nexus — {tr(lang,"maintenancePlan")}</h1>
