@@ -3,6 +3,7 @@ import { useMemo,useState } from "react";
 import { ResponsiveContainer,LineChart,Line,XAxis,YAxis,Tooltip,CartesianGrid } from "recharts";
 import type { ChemistryReading,Tank } from "@/domain/types";
 import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
+import { chemistryCatalogForTank,profileLabel,resolvedAquariumProfile } from "@/domain/chemistryProfile";
 import { chemistryHealth,parameterScore } from "@/domain/health";
 import { chemistryGuidance } from "@/domain/chemistryGuidance";
 import { useAquaStore } from "@/store/useAquaStore";
@@ -13,10 +14,11 @@ import { nowISO,uid } from "@/lib/appUtils";
 import { buildDelimitedText,downloadDelimitedFile,field,numberField,parseDelimitedText } from "@/lib/tabularImport";
 
 export function ChemistryPage({tank}:{tank:Tank}) {
- const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),cfg:any=CHEMISTRY_CATALOG[tank.type],latest=tank.chemistry[0]?.values??{};
+ const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),cfg:any=chemistryCatalogForTank(tank),latest=tank.chemistry[0]?.values??{};
+ const profile=resolvedAquariumProfile(tank),latestReading=tank.chemistry[0];
  const keys=Object.keys(cfg); const [selected,setSelected]=useState(keys[0]); const [open,setOpen]=useState(false);
  const [values,setValues]=useState<Record<string,number>>(()=>Object.fromEntries(keys.map(k=>[k,Number(latest[k]??cfg[k].def)])));
- const [notes,setNotes]=useState(""),[importNote,setImportNote]=useState("");
+ const [notes,setNotes]=useState(""),[testKit,setTestKit]=useState(""),[confidence,setConfidence]=useState<"high"|"medium"|"low">("high"),[importNote,setImportNote]=useState("");
  const chart=useMemo(()=>tank.chemistry.slice(0,30).reverse().map(r=>({date:new Date(r.timestamp).toLocaleDateString(),value:r.values[selected]})),[tank.chemistry,selected]);
  const guidance=useMemo(()=>chemistryGuidance(tank),[tank]);
  const topProblems=guidance.problems.slice(0,6);
@@ -28,7 +30,7 @@ export function ChemistryPage({tank}:{tank:Tank}) {
 
  function save(){
   patch(tank.id,t=>({...t,
-   chemistry:[{timestamp:nowISO(),values,notes},...t.chemistry],
+   chemistry:[{timestamp:nowISO(),values,notes,source:"manual",testKit:testKit.trim()||undefined,confidence},...t.chemistry],
    maintenance:markChemistryDone(t),
    timeline:[{id:uid("ev"),timestamp:nowISO(),type:"chemistry",textAr:"تم تسجيل قراءة كيمياء جديدة.",textEn:"A new chemistry reading was recorded."},...t.timeline]
   }));
@@ -36,8 +38,8 @@ export function ChemistryPage({tank}:{tank:Tank}) {
  }
 
  function downloadTemplate(kind:"csv"|"txt"){
-  const headers=["timestamp",...keys,"notes"];
-  const example:Record<string,unknown>={timestamp:new Date().toISOString(),notes:""};
+  const headers=["timestamp",...keys,"testKit","confidence","notes"];
+  const example:Record<string,unknown>={timestamp:new Date().toISOString(),testKit:"",confidence:"high",notes:""};
   keys.forEach(k=>example[k]=cfg[k].def);
   const delimiter=kind==="txt"?"\t":",";
   const text=buildDelimitedText(headers,[example],delimiter);
@@ -60,6 +62,9 @@ export function ChemistryPage({tank}:{tank:Tank}) {
      timestamp:Number.isNaN(parsed.getTime())?nowISO():parsed.toISOString(),
      values:vals,
      notes:field(row,"notes")||undefined,
+     source:"import",
+     testKit:field(row,"testKit")||undefined,
+     confidence:(["high","medium","low"].includes(field(row,"confidence").toLowerCase())?field(row,"confidence").toLowerCase():"medium") as "high"|"medium"|"low",
      usingDefaults:false
     });
    });
@@ -83,7 +88,7 @@ export function ChemistryPage({tank}:{tank:Tank}) {
   <button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(lang,"addReading")}</button>
  </div>}/>
  {importNote&&<div className="inline-alert info full-span">{importNote}</div>}
- <div className="card panel chemistry-health-summary"><div className="chemistry-health-head"><div><h3>{tr(lang,"chemistryHealth")}</h3><b className="big-number">{guidance.health}%</b></div><span className={`chemistry-health-band ${guidance.health>=80?"good":guidance.health>=60?"warn":"danger"}`}>{guidance.health>=80?bi(lang,"جيدة","Good"):guidance.health>=60?bi(lang,"تحتاج انتباه","Needs attention"):bi(lang,"تحتاج تدخل","Needs action")}</span></div><p className="note">{lang==="ar"?guidance.headlineAr:guidance.headlineEn}</p>{guidance.agePenalty>0&&<div className="inline-alert warn">{bi(lang,`هناك خصم ${guidance.agePenalty} نقطة لأن آخر قراءة أقدم من 7 أيام.`,`${guidance.agePenalty} points are deducted because the latest reading is older than 7 days.`)}</div>}</div>
+ <div className="card panel chemistry-health-summary"><div className="chemistry-health-head"><div><h3>{tr(lang,"chemistryHealth")}</h3><b className="big-number">{guidance.health}%</b></div><span className={`chemistry-health-band ${guidance.health>=80?"good":guidance.health>=60?"warn":"danger"}`}>{guidance.health>=80?bi(lang,"جيدة","Good"):guidance.health>=60?bi(lang,"تحتاج انتباه","Needs attention"):bi(lang,"تحتاج تدخل","Needs action")}</span></div><p className="note">{lang==="ar"?guidance.headlineAr:guidance.headlineEn}</p><div className="summary-strip"><div className="summary"><small>{bi(lang,"بروفايل الأهداف","Target profile")}</small><b>{profileLabel(profile,lang)}</b></div><div className="summary"><small>{bi(lang,"مصدر آخر قراءة","Latest source")}</small><b>{latestReading?.source??"—"}</b></div><div className="summary"><small>{bi(lang,"Test kit / Device","Test kit / Device")}</small><b>{latestReading?.testKit||"—"}</b></div><div className="summary"><small>{bi(lang,"ثقة القراءة","Reading confidence")}</small><b>{latestReading?.confidence??"—"}</b></div></div>{guidance.agePenalty>0&&<div className="inline-alert warn">{bi(lang,`هناك خصم ${guidance.agePenalty} نقطة لأن آخر قراءة أقدم من 7 أيام.`,`${guidance.agePenalty} points are deducted because the latest reading is older than 7 days.`)}</div>}</div>
  <div className="card panel"><label className="field"><span>{tr(lang,"parameter")}</span><select value={selected} onChange={e=>setSelected(e.target.value)}>{keys.map(k=><option key={k}>{k}</option>)}</select></label><div className="chart-box"><ResponsiveContainer width="100%" height={230}><LineChart data={chart}><CartesianGrid stroke="#15384a"/><XAxis dataKey="date" tick={{fill:"#7da5b4",fontSize:9}}/><YAxis tick={{fill:"#7da5b4",fontSize:9}}/><Tooltip/><Line type="monotone" dataKey="value" stroke="#42d7e7" strokeWidth={2} dot={false}/></LineChart></ResponsiveContainer></div></div>
  {guidance.dataIssues.length>0&&<div className="inline-alert danger full-span chemistry-data-alert"><b>⚠️ {bi(lang,"تحقق من البيانات قبل تعديل الحوض","Check the data before changing the tank")}</b>{guidance.dataIssues.map(x=><p key={x.key}>{lang==="ar"?x.reasonAr:x.reasonEn}<br/><strong>{lang==="ar"?x.actionAr:x.actionEn}</strong></p>)}</div>}
  <section className="card panel full-span chemistry-guidance">
@@ -96,6 +101,6 @@ export function ChemistryPage({tank}:{tank:Tank}) {
   {!actionItems.length&&<div className="inline-alert good">✓ {bi(lang,"لا يوجد إجراء تصحيحي رئيسي الآن. استمر بالمراقبة والقياسات الدورية.","No major corrective action is needed now. Continue monitoring and routine testing.")}</div>}
  </section>
   <div className="card panel full-span"><div className="table-wrap"><table><thead><tr><th>{tr(lang,"parameter")}</th><th>{tr(lang,"current")}</th><th>Ideal</th><th>Score</th></tr></thead><tbody>{keys.map(k=>{const m:any=cfg[k],s=parameterScore(latest[k],m);return <tr key={k}><td>{m.label}</td><td>{latest[k]??"—"}</td><td>{m.ideal[0]}–{m.ideal[1]}</td><td>{s===null?"—":`${s}%`}</td></tr>})}</tbody></table></div></div>
- <Modal open={open} title={tr(lang,"addReading")} onClose={()=>setOpen(false)}><div className="form-grid">{keys.map(k=><label className="field" key={k}><span>{cfg[k].label}</span><input type="number" step="any" value={values[k]} onChange={e=>setValues(v=>({...v,[k]:Number(e.target.value)}))}/></label>)}<label className="field full-field"><span>{tr(lang,"notes")}</span><textarea value={notes} onChange={e=>setNotes(e.target.value)}/></label></div><div className="modal-actions"><button className="btn" onClick={()=>setOpen(false)}>{tr(lang,"cancel")}</button><button className="btn primary" onClick={save}>{tr(lang,"save")}</button></div></Modal>
+ <Modal open={open} title={tr(lang,"addReading")} onClose={()=>setOpen(false)}><div className="form-grid">{keys.map(k=><label className="field" key={k}><span>{cfg[k].label}</span><input type="number" step="any" value={values[k]} onChange={e=>setValues(v=>({...v,[k]:Number(e.target.value)}))}/></label>)}<label className="field"><span>Test kit / Device</span><input value={testKit} onChange={e=>setTestKit(e.target.value)}/></label><label className="field"><span>{bi(lang,"ثقة القراءة","Reading confidence")}</span><select value={confidence} onChange={e=>setConfidence(e.target.value as any)}><option value="high">{bi(lang,"مرتفعة","High")}</option><option value="medium">{bi(lang,"متوسطة","Medium")}</option><option value="low">{bi(lang,"منخفضة","Low")}</option></select></label><label className="field full-field"><span>{tr(lang,"notes")}</span><textarea value={notes} onChange={e=>setNotes(e.target.value)}/></label></div><div className="modal-actions"><button className="btn" onClick={()=>setOpen(false)}>{tr(lang,"cancel")}</button><button className="btn primary" onClick={save}>{tr(lang,"save")}</button></div></Modal>
  </section>;
 }

@@ -36,6 +36,7 @@ export function TanksPage({tanks,selectedTankId,onSelect}:{tanks:Tank[];selected
  const [name,setName]=useState(""),[type,setType]=useState<TankType>("marine"),[status,setStatus]=useState<TankStatus>("established"),[ageMonths,setAgeMonths]=useState(0);
  const [l,setL]=useState(120),[w,setW]=useState(60),[h,setH]=useState(60),[loss,setLoss]=useState(15);
  const [hasSump,setHasSump]=useState(true),[sl,setSl]=useState(100),[sw,setSw]=useState(40),[sh,setSh]=useState(35),[fill,setFill]=useState(75);
+ const typeLocked=Boolean(editTarget&&(editTarget.livestock.length>0||editTarget.chemistry.length>0||(editTarget.acclimationSessions??[]).length>0));
 
  function openEdit(t:Tank){
   setEditTarget(t);setName(t.name);setType(t.type);setStatus(t.status);setAgeMonths(t.ageMonths??0);
@@ -73,10 +74,10 @@ export function TanksPage({tanks,selectedTankId,onSelect}:{tanks:Tank[];selected
    <div className="tank-edit-wizard">
     <div className="tank-edit-section"><h4>{lang==="ar"?"معلومات الحوض":"Tank information"}</h4><div className="form-grid">
      <label className="field"><span>{lang==="ar"?"اسم الحوض":"Tank name"}</span><input value={name} onChange={e=>setName(e.target.value)}/></label>
-     <label className="field"><span>{lang==="ar"?"النوع":"Type"}</span><select value={type} onChange={e=>setType(e.target.value as TankType)}><option value="marine">{tr(lang,"marine")}</option><option value="freshwater">{tr(lang,"freshwater")}</option></select></label>
+     <label className="field"><span>{lang==="ar"?"النوع":"Type"}</span><select value={type} disabled={typeLocked} onChange={e=>setType(e.target.value as TankType)}><option value="marine">{tr(lang,"marine")}</option><option value="freshwater">{tr(lang,"freshwater")}</option></select></label>
      <label className="field"><span>{lang==="ar"?"الحالة":"Status"}</span><select value={status} onChange={e=>setStatus(e.target.value as TankStatus)}><option value="new">{statusText(lang,"new")}</option><option value="cycling">{statusText(lang,"cycling")}</option><option value="established">{statusText(lang,"established")}</option></select></label>
      <label className="field"><span>{lang==="ar"?"عمر الحوض / شهر":"Age / months"}</span><input type="number" min="0" value={ageMonths} onChange={e=>setAgeMonths(Number(e.target.value))}/></label>
-    </div></div>
+    </div>{typeLocked&&<div className="inline-alert warn">{lang==="ar"?"نوع الحوض مقفول لأن فيه بيانات/كائنات فعلية. لتجنب خلط Marine وFreshwater أنشئ حوضاً جديداً بدل تحويل هذا الحوض.":"Tank type is locked because real data/livestock exists. Create a new tank instead of converting this one between Marine and Freshwater."}</div>}</div>
     <div className="tank-edit-section"><h4>{lang==="ar"?"أبعاد الحوض":"Display dimensions"}</h4><div className="form-grid">
      <label className="field"><span>L cm</span><input type="number" min="1" value={l} onChange={e=>setL(Number(e.target.value))}/></label><label className="field"><span>W cm</span><input type="number" min="1" value={w} onChange={e=>setW(Number(e.target.value))}/></label><label className="field"><span>H cm</span><input type="number" min="1" value={h} onChange={e=>setH(Number(e.target.value))}/></label><label className="field"><span>{lang==="ar"?"نسبة الإزاحة %":"Displacement %"}</span><input type="number" min="0" max="90" value={loss} onChange={e=>setLoss(Number(e.target.value))}/></label>
     </div></div>

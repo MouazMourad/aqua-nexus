@@ -6,6 +6,7 @@ import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { today,uid,nowISO } from "@/lib/appUtils";
+import { emergencyContext } from "@/domain/emergencyContext";
 
 export function EmergencyPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
@@ -18,6 +19,7 @@ export function EmergencyPage({tank}:{tank:Tank}) {
  const steps:string[]=e?(lang==="ar"?e.stepsAr:e.stepsEn):[];
  const completed=active?.completedSteps??[];
  const progress=steps.length?Math.round(completed.length/steps.length*100):0;
+ const context=useMemo(()=>emergencyContext(tank,selected),[tank,selected]);
 
  function startProtocol(){
   if(!e||active)return;
@@ -59,7 +61,7 @@ export function EmergencyPage({tank}:{tank:Tank}) {
   {activeAny&&<div className="inline-alert warn" style={{marginBottom:12}}>{bi(lang,`يوجد بروتوكول طوارئ نشط: ${activeAny.titleAr}`,`Active emergency protocol: ${activeAny.titleEn}`)}</div>}
   <div className="emergency-list">{entries.map(([k,x]:any)=><button type="button" className={`emergency-card ${selected===k?"selected":""}`} key={k} onClick={()=>setSelected(k)}><b>{lang==="ar"?x.ar:x.en}</b><span className={`status ${x.priority==="critical"?"warn":""}`}>{x.priority}</span><small>{lang==="ar"?x.summaryAr:x.summaryEn}</small></button>)}</div>
  </div>
- <div className="card panel emergency-detail">{e&&<>
+ <div className="card panel emergency-detail">{e&&<><div className="inline-alert info"><b>{bi(lang,"سياق الحوض الحالي","Current tank context")}</b><div className="summary-strip" style={{marginTop:8}}><div className="summary"><small>{bi(lang,"صحة النظام","System health")}</small><b>{context.systemScore}%</b></div>{context.readings.map(x=><div className="summary" key={x.key}><small>{x.key}</small><b>{x.value}</b></div>)}</div>{context.equipment.map((x,i)=><div className={`mini-row ${x.status!=="on"?"warn":""}`} key={i}><b>{x.name} • {x.kind}</b><span>{x.status} • {x.spare?bi(lang,"Backup موجود","backup ready"):bi(lang,"بدون Backup","no backup")}</span></div>)}{context.notes.map((x,i)=><p key={i}>⚠ {x}</p>)}</div>
   <div className="kpi-row"><h3>{lang==="ar"?e.ar:e.en}</h3><span className="status warn">{e.priority}</span></div>
   <p className="note">{lang==="ar"?e.summaryAr:e.summaryEn}</p>
   {!active&&<div className="emergency-actions"><button className="btn primary" onClick={startProtocol}>{bi(lang,"بدء بروتوكول الطوارئ","Start emergency protocol")}</button>{lastCompleted&&<span className="status">{bi(lang,"تم تنفيذ هذا البروتوكول سابقاً","Previously completed")}</span>}</div>}

@@ -107,6 +107,9 @@ export interface ChemistryReading {
   values: Record<string, number | null>;
   notes?: string;
   usingDefaults?: boolean;
+  source?: "manual"|"import"|"device";
+  testKit?: string;
+  confidence?: "high"|"medium"|"low";
 }
 
 export interface MaintenanceTask {
@@ -223,6 +226,10 @@ export interface FilterMediaItem {
 
 export interface QuarantineCase {
   id: string;
+  livestockId?: string;
+  suspectedDiseaseId?: string;
+  symptoms?: string;
+  outcome?: "resolved" | "improved" | "stable" | "worse";
   organism: string;
   reason: string;
   plan: string;

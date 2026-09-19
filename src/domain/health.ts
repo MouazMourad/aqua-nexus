@@ -1,5 +1,6 @@
 import type { ChemistryReading, Tank } from "./types";
 import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
+import { chemistryCatalogForTank } from "./chemistryProfile";
 import { recurringMaintenanceHealth } from "./maintenanceSchedule";
 
 export function parameterScore(value: number | null | undefined, meta: any) {
@@ -24,7 +25,7 @@ export function chemistryAgeDays(tank: Tank) {
 
 export function chemistryReadingScore(tank:Tank, reading?:ChemistryReading) {
   if(!reading)return null;
-  const ranges:any=CHEMISTRY_CATALOG[tank.type];
+  const ranges:any=chemistryCatalogForTank(tank);
   let weighted=0,totalWeight=0;
   Object.entries(ranges).forEach(([key,meta]:[string,any])=>{
     const s=parameterScore(reading.values[key],meta);

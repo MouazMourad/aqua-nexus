@@ -1,5 +1,6 @@
 import type { Tank } from "./types";
 import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
+import { chemistryCatalogForTank } from "./chemistryProfile";
 import { chemistryAgeDays, chemistryHealth, parameterScore } from "./health";
 
 export type ChemistryAdviceLevel = "good" | "info" | "warn" | "danger";
@@ -73,7 +74,7 @@ function genericAction(tank:Tank,key:string,dir:"low"|"high"|"ideal"){
 }
 
 export function chemistryGuidance(tank:Tank){
-  const cfg:any=CHEMISTRY_CATALOG[tank.type];
+  const cfg:any=chemistryCatalogForTank(tank);
   const latest=tank.chemistry[0]?.values??{};
   const items:ChemistryAdviceItem[]=[];
 
