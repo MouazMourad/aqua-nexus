@@ -38,11 +38,12 @@ export function stockingReadiness(tank:Tank,options:StockingCandidateOptions={})
  const bio=bioload(tank);
  const equipment=equipmentAdequacy(tank);
  const compatibility=options.candidate?compatibilityCheck(tank,options.candidate,quantity):undefined;
+ const measuredTank:Tank={...tank,chemistry:tank.chemistry.filter(x=>!x.usingDefaults)};
  const required=requiredWeeklyChemistryKeys(tank);
  const missing:string[]=[],stale:string[]=[],lowConfidence:string[]=[];
 
  for(const key of required){
-  const sample=latestParameterSample(tank,key);
+  const sample=latestParameterSample(measuredTank,key);
   if(!sample){missing.push(key);continue;}
   if(sample.ageDays>parameterFreshnessDays(tank,key))stale.push(key);
   if(sample.confidence==="low")lowConfidence.push(key);
