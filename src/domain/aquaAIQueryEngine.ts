@@ -114,7 +114,7 @@ export function answerAquaQuery(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswe
  const insufficientForAdd=plan.operation==="canAdd"&&(noLivestock||noChemistry);
  const howTarget=intent.normalized;
  const specificEquipment=tank.equipment.find(x=>intent.raw.toLowerCase().includes(x.name.toLowerCase()))||tank.equipment.find(x=>howTarget.includes(x.kind.toLowerCase()));
- const specificMaintenance=specificEquipment?tank.maintenance.filter(x=>x.equipmentId===specificEquipment.id):[];
+ const specificMaintenance=specificEquipment?tank.maintenance.filter(x=>x.sourceEquipmentId===specificEquipment.id):[];
  let summaryAr=snap.ar,summaryEn=snap.en;
  if(insufficientForAdd){
   const missingAr=[noLivestock?"الكائنات الحالية":null,noChemistry?"قراءات الكيمياء الحديثة":null].filter(Boolean).join(" و");
