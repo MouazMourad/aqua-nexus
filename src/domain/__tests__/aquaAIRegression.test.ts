@@ -1,6 +1,6 @@
 import { describe,expect,it } from "vitest";
 import { demoMarineTank } from "@/data/demoTank";
-import { parseAquaQuestion } from "@/domain/aquaAIIntent";
+import { parseAquaQuestion,resolveAquaFollowup } from "@/domain/aquaAIIntent";
 import { buildAquaAIQueryPlan } from "@/domain/aquaAIQueryPlan";
 import { aquaAIAnswer } from "@/domain/aquaAIBrain";
 import { completeMaintenanceTask,maintenanceEffectiveState } from "@/domain/maintenanceSchedule";
@@ -106,4 +106,37 @@ describe("Chemistry safety and measurement integrity",()=>{
   it("blocks implausible values",()=>{const t=structuredClone(demoMarineTank);expect(validateChemistryValue(t,"salinity",1025)).toBeTruthy();expect(validateChemistryValue(t,"KH",-2)).toBeTruthy();});
   it("makes an out-of-safe-range parameter critical regardless of average",()=>{const t=structuredClone(demoMarineTank);t.chemistry=[{timestamp:new Date().toISOString(),values:{temperature:25,pH:8.1,salinity:1.025,KH:8,Ca:430,Mg:1300,NO3:10,PO4:.08,NH3:.5},confidence:"high",source:"manual"}];const a=chemistryHealthAssessment(t);expect(a.critical).toBe(true);expect(a.criticalKeys).toContain("NH3");});
   it("blocks dosing targets outside the safe profile range",()=>{const t=structuredClone(demoMarineTank);expect(validateDosingTarget(t,"KH",20).blocked).toBe(true);expect(validateDosingTarget(t,"KH",8).blocked).toBe(false);});
+});
+
+
+describe("Aqua AI expert evaluation matrix",()=>{
+ const routing=[
+  ["شو المشاكل بالكيميا","chemistry"],["شو غلط بالقراءات","chemistry"],["chemistry issues","chemistry"],
+  ["السكيمر كيف صيانته","maintenance"],["how should I service the skimmer","maintenance"],
+  ["شو مهمة الصيانة التالية","maintenance"],["what maintenance is next","maintenance"],
+  ["فيني نزل سمك هلا","livestock"],["can i add fish now","livestock"],
+  ["ليش النيترات عم ترتفع","chemistry"],["شو اعمل لل PO4","chemistry"],
+  ["قديش ضايل بالمخزون","inventory"],["شو اكل اليوم","feeding"],["ايمتى غير مي","water"]
+ ] as const;
+ for(const [q,d] of routing)it(`routes: ${q}`,()=>expect(buildAquaAIQueryPlan(parseAquaQuestion(q)).primary).toBe(d));
+
+ it("keeps follow-up anchored to prior tank topic",()=>{
+  const first="شو المشاكل بالكيميا";
+  const resolved=resolveAquaFollowup("طيب ليش؟",first,[{question:first,resolved:first,mode:"status",topics:["chemistry"],params:[]}]);
+  expect(resolved).toContain(first);expect(buildAquaAIQueryPlan(parseAquaQuestion(resolved)).primary).toBe("chemistry");
+ });
+ it("carries action follow-up without losing chemistry domain",()=>{
+  const first="شو المشاكل بالكيميا";
+  const second=resolveAquaFollowup("شو اعمل؟",first,[{question:first,resolved:first,topics:["chemistry"],params:[]}]);
+  const i=parseAquaQuestion(second);expect(i.mode).toBe("action");expect(buildAquaAIQueryPlan(i).primary).toBe("chemistry");
+ });
+ it("exposes missing evidence instead of false readiness",()=>{
+  const t=structuredClone(demoMarineTank);t.chemistry=[];t.livestock=[];
+  const a=aquaAIAnswer("فيني ضيف سمك هلا؟",t,"livestock");
+  expect(a.confidence).toBe("low");expect(a.missingEvidenceAr?.length).toBeGreaterThan(0);expect(a.summaryAr).toMatch(/ما في بيانات كافية|ناقص/);
+ });
+ it("separates facts from inferences in normal answers",()=>{
+  const a=aquaAIAnswer("شو وضع الكيميا",tank,"chemistry");
+  expect(a.factsAr?.length).toBeGreaterThan(0);expect(Array.isArray(a.inferencesAr)).toBe(true);
+ });
 });
