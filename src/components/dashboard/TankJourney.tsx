@@ -128,7 +128,7 @@ export function TankJourney({tank}:{tank:Tank}){
 
     {events.slice(-30).map((event,i)=>{const x=xAt(event.timestamp),y=H-B+18+(i%2)*10;return <g key={event.id} className="journey-event-marker" onClick={()=>setSelectedEventId(event.id)}><rect x={x-4} y={y-4} width={8} height={8} transform={`rotate(45 ${x} ${y})`}/></g>})}
 
-    {current&&<g className="journey-forecast"><line x1={xAt(current.timestamp)} y1={yAt(current.score)} x2={FORECAST_X} y2={yAt(forecast.projected7d)} className="journey-forecast-line"/><circle cx={FORECAST_X} cy={yAt(forecast.projected7d)} r={7}/><text x={FORECAST_X} y={Math.max(18,yAt(forecast.projected7d)-14)} textAnchor="middle">{lang==="ar"?"توقع":"Forecast"} {forecast.projected7d}%</text></g>}
+    {current&&forecast.projected7d!==null&&<g className="journey-forecast"><line x1={xAt(current.timestamp)} y1={yAt(current.score)} x2={FORECAST_X} y2={yAt(forecast.projected7d)} className="journey-forecast-line"/><circle cx={FORECAST_X} cy={yAt(forecast.projected7d)} r={7}/><text x={FORECAST_X} y={Math.max(18,yAt(forecast.projected7d)-14)} textAnchor="middle">{lang==="ar"?"توقع":"Forecast"} {forecast.projected7d}%</text></g>}
    </svg>
   </div>
 
