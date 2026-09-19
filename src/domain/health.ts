@@ -18,8 +18,9 @@ export function parameterScore(value: number | null | undefined, meta: any) {
 }
 
 export function chemistryAgeDays(tank: Tank) {
-  if (!tank.chemistry.length) return 999;
-  const latest = new Date(tank.chemistry[0].timestamp).getTime();
+  const measured=tank.chemistry.filter(x=>!x.usingDefaults);
+  if (!measured.length) return 999;
+  const latest = new Date(measured[0].timestamp).getTime();
   return Math.max(0, (Date.now() - latest) / 86400000);
 }
 
@@ -42,9 +43,10 @@ export function chemistryReadingScore(tank:Tank, reading?:ChemistryReading) {
 }
 
 export function chemistryHealthAssessment(tank:Tank){
+  const measuredTank:Tank={...tank,chemistry:tank.chemistry.filter(x=>!x.usingDefaults)};
   const cfg:any=chemistryCatalogForTank(tank);let weighted=0,totalWeight=0;const criticalKeys:string[]=[],measuredKeys:string[]=[];
-  for(const [key,meta] of Object.entries(cfg) as [string,any][]){const sample=latestParameterSample(tank,key);if(!sample)continue;measuredKeys.push(key);const s=parameterScore(sample.value,meta);if(s===null)continue;const weight=Number(meta.weight||1);weighted+=s*weight;totalWeight+=weight;if(sample.value<meta.safe[0]||sample.value>meta.safe[1])criticalKeys.push(key);}
-  const score=totalWeight?Math.round(weighted/totalWeight):null,data=chemistryDataConfidence(tank);
+  for(const [key,meta] of Object.entries(cfg) as [string,any][]){const sample=latestParameterSample(measuredTank,key);if(!sample)continue;measuredKeys.push(key);const s=parameterScore(sample.value,meta);if(s===null)continue;const weight=Number(meta.weight||1);weighted+=s*weight;totalWeight+=weight;if(sample.value<meta.safe[0]||sample.value>meta.safe[1])criticalKeys.push(key);}
+  const score=totalWeight?Math.round(weighted/totalWeight):null,data=chemistryDataConfidence(measuredTank);
   const level=score===null?"unknown":criticalKeys.length?"critical":score<60?"danger":score<80?"warn":"good";
   return {score,level,critical:criticalKeys.length>0,criticalKeys,measuredKeys,dataConfidence:data.score,coverage:data.coverage,freshness:data.freshness,staleKeys:data.staleKeys,missingKeys:data.missingKeys,lowConfidenceKeys:data.lowConfidenceKeys,reliable:score!==null&&data.score>=70&&criticalKeys.length===0} as const;
 }
