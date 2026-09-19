@@ -16,9 +16,11 @@ const kinds:EquipmentKind[]=["lighting","waveMaker","overflow","skimmer","return
 
 export function EquipmentPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
- const [open,setOpen]=useState(false),[details,setDetails]=useState<string|null>(null),[name,setName]=useState(""),[kind,setKind]=useState<EquipmentKind>("lighting"),[location,setLocation]=useState<string>("display"),[brand,setBrand]=useState(""),[model,setModel]=useState(""),[days,setDays]=useState(90),[power,setPower]=useState(0),[hours,setHours]=useState(0),[ratedVolume,setRatedVolume]=useState(0),[flowLph,setFlowLph]=useState(0),[par,setPar]=useState(0),[coverageLength,setCoverageLength]=useState(0),[coverageWidth,setCoverageWidth]=useState(0),[failureNote,setFailureNote]=useState(""),[advancedPosition,setAdvancedPosition]=useState(false);
+ const [open,setOpen]=useState(false),[details,setDetails]=useState<string|null>(null),[name,setName]=useState(""),[kind,setKind]=useState<EquipmentKind>("lighting"),[location,setLocation]=useState<string>("display"),[brand,setBrand]=useState(""),[model,setModel]=useState(""),[days,setDays]=useState(90),[power,setPower]=useState(0),[hours,setHours]=useState(0),[ratedVolume,setRatedVolume]=useState(0),[flowLph,setFlowLph]=useState(0),[par,setPar]=useState(0),[coverageLength,setCoverageLength]=useState(0),[coverageWidth,setCoverageWidth]=useState(0),[failureNote,setFailureNote]=useState(""),[advancedPosition,setAdvancedPosition]=useState(false),[positionPreview,setPositionPreview]=useState<{id:string;position:DisplayEquipmentPosition}|null>(null);
  const visualDevices=tank.equipment;
  const e=tank.equipment.find(x=>x.id===details);
+ const activeDisplayPosition=e?(positionPreview?.id===e.id?positionPreview.position:(e.displayPosition??defaultDisplayPosition(e.kind,0,1))):undefined;
+ const sceneTank=useMemo<Tank>(()=>positionPreview?{...tank,equipment:tank.equipment.map(x=>x.id===positionPreview.id?{...x,displayPosition:positionPreview.position}:x)}:tank,[tank,positionPreview]);
  const profile=e?equipmentProfile(e.kind):null;
  const price=tank.energySettings?.pricePerKwh??0;
  const currency=tank.energySettings?.currency||"USD";
@@ -43,8 +45,18 @@ export function EquipmentPage({tank}:{tank:Tank}) {
   const rect=(ev.currentTarget as HTMLElement).getBoundingClientRect();
   const px=Math.max(0,Math.min(1,(ev.clientX-rect.left)/Math.max(1,rect.width)));
   const py=Math.max(0,Math.min(1,(ev.clientY-rect.top)/Math.max(1,rect.height)));
-  if(plane==="top")posPatch(id,{xPct:2+px*96,zPct:2+py*96});
-  else posPatch(id,{xPct:2+px*96,yPct:kind==="lighting"?145-py*43:95-py*90});
+  const device=tank.equipment.find(x=>x.id===id);
+  const current=positionPreview?.id===id?positionPreview.position:{...defaultDisplayPosition(kind,0,1),...(device?.displayPosition??{})};
+  const next=plane==="top"
+   ?{...current,xPct:2+px*96,zPct:2+py*96}
+   :{...current,xPct:2+px*96,yPct:kind==="lighting"?145-py*43:95-py*90};
+  setPositionPreview({id,position:next});
+ }
+ function commitTouchPosition(id:string){
+  if(positionPreview?.id!==id)return;
+  const next=positionPreview.position;
+  updateDevice(id,x=>({...x,displayPosition:next}));
+  setPositionPreview(null);
  }
  function returnPosPatch(id:string,p:Partial<DisplayEquipmentPosition>){
   updateDevice(id,x=>({...x,overflowReturnPosition:{...resolvedOverflowReturnPosition({...x,overflowPlumbingMode:"separate"},0,1),...(x.overflowReturnPosition??{}),...p}}));
@@ -69,7 +81,7 @@ export function EquipmentPage({tank}:{tank:Tank}) {
   <section className="card panel full-span display-layout-workspace">
     <div className="module-head"><div><h3>{bi(lang,"المجسم الحي للنظام والتجهيزات","Live System & Equipment Layout")}</h3><p className="note">{bi(lang,"الحوض والسامب والتجهيزات الخارجية تظهر معاً. أي إضافة أو تعديل يتحدث فوراً.","Display, sump and external devices are shown together. Every change updates immediately.")}</p></div></div>
     <div className="display-layout-grid">
-      <div className="display-layout-scene equipment-system-scene"><AquariumScene tank={tank} view="system"/></div>
+      <div className="display-layout-scene equipment-system-scene"><AquariumScene tank={sceneTank} view="system"/></div>
       <div className="display-layout-device-list">
         {visualDevices.map(x=><button type="button" className={`layout-device-btn ${x.id===details?"active":""}`} key={x.id} onClick={()=>setDetails(x.id)}><span>{x.kind==="lighting"?"▰":x.kind==="waveMaker"?"◉":x.kind==="overflow"?"▥":"⚙"}</span><div><b>{x.name}</b><small>{x.kind} • {x.location}</small></div></button>)}
       </div>
@@ -148,13 +160,13 @@ export function EquipmentPage({tank}:{tank:Tank}) {
     {e.location==="display"&&<div className="display-position-editor">
       <div className="module-head"><div><h4>{e.kind==="overflow"?bi(lang,"موضع الأوفر فلو / نزول الماء","Overflow / Drain Position"):bi(lang,"حرّك الجهاز باللمس","Place device by touch")}</h4><p className="note">{bi(lang,"اسحب بإصبعك أو اضغط بالمكان المطلوب. الأرقام تنحفظ بالخلف تلقائياً، والضبط الرقمي موجود ضمن Advanced.","Drag or tap where you want the device. Coordinates are stored automatically; numeric fine tuning stays under Advanced.")}</p></div><button className="btn" onClick={()=>setAdvancedPosition(v=>!v)}>{advancedPosition?bi(lang,"إخفاء Advanced","Hide Advanced"):bi(lang,"Advanced","Advanced")}</button></div>
       <div className="touch-position-grid">
-        <div><small>{bi(lang,"من الأعلى — يمين/يسار + أمام/خلف","Top view — left/right + front/back")}</small><div className="touch-position-pad" onPointerDown={ev=>{(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);touchPosition(e.id,e.kind,"top",ev)}} onPointerMove={ev=>{if((ev.buttons&1)===1)touchPosition(e.id,e.kind,"top",ev)}}>
+        <div><small>{bi(lang,"من الأعلى — يمين/يسار + أمام/خلف","Top view — left/right + front/back")}</small><div className="touch-position-pad" onPointerDown={ev=>{(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);touchPosition(e.id,e.kind,"top",ev)}} onPointerMove={ev=>{if(positionPreview?.id===e.id)touchPosition(e.id,e.kind,"top",ev)}} onPointerUp={()=>commitTouchPosition(e.id)} onPointerCancel={()=>setPositionPreview(null)}>
           <span className="touch-grid-line v one"/><span className="touch-grid-line v two"/><span className="touch-grid-line h one"/><span className="touch-grid-line h two"/>
-          <i className="touch-device-dot" style={{left:`${e.displayPosition?.xPct??defaultDisplayPosition(e.kind).xPct}%`,top:`${e.displayPosition?.zPct??defaultDisplayPosition(e.kind).zPct}%`}}>⚙</i>
+          <i className="touch-device-dot" style={{left:`${activeDisplayPosition?.xPct??defaultDisplayPosition(e.kind).xPct}%`,top:`${activeDisplayPosition?.zPct??defaultDisplayPosition(e.kind).zPct}%`}}>⚙</i>
         </div></div>
-        <div><small>{bi(lang,"من الأمام — يمين/يسار + ارتفاع","Front view — left/right + height")}</small><div className="touch-position-pad front" onPointerDown={ev=>{(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);touchPosition(e.id,e.kind,"front",ev)}} onPointerMove={ev=>{if((ev.buttons&1)===1)touchPosition(e.id,e.kind,"front",ev)}}>
+        <div><small>{bi(lang,"من الأمام — يمين/يسار + ارتفاع","Front view — left/right + height")}</small><div className="touch-position-pad front" onPointerDown={ev=>{(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId);touchPosition(e.id,e.kind,"front",ev)}} onPointerMove={ev=>{if(positionPreview?.id===e.id)touchPosition(e.id,e.kind,"front",ev)}} onPointerUp={()=>commitTouchPosition(e.id)} onPointerCancel={()=>setPositionPreview(null)}>
           <span className="touch-grid-line v one"/><span className="touch-grid-line v two"/><span className="touch-grid-line h one"/><span className="touch-grid-line h two"/>
-          <i className="touch-device-dot" style={{left:`${e.displayPosition?.xPct??defaultDisplayPosition(e.kind).xPct}%`,top:`${e.kind==="lighting"?Math.max(0,Math.min(100,(145-(e.displayPosition?.yPct??defaultDisplayPosition(e.kind).yPct))/43*100)):Math.max(0,Math.min(100,(95-(e.displayPosition?.yPct??defaultDisplayPosition(e.kind).yPct))/90*100))}%`}}>⚙</i>
+          <i className="touch-device-dot" style={{left:`${activeDisplayPosition?.xPct??defaultDisplayPosition(e.kind).xPct}%`,top:`${e.kind==="lighting"?Math.max(0,Math.min(100,(145-(activeDisplayPosition?.yPct??defaultDisplayPosition(e.kind).yPct))/43*100)):Math.max(0,Math.min(100,(95-(activeDisplayPosition?.yPct??defaultDisplayPosition(e.kind).yPct))/90*100))}%`}}>⚙</i>
         </div></div>
       </div>
       <div className="touch-rotation-row"><span>{bi(lang,"اتجاه الجهاز","Device direction")} <b>{Math.round(e.displayPosition?.rotationY??defaultDisplayPosition(e.kind).rotationY??0)}°</b></span><button className="btn" onClick={()=>posPatch(e.id,{rotationY:((e.displayPosition?.rotationY??0)-15+360)%360})}>↶ 15°</button><button className="btn" onClick={()=>posPatch(e.id,{rotationY:((e.displayPosition?.rotationY??0)+15)%360})}>15° ↷</button></div>
@@ -171,7 +183,7 @@ export function EquipmentPage({tank}:{tank:Tank}) {
         <label className="field"><span>{bi(lang,"طريقة الصاعد والنازل","Drain / Return Arrangement")}</span><select value={e.overflowPlumbingMode??"combined"} onChange={ev=>updateDevice(e.id,x=>({...x,overflowPlumbingMode:ev.target.value}))}><option value="combined">{bi(lang,"الصاعد والنازل ضمن نفس الأوفر فلو","Drain + Return inside same overflow")}</option><option value="separate">{bi(lang,"النازل بالأوفر فلو والصاعد بمكان منفصل","Drain in overflow + separate return outlet")}</option></select></label>
         {(e.overflowPlumbingMode??"combined")==="combined"?<div className="inline-alert good">{bi(lang,"الصاعد يتحرك تلقائياً مع الأوفر فلو.","The return follows the overflow automatically.")}</div>:<div className="return-position-editor"><h4>{bi(lang,"موضع الصاعد — Advanced","Return outlet — Advanced")}</h4><label className="range-field"><span>X {Math.round(resolvedOverflowReturnPosition(e).xPct)}%</span><input type="range" min="2" max="98" value={resolvedOverflowReturnPosition(e).xPct} onChange={ev=>returnPosPatch(e.id,{xPct:Number(ev.target.value)})}/></label><label className="range-field"><span>Y {Math.round(resolvedOverflowReturnPosition(e).yPct)}%</span><input type="range" min="8" max="94" value={resolvedOverflowReturnPosition(e).yPct} onChange={ev=>returnPosPatch(e.id,{yPct:Number(ev.target.value)})}/></label><label className="range-field"><span>Z {Math.round(resolvedOverflowReturnPosition(e).zPct)}%</span><input type="range" min="2" max="98" value={resolvedOverflowReturnPosition(e).zPct} onChange={ev=>returnPosPatch(e.id,{zPct:Number(ev.target.value)})}/></label></div>}
       </div>}
-      <div className="inline-alert info">{bi(lang,"أي حركة تتحدث فوراً على المجسم. البرنامج يمنع الموضع من الخروج عن حدود الحوض، ويمكنك استخدام Advanced للضبط الدقيق.","Every move updates the model immediately. Placement is clamped to the tank bounds, with Advanced available for fine tuning.")}</div>
+      <div className="inline-alert info">{bi(lang,"أثناء السحب يتحدث المجسم كمعاينة محلية، وعند رفع إصبعك يحفظ Aqua Nexus الموضع مرة واحدة فقط. هيك منمنع عشرات عمليات الحفظ والتحليل أثناء الحركة، وAdvanced يبقى للضبط الدقيق.","Dragging updates a local live preview; Aqua Nexus commits the position once when you release. This avoids repeated persistence and intelligence recalculation during movement, while Advanced remains available for fine tuning.")}</div>
     </div>}
     <div className="modal-actions"><button className="btn danger" onClick={()=>{remove(e.id);setDetails(null)}}>{tr(lang,"delete")}</button><button className="btn good" onClick={()=>service(e.id)}>{tr(lang,"serviceDone")}</button></div><style jsx>{`
       .touch-position-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.touch-position-grid>div{display:grid;gap:6px}.touch-position-grid small{opacity:.68}
