@@ -80,7 +80,7 @@ export function parseAquaQuestion(raw:string):AquaQuestionIntent{
  if(hasAny(s,["لو ","اذا ","إذا ","what if","لو ضفت","اذا ضفت","إذا ضفت","لو ركبت"]))mode="whatIf";
  else if(hasAny(s,["بقدر ضيف","فيني ضيف","اقدر اضيف","هل اضيف","can i add","safe to add","اضافه سمك","إضافة سمك","اضافه كائن","إضافة كائن"]))mode="canAdd";
  else if(hasAny(s,["توقع","forecast","predict","مستقبل","رايح","امتى يوصل","ايمتى يوصل","متى يصل","when will reach","when will it reach"]))mode="forecast";
- else if(hasAny(s,["كيف اعمل","كيف اعملها","كيف ساوي","كيف اساوي","طريقة","طريقه","خطوات","how do i","how to","steps"]))mode="how";
+ else if(hasAny(s,["كيف اعمل","كيف اعملها","كيف ساوي","كيف اساوي","كيف اصين","كيف صيانته","كيف صيانتها","كيف انظف","طريقة","طريقه","خطوات","how do i","how to","how should","steps"]))mode="how";
  else if(hasAny(s,["ايمتى","امتى","متى","موعد","الجاية","الجايه","القادمة","القادمه","next due","when is","when should","when do"]))mode="when";
  else if(hasAny(s,["اخر","آخر","latest","last reading","last test","last change","last service","last dose","last feeding"]))mode="latest";
  else if(hasAny(s,["شو المهام","ما المهام","شو عندي","اعرض","عرض","list","show me","what tasks"]))mode="list";
