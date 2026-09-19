@@ -264,11 +264,16 @@ export function compatibilityCheck(
 
 
 export interface TankCompatibilityAudit {
+  /** Compatibility score among species Aqua Nexus can verify. */
   score:number;
+  rawScore:number;
   level:CompatibilityLevel;
   issues:CompatibilityIssue[];
   dangerCount:number;
   warningCount:number;
+  knownCount:number;
+  totalCount:number;
+  verifiedCoverage:number;
 }
 
 function pushUniqueIssue(list:CompatibilityIssue[],issue:CompatibilityIssue){
@@ -364,7 +369,13 @@ export function auditTankCompatibility(tank:Tank):TankCompatibilityAudit {
 
   const dangerCount=issues.filter(x=>x.level==="danger").length;
   const warningCount=issues.filter(x=>x.level==="warn").length;
-  const score=Math.max(0,Math.round(100-dangerCount*25-warningCount*8));
+  const rawScore=Math.max(0,Math.round(100-dangerCount*25-warningCount*8));
+  const totalCount=rows.length;
+  const knownCount=rows.filter(x=>Boolean(x.catalog)).length;
+  const verifiedCoverage=totalCount?Math.round(knownCount/totalCount*100):100;
+  // Do not pretend an unknown-species tank has fully verified compatibility.
+  // The score describes known species; coverage carries the confidence of that score.
+  const score=rawScore;
   const level:CompatibilityLevel=dangerCount?"danger":warningCount?"warn":"good";
-  return {score,level,issues,dangerCount,warningCount};
+  return {score,rawScore,level,issues,dangerCount,warningCount,knownCount,totalCount,verifiedCoverage};
 }
