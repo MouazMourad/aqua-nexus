@@ -8,10 +8,10 @@ export type SystemAlertLevel="info"|"warn"|"danger";
 export interface SystemAlert{
   id:string;
   level:SystemAlertLevel;
-  domain:"chemistry"|"maintenance"|"equipment"|"livestock"|"inventory"|"quarantine"|"emergency"|"acclimation"|"system";
+  domain:"chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|"waterChange"|"rodi"|"quarantine"|"emergency"|"acclimation"|"sump"|"journal"|"expense"|"system";
   ar:string;
   en:string;
-  actionPage?:"chemistry"|"maintenance"|"equipment"|"livestock"|"inventory"|"quarantine"|"emergency"|"acclimation";
+  actionPage?:string;
 }
 
 function pushUnique(list:SystemAlert[],alert:SystemAlert){
@@ -74,6 +74,10 @@ export function systemAlerts(tank:Tank):SystemAlert[]{
 
   if(system.score<60)pushUnique(out,{id:"system-critical",level:"danger",domain:"system",ar:`صحة النظام الكلية ${system.score}% وتحتاج تدخل منظم حسب أعلى التنبيهات.`,en:`Overall system health is ${system.score}% and needs structured action based on the highest-priority alerts.`});
   else if(system.score<80)pushUnique(out,{id:"system-watch",level:"warn",domain:"system",ar:`صحة النظام الكلية ${system.score}% وتحتاج متابعة.`,en:`Overall system health is ${system.score}% and needs attention.`});
+
+  for(const g of (tank.guidanceActions??[]).filter(x=>!["resolved","verified"].includes(x.status)).slice(0,20)){
+    pushUnique(out,{id:`core-${g.id}`,level:g.level,domain:g.domain,ar:g.titleAr,en:g.titleEn,actionPage:g.page});
+  }
 
   const order={danger:0,warn:1,info:2};
   return out.sort((a,b)=>order[a.level]-order[b.level]);
