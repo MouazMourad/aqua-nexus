@@ -64,6 +64,10 @@ export const EQUIPMENT_LIFECYCLE:Record<EquipmentKind,LifeDefaults>={
  probe:{min:Y,max:3*Y,criticality:"important",tasks:[
   T("calibrate","تنظيف ومعايرة المجس","Clean and calibrate probe",30,"monthly",["اشطف المجس","نظفه حسب نوعه","عاير بمحاليل صالحة","قارن بمرجع مستقل","سجل النتيجة"])
  ],consumables:[C("Calibration solution","Calibration solution",180,100,"mL")]},
+ co2:{min:5*Y,max:12*Y,criticality:"important",tasks:[
+  T("leak","فحص تسريب وضغط منظومة CO₂","Inspect CO₂ pressure and leaks",30,"monthly",["افحص ضغط الأسطوانة","اختبر الوصلات للتسريب","افحص المنظم والـsolenoid","راجع الـbubble counter والـdiffuser","أكد توقيت CO₂ مع الإضاءة"]),
+  T("diffuser","تنظيف وفحص CO₂ diffuser","Clean and inspect CO₂ diffuser",30,"monthly",["أوقف CO₂ بأمان","نظف الـdiffuser حسب تعليمات الشركة","افحص انسداد المسام","أعد التشغيل وراقب الانتشار"])
+ ],consumables:[C("CO₂ cylinder/refill","CO₂ cylinder/refill",180,1),C("CO₂ tubing","CO₂ tubing",730,1,"m")]},
  overflow:{min:10*Y,max:20*Y,criticality:"critical",tasks:[
   T("inspect","فحص Overflow ومسار الصرف","Inspect overflow and drain path",30,"monthly",["افحص الأسنان/الشبك","تأكد من عدم وجود انسداد","راجع الصوت ومستوى الماء","افحص التسريب"]),
   T("poweroff","اختبار انقطاع الكهرباء والرجوع","Power-off and backflow test",182,"semiannual",["افصل مضخة الرجوع","راقب مستوى السامب","تأكد من توقف السيفون بأمان","أعد التشغيل وتأكد من استقرار الصرف"])
