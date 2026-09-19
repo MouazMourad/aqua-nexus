@@ -11,7 +11,7 @@ interface LifeDefaults{min:number;max:number;criticality:"critical"|"important"|
 
 const Y=365;
 const T=(key:string,ar:string,en:string,days:number,cadence:Cadence,checklist:string[]):MaintenanceBlueprint=>({key,ar,en,days,cadence,checklist});
-const C=(name:string,nameEn:string,lifeDays:number,minimumOnHand=1):Omit<EquipmentConsumable,"id">=>({name,nameEn,lifeDays,minimumOnHand,quantityOnHand:0});
+const C=(name:string,nameEn:string,lifeDays:number,minimumOnHand=1,unit:NonNullable<EquipmentConsumable["unit"]>="pc"):Omit<EquipmentConsumable,"id">=>({name,nameEn,lifeDays,minimumOnHand,quantityOnHand:0,unit});
 
 export const EQUIPMENT_LIFECYCLE:Record<EquipmentKind,LifeDefaults>={
  lighting:{min:5*Y,max:10*Y,criticality:"important",tasks:[
@@ -38,7 +38,7 @@ export const EQUIPMENT_LIFECYCLE:Record<EquipmentKind,LifeDefaults>={
  ],consumables:[C("Roller fleece","Roller fleece",30,1)]},
  reactor:{min:8*Y,max:15*Y,criticality:"normal",tasks:[
   T("flow","فحص تدفق وميديا الرياكتر","Check reactor flow and media",30,"monthly",["راجع التدفق","افحص تكتل الميديا","افحص O-ring والتسريب","بدل الميديا عند الحاجة"])
- ],consumables:[C("Media refill","Media refill",45,1)]},
+ ],consumables:[C("Media refill","Media refill",45,250,"g")]},
  heater:{min:2*Y,max:5*Y,criticality:"critical",tasks:[
   T("verify","فحص السخان ومقارنة الحرارة","Inspect heater and verify temperature",30,"monthly",["قارن الحرارة بمرجع مستقل","افحص الغلاف والكابل","تأكد من عدم وجود تكاثف/صدأ","راجع عمل الكنترولر"]),
   T("safety","مراجعة أمان السخان","Heater safety review",90,"quarterly",["اختبر فصل الكنترولر","افحص تثبيت السخان","راجع سجل الحرارة","قرر إن كان يلزم استبدال وقائي"])
@@ -51,7 +51,7 @@ export const EQUIPMENT_LIFECYCLE:Record<EquipmentKind,LifeDefaults>={
  ],consumables:[C("UV-C lamp","UV-C lamp",300,1),C("UV O-ring","UV O-ring",730,1)]},
  ozone:{min:3*Y,max:7*Y,criticality:"normal",tasks:[
   T("check","فحص مولد الأوزون ومسار الهواء","Inspect ozone generator and air path",30,"monthly",["افحص الرائحة والتسريب","راجع مجفف الهواء","افحص الكربون على المخارج","راجع ORP والتحكم"])
- ],consumables:[C("Air dryer media","Air dryer media",60,1),C("Activated carbon","Activated carbon",30,1)]},
+ ],consumables:[C("Air dryer media","Air dryer media",60,250,"g"),C("Activated carbon","Activated carbon",30,250,"g")]},
  ato:{min:4*Y,max:8*Y,criticality:"important",tasks:[
   T("test","اختبار حساس ومضخة ATO","Test ATO sensor and pump",7,"weekly",["اختبر توقف المضخة","نظف الحساس/العوامة","افحص السيفون العكسي","اختبر حماية التشغيل الطويل"])
  ],consumables:[]},
@@ -63,7 +63,7 @@ export const EQUIPMENT_LIFECYCLE:Record<EquipmentKind,LifeDefaults>={
  ],consumables:[]},
  probe:{min:Y,max:3*Y,criticality:"important",tasks:[
   T("calibrate","تنظيف ومعايرة المجس","Clean and calibrate probe",30,"monthly",["اشطف المجس","نظفه حسب نوعه","عاير بمحاليل صالحة","قارن بمرجع مستقل","سجل النتيجة"])
- ],consumables:[C("Calibration solution","Calibration solution",180,1)]},
+ ],consumables:[C("Calibration solution","Calibration solution",180,100,"mL")]},
  overflow:{min:10*Y,max:20*Y,criticality:"critical",tasks:[
   T("inspect","فحص Overflow ومسار الصرف","Inspect overflow and drain path",30,"monthly",["افحص الأسنان/الشبك","تأكد من عدم وجود انسداد","راجع الصوت ومستوى الماء","افحص التسريب"]),
   T("poweroff","اختبار انقطاع الكهرباء والرجوع","Power-off and backflow test",182,"semiannual",["افصل مضخة الرجوع","راقب مستوى السامب","تأكد من توقف السيفون بأمان","أعد التشغيل وتأكد من استقرار الصرف"])

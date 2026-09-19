@@ -5,6 +5,9 @@ import { buildAquaAIQueryPlan } from "@/domain/aquaAIQueryPlan";
 import { aquaAIAnswer } from "@/domain/aquaAIBrain";
 import { completeMaintenanceTask,maintenanceEffectiveState } from "@/domain/maintenanceSchedule";
 import { systemAlerts } from "@/domain/alertEngine";
+import { chemistryGuidance } from "@/domain/chemistryGuidance";
+import { rodiIntelligence } from "@/domain/rodiIntelligence";
+import { sumpIntelligence } from "@/domain/sumpIntelligence";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -65,5 +68,31 @@ describe("Core system regression",()=>{
     t.equipment=[...t.equipment,{id:"broken-return",name:"Broken Return",kind:"returnPump",location:"external",status:"warning"}];
     const alerts=systemAlerts(t);
     expect(alerts.some(x=>x.domain==="equipment")).toBe(true);
+  });
+});
+
+
+describe("Safety and data-integrity regression",()=>{
+  it("treats low-confidence chemistry as a data issue",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.chemistry[0]={...t.chemistry[0],confidence:"low"};
+    const guide=chemistryGuidance(t);
+    expect(guide.dataIssues.length).toBeGreaterThan(0);
+    expect(guide.headlineEn).toMatch(/low confidence/i);
+  });
+
+  it("RODI cannot be good when membrane rejection is poor",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.rodi=[{id:"r1",timestamp:new Date().toISOString(),tdsIn:10,tdsOut:1,liters:20,wasteLiters:60}];
+    expect(rodiIntelligence(t).status).not.toBe("good");
+  });
+
+  it("uses measured sump drain-back when a power-off test is recorded",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.sump.enabled=true;
+    t.sump.measuredDrainbackLiters=42;
+    const audit=sumpIntelligence(t);
+    expect(audit.drainbackSource).toBe("measured");
+    expect(audit.drainbackEstimate).toBe(42);
   });
 });

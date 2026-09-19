@@ -137,15 +137,30 @@ export function chemistryGuidance(tank:Tank){
     return (a.score??101)-(b.score??101);
   });
 
+  const readingConfidence=tank.chemistry[0]?.confidence;
+  const confidenceIssues=readingConfidence==="low"
+    ? items.filter(x=>x.current!==null).map(x=>({
+        ...x,
+        level:"warn" as const,
+        reasonAr:`ثقة آخر قراءة منخفضة؛ قيمة ${x.titleAr} لا يجب استخدامها لقرار تصحيحي قبل إعادة القياس.`,
+        reasonEn:`The latest reading has low confidence; ${x.titleEn} should not drive a corrective action until it is retested.`,
+        actionAr:"أعد القياس بأداة/كيت موثوق قبل الجرعات أو التعديلات التصحيحية.",
+        actionEn:"Retest with a reliable kit/device before corrective dosing or adjustments."
+      }))
+    : [];
   const problems=items.filter(x=>x.level==="danger"||x.level==="warn"||x.suspectedFormat);
-  const dataIssues=items.filter(x=>Boolean(x.suspectedFormat));
+  const dataIssues=[...items.filter(x=>Boolean(x.suspectedFormat)),...confidenceIssues];
   const age=chemistryAgeDays(tank);
   const health=chemistryHealth(tank);
   const agePenalty=age>7?Math.min(30,Math.round((age-7)*3)):0;
 
   return {
     health,ageDays:age,agePenalty,problems,dataIssues,all:items,
-    headlineAr:problems.length?"صحة الكيمياء "+health+"% لأن "+problems.length+" عامل/عوامل تحتاج انتباه.":"صحة الكيمياء "+health+"% والقيم الحالية ضمن وضع جيد.",
-    headlineEn:problems.length?"Chemistry health is "+health+"% because "+problems.length+" parameter(s) need attention.":"Chemistry health is "+health+"% and current values are in good condition."
+    headlineAr:readingConfidence==="low"
+      ?"آخر قراءة ثقتها منخفضة؛ أعد الفحص قبل أي جرعة أو تعديل تصحيحي."
+      :problems.length?"صحة الكيمياء "+health+"% لأن "+problems.length+" عامل/عوامل تحتاج انتباه.":"صحة الكيمياء "+health+"% والقيم الحالية ضمن وضع جيد.",
+    headlineEn:readingConfidence==="low"
+      ?"The latest chemistry reading has low confidence; retest before corrective dosing or adjustments."
+      :problems.length?"Chemistry health is "+health+"% because "+problems.length+" parameter(s) need attention.":"Chemistry health is "+health+"% and current values are in good condition."
   };
 }

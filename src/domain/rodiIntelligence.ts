@@ -7,7 +7,10 @@ export function rodiIntelligence(tank:Tank){
   const efficiency=latest.wasteLiters!==undefined&&(latest.liters+latest.wasteLiters)>0?latest.liters/(latest.liters+latest.wasteLiters)*100:null;
   const prev=tank.rodi[1];
   const trend=prev?latest.tdsOut>prev.tdsOut?"worse":latest.tdsOut<prev.tdsOut?"better":"stable":"unknown";
-  const status=latest.tdsOut<=1?"good":latest.tdsOut<=5?"watch":"danger";
+  const tdsDanger=latest.tdsOut>5,tdsWatch=latest.tdsOut>1;
+  const rejectionDanger=rejection!==null&&rejection<90,rejectionWatch=rejection!==null&&rejection<95;
+  const efficiencyDanger=efficiency!==null&&efficiency<10,efficiencyWatch=efficiency!==null&&efficiency<20;
+  const status=(tdsDanger||rejectionDanger||efficiencyDanger)?"danger":(tdsWatch||rejectionWatch||efficiencyWatch)?"watch":"good";
   const notes:string[]=[];
   if(latest.tdsOut>1)notes.push("TDS الخارج لم يعد صفراً/قريباً من الصفر؛ راجع DI resin والممبرين وترتيب الفلاتر.");
   if(rejection!==null&&rejection<95)notes.push("نسبة رفض الممبرين أقل من 95% تقريباً؛ افحص ضغط المصدر والممبرين وTDS قبل/بعد RO.");

@@ -33,6 +33,7 @@ export interface EquipmentConsumable {
   lifeDays?:number;
   quantityOnHand?:number;
   minimumOnHand?:number;
+  unit?: "pc" | "g" | "mL" | "L" | "m";
 }
 
 export interface Equipment {
@@ -99,6 +100,8 @@ export interface Sump {
   enabled: boolean;
   dimensions: DimensionsCm;
   operatingFillPercent: number;
+  /** Measured water that drains back to the sump during a real power-off test. */
+  measuredDrainbackLiters?: number;
   chambers: SumpChamber[];
 }
 

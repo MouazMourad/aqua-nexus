@@ -68,7 +68,7 @@ export function AquaDashboard() {
  }
 
  // Full wizard state
- const [step,setStep]=useState(1),[name,setName]=useState(""),[type,setType]=useState<TankType>("marine"),[status,setStatus]=useState<TankStatus>("new"),[ageMonths,setAgeMonths]=useState(0);
+ const [step,setStep]=useState(1),[name,setName]=useState(""),[type,setType]=useState<TankType>("marine"),[profile,setProfile]=useState<"auto"|"fishOnly"|"reef"|"planted">("auto"),[status,setStatus]=useState<TankStatus>("new"),[ageMonths,setAgeMonths]=useState(0);
  const [l,setL]=useState(120),[w,setW]=useState(60),[h,setH]=useState(60),[loss,setLoss]=useState(15);
  const [hasSump,setHasSump]=useState(true),[sl,setSl]=useState(100),[sw,setSw]=useState(40),[sh,setSh]=useState(35),[fill,setFill]=useState(75),[count,setCount]=useState(3);
  const [equipment,setEquipment]=useState<EquipmentKind[]>(["lighting","waveMaker","overflow","returnPump","heater"]);
@@ -88,22 +88,24 @@ export function AquaDashboard() {
  },[l,w,h,loss,hasSump,sl,sw,sh,fill]);
 
  function resetWizard(){
-  setStep(1);setName("");setType("marine");setStatus("new");setAgeMonths(0);
+  setStep(1);setName("");setType("marine");setProfile("auto");setStatus("new");setAgeMonths(0);
   setL(120);setW(60);setH(60);setLoss(15);setHasSump(true);setSl(100);setSw(40);setSh(35);setFill(75);setCount(3);
   setEquipment(["lighting","waveMaker","overflow","returnPump","heater"]);setMaintenanceDone(true);setChem({});setUseDefaults(true);
  }
 
  function create(){
   const id=uid("tank"),each=sl/Math.max(1,count);
+  const chamberRows=hasSump?Array.from({length:count},(_,i)=>({id:uid("ch"),name:`حجرة ${i+1}`,nameEn:`Chamber ${i+1}`,x:i*each,y:0,length:each,width:sw,height:sh,waterHeight:sh*fill/100,media:[]})):[];
+  const returnChamberId=chamberRows[chamberRows.length-1]?.id;
   const values:Record<string,number|null>={};
   Object.entries(chemCfg).forEach(([k,m]:[string,any])=>values[k]=chem[k] ?? (useDefaults ? m.def : null));
   const weeklyTask = {id:uid("task"),title:"قياس النسب الكيميائية الأسبوعي",titleEn:"Weekly chemistry measurement",cadence:"weekly" as const,done:false,nextDue:new Date(Date.now()+7*86400000).toISOString().slice(0,10),manual:false};
   const newTank:Tank={
-   id,name:name||tr(language,"addTank"),type,status,ageMonths,
+   id,name:name||tr(language,"addTank"),type,ecosystemProfile:profile==="auto"?undefined:profile,status,ageMonths,
    display:{length:l,width:w,height:h,displacementPercent:loss,grossLiters:preview.gross,netLiters:preview.net},
-   sump:{enabled:hasSump,dimensions:{length:sl,width:sw,height:sh},operatingFillPercent:fill,chambers:hasSump?Array.from({length:count},(_,i)=>({id:uid("ch"),name:`حجرة ${i+1}`,nameEn:`Chamber ${i+1}`,x:i*each,y:0,length:each,width:sw,height:sh,waterHeight:sh*fill/100,media:[]})):[]},
+   sump:{enabled:hasSump,dimensions:{length:sl,width:sw,height:sh},operatingFillPercent:fill,chambers:chamberRows},
    systemVolumeLiters:preview.system,
-   equipment:equipment.map((kind)=>({id:uid("eq"),name:equipOptions.find(x=>x.kind===kind)?.en||kind,kind,location:kind==="lighting"||kind==="waveMaker"||kind==="overflow"?"display":hasSump&&kind==="returnPump"?`sump:${count?`ch-${count}`:""}`:"external",status:"on",displayPosition:undefined} as any)),
+   equipment:equipment.map((kind)=>({id:uid("eq"),name:equipOptions.find(x=>x.kind===kind)?.en||kind,kind,location:kind==="lighting"||kind==="waveMaker"||kind==="overflow"?"display":hasSump&&kind==="returnPump"&&returnChamberId?`sump:${returnChamberId}`:"external",status:"on",displayPosition:undefined} as any)),
    chemistry:[{timestamp:nowISO(),values,usingDefaults:useDefaults}],
    maintenance:maintenanceDone?[weeklyTask,{id:uid("task"),title:"تنظيف وفحص النظام",titleEn:"Inspect and clean system",cadence:"weekly",done:false,nextDue:new Date(Date.now()+7*86400000).toISOString().slice(0,10)}]:[weeklyTask],
    livestock:[],inventory:[],timeline:[{id:uid("ev"),timestamp:nowISO(),type:"setup",textAr:"تم إنشاء الحوض عبر معالج الإعداد الذكي.",textEn:"Tank created using the Smart Setup Wizard."}],photos:[],feeding:[],dosing:[],doserChannels:[],quarantine:[],expenses:[],waterChanges:[],rodi:[],createdAt:nowISO()
@@ -118,7 +120,7 @@ export function AquaDashboard() {
 
    {step===1&&<div className="form-grid">
     <label className="field"><span>{tr(language,"name")}</span><input value={name} onChange={e=>setName(e.target.value)}/></label>
-    <label className="field"><span>{tr(language,"type")}</span><select value={type} onChange={e=>setType(e.target.value as TankType)}><option value="marine">{tr(language,"marine")}</option><option value="freshwater">{tr(language,"freshwater")}</option></select></label>
+    <label className="field"><span>{tr(language,"type")}</span><select value={type} onChange={e=>{setType(e.target.value as TankType);setProfile("auto")}}><option value="marine">{tr(language,"marine")}</option><option value="freshwater">{tr(language,"freshwater")}</option></select></label><label className="field"><span>{bi(language,"بروفايل الحوض","Tank profile")}</span><select value={profile} onChange={e=>setProfile(e.target.value as any)}><option value="auto">Auto</option>{type==="marine"?<><option value="reef">Reef</option><option value="fishOnly">Fish-only</option></>:<><option value="planted">Planted</option><option value="fishOnly">Fish-only</option></>}</select></label>
     <label className="field"><span>{tr(language,"status")}</span><select value={status} onChange={e=>setStatus(e.target.value as TankStatus)}><option value="new">{tr(language,"new")}</option><option value="cycling">{tr(language,"cycling")}</option><option value="established">{tr(language,"established")}</option></select></label>
     <label className="field"><span>{tr(language,"ageMonths")}</span><input type="number" min="0" value={ageMonths} onChange={e=>setAgeMonths(Number(e.target.value))}/></label>
    </div>}
@@ -181,7 +183,7 @@ export function AquaDashboard() {
     <div className="training-entry-grid">
      {trainingTanks.map(t=><button key={t.id} className="training-entry-card" onClick={()=>{handleSelectTank(t.id);setPage("dashboard")}}>
       <span className="training-entry-icon">{t.type==="marine"?"🌊":"🌿"}</span>
-      <span><b>{language==="ar"?(t.type==="marine"?"حوض تدريب بحري":"حوض تدريب نهري"):(t.type==="marine"?"Marine Training Tank":"Freshwater Training Tank")}</b><small>{language==="ar"?"صحة 100% • بيانات تدريبية محمية":"100% health • protected training data"}</small></span>
+      <span><b>{language==="ar"?(t.type==="marine"?"حوض تدريب بحري":"حوض تدريب نهري"):(t.type==="marine"?"Marine Training Tank":"Freshwater Training Tank")}</b><small>{language==="ar"?`صحة ${systemHealth(t).score}% • بيانات تدريبية محمية`:`${systemHealth(t).score}% health • protected training data`}</small></span>
       <strong>→</strong>
      </button>)}
     </div>

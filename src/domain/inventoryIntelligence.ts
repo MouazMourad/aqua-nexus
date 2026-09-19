@@ -20,7 +20,7 @@ export function unifiedInventory(tank:Tank){
   }));
   const consumables:UnifiedStockRow[]=tank.equipment.flatMap(e=>(e.consumables??[]).map(c=>({
     id:`${e.id}:${c.id}`,source:"equipment-consumable" as const,name:c.name,nameEn:c.nameEn,
-    category:e.name,quantity:c.quantityOnHand??0,minimum:c.minimumOnHand??0,unit:"pc",
+    category:e.name,quantity:c.quantityOnHand??0,minimum:c.minimumOnHand??0,unit:c.unit??"pc",
     equipmentId:e.id,consumableId:c.id
   })));
   const rows=[...general,...consumables];

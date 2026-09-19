@@ -27,6 +27,9 @@ export function systemAlerts(tank:Tank):SystemAlert[]{
   if(guide.ageDays>7){
     pushUnique(out,{id:"chem-stale",level:guide.ageDays>14?"danger":"warn",domain:"chemistry",ar:`آخر فحص كيمياء عمره ${Math.floor(guide.ageDays)} يوم.`,en:`Latest chemistry test is ${Math.floor(guide.ageDays)} days old.`,actionPage:"chemistry"});
   }
+  for(const x of guide.dataIssues.slice(0,3)){
+    pushUnique(out,{id:`chem-data-${x.key}`,level:"warn",domain:"chemistry",ar:x.reasonAr,en:x.reasonEn,actionPage:"chemistry"});
+  }
   for(const x of guide.problems.slice(0,6)){
     pushUnique(out,{id:`chem-${x.key}`,level:x.level==="danger"?"danger":"warn",domain:"chemistry",ar:x.reasonAr,en:x.reasonEn,actionPage:"chemistry"});
   }

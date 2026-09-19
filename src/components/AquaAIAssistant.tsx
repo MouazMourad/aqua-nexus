@@ -3,7 +3,8 @@ import { FormEvent,useEffect,useMemo,useState } from "react";
 import type { Tank } from "@/domain/types";
 import type { AppPage } from "@/components/navigation/MainNav";
 import { useAquaStore } from "@/store/useAquaStore";
-import { bioload,chemistryHealth,maintenanceHealth,tankHealth,tankHealthTrend } from "@/domain/health";
+import { systemHealth,systemHealthTrend } from "@/domain/systemHealth";
+import { systemAlerts } from "@/domain/alertEngine";
 import { aquaAIAnswer,type AquaAIAnswer,type AquaAIPage } from "@/domain/aquaAIBrain";
 import { parseAquaQuestion,resolveAquaFollowup } from "@/domain/aquaAIIntent";
 import { tankMood } from "@/domain/tankLearning";
@@ -20,9 +21,9 @@ type InsightView={id:string;labelAr:string;labelEn:string;promptAr:string;prompt
 export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;onNavigate?:(page:AppPage)=>void}){
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
  const [open,setOpen]=useState(false),[selected,setSelected]=useState<string|null>(null),[question,setQuestion]=useState(""),[askedQuestion,setAskedQuestion]=useState(""),[resolvedQuestion,setResolvedQuestion]=useState(""),[conversationContext,setConversationContext]=useState(""),[stage,setStage]=useState(0),[scopeBlocked,setScopeBlocked]=useState(false),[greeting,setGreeting]=useState(false),[planNote,setPlanNote]=useState("");
- const th=tankHealth(tank),ch=chemistryHealth(tank),mh=maintenanceHealth(tank),trend=tankHealthTrend(tank),bio=bioload(tank),mood=tankMood(tank);
- const warnings=tank.equipment.some(x=>x.status==="warning"||x.status==="service");
- const state:"normal"|"alert"|"critical"=(th<60||ch<55||bio.status==="danger")?"critical":(th<80||ch<75||mh<70||trend==="declining"||warnings)?"alert":"normal";
+ const health=systemHealth(tank),trend=systemHealthTrend(tank),alerts=systemAlerts(tank),mood=tankMood(tank);
+ const hasDanger=alerts.some(x=>x.level==="danger"),hasWarning=alerts.some(x=>x.level==="warn");
+ const state:"normal"|"alert"|"critical"=(health.score<60||hasDanger)?"critical":(health.score<80||trend==="declining"||hasWarning)?"alert":"normal";
  const learned=useMemo(()=>learnedTankSignals(tank),[tank]);
  const plans:AquaActionPlan[]=((tank as any).aiActionPlans??[]),currentPlan=plans.find(x=>x.status==="active");
  const views:InsightView[]=[
@@ -88,7 +89,7 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
  const nextCheck=actionText||(lang==="ar"?"استمر بالمراقبة وسجّل أي تغير جديد قبل تعديل أكثر من متغير بنفس الوقت.":"Keep monitoring and record any new change before altering multiple variables at once.");
  const scopeMessage=scopeBlocked?scopeReply(askedQuestion):null;
  const answerIntent=parseAquaQuestion(resolvedQuestion||askedQuestion||"");
- const autoStage=["how","when","latest","list","count","why"].includes(answerIntent.mode)?2:["action","dose","waterChange","canAdd"].includes(answerIntent.mode)?3:1;
+ const autoStage=["how","when","latest","list","count","why"].includes(answerIntent.mode)?2:["action","dose","waterChange","canAdd","whatIf"].includes(answerIntent.mode)?3:1;
  const visibleStage=Math.max(stage,autoStage);
  const detailLabel=lang==="ar"?(answerIntent.mode==="how"?"الخطوات العملية":answerIntent.mode==="when"?"المواعيد والتفاصيل":answerIntent.mode==="latest"?"آخر بيانات مسجلة":answerIntent.mode==="list"||answerIntent.mode==="count"?"التفاصيل":answerIntent.mode==="why"?"الأسباب وما ألاحظه":"التفاصيل والتحليل"):(answerIntent.mode==="how"?"PRACTICAL STEPS":answerIntent.mode==="when"?"TIMING & DETAILS":answerIntent.mode==="latest"?"LATEST LOGGED DATA":answerIntent.mode==="list"||answerIntent.mode==="count"?"DETAILS":answerIntent.mode==="why"?"WHY • WHAT I NOTICE":"DETAILS & ANALYSIS");
 
