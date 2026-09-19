@@ -15,6 +15,7 @@ export interface SmartInsight {
 export function smartInsights(tank: Tank): SmartInsight[] {
   const out: SmartInsight[] = [];
   const latest = tank.chemistry[0]?.values ?? {};
+  const measuredChemistry = tank.chemistry.filter(x=>!x.usingDefaults);
   const age = chemistryAgeDays(tank);
   const trend = tankHealthTrend(tank);
   const bio = bioload(tank);
@@ -26,7 +27,8 @@ export function smartInsights(tank: Tank): SmartInsight[] {
   const latestVision:any=((tank as any).visionAssessments??[])[0];
   const activePlan:any=((tank as any).aiActionPlans??[]).find((x:any)=>x.status==="active");
 
-  if (age > 7) out.push({level:"warn",ar:`مر ${Math.floor(age)} يوماً على آخر فحص كيميائي. يجب إجراء فحص جديد.`,en:`It has been ${Math.floor(age)} days since the last chemistry test. A new test is due.`});
+  if (!measuredChemistry.length) out.push({level:"warn",ar:"لا يوجد فحص كيميائي مقاس فعلياً بعد. سجّل أول قراءة حقيقية لبدء التقييم.",en:"No measured chemistry test is available yet. Record the first real reading to start the assessment."});
+  else if (age > 7) out.push({level:"warn",ar:`مر ${Math.floor(age)} يوماً على آخر فحص كيميائي. يجب إجراء فحص جديد.`,en:`It has been ${Math.floor(age)} days since the last chemistry test. A new test is due.`});
   if (trend === "declining") out.push({level:"danger",ar:"اتجاه صحة الحوض يتراجع مقارنة بالقراءة السابقة.",en:"Tank health is declining compared with the previous reading."});
   if (trend === "improving") out.push({level:"good",ar:"اتجاه صحة الحوض يتحسن مقارنة بالقراءة السابقة.",en:"Tank health is improving compared with the previous reading."});
   if (bio.ratio > 1) out.push({level:"warn",ar:"الحمل البيولوجي مرتفع بالنسبة لحجم النظام الحالي.",en:"Biological load is high for the current system volume."});
