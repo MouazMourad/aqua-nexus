@@ -5,7 +5,7 @@ import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi,categoryText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { compatibilityCheck } from "@/domain/compatibility";
+import { stockingReadiness } from "@/domain/stockingReadiness";
 import { uid,nowISO,today } from "@/lib/appUtils";
 import { buildDelimitedText,downloadDelimitedFile,field,numberField,parseDelimitedText } from "@/lib/tabularImport";
 
@@ -389,9 +389,27 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   setExceptionPickerOpen(false);
   setExceptionBoxExpanded(false);
  }
- function markAdded(item:AcclimationItem){if(!active)return;const catalog:any=lib.find((x:any)=>x.id===item.libraryId);let riskOverride=false;if(catalog){const check=compatibilityCheck(tank,catalog,item.quantity);if(check.level==="danger"){const token=window.prompt(lang==="ar"?"يوجد مانع خطر من التوافق/التجهيزات/الحمل. الأفضل تأجيل النقل ومعالجة السبب. إذا كان ترك الكائن في وعاء الشحنة أخطر ولا يوجد بديل، اكتب OVERRIDE لتسجيل تجاوز استثنائي.":"A dangerous compatibility/equipment/bioload blocker exists. Prefer deferring transfer and fixing the cause. If keeping the animal in shipping water is riskier and there is no alternative, type OVERRIDE to log an exceptional override.");if(token!=="OVERRIDE")return;riskOverride=true;}}
-  const livestock:LivestockItem={id:uid("live"),libraryId:item.libraryId,name:item.name,nameEn:item.nameEn,category:item.category,quantity:item.quantity,health:item.health==="critical"||item.health==="stressed"?"watch":"good",load:catalog?.load??1,addedAt:today()};const nextItems=active.items.map(x=>x.id===item.id?{...x,status:"added" as const,addedAt:nowISO()}:x);const allDone=nextItems.every(x=>x.status==="added"||x.status==="deferred");patch(tank.id,t=>({...t,acclimationSessions:[{...active,status:allDone?"completed":"release",completedAt:allDone?nowISO():undefined,items:nextItems,events:[ev(`تم إدخال ${item.name} إلى الحوض بدون ماء الشحنة.`,`Transferred ${item.nameEn||item.name} to the aquarium without shipping water.`),...active.events]},...(t.acclimationSessions??[]).filter(x=>x.id!==active.id)],livestock:[...t.livestock,livestock],timeline:[{id:uid("ev"),timestamp:nowISO(),type:riskOverride?"acclimation-risk-override":"acclimation",textAr:riskOverride?`تم إدخال ${item.name} مع تسجيل Risk Override استثنائي بسبب مانع خطر.`:`اكتملت أقلمة ${item.name} وتم إدخاله.`,textEn:riskOverride?`Transferred ${item.nameEn||item.name} with an explicitly logged exceptional risk override.`:`Acclimation completed for ${item.nameEn||item.name}.`},...t.timeline]}));
- }
+ function markAdded(item:AcclimationItem){
+  if(!active)return;
+  const catalog:any=lib.find((x:any)=>x.id===item.libraryId);
+  const readiness=stockingReadiness(tank,{candidate:catalog,quantity:item.quantity,candidateKnown:Boolean(catalog),candidateLabelAr:item.name,candidateLabelEn:item.nameEn||item.name});
+  let riskOverride=false;
+  if(readiness.state!=="ready"){
+    const reason=lang==="ar"?(readiness.blockersAr[0]||readiness.missingEvidenceAr[0]||"الجاهزية غير مؤكدة."):(readiness.blockersEn[0]||readiness.missingEvidenceEn[0]||"Readiness is not confirmed.");
+    const token=window.prompt(lang==="ar"
+      ?("قرار الجاهزية المركزي لا يسمح بتنزيل الكائن بشكل طبيعي الآن. "+reason+" إذا كان إبقاء الكائن في ماء الشحنة أخطر ولا يوجد بديل آمن، اكتب OVERRIDE لتسجيل تجاوز استثنائي.")
+      :("Central readiness does not support a normal release right now. "+reason+" If keeping the animal in shipping water is riskier and there is no safer alternative, type OVERRIDE to log an exceptional override."));
+    if(token!=="OVERRIDE")return;
+    riskOverride=true;
+  }else if(readiness.requiresConfirmation){
+    const ok=window.confirm(lang==="ar"?"الجاهزية تسمح مبدئياً لكن يوجد تنبيه مهم. هل تريد متابعة التنزيل وتسجيله؟":"Readiness is provisionally acceptable but has an important caution. Continue and log the release?");
+    if(!ok)return;
+  }
+  const livestock:LivestockItem={id:uid("live"),libraryId:item.libraryId,name:item.name,nameEn:item.nameEn,category:item.category,quantity:item.quantity,health:item.health==="critical"||item.health==="stressed"?"watch":"good",load:catalog?.load??1,addedAt:today()};
+  const nextItems=active.items.map(x=>x.id===item.id?{...x,status:"added" as const,addedAt:nowISO()}:x);
+  const allDone=nextItems.every(x=>x.status==="added"||x.status==="deferred");
+  patch(tank.id,t=>({...t,acclimationSessions:[{...active,status:allDone?"completed":"release",completedAt:allDone?nowISO():undefined,items:nextItems,events:[ev(`تم إدخال ${item.name} إلى الحوض بدون ماء الشحنة.`,`Transferred ${item.nameEn||item.name} to the aquarium without shipping water.`),...active.events]},...(t.acclimationSessions??[]).filter(x=>x.id!==active.id)],livestock:[...t.livestock,livestock],timeline:[{id:uid("ev"),timestamp:nowISO(),type:riskOverride?"acclimation-risk-override":"acclimation",textAr:riskOverride?`تم إدخال ${item.name} مع تسجيل Risk Override استثنائي بعد فحص الجاهزية المركزي.`:`اكتملت أقلمة ${item.name} وتم إدخاله بعد فحص الجاهزية المركزي.`,textEn:riskOverride?`Transferred ${item.nameEn||item.name} with an explicitly logged exceptional override after central readiness screening.`:`Acclimation completed for ${item.nameEn||item.name} after central readiness screening.`},...t.timeline]}));
+}
  function downloadShipmentTemplate(kind:"csv"|"txt"){
   const headers=["libraryId","name","nameEn","category","quantity","health","temperament","sensitivity","subtype","dripMinutes","intervalMinutes","placement","notes"];
   const marine=tank.type==="marine";
