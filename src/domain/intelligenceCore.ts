@@ -22,6 +22,12 @@ export interface IntelligenceAction{
 }
 
 
+
+const pageByDomain:Record<IntelligenceDomain,string>={
+ chemistry:"chemistry",dosing:"dosing",maintenance:"maintenance",equipment:"equipment",livestock:"livestock",inventory:"inventory",feeding:"feeding",
+ waterChange:"water-change",rodi:"rodi",quarantine:"quarantine",emergency:"emergency",acclimation:"acclimation",sump:"sump",journal:"journal",expense:"expenses",system:"dashboard"
+};
+
 export interface TankIntelligenceCore{
  generatedAt:string;
  health:ReturnType<typeof systemHealth>;
@@ -36,7 +42,6 @@ export interface TankIntelligenceCore{
  predictions:ReturnType<typeof proactivePredictions>;
  memory:ReturnType<typeof biologicalMemory>;
  actions:IntelligenceAction[];
- impacts:CrossPageImpact[];
  guidanceActions:GuidanceAction[];
  dataConfidence:number;
  critical:boolean;
