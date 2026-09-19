@@ -19,7 +19,7 @@ export interface TankAIContext {
   schema:"aqua-nexus-ai-context/v1";
   generatedAt:string;
   tank:{id:string;name:string;type:string;status:string;ageMonths?:number;systemVolumeLiters:number};
-  state:{health:number;chemistry:number;maintenance:number;bioloadPercent:number;stateScore:number;stateBand:string;mood:string;forecast7d:number;forecastDirection:string;forecastConfidence:string};
+  state:{health:number;chemistry:number;maintenance:number;bioloadPercent:number;stateScore:number;stateBand:string;mood:string;forecast7d:number|null;forecastDirection:string;forecastConfidence:string};
   chemistry:{latest:Record<string,number|null>;readingCount:number;recent:Array<{timestamp:string;values:Record<string,number|null>}>;guidance:ReturnType<typeof chemistryGuidance>};
   systemHealth:ReturnType<typeof systemHealth>;
   learning:{baselines:ReturnType<typeof tankBaselines>;signals:ReturnType<typeof learnedTankSignals>;predictions:ReturnType<typeof proactivePredictions>;repeatedPatterns:ReturnType<typeof repeatedResponsePatterns>;memory:ReturnType<typeof biologicalMemory>;eventLinks:ReturnType<typeof eventChemistryLinks>};
