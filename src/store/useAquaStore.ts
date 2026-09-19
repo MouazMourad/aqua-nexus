@@ -188,7 +188,7 @@ export const useAquaStore = create<AquaStore>()(
           const events=deriveIntelligenceEvents(t,next);
           next={...next,intelligenceEvents:mergeIntelligenceEvents(t.intelligenceEvents,events)};
           const core=tankIntelligenceCore(next);
-          next={...next,guidanceActions:reconcileGuidanceActions(t.guidanceActions,core.guidanceActions)};
+          next={...next,guidanceActions:reconcileGuidanceActions(t.guidanceActions,core.guidanceActions,next.intelligenceEvents)};
           return withHealthSnapshot(t,next);
         })
       })),
