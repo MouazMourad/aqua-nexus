@@ -1,4 +1,4 @@
-const CACHE_NAME="aqua-nexus-pwa-v3";
+const CACHE_NAME="aqua-nexus-pwa-v4";
 
 self.addEventListener("install",()=>self.skipWaiting());
 self.addEventListener("activate",event=>{
