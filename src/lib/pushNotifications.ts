@@ -1,5 +1,7 @@
 import type { Language, Tank } from "@/domain/types";
-import { bioload,chemistryHealth,maintenanceHealth,tankHealth,tankHealthTrend } from "@/domain/health";
+import { systemHealth,systemHealthTrend } from "@/domain/systemHealth";
+import { systemAlerts } from "@/domain/alertEngine";
+import { maintenanceEffectiveState } from "@/domain/maintenanceSchedule";
 import { aquaWorkspaceHeaders,getAquaDeviceId } from "@/lib/anonymousWorkspace";
 
 const FALLBACK_VAPID_PUBLIC_KEY="BD9A5jEWZLVFsG8PGXEIZyM4OCv1H4QHOJyXTi26-AyWb8Cm-b9q0wuQZiMG4SVAdoQYsrMGu5SBPcmsxu1_c20";
@@ -28,16 +30,21 @@ function uint8ToBase64Url(value:ArrayBuffer|null){
 }
 
 function stabilityState(t:Tank){
-  const overall=tankHealth(t),chemistry=chemistryHealth(t),maintenance=maintenanceHealth(t),trend=tankHealthTrend(t),bio=bioload(t);
-  const equipmentWarnings=t.equipment.filter(x=>x.status==="warning"||x.status==="service").length;
-  const reasons:string[]=[];
-  if(overall<80) reasons.push("health");
-  if(chemistry<75) reasons.push("chemistry");
-  if(maintenance<70) reasons.push("maintenance");
-  if(trend==="declining") reasons.push("declining");
-  if(bio.status==="danger") reasons.push("bioload");
-  if(equipmentWarnings>0) reasons.push("equipment");
-  return {overall,chemistry,maintenance,trend,bioload:bio.status,equipmentWarnings,unstable:reasons.length>0,reasons};
+  const health=systemHealth(t),trend=systemHealthTrend(t),alerts=systemAlerts(t);
+  const reasons=[...new Set(alerts.filter(x=>x.level!=="info").map(x=>x.domain))];
+  return {
+    overall:health.score,
+    chemistry:health.chemistry,
+    maintenance:health.maintenance,
+    bioload:health.bioload,
+    equipment:health.equipment,
+    compatibility:health.compatibility,
+    livestock:health.livestock,
+    trend,
+    equipmentWarnings:health.equipmentAudit.issues.length,
+    unstable:health.score<80||alerts.some(x=>x.level==="danger"),
+    reasons
+  };
 }
 
 function backgroundAlertState(t:Tank){
@@ -48,7 +55,7 @@ function backgroundAlertState(t:Tank){
     .sort((a,b)=>new Date(a.nextDoseAt!).getTime()-new Date(b.nextDoseAt!).getTime())[0];
   return {
     lastChemistryAt:t.chemistry[0]?.timestamp??null,
-    maintenanceTasks:t.maintenance.filter(x=>!x.done).slice(0,30).map(x=>({id:x.id,title:x.title,titleEn:x.titleEn??x.title,nextDue:x.nextDue??null})),
+    maintenanceTasks:t.maintenance.filter(x=>!maintenanceEffectiveState(x).completed).slice(0,30).map(x=>({id:x.id,title:x.title,titleEn:x.titleEn??x.title,nextDue:x.nextDue??null})),
     treatmentCount:t.livestock.filter(x=>x.health==="treatment").reduce((sum,x)=>sum+Math.max(1,x.quantity),0),
     watchCount:t.livestock.filter(x=>x.health==="watch").reduce((sum,x)=>sum+Math.max(1,x.quantity),0),
     activeQuarantineCount:activeQuarantine.length,

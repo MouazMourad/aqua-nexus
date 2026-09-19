@@ -7,8 +7,8 @@ import { SafeAquariumScene } from "@/components/three/SafeAquariumScene";
 import { EquipmentPanel } from "@/components/panels/EquipmentPanel";
 import { TankHealthShareCard } from "@/components/dashboard/TankHealthShareCard";
 import { TankJourney } from "@/components/dashboard/TankJourney";
-import { bioload,chemistryAgeDays,chemistryHealth,maintenanceHealth,tankHealthTrend } from "@/domain/health";
-import { systemHealth } from "@/domain/systemHealth";
+import { bioload,chemistryAgeDays,chemistryHealth,maintenanceHealth } from "@/domain/health";
+import { systemHealth,systemHealthTrend } from "@/domain/systemHealth";
 import { smartInsights } from "@/domain/smartInsights";
 import { tankContextStats,tankForecast,tankStateView } from "@/domain/tankIntelligence";
 import { biologicalMemory,proactivePredictions,tankMood } from "@/domain/tankLearning";
@@ -24,7 +24,7 @@ const LAYOUT_KEY="aqua-dashboard-layout-v3";
 
 export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:AppPage)=>void}) {
  const lang=useAquaStore(s=>s.language);
- const ch=chemistryHealth(tank),mh=maintenanceHealth(tank),trend=tankHealthTrend(tank),bio=bioload(tank);
+ const ch=chemistryHealth(tank),mh=maintenanceHealth(tank),trend=systemHealthTrend(tank),bio=bioload(tank);
  const system=systemHealth(tank),th=system.score;
  const insights=smartInsights(tank),state=tankStateView(tank),forecast=tankForecast(tank),context=tankContextStats(tank);
  const mood=tankMood(tank),predictions=proactivePredictions(tank),memory=biologicalMemory(tank);

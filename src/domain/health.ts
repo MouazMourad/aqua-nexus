@@ -1,5 +1,6 @@
 import type { ChemistryReading, Tank } from "./types";
 import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
+import { recurringMaintenanceHealth } from "./maintenanceSchedule";
 
 export function parameterScore(value: number | null | undefined, meta: any) {
   if (typeof value !== "number" || Number.isNaN(value)) return null;
@@ -51,15 +52,7 @@ export function chemistryHealth(tank: Tank) {
 }
 
 export function maintenanceHealth(tank: Tank) {
-  if (!tank.maintenance.length) return 70;
-  const today = new Date().toISOString().slice(0,10);
-  let points = 0;
-  tank.maintenance.forEach(t => {
-    if (t.done) points += 1;
-    else if (t.nextDue && t.nextDue < today) points += .15;
-    else points += .65;
-  });
-  return Math.round(points / tank.maintenance.length * 100);
+  return recurringMaintenanceHealth(tank.maintenance);
 }
 
 export function tankHealth(tank: Tank) {

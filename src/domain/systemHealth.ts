@@ -69,3 +69,11 @@ export function systemHealth(tank:Tank):SystemHealthResult{
     equipmentAudit,compatibilityAudit
   };
 }
+
+export function systemHealthTrend(tank:Tank):"improving"|"stable"|"declining"{
+  const snapshots=(tank.healthSnapshots??[]).filter(x=>Number.isFinite(x.score));
+  if(snapshots.length<2)return "stable";
+  const latest=snapshots[0].score,previous=snapshots[1].score;
+  const delta=latest-previous;
+  return delta>=5?"improving":delta<=-5?"declining":"stable";
+}

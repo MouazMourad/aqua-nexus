@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { uid,nowISO } from "@/lib/appUtils";
 import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
 import { calculateDose,DOSING_PRESETS,type DosingForm,type DosingParameter } from "@/domain/dosingCalculator";
+import { chemistryGuidance } from "@/domain/chemistryGuidance";
 
 const colors=["#27c2dc","#62d48f","#f6c85f","#c877ff","#ff7e79","#4b8bff"];
 
@@ -44,6 +45,12 @@ export function DosingPage({tank}:{tank:Tank}) {
 
  const presets=DOSING_PRESETS.filter(x=>x.parameter===param);
  const chosen=presets.find(x=>x.id===presetId)??presets[0];
+ const guide=useMemo(()=>chemistryGuidance(tank),[tank]);
+ const latestReading=tank.chemistry[0];
+ const readingAgeHours=latestReading?Math.max(0,(Date.now()-new Date(latestReading.timestamp).getTime())/3600000):99999;
+ const latestParamValue=latestValue(tank,param);
+ const dataIssue=guide.dataIssues.find(x=>x.key===param);
+ const dosingReady=Boolean(latestReading)&&latestParamValue!==undefined&&readingAgeHours<=48&&!dataIssue;
  const calc=useMemo(()=>calculateDose({
   parameter:param,current:cur,target,volumeLiters:tank.systemVolumeLiters,form,presetId:chosen?.id,purityPercent:purity,stockGramsPerLiter,productRaisePerMlPer100L:productRaise
  }),[param,cur,target,tank.systemVolumeLiters,form,chosen?.id,purity,stockGramsPerLiter,productRaise]);
@@ -57,7 +64,7 @@ export function DosingPage({tank}:{tank:Tank}) {
  }
  function updateChannel(id:string,p:Partial<DoserChannel>){patch(tank.id,t=>({...t,doserChannels:t.doserChannels.map(x=>x.id===id?{...x,...p}:x)}))}
  function log(){
-  if(!calc.valid)return;
+  if(!calc.valid||!dosingReady)return;
   const material=form==="product"?(lang==="ar"?"محلول تجاري":"Commercial product"):(lang==="ar"?chosen?.ar:chosen?.en)||chosen?.formula||param;
   const ts=nowISO();
   patch(tank.id,t=>{
@@ -114,10 +121,11 @@ export function DosingPage({tank}:{tank:Tank}) {
    <div className="summary"><small>{lang==="ar"?"حد الأمان اليومي":"Daily safety limit"}</small><b>{safetyLimit}</b></div>
   </div>
 
+  {!dosingReady&&<div className="inline-alert danger" style={{marginTop:12}}><b>{lang==="ar"?"حماية الجرعات: يلزم قياس حديث وموثوق":"Dosing safety gate: a fresh reliable reading is required"}</b><p>{!latestReading?(lang==="ar"?"ما في قراءة كيمياء مسجلة. سجل فحصاً أولاً.":"No chemistry reading is logged. Record a test first."):latestParamValue===undefined?(lang==="ar"?`آخر فحص ما فيه قراءة ${param}.`:`Latest test does not include ${param}.`):dataIssue?(lang==="ar"?dataIssue.reasonAr:dataIssue.reasonEn):readingAgeHours>48?(lang==="ar"?`آخر قراءة أقدم من 48 ساعة (${Math.floor(readingAgeHours)} ساعة). أعد القياس قبل جرعة تصحيحية.`:`Latest reading is older than 48 hours (${Math.floor(readingAgeHours)}h). Retest before corrective dosing.`):""}</p></div>}
   {!calc.valid&&<div className="inline-alert warn" style={{marginTop:12}}>{form==="product"?(lang==="ar"?"أدخل قوة المنتج كما هي مكتوبة على العبوة حتى يتم الحساب.":"Enter the product strength from its label to calculate the dose."):(lang==="ar"?"تأكد أن الهدف أعلى من القراءة الحالية وأن بيانات التركيز صحيحة.":"Make sure the target is above the current reading and concentration data is valid.")}</div>}
   {calc.largeCorrection&&<div className="inline-alert warn" style={{marginTop:12}}>{lang==="ar"?`التصحيح كبير؛ قُسّم تلقائياً إلى ${calc.steps} جرعات يومية محافظة، وسيتم إنشاء مهمة جرعة ومهمة إعادة قياس لكل خطوة. لا تنفذ الخطوة التالية إذا لم تؤكد القراءة الجديدة الاستجابة المتوقعة.`:`This correction is large; it is automatically split into ${calc.steps} conservative daily doses. A dose task and retest task will be created for each step. Do not continue unless the new reading confirms the expected response.`}</div>}
   {form!=="product"&&<div className="note" style={{marginTop:10}}>{lang==="ar"?"الحساب للمركب المحدد كما هو مكتوب، لذلك يجب اختيار الشكل الكيميائي الصحيح (مثلاً سداسي الماء مقابل اللامائي) وإدخال النقاوة الفعلية.":"The calculation is specific to the selected chemical form. Choose the exact hydrate/anhydrous form and enter actual purity."}</div>}
-  <div style={{marginTop:12}}><button className="btn primary" onClick={log} disabled={!calc.valid}>{calc.steps>1?(lang==="ar"?"إنشاء خطة الجرعات الآمنة":"Create safe dosing plan"):(lang==="ar"?"تسجيل الجرعة وإنشاء مهمة إعادة قياس":"Log dose & create retest task")}</button></div>
+  <div style={{marginTop:12}}><button className="btn primary" onClick={log} disabled={!calc.valid||!dosingReady}>{calc.steps>1?(lang==="ar"?"إنشاء خطة الجرعات الآمنة":"Create safe dosing plan"):(lang==="ar"?"تسجيل الجرعة وإنشاء مهمة إعادة قياس":"Log dose & create retest task")}</button></div>
  </div>
 
  <div className="card panel full-span">
