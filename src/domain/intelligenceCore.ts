@@ -7,7 +7,7 @@ import { healthTimeline,tankForecast,tankStateView } from "./tankIntelligence";
 import { proactivePredictions,biologicalMemory } from "./tankLearning";
 
 export type IntelligenceDomain =
- "chemistry"|"maintenance"|"bioload"|"equipment"|"livestock"|"inventory"|
+ "chemistry"|"maintenance"|"equipment"|"livestock"|"inventory"|
  "quarantine"|"emergency"|"acclimation"|"system";
 
 export interface IntelligenceAction{
@@ -59,7 +59,7 @@ export function tankIntelligenceCore(tank:Tank):TankIntelligenceCore{
  const bio=bioload(tank);
 
  const pageByDomain:Record<IntelligenceDomain,string>={
-  chemistry:"chemistry",maintenance:"maintenance",bioload:"livestock",
+  chemistry:"chemistry",maintenance:"maintenance",
   equipment:"equipment",livestock:"livestock",inventory:"inventory",
   quarantine:"quarantine",emergency:"emergency",acclimation:"acclimation",system:"dashboard"
  };
