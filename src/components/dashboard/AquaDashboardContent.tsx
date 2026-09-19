@@ -8,7 +8,8 @@ import { EquipmentPanel } from "@/components/panels/EquipmentPanel";
 import { TankHealthShareCard } from "@/components/dashboard/TankHealthShareCard";
 import { TankJourney } from "@/components/dashboard/TankJourney";
 import { bioload,chemistryAgeDays,chemistryHealthAssessment,maintenanceHealth } from "@/domain/health";
-import { systemHealth,systemHealthTrend } from "@/domain/systemHealth";
+import { systemHealthTrend } from "@/domain/systemHealth";
+import { tankIntelligenceCore } from "@/domain/intelligenceCore";
 import { smartInsights } from "@/domain/smartInsights";
 import { tankContextStats,tankForecast,tankStateView } from "@/domain/tankIntelligence";
 import { biologicalMemory,proactivePredictions,tankMood } from "@/domain/tankLearning";
@@ -24,10 +25,11 @@ const LAYOUT_KEY="aqua-dashboard-layout-v3";
 
 export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:AppPage)=>void}) {
  const lang=useAquaStore(s=>s.language);
- const chemistry=chemistryHealthAssessment(tank),ch=chemistry.score,mh=maintenanceHealth(tank),trend=systemHealthTrend(tank),bio=bioload(tank);
- const system=systemHealth(tank),th=system.score;
- const insights=smartInsights(tank),state=tankStateView(tank),forecast=tankForecast(tank),context=tankContextStats(tank);
- const mood=tankMood(tank),predictions=proactivePredictions(tank),memory=biologicalMemory(tank);
+ const core=tankIntelligenceCore(tank);
+ const chemistry=core.chemistry,ch=chemistry.score,mh=core.maintenance,trend=systemHealthTrend(tank),bio=core.bioload;
+ const system=core.health,th=system.score;
+ const insights=core.insights,state=core.state,forecast=core.forecast,context=tankContextStats(tank);
+ const mood=tankMood(tank),predictions=core.predictions,memory=core.memory;
  const today=new Date().toISOString().slice(0,10);
  const due=tank.maintenance.filter(x=>!x.done&&(!x.nextDue||x.nextDue<=today)).slice(0,5);
  const age=chemistryAgeDays(tank),latest=tank.chemistry[0]?.values??{};
