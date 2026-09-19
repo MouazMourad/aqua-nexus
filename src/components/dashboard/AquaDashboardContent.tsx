@@ -114,8 +114,8 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
  const actionPageAliases:Record<string,AppPage>={"water-change":"waterchange","waterChange":"waterchange"};
  const nextActionPage:AppPage=nextAction?((actionPageAliases[nextAction.page]??nextAction.page) as AppPage):"dashboard";
  const statePlain=lang==="ar"
-  ?(state.band==="good"?"الحوض مستقر":state.band==="warn"?"الحوض يحتاج متابعة":"الحوض يحتاج تدخل")
-  :(state.band==="good"?"Tank is stable":state.band==="warn"?"Tank needs attention":"Tank needs action");
+  ?(state.band==="excellent"||state.band==="stable"?"الحوض مستقر":state.band==="watch"?"الحوض يحتاج متابعة":"الحوض يحتاج تدخل")
+  :(state.band==="excellent"||state.band==="stable"?"Tank is stable":state.band==="watch"?"Tank needs attention":"Tank needs action");
  const riskPlain=lang==="ar"
   ?(critical?(String(critical)+" تنبيه يحتاج انتباه"):"لا يوجد خطر حرج الآن")
   :(critical?(String(critical)+" alert"+(critical===1?"":"s")+" need attention"):"No critical risk right now");
