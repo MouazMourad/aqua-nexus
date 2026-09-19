@@ -21,19 +21,6 @@ export interface IntelligenceAction{
  priority:number;
 }
 
-export interface CrossPageImpact{
- id:string;
- source:"chemistry"|"equipment"|"livestock"|"inventory"|"quarantine"|"emergency"|"acclimation"|"system";
- domains:IntelligenceDomain[];
- level:"info"|"warn"|"danger";
- weight:number;
- confidence:number;
- ar:string;
- en:string;
- resourcePresetId?:string;
- resourceAvailable?:boolean;
- suggestedPage:string;
-}
 
 export interface TankIntelligenceCore{
  generatedAt:string;
