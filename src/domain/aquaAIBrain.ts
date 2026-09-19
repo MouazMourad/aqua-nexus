@@ -310,7 +310,7 @@ function stockingReadinessAnswer(tank:Tank,question:string):AquaAIAnswer{
   const candidate=candidateFromQuestion(question,tank),quantity=quantityFromQuestion(question);
   const readiness=stockingReadiness(tank,{candidate,quantity,candidateKnown:candidate?true:undefined});
   const candidateAr=candidate?.ar||candidate?.en,candidateEn=candidate?.en||candidate?.ar;
-  const stateAr=readiness.state==="ready"?"جاهز مبدئياً":readiness.state==="not_now"?"غير مناسب للإضافة الآن":"ما في أدلة كافية للحكم";
+  const stateAr=readiness.state==="ready"?"جاهز مبدئياً":readiness.state==="not_now"?"غير مناسب للإضافة الآن":"ما في بيانات كافية للحكم";
   const stateEn=readiness.state==="ready"?"Provisionally ready":readiness.state==="not_now"?"Not suitable for an addition now":"Not enough evidence to decide";
   const detailsAr=[
     candidate?("الكائن المطلوب: "+candidateAr+" ×"+quantity+"."):"التقييم عام للحوض لأن السؤال ما حدد نوع معروف من المكتبة.",
