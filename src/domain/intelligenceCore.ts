@@ -10,8 +10,8 @@ import { chemistryGuidance } from "./chemistryGuidance";
 import { unifiedInventory } from "./inventoryIntelligence";
 
 export type IntelligenceDomain =
- "chemistry"|"maintenance"|"equipment"|"livestock"|"inventory"|
- "quarantine"|"emergency"|"acclimation"|"system";
+ "chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|
+ "waterChange"|"rodi"|"quarantine"|"emergency"|"acclimation"|"sump"|"journal"|"expense"|"system";
 
 export interface IntelligenceAction{
  id:string;
@@ -81,8 +81,9 @@ export function tankIntelligenceCore(tank:Tank):TankIntelligenceCore{
 
  const pageByDomain:Record<IntelligenceDomain,string>={
   chemistry:"chemistry",maintenance:"maintenance",
-  equipment:"equipment",livestock:"livestock",inventory:"inventory",
-  quarantine:"quarantine",emergency:"emergency",acclimation:"acclimation",system:"dashboard"
+  equipment:"equipment",livestock:"livestock",inventory:"inventory",dosing:"dosing",feeding:"feeding",
+  waterChange:"water-change",rodi:"rodi",quarantine:"quarantine",emergency:"emergency",acclimation:"acclimation",
+  sump:"sump",journal:"journal",expense:"expenses",system:"dashboard"
  };
  const chemistryResource:Record<string,string|undefined>={KH:"khBuffer",Ca:"calcium",Mg:"magnesium",PO4:"phosphateMedia",salinity:"marineSalt"};
  const impacts:CrossPageImpact[]=chemistryGuide.problems.map(problem=>{
