@@ -261,6 +261,9 @@ export interface FeedingLog {
   food: string;
   amount: string;
   notes?: string;
+  inventoryItemId?: string;
+  inventoryQuantityUsed?: number;
+  inventoryUnit?: string;
 }
 
 export interface DosingLog {
