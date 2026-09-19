@@ -1,5 +1,5 @@
-export type AquaQuestionMode="status"|"why"|"action"|"how"|"when"|"latest"|"list"|"count"|"trend"|"forecast"|"compare"|"canAdd"|"waterChange"|"dose"|"general";
-export type AquaQuestionTopic="chemistry"|"livestock"|"equipment"|"maintenance"|"dosing"|"acclimation"|"emergency"|"rodi"|"feeding"|"water"|"general";
+export type AquaQuestionMode="status"|"why"|"action"|"how"|"when"|"latest"|"list"|"count"|"trend"|"forecast"|"compare"|"canAdd"|"whatIf"|"waterChange"|"dose"|"general";
+export type AquaQuestionTopic="chemistry"|"livestock"|"equipment"|"maintenance"|"dosing"|"acclimation"|"emergency"|"rodi"|"feeding"|"water"|"inventory"|"expenses"|"diseases"|"quarantine"|"journal"|"sump"|"general";
 export type AquaQuestionParam="KH"|"Ca"|"Mg"|"NO3"|"PO4"|"pH"|"salinity"|"temperature"|"NH3"|"NO2"|"GH"|"TDS";
 
 export interface AquaQuestionIntent{
@@ -64,6 +64,12 @@ export function parseAquaQuestion(raw:string):AquaQuestionIntent{
  if(hasAny(s,["rodi","ro/di","ماء المصدر","مياه المصدر","فلتر المي","tds"]))add("rodi");
  if(hasAny(s,["اكل","أكل","تغذيه","تغذية","feeding","feed"]))add("feeding");
  if(hasAny(s,["تغيير مي","تغيير ماء","بدل مي","water change","change water"]))add("water");
+ if(hasAny(s,["مخزون","ستوك","stock","inventory","احتياطي","spare","خلص","ضايـل","ضايل"]))add("inventory");
+ if(hasAny(s,["مصاريف","تكلفه","تكلفة","كلفه","كلفة","expense","cost","budget"]))add("expenses");
+ if(hasAny(s,["مرض","امراض","أمراض","اعراض","أعراض","disease","symptom","ich","white spot"]))add("diseases");
+ if(hasAny(s,["حجر","quarantine","hospital tank"]))add("quarantine");
+ if(hasAny(s,["صوره","صورة","صور","photo","visual","نمو","growth","لون"]))add("journal");
+ if(hasAny(s,["سامب","sump","حجره","حجرة"]))add("sump");
  if(!topics.length)add("general");
 
  const asksForReason=hasAny(s,["ليش","لماذا","سبب","شو السبب","why","cause","reason"]);
@@ -71,7 +77,8 @@ export function parseAquaQuestion(raw:string):AquaQuestionIntent{
  const asksForRisk=hasAny(s,["خطر","خطير","حرج","safe","danger","risk","مناسب","امن","آمن"]);
  const asksAboutBioload=hasAny(s,["bioload","bio load","حمل حيوي","الحمل الحيوي","الحمل البيولوجي","البيولوجي عندي","قدره الحوض","قدرة الحوض"]);
  let mode:AquaQuestionMode="general";
- if(hasAny(s,["بقدر ضيف","فيني ضيف","اقدر اضيف","هل اضيف","can i add","safe to add","اضافه سمك","إضافة سمك","اضافه كائن","إضافة كائن"]))mode="canAdd";
+ if(hasAny(s,["لو ","اذا ","إذا ","what if","لو ضفت","اذا ضفت","إذا ضفت","لو ركبت"]))mode="whatIf";
+ else if(hasAny(s,["بقدر ضيف","فيني ضيف","اقدر اضيف","هل اضيف","can i add","safe to add","اضافه سمك","إضافة سمك","اضافه كائن","إضافة كائن"]))mode="canAdd";
  else if(hasAny(s,["توقع","forecast","predict","مستقبل","رايح","امتى يوصل","ايمتى يوصل","متى يصل","when will reach","when will it reach"]))mode="forecast";
  else if(hasAny(s,["كيف اعمل","كيف اعملها","كيف ساوي","كيف اساوي","طريقة","طريقه","خطوات","how do i","how to","steps"]))mode="how";
  else if(hasAny(s,["ايمتى","امتى","متى","موعد","الجاية","الجايه","القادمة","القادمه","next due","when is","when should","when do"]))mode="when";
@@ -101,7 +108,7 @@ export function resolveAquaFollowup(current:string,previous?:string){
   "ليش","طيب ليش","شو الحل","شو ساوي","شو اعمل","وبعدين","بعدها","هلق شو","هاد","هالشي","هالقيمه","هالقيمة","هي","هو","طيب","then","why","what next","what do i do","this","that","it"
  ]);
  const parsed=parseAquaQuestion(clean);
- const standalone=parsed.params.length>0||parsed.topics.some(x=>x!=="general")||["canAdd","waterChange","forecast","compare","trend","dose","how","when","latest","list","count"].includes(parsed.mode);
+ const standalone=parsed.params.length>0||parsed.topics.some(x=>x!=="general")||["canAdd","whatIf","waterChange","forecast","compare","trend","dose","how","when","latest","list","count"].includes(parsed.mode);
  if((short&&referential)||(!standalone&&referential))return previous+" | follow-up: "+clean;
  return clean;
 }

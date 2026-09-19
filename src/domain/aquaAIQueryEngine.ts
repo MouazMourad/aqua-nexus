@@ -11,6 +11,12 @@ import { analyzeNutrients } from "./nutrientEngine";
 import { tankEnergy } from "./equipmentIntelligence";
 import { answerSpecialOperation } from "./aquaAIOperationAnswers";
 import { systemHealth } from "./systemHealth";
+import { unifiedInventory } from "./inventoryIntelligence";
+import { feedingIntelligence } from "./feedingIntelligence";
+import { rodiIntelligence } from "./rodiIntelligence";
+import { sumpIntelligence } from "./sumpIntelligence";
+import { systemAlerts } from "./alertEngine";
+import { maintenanceEffectiveState } from "./maintenanceSchedule";
 
 function actionDomain(page:string):AquaDomain{
  if(page==="chemistry")return "chemistry";
@@ -21,12 +27,19 @@ function actionDomain(page:string):AquaDomain{
  if(page==="acclimation")return "acclimation";
  if(page==="emergency")return "emergency";
  if(page==="rodi")return "rodi";
+ if(page==="inventory")return "inventory";
+ if(page==="expenses")return "expenses";
+ if(page==="diseases")return "diseases";
+ if(page==="journal")return "journal";
+ if(page==="sump")return "sump";
+ if(page==="feeding")return "feeding";
+ if(page==="waterchange")return "water";
  return "system";
 }
 
 function domainTitle(domain:AquaDomain,lang:"ar"|"en"){
- const ar:Record<AquaDomain,string>={system:"الوضع العام للحوض",chemistry:"الكيمياء",bioload:"الحمل الحيوي",livestock:"الكائنات",equipment:"المعدات",maintenance:"الصيانة",dosing:"الجرعات",acclimation:"الإقلمة",emergency:"الطوارئ",rodi:"RO/DI وماء المصدر",feeding:"التغذية",water:"تغيير الماء"};
- const en:Record<AquaDomain,string>={system:"Overall tank status",chemistry:"Chemistry",bioload:"Bioload",livestock:"Livestock",equipment:"Equipment",maintenance:"Maintenance",dosing:"Dosing",acclimation:"Acclimation",emergency:"Emergency",rodi:"RO/DI & source water",feeding:"Feeding",water:"Water changes"};
+ const ar:Record<AquaDomain,string>={system:"الوضع العام للحوض",chemistry:"الكيمياء",bioload:"الحمل الحيوي",livestock:"الكائنات",equipment:"المعدات",maintenance:"الصيانة",dosing:"الجرعات",acclimation:"الإقلمة",emergency:"الطوارئ",rodi:"RO/DI وماء المصدر",feeding:"التغذية",water:"تغيير الماء",inventory:"المخزون",expenses:"المصاريف",diseases:"الأمراض",quarantine:"الحجر والعلاج",journal:"الصور والتطور",sump:"السامب"};
+ const en:Record<AquaDomain,string>={system:"Overall tank status",chemistry:"Chemistry",bioload:"Bioload",livestock:"Livestock",equipment:"Equipment",maintenance:"Maintenance",dosing:"Dosing",acclimation:"Acclimation",emergency:"Emergency",rodi:"RO/DI & source water",feeding:"Feeding",water:"Water changes",inventory:"Inventory",expenses:"Expenses",diseases:"Diseases",quarantine:"Quarantine & treatment",journal:"Photos & progression",sump:"Sump"};
  return (lang==="ar"?ar:en)[domain];
 }
 
@@ -34,12 +47,12 @@ function snapshot(tank:Tank,plan:AquaAIQueryPlan){
  const guide=chemistryGuidance(tank),bio=bioload(tank),state=tankStateView(tank),maint=maintenanceHealth(tank);
  const system=systemHealth(tank);
  const today=new Date().toISOString().slice(0,10);
- const due=tank.maintenance.filter(x=>!x.done&&(!x.nextDue||x.nextDue<=today));
+ const due=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).due);
  const warnings=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
  const watch=tank.livestock.filter(x=>x.health==="watch"||x.health==="treatment");
  const activeAcc=(tank.acclimationSessions??[]).filter(x=>x.status!=="completed");
  const lastRodi=tank.rodi[0],lastWater=tank.waterChanges[0];
- const energy=tankEnergy(tank),nutrients=analyzeNutrients(tank),mood=tankMood(tank);
+ const energy=tankEnergy(tank),nutrients=analyzeNutrients(tank),mood=tankMood(tank),stock=unifiedInventory(tank),feeding=feedingIntelligence(tank),rodiIntel=rodiIntelligence(tank),sumpIntel=sumpIntelligence(tank),alerts=systemAlerts(tank);
  switch(plan.primary){
   case "chemistry":{
    const top=guide.problems.slice(0,4);
@@ -64,11 +77,27 @@ function snapshot(tank:Tank,plan:AquaAIQueryPlan){
   case "dosing":
    return {ar:`عندك ${tank.dosing.length} جرعة مسجلة. قرار الجرعة لازم ينطلق من آخر قراءة واتجاه KH/Ca/Mg وليس من رقم منفرد.`,en:`There are ${tank.dosing.length} logged doses. Dosing decisions should use the latest reading and KH/Ca/Mg trend, not a single number.`,dar:guide.problems.filter(x=>["KH","Ca","Mg"].includes(x.key)).slice(0,3).map(x=>`${x.reasonAr} ${x.actionAr}`),den:guide.problems.filter(x=>["KH","Ca","Mg"].includes(x.key)).slice(0,3).map(x=>`${x.reasonEn} ${x.actionEn}`),ear:[`${tank.dosing.length} جرعات مسجلة`],een:[`${tank.dosing.length} logged doses`]};
   case "feeding":
-   return {ar:`التغذية لازم تنقرأ مع الحمل الحيوي والمغذيات. الحمل الحالي ${Math.round(bio.ratio*100)}%.`,en:`Feeding should be read together with bioload and nutrients. Current bioload is ${Math.round(bio.ratio*100)}%.`,dar:[nutrients.signals.find(x=>x.level!=="good")?.ar||"ما في إشارة مغذيات واضحة حالياً."],den:[nutrients.signals.find(x=>x.level!=="good")?.en||"No clear nutrient signal is present right now."],ear:[`${tank.livestock.length} سجلات كائنات`],een:[`${tank.livestock.length} livestock records`]};
+   return {ar:`التغذية: ${feeding.recent7d} تسجيل خلال 7 أيام، وضغط المغذيات ${feeding.nutrientPressure}.`,en:`Feeding: ${feeding.recent7d} log(s) in 7 days; nutrient pressure is ${feeding.nutrientPressure}.`,dar:feeding.suggestions,den:feeding.suggestions,ear:[`${tank.livestock.length} سجلات كائنات`,`${feeding.recent7d} تغذيات/7 أيام`],een:[`${tank.livestock.length} livestock records`,`${feeding.recent7d} feedings/7d`]};
+  case "inventory":
+   return {ar:`المخزون الموحد فيه ${stock.total} عنصر، منها ${stock.low.length} منخفضة.`,en:`Unified inventory has ${stock.total} item(s), with ${stock.low.length} low.`,dar:stock.low.slice(0,6).map(x=>`${x.name}: ${x.quantity} ${x.unit} / الحد ${x.minimum}`),den:stock.low.slice(0,6).map(x=>`${x.nameEn||x.name}: ${x.quantity} ${x.unit} / min ${x.minimum}`),ear:[`${stock.consumables.length} مستهلكات معدات`],een:[`${stock.consumables.length} equipment consumables`]};
+  case "expenses":{
+   const month=new Date().toISOString().slice(0,7),rows=tank.expenses.filter(x=>x.date.startsWith(month));const totals=rows.reduce((m:any,x)=>{m[x.currency]=(m[x.currency]||0)+x.amount;return m;},{});
+   return {ar:`هذا الشهر عندك ${rows.length} مصروف مسجل.`,en:`There are ${rows.length} logged expense(s) this month.`,dar:[...Object.entries(totals).map(([c,v])=>`${Number(v).toFixed(2)} ${c}`),`استهلاك الطاقة التقديري ${energy.monthlyKwh.toFixed(1)} kWh/شهر.`],den:[...Object.entries(totals).map(([c,v])=>`${Number(v).toFixed(2)} ${c}`),`Estimated energy use ${energy.monthlyKwh.toFixed(1)} kWh/month.`],ear:[`${tank.expenses.length} مصاريف مسجلة`],een:[`${tank.expenses.length} logged expenses`]};}
+  case "diseases":{
+   const treatment=tank.livestock.filter(x=>x.health==="treatment"||x.health==="watch");
+   return {ar:treatment.length?`في ${treatment.length} سجل كائن تحت المراقبة/العلاج.`:"ما في كائن مسجل تحت العلاج حالياً.",en:treatment.length?`${treatment.length} livestock record(s) are under watch/treatment.`:"No livestock is currently marked under treatment.",dar:[...treatment.slice(0,5).map(x=>`${x.name}: ${x.health}`),...tank.quarantine.filter(x=>x.status==="active").slice(0,4).map(x=>`${x.organism}: ${x.reason}`)],den:[...treatment.slice(0,5).map(x=>`${x.nameEn||x.name}: ${x.health}`),...tank.quarantine.filter(x=>x.status==="active").slice(0,4).map(x=>`${x.organism}: ${x.reason}`)],ear:[`${tank.quarantine.filter(x=>x.status==="active").length} حالات علاج نشطة`],een:[`${tank.quarantine.filter(x=>x.status==="active").length} active treatment cases`]};}
+  case "quarantine":{
+   const active=tank.quarantine.filter(x=>x.status==="active");
+   return {ar:active.length?`في ${active.length} حالة حجر/علاج نشطة.`:"ما في حجر أو علاج نشط.",en:active.length?`${active.length} quarantine/treatment case(s) are active.`:"No active quarantine/treatment cases.",dar:active.slice(0,6).map(x=>`${x.organism}: ${x.reason}${x.nextDoseAt?` • الجرعة القادمة ${new Date(x.nextDoseAt).toLocaleString()}`:""}`),den:active.slice(0,6).map(x=>`${x.organism}: ${x.reason}${x.nextDoseAt?` • next dose ${new Date(x.nextDoseAt).toLocaleString()}`:""}`),ear:[`${tank.quarantine.length} حالات مسجلة`],een:[`${tank.quarantine.length} logged cases`]};}
+  case "journal":{
+   const latest:any=((tank as any).visionAssessments??[])[0];
+   return {ar:latest?`آخر تحليل بصري: ${latest.triage?.summaryAr||"مسجل"}.`:`عندك ${tank.photos.length} صورة، لكن ما في تحليل بصري حديث.`,en:latest?`Latest visual assessment: ${latest.triage?.summaryEn||"logged"}.`:`There are ${tank.photos.length} photo(s), but no recent visual assessment.`,dar:latest?(latest.triage?.nextAr||[]).slice(0,5):[],den:latest?(latest.triage?.nextEn||[]).slice(0,5):[],ear:[`${tank.photos.length} صور`],een:[`${tank.photos.length} photos`]};}
+  case "sump":
+   return {ar:sumpIntel.enabled?`السامب ${sumpIntel.issues.length?"يحتاج مراجعة":"ما فيه مشكلة هندسية واضحة"}؛ هامش الأمان التقديري ${sumpIntel.safetyMargin.toFixed(1)} لتر.`:"الحوض مسجل بدون سامب.",en:sumpIntel.enabled?`Sump ${sumpIntel.issues.length?"needs review":"has no obvious geometry issue"}; estimated safety margin ${sumpIntel.safetyMargin.toFixed(1)} L.`:"Tank is configured without a sump.",dar:sumpIntel.issues,den:sumpIntel.issues,ear:[`Freeboard ${sumpIntel.freeboard.toFixed(1)} L`],een:[`Freeboard ${sumpIntel.freeboard.toFixed(1)} L`]};
   case "water":
    return {ar:lastWater?`آخر تغيير ماء مسجل ${lastWater.liters} لتر بتاريخ ${new Date(lastWater.timestamp).toLocaleDateString()}.`:"ما في تغيير ماء مسجل مؤخراً.",en:lastWater?`Latest logged water change: ${lastWater.liters} L on ${new Date(lastWater.timestamp).toLocaleDateString()}.`:"No recent water change is logged.",dar:[`صحة الكيمياء الحالية ${guide.health}%.`],den:[`Current chemistry health is ${guide.health}%.`],ear:[`${tank.waterChanges.length} تغييرات ماء مسجلة`],een:[`${tank.waterChanges.length} logged water changes`]};
   default:
-   return {ar:`الحوض ${mood.ar}. الصحة العامة ${system.score}%: الكيمياء ${system.chemistry}%، الصيانة ${system.maintenance}%، الحمل الحيوي ${system.bioload}%، التجهيزات ${system.equipment}%، التوافق ${system.compatibility}%، وحالة الكائنات ${system.livestock}%.`,en:`The tank is ${mood.en}. Overall health is ${system.score}%: chemistry ${system.chemistry}%, maintenance ${system.maintenance}%, bioload ${system.bioload}%, equipment ${system.equipment}%, compatibility ${system.compatibility}%, and livestock condition ${system.livestock}%.`,dar:[...state.drivers.slice(0,6).map(x=>x.ar),...(system.compatibilityAudit.issues[0]?[`تعارض مستمر: ${system.compatibilityAudit.issues[0].ar}`]:[])],den:[...state.drivers.slice(0,6).map(x=>x.en),...(system.compatibilityAudit.issues[0]?[`Persistent conflict: ${system.compatibilityAudit.issues[0].en}`]:[])],ear:[`الصحة العامة ${system.score}%`,`التجهيزات ${system.equipment}%`,`التوافق ${system.compatibility}%`],een:[`Overall health ${system.score}%`,`Equipment ${system.equipment}%`,`Compatibility ${system.compatibility}%`]};
+   return {ar:`الحوض ${mood.ar}. الصحة العامة ${system.score}%: الكيمياء ${system.chemistry}%، الصيانة ${system.maintenance}%، الحمل الحيوي ${system.bioload}%، التجهيزات ${system.equipment}%، التوافق ${system.compatibility}%، وحالة الكائنات ${system.livestock}%.`,en:`The tank is ${mood.en}. Overall health is ${system.score}%: chemistry ${system.chemistry}%, maintenance ${system.maintenance}%, bioload ${system.bioload}%, equipment ${system.equipment}%, compatibility ${system.compatibility}%, and livestock condition ${system.livestock}%.`,dar:[...alerts.slice(0,4).map(x=>x.ar),...state.drivers.slice(0,4).map(x=>x.ar),...(system.compatibilityAudit.issues[0]?[`تعارض مستمر: ${system.compatibilityAudit.issues[0].ar}`]:[])],den:[...alerts.slice(0,4).map(x=>x.en),...state.drivers.slice(0,4).map(x=>x.en),...(system.compatibilityAudit.issues[0]?[`Persistent conflict: ${system.compatibilityAudit.issues[0].en}`]:[])],ear:[`الصحة العامة ${system.score}%`,`التجهيزات ${system.equipment}%`,`التوافق ${system.compatibility}%`],een:[`Overall health ${system.score}%`,`Equipment ${system.equipment}%`,`Compatibility ${system.compatibility}%`]};
  }
 }
 
@@ -92,8 +121,8 @@ export function answerAquaQuery(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswe
   summaryAr=topSignal?`أهم اتجاه ظاهر: ${topSignal.ar}`:snap.ar;
   summaryEn=topSignal?`Main visible trend: ${topSignal.en}`:snap.en;
  }
- const suffixAr=plan.operation==="why"?"تحليل السبب":plan.operation==="action"?"الخطوة التالية":plan.operation==="how"?"طريقة العمل":plan.operation==="when"?"الموعد":plan.operation==="list"?"القائمة":plan.operation==="count"?"العدد":plan.operation==="trend"?"الاتجاه":plan.operation==="compare"?"المقارنة":"الحالة";
- const suffixEn=plan.operation==="why"?"cause analysis":plan.operation==="action"?"next action":plan.operation==="how"?"how to":plan.operation==="when"?"timing":plan.operation==="list"?"list":plan.operation==="count"?"count":plan.operation==="trend"?"trend":plan.operation==="compare"?"comparison":"status";
+ const suffixAr=plan.operation==="whatIf"?"محاكاة":plan.operation==="why"?"تحليل السبب":plan.operation==="action"?"الخطوة التالية":plan.operation==="how"?"طريقة العمل":plan.operation==="when"?"الموعد":plan.operation==="list"?"القائمة":plan.operation==="count"?"العدد":plan.operation==="trend"?"الاتجاه":plan.operation==="compare"?"المقارنة":"الحالة";
+ const suffixEn=plan.operation==="whatIf"?"simulation":plan.operation==="why"?"cause analysis":plan.operation==="action"?"next action":plan.operation==="how"?"how to":plan.operation==="when"?"timing":plan.operation==="list"?"list":plan.operation==="count"?"count":plan.operation==="trend"?"trend":plan.operation==="compare"?"comparison":"status";
  return {
   titleAr:`${domainTitle(plan.primary,"ar")} — ${suffixAr}`,titleEn:`${domainTitle(plan.primary,"en")} — ${suffixEn}`,
   summaryAr,summaryEn,

@@ -5,6 +5,9 @@ import type { AquaAIQueryPlan } from "./aquaAIQueryPlan";
 import { resolveAquaEntities,equipmentKindLabel } from "./aquaAIEntities";
 import { maintenanceProcedure } from "./aquaAIMaintenanceKnowledge";
 import { latestTankAnswer } from "./aquaAILatestAnswer";
+import { answerWhatIf } from "./aquaAIWhatIf";
+import { unifiedInventory } from "./inventoryIntelligence";
+import { maintenanceEffectiveState } from "./maintenanceSchedule";
 
 function dateOnly(value?:string){
  if(!value)return undefined;
@@ -154,7 +157,7 @@ function listOrCountAnswer(tank:Tank,plan:AquaAIQueryPlan):AquaAIAnswer|undefine
   };
  }
  if(plan.primary==="maintenance"){
-  const pending=tank.maintenance.filter(x=>!x.done);
+  const pending=tank.maintenance.filter(x=>!maintenanceEffectiveState(x).completed);
   return {
    titleAr:isCount?"عدد مهام الصيانة":"مهام الصيانة",titleEn:isCount?"Maintenance task count":"Maintenance tasks",
    summaryAr:`عندك ${tank.maintenance.length} مهمة صيانة، منها ${pending.length} غير منجزة حالياً.`,summaryEn:`You have ${tank.maintenance.length} maintenance tasks, with ${pending.length} currently not completed.`,
@@ -164,10 +167,19 @@ function listOrCountAnswer(tank:Tank,plan:AquaAIQueryPlan):AquaAIAnswer|undefine
    confidence:"high",action:{page:"maintenance",ar:"افتح الصيانة",en:"Open maintenance"}
   };
  }
+ if(plan.primary==="inventory"){
+  const stock=unifiedInventory(tank),low=stock.low;
+  return {titleAr:isCount?"عدد عناصر المخزون":"المخزون الموحد",titleEn:isCount?"Inventory count":"Unified inventory",summaryAr:`عندك ${stock.total} عنصر مخزون، منها ${low.length} منخفضة.`,summaryEn:`You have ${stock.total} stock item(s), with ${low.length} low.`,detailsAr:stock.rows.slice(0,12).map(x=>`${x.name}: ${x.quantity} ${x.unit} (الحد ${x.minimum})`),detailsEn:stock.rows.slice(0,12).map(x=>`${x.nameEn||x.name}: ${x.quantity} ${x.unit} (min ${x.minimum})`),evidenceAr:[`${stock.consumables.length} مستهلكات معدات`],evidenceEn:[`${stock.consumables.length} equipment consumables`],confidence:"high",action:{page:"inventory",ar:"افتح المخزون",en:"Open inventory"}};
+ }
+ if(plan.primary==="quarantine"){
+  const active=tank.quarantine.filter(x=>x.status==="active");
+  return {titleAr:isCount?"حالات الحجر النشطة":"الحجر والعلاج",titleEn:isCount?"Active quarantine cases":"Quarantine & treatment",summaryAr:`في ${active.length} حالة نشطة من أصل ${tank.quarantine.length}.`,summaryEn:`${active.length} active case(s) out of ${tank.quarantine.length} total.`,detailsAr:active.map(x=>`${x.organism}: ${x.reason}`),detailsEn:active.map(x=>`${x.organism}: ${x.reason}`),evidenceAr:[`${tank.quarantine.length} حالات`],evidenceEn:[`${tank.quarantine.length} cases`],confidence:"high",action:{page:"quarantine",ar:"افتح الحجر",en:"Open quarantine"}};
+ }
  return undefined;
 }
 
 export function answerSpecialOperation(tank:Tank,intent:AquaQuestionIntent,plan:AquaAIQueryPlan):AquaAIAnswer|undefined{
+ if(plan.operation==="whatIf")return answerWhatIf(tank,intent.raw);
  if(plan.operation==="how"){
   const procedure=procedureAnswer(tank,intent);
   if(procedure)return procedure;

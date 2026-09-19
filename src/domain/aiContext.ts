@@ -8,6 +8,12 @@ import { mediaPredictions } from "./mediaPredictor";
 import { tankEnergy } from "./equipmentIntelligence";
 import { chemistryGuidance } from "./chemistryGuidance";
 import { systemHealth } from "./systemHealth";
+import { unifiedInventory } from "./inventoryIntelligence";
+import { feedingIntelligence } from "./feedingIntelligence";
+import { rodiIntelligence } from "./rodiIntelligence";
+import { sumpIntelligence } from "./sumpIntelligence";
+import { systemAlerts } from "./alertEngine";
+import { maintenanceEffectiveState } from "./maintenanceSchedule";
 
 export interface TankAIContext {
   schema:"aqua-nexus-ai-context/v1";
@@ -23,6 +29,7 @@ export interface TankAIContext {
   livestock:{total:number;watch:number;treatment:number};
   care:{activeQuarantine:number;activeEmergency:number;recentFeedings:number;recentWaterChanges:number;recentDoses:number};
   recentEvents:Array<{timestamp:string;type:string;textAr:string;textEn:string}>;
+  operations:{alerts:ReturnType<typeof systemAlerts>;inventory:ReturnType<typeof unifiedInventory>;feeding:ReturnType<typeof feedingIntelligence>;rodi:ReturnType<typeof rodiIntelligence>;sump:ReturnType<typeof sumpIntelligence>;expenses:Array<{date:string;description:string;amount:number;currency:string}>};
 }
 
 const DAY=86400000;
@@ -30,7 +37,7 @@ export function buildTankAIContext(tank:Tank):TankAIContext{
   const today=new Date().toISOString().slice(0,10),now=Date.now();
   const state=tankStateView(tank),forecast=tankForecast(tank),mood=tankMood(tank),energy=tankEnergy(tank);
   const system=systemHealth(tank);
-  const due=tank.maintenance.filter(x=>!x.done&&(!x.nextDue||x.nextDue<=today)).slice(0,12).map(x=>({id:x.id,title:x.title,titleEn:x.titleEn,nextDue:x.nextDue}));
+  const due=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).due).slice(0,12).map(x=>({id:x.id,title:x.title,titleEn:x.titleEn,nextDue:x.nextDue}));
   const within=(timestamp:string,days:number)=>{const t=new Date(timestamp).getTime();return Number.isFinite(t)&&now-t<=days*DAY;};
   const bio=bioload(tank);
   return {
@@ -46,7 +53,8 @@ export function buildTankAIContext(tank:Tank):TankAIContext{
     equipment:{warnings:tank.equipment.filter(x=>x.status==="warning"||x.status==="service").map(x=>({id:x.id,name:x.name,kind:x.kind,status:x.status})),energy:{dailyKwh:energy.dailyKwh,monthlyKwh:energy.monthlyKwh,monthlyCost:energy.monthlyCost,configured:energy.configured,currency:tank.energySettings?.currency||""},media:mediaPredictions(tank)},
     livestock:{total:tank.livestock.reduce((s,x)=>s+x.quantity,0),watch:tank.livestock.filter(x=>x.health==="watch").length,treatment:tank.livestock.filter(x=>x.health==="treatment").length},
     care:{activeQuarantine:tank.quarantine.filter(x=>x.status==="active").length,activeEmergency:(tank.emergencySessions??[]).filter(x=>x.status==="active").length,recentFeedings:tank.feeding.filter(x=>within(x.timestamp,7)).length,recentWaterChanges:tank.waterChanges.filter(x=>within(x.timestamp,30)).length,recentDoses:tank.dosing.filter(x=>within(x.timestamp,7)).length},
-    recentEvents:tank.timeline.slice(0,20).map(x=>({timestamp:x.timestamp,type:x.type,textAr:x.textAr,textEn:x.textEn}))
+    recentEvents:tank.timeline.slice(0,20).map(x=>({timestamp:x.timestamp,type:x.type,textAr:x.textAr,textEn:x.textEn})),
+    operations:{alerts:systemAlerts(tank),inventory:unifiedInventory(tank),feeding:feedingIntelligence(tank),rodi:rodiIntelligence(tank),sump:sumpIntelligence(tank),expenses:tank.expenses.slice(0,30).map(x=>({date:x.date,description:x.description,amount:x.amount,currency:x.currency}))}
   };
 }
 

@@ -2,11 +2,11 @@ import type { AquaQuestionIntent,AquaQuestionParam,AquaQuestionTopic } from "./a
 
 export type AquaDomain=
  |"system"|"chemistry"|"bioload"|"livestock"|"equipment"|"maintenance"
- |"dosing"|"acclimation"|"emergency"|"rodi"|"feeding"|"water";
+ |"dosing"|"acclimation"|"emergency"|"rodi"|"feeding"|"water"|"inventory"|"expenses"|"diseases"|"quarantine"|"journal"|"sump";
 
 export type AquaOperation=
  |"status"|"why"|"action"|"how"|"when"|"latest"|"list"|"count"|"trend"|"forecast"|"compare"
- |"canAdd"|"waterChange"|"dose"|"general";
+ |"canAdd"|"whatIf"|"waterChange"|"dose"|"general";
 
 export interface AquaAIQueryPlan{
  operation:AquaOperation;
@@ -31,7 +31,13 @@ const SOURCE_MAP:Record<AquaDomain,string[]>={
  emergency:["equipment","chemistry","data","livestock"],
  rodi:["data","history","chemistry"],
  feeding:["livestock","bioload","nutrients"],
- water:["chemistry","history","maintenance","data"]
+ water:["chemistry","history","maintenance","data"],
+ inventory:["equipment","maintenance","data"],
+ expenses:["data","equipment","history"],
+ diseases:["livestock","chemistry","history","learning"],
+ quarantine:["livestock","chemistry","maintenance","history"],
+ journal:["livestock","history","learning","chemistry"],
+ sump:["equipment","maintenance","data"]
 };
 
 function broadQuery(s:string){
@@ -50,6 +56,12 @@ function topicToDomain(topic:AquaQuestionTopic):AquaDomain|undefined{
  if(topic==="rodi")return "rodi";
  if(topic==="feeding")return "feeding";
  if(topic==="water")return "water";
+ if(topic==="inventory")return "inventory";
+ if(topic==="expenses")return "expenses";
+ if(topic==="diseases")return "diseases";
+ if(topic==="quarantine")return "quarantine";
+ if(topic==="journal")return "journal";
+ if(topic==="sump")return "sump";
  return undefined;
 }
 
@@ -58,7 +70,7 @@ export function buildAquaAIQueryPlan(intent:AquaQuestionIntent):AquaAIQueryPlan{
  const broad=broadQuery(s);
  const scores:Record<AquaDomain,number>={
   system:0,chemistry:0,bioload:0,livestock:0,equipment:0,maintenance:0,
-  dosing:0,acclimation:0,emergency:0,rodi:0,feeding:0,water:0
+  dosing:0,acclimation:0,emergency:0,rodi:0,feeding:0,water:0,inventory:0,expenses:0,diseases:0,quarantine:0,journal:0,sump:0
  };
  const add=(domain:AquaDomain,score:number)=>{scores[domain]+=score;};
 
@@ -83,6 +95,12 @@ export function buildAquaAIQueryPlan(intent:AquaQuestionIntent):AquaAIQueryPlan{
  if(/rodi|ro\/di|ماء المصدر|مياه المصدر|فلتر المي|tds/.test(s))add("rodi",10);
  if(/اكل|تغذيه|feeding|feed/.test(s))add("feeding",9);
  if(/تغيير مي|تغيير ماء|بدل مي|water change|change water/.test(s))add("water",11);
+ if(/مخزون|ستوك|stock|inventory|احتياطي|spare|ضايل/.test(s))add("inventory",10);
+ if(/مصاريف|تكلفه|كلفه|expense|cost|budget/.test(s))add("expenses",10);
+ if(/مرض|امراض|اعراض|disease|symptom|ich|white spot/.test(s))add("diseases",10);
+ if(/حجر|quarantine|hospital tank/.test(s))add("quarantine",11);
+ if(/صوره|صور|photo|visual|نمو|growth|لون/.test(s))add("journal",9);
+ if(/سامب|sump|حجره/.test(s))add("sump",10);
 
  // A broad question is system-wide only when no specific domain clearly wins.
  const ranked=(Object.entries(scores) as Array<[AquaDomain,number]>).sort((a,b)=>b[1]-a[1]);
@@ -98,6 +116,7 @@ export function buildAquaAIQueryPlan(intent:AquaQuestionIntent):AquaAIQueryPlan{
  const crossDomain=
   primary==="system"||
   operation==="canAdd"||
+  operation==="whatIf"||
   operation==="waterChange"||
   (intent.asksForRisk&&(primary==="livestock"||primary==="bioload"));
 

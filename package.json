@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "vitest run"
   },
   "dependencies": {
     "@netlify/blobs": "latest",
@@ -27,6 +28,7 @@
     "@types/react-dom": "^19.1.0",
     "@types/three": "^0.180.0",
     "@types/web-push": "^3.6.4",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.4"
   }
 }
