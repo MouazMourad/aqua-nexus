@@ -29,9 +29,9 @@ export function verifyGuidanceActions(actions:GuidanceAction[],events:Intelligen
   return {...a,status:"verified" as const,verifiedAt:iso(),verificationEventId:ev.id,outcome:"unknown" as const,resolvedReasonAr:"تم تسجيل دليل متابعة بعد تنفيذ الإجراء.",resolvedReasonEn:"Follow-up evidence was recorded after the action."};
  });
 }
-export function reconcileGuidanceActions(existing:GuidanceAction[]=[],generated:GuidanceAction[]){
+export function reconcileGuidanceActions(existing:GuidanceAction[]=[],generated:GuidanceAction[],events:IntelligenceEvent[]=[]){
  const byKey=new Map(existing.map(x=>[x.dedupeKey,x])),active=new Set(generated.map(x=>x.dedupeKey)),now=iso();
  const next=generated.map(g=>{const old=byKey.get(g.dedupeKey);return old?{...g,id:old.id,createdAt:old.createdAt,updatedAt:now,status:old.status==="in_progress"?"in_progress":g.status,sourceEventIds:[...new Set([...old.sourceEventIds,...g.sourceEventIds])].slice(-20)}:g;});
  for(const old of existing)if(!active.has(old.dedupeKey)&&old.status!=="resolved"&&old.status!=="verified")next.push({...old,status:old.status==="done"||old.status==="awaiting_verification"?"awaiting_verification":"resolved",updatedAt:now});
- return verifyGuidanceActions(next.slice(0,300),[]);
+ return verifyGuidanceActions(next.slice(0,300),events);
 }
