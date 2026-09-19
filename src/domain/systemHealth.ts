@@ -63,7 +63,7 @@ export function systemHealth(tank:Tank):SystemHealthResult{
     {key:"maintenance",score:maintenance,weight:.15,ar:"الصيانة",en:"Maintenance",known:true},
     {key:"bioload",score:bio,weight:.15,ar:"الحمل الحيوي",en:"Bioload",known:true},
     {key:"equipment",score:equipmentAudit.score,weight:.20,ar:"كفاية التجهيزات",en:"Equipment adequacy",known:tank.equipment.length>0},
-    {key:"compatibility",score:compatibilityAudit.score,weight:.15,ar:"توافق الكائنات",en:"Livestock compatibility",known:tank.livestock.length>0},
+    {key:"compatibility",score:compatibilityAudit.score,weight:.15*(compatibilityAudit.verifiedCoverage/100),ar:compatibilityAudit.verifiedCoverage<100?`توافق الكائنات • تغطية ${compatibilityAudit.verifiedCoverage}%`:"توافق الكائنات",en:compatibilityAudit.verifiedCoverage<100?`Livestock compatibility • ${compatibilityAudit.verifiedCoverage}% verified`:"Livestock compatibility",known:compatibilityAudit.knownCount>0},
     {key:"livestock",score:livestock,weight:.05,ar:"حالة الكائنات",en:"Livestock condition",known:tank.livestock.length>0}
   ];
   const activeComponents=components.filter(x=>x.known);
