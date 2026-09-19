@@ -25,7 +25,7 @@ export function buildAquaAIContext(tank:Tank){
   forecast:core.forecast,
   chemistry:{latest:tank.chemistry[0]??null,recent:tank.chemistry.slice(0,10),baselines:tankBaselines(tank),predictions:proactivePredictions(tank),nutrients:analyzeNutrients(tank),guidance:chemistryGuidance(tank)},
   systemHealth:core.health,
-  intelligence:{dataConfidence:core.dataConfidence,critical:core.critical,actions:core.actions,guidanceActions:(tank.guidanceActions??core.guidanceActions).filter(x=>x.status!=="resolved"&&x.status!=="verified"),impacts:core.impacts,recentEvents:(tank.intelligenceEvents??[]).slice(0,50),insights:core.insights,predictions:core.predictions,memory:core.memory},
+  intelligence:{dataConfidence:core.dataConfidence,critical:core.critical,actions:core.actions,guidanceActions:(tank.guidanceActions??core.guidanceActions).filter(x=>x.status!=="resolved"&&x.status!=="verified"),recentEvents:(tank.intelligenceEvents??[]).slice(0,50),insights:core.insights,predictions:core.predictions,memory:core.memory},
   learnedSignals:learnedTankSignals(tank),
   biologicalMemory:core.memory,
   eventLinks:eventChemistryLinks(tank),
