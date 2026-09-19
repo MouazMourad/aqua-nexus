@@ -82,7 +82,7 @@ export function HealthTimelineChart({tank}:{tank:Tank}){
       </div>
       <div className="health-event-copy">
         <b>{lang==="ar"?selected.reasonAr:selected.reasonEn}</b>
-        <p>{lang==="ar"?`الكيمياء ${selected.chemistry}% • الصيانة ${selected.maintenance}%`:`Chemistry ${selected.chemistry}% • Maintenance ${selected.maintenance}%`}</p>
+        <p>{lang==="ar"?`الكيمياء ${selected.chemistry===null?"غير معروفة":selected.chemistry+"%"} • الصيانة ${selected.maintenance}%`:`Chemistry ${selected.chemistry===null?"unknown":selected.chemistry+"%"} • Maintenance ${selected.maintenance}%`}</p>
         {selected.event&&<p className="event-link-note">◆ {lang==="ar"?selected.event.textAr:selected.event.textEn}</p>}
         {selected.delta<=-5&&selected.recoveryEvent&&<p className="recovery-note">↗ {lang==="ar"?`الإجراء المرتبط بالتعافي لاحقاً: ${selected.recoveryEvent.textAr}`:`Later recovery was associated with: ${selected.recoveryEvent.textEn}`}</p>}
         {selected.source==="estimated"&&<small className="note">{lang==="ar"?"هذه نقطة تاريخية تقديرية مبنية على قراءة الكيمياء؛ النقاط الجديدة تُحفظ كلقطات حالة فعلية.":"This historical point is estimated from the chemistry record; new points are stored as real state snapshots."}</small>}
