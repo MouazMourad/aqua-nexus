@@ -4,7 +4,7 @@ const eid=(d:string,v:string,s?:string)=>`evt-${d}-${v}-${s||Date.now()}`;
 export function deriveIntelligenceEvents(before:Tank,after:Tank):IntelligenceEvent[]{
  const out:IntelligenceEvent[]=[];const push=(e:Omit<IntelligenceEvent,"id">)=>out.push({id:eid(e.domain,e.verb,e.sourceId),...e});
  for(const r of after.chemistry.filter(x=>!before.chemistry.some(b=>b.timestamp===x.timestamp)))for(const [parameter,value] of Object.entries(r.values)){if(typeof value==="number")push({timestamp:r.timestamp,kind:"fact",domain:"chemistry",verb:"measured",parameter,value,confidence:r.confidence==="high"?100:r.confidence==="low"?40:70,sourceId:r.timestamp,sourcePage:"chemistry",textAr:`تم قياس ${parameter}: ${value}`,textEn:`${parameter} measured: ${value}`});}
- for(const d of after.dosing.filter(x=>!before.dosing.some(b=>b.id===x.id||b.timestamp===x.timestamp&&b.parameter===x.parameter&&b.ml===x.ml)))push({timestamp:d.timestamp,kind:"action",domain:"dosing",verb:"dose_given",parameter:d.parameter,value:d.ml,unit:"mL",confidence:100,sourceId:d.id||d.timestamp,sourcePage:"dosing",textAr:`تمت جرعة ${d.parameter}: ${d.ml} mL`,textEn:`${d.parameter} dose given: ${d.ml} mL`});
+ for(const d of after.dosing.filter(x=>!before.dosing.some(b=>b.id===x.id||b.timestamp===x.timestamp&&b.parameter===x.parameter&&b.ml===x.ml)))push({timestamp:d.timestamp,kind:"action",domain:"dosing",verb:"dose_given",parameter:d.parameter,value:d.ml,unit:"mL",confidence:100,sourceId:d.id||d.timestamp,sourcePage:"dosing",textAr:`تمت جرعة ${d.parameter}: ${d.ml} mL`,textEn:`${d.parameter} dose given: ${d.ml} mL`,metadata:{material:d.material||d.chamberMaterial||null,inventoryItemId:d.inventoryItemId||null,reason:d.reason||null,sourceReadingTimestamp:d.sourceReadingTimestamp||null,verifyAfter:d.verifyAfter||null}});
  for(const w of after.waterChanges.filter(x=>!before.waterChanges.some(b=>b.id===x.id||b.timestamp===x.timestamp)))push({timestamp:w.timestamp,kind:"action",domain:"waterChange",verb:"water_changed",value:w.percent,unit:"%",confidence:100,sourceId:w.id||w.timestamp,sourcePage:"water-change",textAr:`تم تغيير ${w.percent}% من الماء`,textEn:`${w.percent}% water change completed`});
  for(const f of after.feeding.filter(x=>!before.feeding.some(b=>b.id===x.id||b.timestamp===x.timestamp)))push({timestamp:f.timestamp,kind:"action",domain:"feeding",verb:"fed",value:f.amount,confidence:100,sourceId:f.id||f.timestamp,sourcePage:"feeding",textAr:`تم تسجيل تغذية: ${f.food}`,textEn:`Feeding logged: ${f.food}`});
  for(const r of after.rodi.filter(x=>!before.rodi.some(b=>b.id===x.id||b.timestamp===x.timestamp)))push({timestamp:r.timestamp,kind:"fact",domain:"rodi",verb:"batch_logged",value:r.tdsOut,unit:"TDS",confidence:90,sourceId:r.id||r.timestamp,sourcePage:"rodi",textAr:`تم تسجيل RO/DI، TDS الخارج ${r.tdsOut}`,textEn:`RO/DI logged, output TDS ${r.tdsOut}`});
@@ -19,9 +19,19 @@ export function deriveIntelligenceEvents(before:Tank,after:Tank):IntelligenceEve
  return out;
 }
 export function mergeIntelligenceEvents(existing:IntelligenceEvent[]=[],incoming:IntelligenceEvent[]){const seen=new Set(existing.map(x=>x.id));return [...incoming.filter(x=>!seen.has(x.id)),...existing].slice(0,1000);}
+function latestEvent(events:IntelligenceEvent[],domain:string,parameter?:string,verb?:string){return events.find(e=>e.domain===domain&&(!parameter||e.parameter===parameter)&&(!verb||e.verb===verb));}
+export function verifyGuidanceActions(actions:GuidanceAction[],events:IntelligenceEvent[]=[]){
+ return actions.map(a=>{
+  if(a.status!=="done"&&a.status!=="awaiting_verification")return a;
+  if(a.verifyAfter&&Date.now()<new Date(a.verifyAfter).getTime())return {...a,status:"awaiting_verification" as const};
+  const ev=a.domain==="chemistry"&&a.parameter?latestEvent(events,"chemistry",a.parameter,"measured"):latestEvent(events,a.domain,a.parameter);
+  if(!ev||a.executedAt&&new Date(ev.timestamp).getTime()<=new Date(a.executedAt).getTime())return {...a,status:"awaiting_verification" as const};
+  return {...a,status:"verified" as const,verifiedAt:iso(),verificationEventId:ev.id,outcome:"unknown" as const,resolvedReasonAr:"تم تسجيل دليل متابعة بعد تنفيذ الإجراء.",resolvedReasonEn:"Follow-up evidence was recorded after the action."};
+ });
+}
 export function reconcileGuidanceActions(existing:GuidanceAction[]=[],generated:GuidanceAction[]){
  const byKey=new Map(existing.map(x=>[x.dedupeKey,x])),active=new Set(generated.map(x=>x.dedupeKey)),now=iso();
  const next=generated.map(g=>{const old=byKey.get(g.dedupeKey);return old?{...g,id:old.id,createdAt:old.createdAt,updatedAt:now,status:old.status==="in_progress"?"in_progress":g.status,sourceEventIds:[...new Set([...old.sourceEventIds,...g.sourceEventIds])].slice(-20)}:g;});
  for(const old of existing)if(!active.has(old.dedupeKey)&&old.status!=="resolved"&&old.status!=="verified")next.push({...old,status:old.status==="done"||old.status==="awaiting_verification"?"awaiting_verification":"resolved",updatedAt:now});
- return next.slice(0,300);
+ return verifyGuidanceActions(next.slice(0,300),[]);
 }
