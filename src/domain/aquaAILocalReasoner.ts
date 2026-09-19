@@ -2,12 +2,11 @@ import type { Tank } from "./types";
 import type { AquaQuestionIntent } from "./aquaAIIntent";
 import { chemistryGuidance } from "./chemistryGuidance";
 import { bioload, chemistryAgeDays, maintenanceHealth } from "./health";
-import { tankStateView } from "./tankIntelligence";
+import { tankIntelligenceCore } from "./intelligenceCore";
 import { eventChemistryLinks, proactivePredictions } from "./tankLearning";
 import { learnedTankSignals, repeatedResponsePatterns, tankBaselines } from "./tankPatterns";
 import { analyzeNutrients } from "./nutrientEngine";
-import { systemHealth } from "./systemHealth";
-import { systemAlerts } from "./alertEngine";
+
 import { unifiedInventory } from "./inventoryIntelligence";
 import { rodiIntelligence } from "./rodiIntelligence";
 import { sumpIntelligence } from "./sumpIntelligence";
@@ -70,9 +69,10 @@ function relevantParam(intent:AquaQuestionIntent,param:string){return !intent.pa
 function topicRelevant(intent:AquaQuestionIntent,topic:string){return intent.topics.includes("general" as any)||intent.topics.includes(topic as any);}
 
 export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasoningResult{
- const guide=chemistryGuidance(tank),state=tankStateView(tank),bio=bioload(tank),nutrients=analyzeNutrients(tank);
- const system=systemHealth(tank);
- const allAlerts=systemAlerts(tank),stock=unifiedInventory(tank),rodiState=rodiIntelligence(tank),sumpState=sumpIntelligence(tank),feedingState=feedingIntelligence(tank);
+ const core=tankIntelligenceCore(tank);
+ const guide=chemistryGuidance(tank),state=core.state,bio=core.bioload,nutrients=analyzeNutrients(tank);
+ const system=core.health;
+ const allAlerts=core.alerts,stock=unifiedInventory(tank),rodiState=rodiIntelligence(tank),sumpState=sumpIntelligence(tank),feedingState=feedingIntelligence(tank);
  const age=chemistryAgeDays(tank);
  const today=new Date().toISOString().slice(0,10);
  const signals:LocalReasoningSignal[]=[];
@@ -167,7 +167,7 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
 
  const overdue=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).overdue);
  if(overdue.length&&(topicRelevant(intent,"maintenance")||intent.topics.includes("general"))){
-  pushSignal({id:"maintenance-overdue",level:maintenanceHealth(tank)<50?"danger":"warn",confidence:"high",source:"maintenance",score:65,ar:`هناك ${overdue.length} مهمة صيانة مستحقة؛ أقربها ${overdue[0].title}.`,en:`There are ${overdue.length} overdue maintenance task(s); first: ${overdue[0].titleEn||overdue[0].title}.`});
+  pushSignal({id:"maintenance-overdue",level:core.maintenance<50?"danger":"warn",confidence:"high",source:"maintenance",score:65,ar:`هناك ${overdue.length} مهمة صيانة مستحقة؛ أقربها ${overdue[0].title}.`,en:`There are ${overdue.length} overdue maintenance task(s); first: ${overdue[0].titleEn||overdue[0].title}.`});
   pushAction({id:"maintenance-action",priority:62,level:"warn",page:"maintenance",ar:`ابدأ بمهمة الصيانة الأعلى تأثيراً: ${overdue[0].title}.`,en:`Start with the highest-impact due task: ${overdue[0].titleEn||overdue[0].title}.`,whyAr:"تأخر الصيانة ممكن يفسر جزءاً من تراجع الاستقرار أو تراكم المغذيات.",whyEn:"Delayed maintenance can contribute to reduced stability or nutrient accumulation.",recheckAr:"بعد التنفيذ حدّث المهمة وراقب القراءة التالية.",recheckEn:"After completion, update the task and watch the next reading."});
  }
 
@@ -239,7 +239,7 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
   pushAction({id:"visual-review",priority:latestVisual.triage.level==="urgent"?80:56,level:latestVisual.triage.level==="urgent"?"danger":"warn",page:"journal",ar:"راجع الصورة مع الكيمياء وسلوك الكائن ولا تعتبر الصورة وحدها تشخيصاً نهائياً.",en:"Review the image together with chemistry and behavior; do not treat the image alone as a definitive diagnosis.",whyAr:"التحليل البصري احتمالي وقيمته الأقوى بالمقارنة الزمنية وربطه بسياق الحوض.",whyEn:"Visual analysis is probabilistic and is strongest when compared over time with tank context.",recheckAr:"كرر صورة بنفس الزاوية والإضاءة وسجل تغير الأعراض.",recheckEn:"Repeat a capture with the same angle/light and log symptom changes."});
  }
 
- for(const p of proactivePredictions(tank)){
+ for(const p of core.predictions){
   if(!chemistryRelevant)continue;
   if(!(intent.mode==="forecast"||intent.mode==="trend"||relevantParam(intent,p.parameter)))continue;
   pushSignal({id:p.id,level:p.level==="danger"?"danger":p.level==="warn"?"warn":"info",confidence:p.confidence,source:"trend",score:p.level==="danger"?82:p.level==="warn"?60:35,ar:p.ar,en:p.en});
