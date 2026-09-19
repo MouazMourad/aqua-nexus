@@ -105,7 +105,7 @@ export function nextBestAction(tank:Tank):AquaAIAction{
   const core=tankIntelligenceCore(tank);
   const alerts=core.alerts;
   const critical=alerts.find(x=>x.level==="danger"&&x.actionPage);
-  if(critical?.actionPage)return {page:critical.actionPage,ar:critical.ar,en:critical.en};
+  if(critical?.actionPage)return {page:critical.actionPage as AquaAIPage,ar:critical.ar,en:critical.en};
   const oldChem=tank.chemistry[0]?Math.floor((Date.now()-new Date(tank.chemistry[0].timestamp).getTime())/DAY):999;
   if(oldChem>7)return {page:"chemistry",ar:"سجّل فحصاً كيميائياً جديداً",en:"Log a fresh chemistry test"};
   const pred=proactivePredictions(tank)[0];
@@ -114,7 +114,7 @@ export function nextBestAction(tank:Tank):AquaAIAction{
   const overdue=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).overdue);
   if(overdue.length)return {page:"maintenance",ar:`أنجز ${overdue.length} مهمة صيانة متأخرة`,en:`Complete ${overdue.length} overdue maintenance task(s)`};
   const warning=alerts.find(x=>x.level==="warn"&&x.actionPage);
-  if(warning?.actionPage)return {page:warning.actionPage,ar:warning.ar,en:warning.en};
+  if(warning?.actionPage)return {page:warning.actionPage as AquaAIPage,ar:warning.ar,en:warning.en};
   return {page:"dashboard",ar:"استمر بالمراقبة وسجّل أي تغير مهم",en:"Keep monitoring and log meaningful changes"};
 }
 
