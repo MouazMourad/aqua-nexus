@@ -3,7 +3,8 @@ import { useMemo,useState } from "react";
 import type { LivestockItem,Tank } from "@/domain/types";
 import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
 import { bioload } from "@/domain/health";
-import { auditTankCompatibility,compatibilityCheck } from "@/domain/compatibility";
+import { auditTankCompatibility } from "@/domain/compatibility";
+import { stockingReadiness } from "@/domain/stockingReadiness";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,categoryText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -22,13 +23,15 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
    return mapped===category;
  }),[category,tank.type]);
  const chosen:any=list.find(x=>x.id===selected);
- const check=selected && selected!=="__other__" && chosen ? compatibilityCheck(tank,chosen,qty) : null;
+ const readiness=selected?stockingReadiness(tank,{candidate:selected==="__other__"?undefined:chosen,quantity:qty,candidateKnown:selected==="__other__"?false:Boolean(chosen),candidateLabelAr:custom||tr(lang,"otherEntry"),candidateLabelEn:custom||"Manual species"}):null;
+ const check=readiness?.compatibility??null;
+ const readinessNeedsConfirm=Boolean(readiness&&(readiness.state==="insufficient_evidence"||readiness.requiresConfirmation));
 
  function reset(){setSelected("");setCustom("");setQty(1);setRiskConfirmed(false)}
  function close(){setOpen(false);reset()}
  function add(){
-  if(check?.blocked)return;
-  if(check?.requiresConfirmation && !riskConfirmed)return;
+  if(readiness?.state==="not_now")return;
+  if(readinessNeedsConfirm&&!riskConfirmed)return;
   const name=selected==="__other__"?(custom||tr(lang,"otherEntry")):(chosen?.ar||custom);
   const nameEn=selected==="__other__"?(custom||"Other"):(chosen?.en||custom);
   const item:LivestockItem={id:uid("live"),libraryId:chosen?.id,name,nameEn,category,quantity:qty,health:"good",load:chosen?.load??1,addedAt:today()};
@@ -51,7 +54,7 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
   </div>
 
   <div className="card panel full-span">
-   <div className="module-head"><div><small className="eyebrow-mini">SYSTEM COMPATIBILITY</small><h3>{lang==="ar"?"توافق الكائنات الحالية":"Current livestock compatibility"}</h3></div><span className={`status ${audit.level==="danger"?"danger":audit.level==="warn"?"warn":""}`}>{audit.score}%</span></div>
+   <div className="module-head"><div><small className="eyebrow-mini">SYSTEM COMPATIBILITY</small><h3>{lang==="ar"?"توافق الكائنات الحالية":"Current livestock compatibility"}</h3><p className="note">{lang==="ar"?`التغطية الموثقة ${audit.verifiedCoverage}% (${audit.knownCount}/${audit.totalCount||0} كائنات معروفة للمكتبة).`:`Verified coverage ${audit.verifiedCoverage}% (${audit.knownCount}/${audit.totalCount||0} library-known livestock).`}</p></div><span className={`status ${audit.level==="danger"?"danger":audit.level==="warn"?"warn":""}`}>{audit.totalCount&&audit.knownCount===0?"N/A":`${audit.score}%`}</span></div>
    {audit.issues.length?<div className="compat-issues">{audit.issues.map((x,i)=><div key={i} className={`inline-alert ${x.level}`}>{lang==="ar"?x.ar:x.en}</div>)}</div>:<div className="inline-alert good">✓ {lang==="ar"?"ما في تعارض معروف ضمن الكائنات المسجلة حالياً.":"No known conflict is detected among currently registered livestock."}</div>}
    <p className="note">{lang==="ar"?"هالفحص مستمر على كل الموجود بالحوض، مو بس وقت إضافة كائن جديد، ونتيجته تدخل بالصحة العامة وبـ Local Best AI.":"This audit continuously checks existing livestock, not only new additions, and feeds overall health and Local Best AI."}</p>
   </div>
@@ -73,6 +76,13 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
     <label className="field"><span>{tr(lang,"quantity")}</span><input type="number" min="1" value={qty} onChange={e=>{setQty(Number(e.target.value));setRiskConfirmed(false)}}/></label>
    </div>
 
+   {readiness&&<div className={`compatibility-panel ${readiness.state==="not_now"?"danger":readiness.state==="insufficient_evidence"?"warn":"good"}`}>
+    <div className="compat-head"><h3>{lang==="ar"?"جاهزية الإضافة":"Addition readiness"}</h3><span className={`compat-badge ${readiness.state==="not_now"?"danger":readiness.state==="insufficient_evidence"?"warn":"good"}`}>{lang==="ar"?(readiness.state==="ready"?"جاهز مبدئياً":readiness.state==="not_now"?"ليس الآن":"بيانات غير كافية"):(readiness.state==="ready"?"Provisionally ready":readiness.state==="not_now"?"Not now":"Insufficient evidence")}</span></div>
+    {readiness.blockersAr.map((x,i)=><div className="inline-alert danger" key={`block-${i}`}>{lang==="ar"?x:readiness.blockersEn[i]}</div>)}
+    {readiness.missingEvidenceAr.map((x,i)=><div className="inline-alert warn" key={`missing-${i}`}>{lang==="ar"?`معلومة ناقصة: ${x}`:`Missing evidence: ${readiness.missingEvidenceEn[i]}`}</div>)}
+    {readiness.cautionsAr.map((x,i)=><div className="inline-alert warn" key={`caution-${i}`}>{lang==="ar"?x:readiness.cautionsEn[i]}</div>)}
+   </div>}
+
    {check&&<div className={`compatibility-panel ${check.level}`}>
     <div className="compat-head">
       <h3>{tr(lang,"compatibilityReport")}</h3>
@@ -85,12 +95,12 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
     </div>
     {check.issues.length ? <div className="compat-issues">{check.issues.map((issue,i)=><div key={i} className={`inline-alert ${issue.level}`}>{lang==="ar"?issue.ar:issue.en}</div>)}</div> : <div className="inline-alert good">{tr(lang,"noConflict")}</div>}
     {check.blocked&&<div className="inline-alert danger"><b>{lang==="ar"?"لن يسمح Aqua Nexus بإضافة هذا الكائن لأن التعارض مصنف خطراً.":"Aqua Nexus will not add this organism because the detected incompatibility is classified as dangerous."}</b></div>}
-    {check.requiresConfirmation&&!check.blocked&&<label className="risk-confirm"><input type="checkbox" checked={riskConfirmed} onChange={e=>setRiskConfirmed(e.target.checked)}/><span>{tr(lang,"confirmRisk")}</span></label>}
+    {readinessNeedsConfirm&&readiness?.state!=="not_now"&&<label className="risk-confirm"><input type="checkbox" checked={riskConfirmed} onChange={e=>setRiskConfirmed(e.target.checked)}/><span>{lang==="ar"?"أفهم أن الجاهزية غير مكتملة أو يوجد تنبيه، وأريد تسجيل الإضافة مع هذه الملاحظة.":"I understand readiness is incomplete or cautioned and want to record the addition with this warning."}</span></label>}
    </div>}
 
-   {selected==="__other__"&&<div className="inline-alert warn">{lang==="ar"?"الإدخال اليدوي لا يمكن فحص توافقه تلقائياً قبل إضافته. استخدم المكتبة كلما كان النوع موجوداً فيها.":"Manual entries cannot be automatically compatibility-checked before adding. Use the library whenever the species is available."}</div>}
+   {selected==="__other__"&&<div className="inline-alert warn">{lang==="ar"?"النوع اليدوي يبقى مسجلاً، لكن Aqua Nexus ما رح يدّعي أن توافقه موثّق. سيظهر ضمن Coverage غير المكتملة حتى يتم ربطه بنوع معروف.":"The manual species can still be recorded, but Aqua Nexus will not claim verified compatibility. It remains outside verified coverage until linked to a known species."}</div>}
 
-   <div className="modal-actions"><button className="btn" onClick={close}>{tr(lang,"cancel")}</button><button className="btn primary" onClick={add} disabled={!selected || !!check?.blocked || (!!check?.requiresConfirmation&&!riskConfirmed)}>{check?.blocked?(lang==="ar"?"غير مناسب للحوض":"Not suitable") : tr(lang,"save")}</button></div>
+   <div className="modal-actions"><button className="btn" onClick={close}>{tr(lang,"cancel")}</button><button className="btn primary" onClick={add} disabled={!selected || readiness?.state==="not_now" || (readinessNeedsConfirm&&!riskConfirmed)}>{readiness?.state==="not_now"?(lang==="ar"?"ليس مناسباً الآن":"Not suitable now") : tr(lang,"save")}</button></div>
   </Modal>
  </section>;
 }
