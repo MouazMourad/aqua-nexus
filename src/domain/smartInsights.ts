@@ -42,9 +42,13 @@ export function smartInsights(tank: Tank): SmartInsight[] {
   if(activePlan)out.push({level:"info",ar:`في خطة متابعة نشطة من Aqua AI: ${activePlan.titleAr} (${activePlan.steps.filter((x:any)=>x.done).length}/${activePlan.steps.length}).`,en:`An Aqua AI follow-up plan is active: ${activePlan.titleEn} (${activePlan.steps.filter((x:any)=>x.done).length}/${activePlan.steps.length}).`});
 
   if (tank.chemistry.length >= 2) {
-    const n0 = Number(tank.chemistry[0].values.NO3 ?? 0),n1 = Number(tank.chemistry[1].values.NO3 ?? n0);
-    const recentAdd = tank.timeline.find(e => /livestock|كائن|سمك|مرجان/i.test(`${e.type} ${e.textAr} ${e.textEn}`));
-    if (n0 > n1 * 1.25 && recentAdd) out.push({level:"info",ar:"لوحظ ارتفاع في NO3 بعد حدث إضافة كائنات. راقب الحمل البيولوجي والتغذية.",en:"NO3 increased after a livestock-related event. Monitor bioload and feeding."});
+    const newer=tank.chemistry[0],older=tank.chemistry[1];
+    const n0=newer.values.NO3,n1=older.values.NO3;
+    const newerAt=new Date(newer.timestamp).getTime(),olderAt=new Date(older.timestamp).getTime();
+    const relatedAdd=typeof n0==="number"&&typeof n1==="number"&&Number.isFinite(newerAt)&&Number.isFinite(olderAt)
+      ? tank.timeline.find(e=>{const t=new Date(e.timestamp).getTime();return t>=olderAt&&t<=newerAt&&/livestock|كائن|سمك|مرجان/i.test(`${e.type} ${e.textAr} ${e.textEn}`);})
+      : undefined;
+    if (typeof n0==="number"&&typeof n1==="number"&&n0>n1*1.25&&relatedAdd) out.push({level:"info",ar:"لوحظ ارتفاع في NO3 بعد حدث إضافة كائنات ضمن نفس فترة القياس. راقب الحمل البيولوجي والتغذية.",en:"NO3 increased after a livestock-related event within the same measurement interval. Monitor bioload and feeding."});
   }
 
   nutrients.signals.forEach(signal => {if (signal.level !== "good" || out.length === 0) out.push(signal);});
