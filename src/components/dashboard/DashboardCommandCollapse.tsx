@@ -31,11 +31,15 @@ export function DashboardCommandCollapse(){
       const isArabic=Boolean(panel.closest('[dir="rtl"]'));
       const clear=Boolean(panel.querySelector(".today-clear"));
       const count=clear?0:panel.querySelectorAll(".today-actions button").length;
+      const alerts=document.querySelectorAll(".aqua-danger-console .danger-reason").length;
       const confidence=panel.querySelector<HTMLElement>(".confidence-pill b")?.textContent?.trim()||"—";
-      const taskText=isArabic
-        ? (count===0?"لا مهام ضرورية اليوم":count===1?"1 مهمة اليوم":`${count} مهام اليوم`)
-        : (count===0?"No required tasks today":count===1?"1 task today":`${count} tasks today`);
-      const html=`<span>${count===0?"✓":"◎"}</span><b>${taskText}</b><em>${isArabic?"ثقة":"Confidence"} ${confidence}</em>`;
+      const firstAlert=document.querySelector<HTMLElement>(".aqua-danger-console .danger-reason b")?.textContent?.trim();
+      const firstTask=panel.querySelector<HTMLElement>(".today-actions button b")?.textContent?.trim();
+      const headline=isArabic
+        ? (alerts?`${alerts} تنبيه يحتاج انتباه`:count===0?"الحوض تحت المراقبة — لا مهام ضرورية اليوم":count===1?"1 مهمة اليوم":`${count} مهام اليوم`)
+        : (alerts?`${alerts} alert${alerts===1?"":"s"} need attention`:count===0?"Tank monitored — no required tasks today":count===1?"1 task today":`${count} tasks today`);
+      const next=firstAlert||firstTask||(isArabic?"اضغط لتشوف التحليل والمتابعة الذكية":"Tap to open analysis and smart follow-up");
+      const html=`<span>${alerts?"!":count===0?"✓":"◎"}</span><div><b>${headline}</b><small>${next}</small></div><em>${isArabic?"ثقة":"Confidence"} ${confidence}</em>`;
       if(glance.innerHTML!==html)glance.innerHTML=html;
     };
 
@@ -146,7 +150,9 @@ export function DashboardCommandCollapse(){
     .aqua-command-center.aqua-command-collapsed .smart-followup{display:none!important}
     .aqua-command-center.aqua-command-collapsed .aqua-command-glance{display:grid;grid-template-columns:26px 1fr auto;align-items:center;gap:8px;margin-top:9px;padding:10px 11px;border:1px solid rgba(77,211,244,.12);border-radius:12px;background:rgba(70,197,232,.045)}
     .aqua-command-glance>span{width:24px;height:24px;display:grid;place-items:center;border-radius:8px;background:rgba(91,224,167,.09);color:#79e4b0;font-weight:900}
-    .aqua-command-glance>b{font-size:12px;line-height:1.3}
+    .aqua-command-glance>div{min-width:0;display:grid;gap:2px}
+    .aqua-command-glance>div>b{font-size:12px;line-height:1.3}
+    .aqua-command-glance>div>small{font-size:10px;line-height:1.3;opacity:.62;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .aqua-command-glance>em{font-size:11px;font-style:normal;color:#79e4b0;white-space:nowrap}
     .aqua-command-center.aqua-command-expanded{border-color:rgba(83,218,255,.22)!important;box-shadow:0 14px 34px rgba(0,0,0,.16)}
 
@@ -165,7 +171,7 @@ export function DashboardCommandCollapse(){
       .aqua-command-center[data-aqua-collapsible="1"] .command-head:after{width:26px;height:26px;flex-basis:26px;font-size:18px;margin-inline-start:2px}
       .aqua-command-center.aqua-command-collapsed .command-head h3{font-size:18px;margin-top:2px}
       .aqua-command-center.aqua-command-collapsed .aqua-command-glance{grid-template-columns:24px 1fr auto;padding:9px 10px}
-      .aqua-command-glance>b{font-size:11px}.aqua-command-glance>em{font-size:10px}
+      .aqua-command-glance>div>b{font-size:11px}.aqua-command-glance>div>small{font-size:9px}.aqua-command-glance>em{font-size:10px}
       .aqua-sheet-backdrop{background:rgba(0,9,15,.48);backdrop-filter:none;-webkit-backdrop-filter:none}
       .pd-inline-share.aqua-floating-sheet,.pd-customizer.aqua-floating-sheet{bottom:0!important;width:100vw;max-height:84dvh;border-radius:24px 24px 0 0!important;padding-bottom:max(16px,env(safe-area-inset-bottom))!important}
       .pd-customizer.aqua-floating-sheet .pd-custom-list{grid-template-columns:1fr!important}
