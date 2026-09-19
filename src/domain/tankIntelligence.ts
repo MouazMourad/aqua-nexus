@@ -24,7 +24,7 @@ export interface HealthTimelinePoint {
   id: string;
   timestamp: string;
   score: number;
-  chemistry: number;
+  chemistry: number | null;
   maintenance: number;
   source: "snapshot" | "estimated";
   reasonAr: string;
