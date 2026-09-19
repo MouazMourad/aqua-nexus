@@ -3,8 +3,8 @@
 import { useEffect,useMemo,useState } from "react";
 import { createPortal } from "react-dom";
 import type { AppPage } from "@/components/navigation/MainNav";
-import { chemistryAgeDays,chemistryHealthAssessment,maintenanceHealth } from "@/domain/health";
-import { healthTimeline,tankStateView } from "@/domain/tankIntelligence";
+import { chemistryAgeDays } from "@/domain/health";
+import { healthTimeline } from "@/domain/tankIntelligence";
 import { useAquaStore } from "@/store/useAquaStore";
 import { nowISO,uid } from "@/lib/appUtils";
 import { tankIntelligenceCore } from "@/domain/intelligenceCore";
@@ -135,7 +135,7 @@ export function DashboardCommandLayer(){
 
   const today:{page:AppPage;ar:string;en:string;icon:string;priority:number}[]=[];
   const alarmPages=new Set(risks.map(x=>x.page));
-  if(chemAge>7&&!alarmPages.has("chemistry"))today.push({page:"chemistry",icon:"⚗",ar:`تحديث فحص الكيمياء — آخر فحص منذ ${Math.floor(chemAge)} يوم`,en:`Refresh chemistry — last test ${Math.floor(chemAge)} days ago`,priority:1});
+  if(chem!==null&&chemAge>7&&!alarmPages.has("chemistry"))today.push({page:"chemistry",icon:"⚗",ar:`تحديث فحص الكيمياء — آخر فحص منذ ${Math.floor(chemAge)} يوم`,en:`Refresh chemistry — last test ${Math.floor(chemAge)} days ago`,priority:1});
   if(overdue[0]&&!alarmPages.has("maintenance"))today.push({page:"maintenance",priority:2,icon:"✓",ar:`صيانة مستحقة: ${overdue[0].title}`,en:`Maintenance due: ${overdue[0].titleEn||overdue[0].title}`});
   if((treatment.length||watch.length)&&!alarmPages.has("livestock"))today.push({page:"diseases",priority:1,icon:"✚",ar:`متابعة ${treatment.length+watch.length} كائن تحت المراقبة/العلاج`,en:`Review ${treatment.length+watch.length} livestock item(s) under watch/treatment`});
   if(equipment.length&&!alarmPages.has("equipment"))today.push({page:"equipment",priority:2,icon:"⚙",ar:`فحص ${equipment.length} تجهيزات تحتاج انتباه`,en:`Check ${equipment.length} equipment item(s) needing attention`});
