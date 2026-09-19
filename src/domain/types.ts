@@ -134,6 +134,8 @@ export interface MaintenanceTask {
   intervalDays?: number;
   checklist?: string[];
   checklistDone?: number[];
+  sourceDomain?: IntelligenceEventDomain;
+  sourceId?: string;
 }
 
 export interface LivestockItem {
@@ -347,6 +349,8 @@ export interface EmergencySession {
   completedAt?: string;
   completedSteps: number[];
   status: "active" | "completed";
+  outcome?: "unknown" | "improved" | "stable" | "worse" | "resolved";
+  verifyAfter?: string;
 }
 
 export interface ExpenseItem {
