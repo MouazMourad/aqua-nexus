@@ -117,7 +117,7 @@ export function tankStateView(tank:Tank):TankStateView {
     }));
 
   if(maint<70||overdue.length)drivers.push({level:maint<50?"danger":"warn",ar:`الصيانة ${maint}%${overdue.length?` • ${overdue.length} مهمة متأخرة`:""}.`,en:`Maintenance is ${maint}%${overdue.length?` • ${overdue.length} overdue task(s)`:""}.`});
-  if(age>7)drivers.push({level:"warn",ar:`آخر فحص كيميائي منذ ${Math.floor(age)} يوم.`,en:`The last chemistry test was ${Math.floor(age)} days ago.`});
+  if(chem!==null&&age>7)drivers.push({level:"warn",ar:`آخر فحص كيميائي منذ ${Math.floor(age)} يوم.`,en:`The last chemistry test was ${Math.floor(age)} days ago.`});
   if(bio.status==="high"||bio.status==="danger")drivers.push({level:bio.status==="danger"?"danger":"warn",ar:`الحمل البيولوجي ${Math.round(bio.ratio*100)}% ويؤثر على هامش استقرار الحوض.`,en:`Bioload is ${Math.round(bio.ratio*100)}% and is reducing the tank's stability margin.`});
   if(equipment.length)drivers.push({level:"warn",ar:`هناك ${equipment.length} جهاز يحتاج انتباهاً أو صيانة.`,en:`${equipment.length} equipment item(s) need attention or service.`});
   if(system.equipmentAudit.issues.length){
