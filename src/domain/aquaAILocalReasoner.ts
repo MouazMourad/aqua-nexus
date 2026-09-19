@@ -85,6 +85,12 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
  const pushSignal=(x:LocalReasoningSignal)=>{if(!signals.some(s=>s.id===x.id))signals.push(x);};
  const pushAction=(x:LocalReasoningAction)=>{if(!actions.some(a=>a.id===x.id))actions.push(x);};
 
+ for(const a of core.actions){
+  const relevant=broadQuestion||intent.topics.includes(a.domain as any)||(a.domain==="waterChange"&&intent.topics.includes("waterChange" as any));
+  if(!relevant)continue;
+  pushAction({id:`core-${a.id}`,priority:a.level==="danger"?110:a.level==="warn"?100:90,level:a.level,page:a.page,ar:a.ar,en:a.en,whyAr:"هذا الإجراء صادر عن عقل Aqua Nexus المركزي بعد دمج حالة الحوض والأحداث والاعتماديات الحالية.",whyEn:"This action comes from the Aqua Nexus central core after combining current tank state, events and dependencies.",recheckAr:"نفّذ الإجراء من صفحته ثم سجّل التنفيذ والنتيجة حتى يعيد العقل التقييم.",recheckEn:"Execute it from its page, then log execution and outcome so the core can reassess."});
+ }
+
  const mentionedLivestock=tank.livestock.filter(x=>containsName(intent.raw,x.name)||containsName(intent.raw,x.nameEn)).map(x=>x.id);
  const mentionedEquipment=tank.equipment.filter(x=>containsName(intent.raw,x.name)||containsName(intent.raw,x.brand)||containsName(intent.raw,x.model)).map(x=>x.id);
 
