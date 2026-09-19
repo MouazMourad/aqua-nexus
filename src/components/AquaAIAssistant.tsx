@@ -3,8 +3,8 @@ import { FormEvent,useEffect,useMemo,useState } from "react";
 import type { Tank } from "@/domain/types";
 import type { AppPage } from "@/components/navigation/MainNav";
 import { useAquaStore } from "@/store/useAquaStore";
-import { systemHealth,systemHealthTrend } from "@/domain/systemHealth";
-import { systemAlerts } from "@/domain/alertEngine";
+import { systemHealthTrend } from "@/domain/systemHealth";
+import { tankIntelligenceCore } from "@/domain/intelligenceCore";
 import { aquaAIAnswer,type AquaAIAnswer,type AquaAIPage } from "@/domain/aquaAIBrain";
 import { parseAquaQuestion,resolveAquaFollowup } from "@/domain/aquaAIIntent";
 import { tankMood } from "@/domain/tankLearning";
@@ -21,7 +21,8 @@ type InsightView={id:string;labelAr:string;labelEn:string;promptAr:string;prompt
 export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;onNavigate?:(page:AppPage)=>void}){
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
  const [open,setOpen]=useState(false),[selected,setSelected]=useState<string|null>(null),[question,setQuestion]=useState(""),[askedQuestion,setAskedQuestion]=useState(""),[resolvedQuestion,setResolvedQuestion]=useState(""),[conversationContext,setConversationContext]=useState(""),[stage,setStage]=useState(0),[scopeBlocked,setScopeBlocked]=useState(false),[greeting,setGreeting]=useState(false),[planNote,setPlanNote]=useState("");
- const health=systemHealth(tank),trend=systemHealthTrend(tank),alerts=systemAlerts(tank),mood=tankMood(tank);
+ const core=useMemo(()=>tankIntelligenceCore(tank),[tank]);
+ const health=core.health,trend=systemHealthTrend(tank),alerts=core.alerts,mood=tankMood(tank);
  const hasDanger=alerts.some(x=>x.level==="danger"),hasWarning=alerts.some(x=>x.level==="warn");
  const state:"normal"|"alert"|"critical"=(health.score<60||hasDanger)?"critical":(health.score<80||trend==="declining"||hasWarning)?"alert":"normal";
  const learned=useMemo(()=>learnedTankSignals(tank),[tank]);
