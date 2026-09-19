@@ -134,13 +134,12 @@ export function DashboardCommandLayer(){
    }));
 
   const today:{page:AppPage;ar:string;en:string;icon:string;priority:number}[]=[];
-  const dangerRisks=risks.filter(x=>x.level==="danger").slice(0,2);
-  dangerRisks.forEach(x=>today.push({page:x.page,icon:"!",ar:x.ar,en:x.en,priority:0}));
-  if(chemAge>7)today.push({page:"chemistry",icon:"⚗",ar:`تحديث فحص الكيمياء — آخر فحص منذ ${Math.floor(chemAge)} يوم`,en:`Refresh chemistry — last test ${Math.floor(chemAge)} days ago`,priority:1});
-  if(overdue[0])today.push({page:"maintenance",priority:2,icon:"✓",ar:`صيانة مستحقة: ${overdue[0].title}`,en:`Maintenance due: ${overdue[0].titleEn||overdue[0].title}`});
-  if(treatment.length||watch.length)today.push({page:"diseases",priority:1,icon:"✚",ar:`متابعة ${treatment.length+watch.length} كائن تحت المراقبة/العلاج`,en:`Review ${treatment.length+watch.length} livestock item(s) under watch/treatment`});
-  if(equipment.length)today.push({page:"equipment",priority:2,icon:"⚙",ar:`فحص ${equipment.length} تجهيزات تحتاج انتباه`,en:`Check ${equipment.length} equipment item(s) needing attention`});
-  if((tank.acclimationSessions??[]).some(x=>x.status!=="completed"))today.push({page:"acclimation",priority:3,icon:"⇄",ar:"متابعة جلسة الأقلمة النشطة",en:"Continue the active acclimation session"});
+  const alarmPages=new Set(risks.map(x=>x.page));
+  if(chemAge>7&&!alarmPages.has("chemistry"))today.push({page:"chemistry",icon:"⚗",ar:`تحديث فحص الكيمياء — آخر فحص منذ ${Math.floor(chemAge)} يوم`,en:`Refresh chemistry — last test ${Math.floor(chemAge)} days ago`,priority:1});
+  if(overdue[0]&&!alarmPages.has("maintenance"))today.push({page:"maintenance",priority:2,icon:"✓",ar:`صيانة مستحقة: ${overdue[0].title}`,en:`Maintenance due: ${overdue[0].titleEn||overdue[0].title}`});
+  if((treatment.length||watch.length)&&!alarmPages.has("livestock"))today.push({page:"diseases",priority:1,icon:"✚",ar:`متابعة ${treatment.length+watch.length} كائن تحت المراقبة/العلاج`,en:`Review ${treatment.length+watch.length} livestock item(s) under watch/treatment`});
+  if(equipment.length&&!alarmPages.has("equipment"))today.push({page:"equipment",priority:2,icon:"⚙",ar:`فحص ${equipment.length} تجهيزات تحتاج انتباه`,en:`Check ${equipment.length} equipment item(s) needing attention`});
+  if((tank.acclimationSessions??[]).some(x=>x.status!=="completed")&&!alarmPages.has("acclimation"))today.push({page:"acclimation",priority:3,icon:"⇄",ar:"متابعة جلسة الأقلمة النشطة",en:"Continue the active acclimation session"});
 
   today.sort((a,b)=>a.priority-b.priority);
   const history=healthTimeline(tank);
