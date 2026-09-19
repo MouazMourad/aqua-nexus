@@ -1,4 +1,5 @@
 import type { GuidanceAction,Tank } from "./types";
+import { deriveGuidanceActions } from "./impactEngine";
 import { chemistryHealthAssessment,maintenanceHealth,bioload } from "./health";
 import { systemHealth } from "./systemHealth";
 import { systemAlerts } from "./alertEngine";
@@ -100,13 +101,7 @@ export function tankIntelligenceCore(tank:Tank):TankIntelligenceCore{
    resourcePresetId,resourceAvailable,suggestedPage:resourcePresetId&&!resourceAvailable?"inventory":"maintenance"
   };
  });
- const now=new Date().toISOString();
- const recentEvents=tank.intelligenceEvents??[];
- const guidanceActions:GuidanceAction[]=impacts.map(impact=>{
-  const related=recentEvents.filter(e=>impact.source===e.domain&&(impact.id.endsWith(e.parameter||"")||impact.source!=="chemistry")).slice(0,10);
-  const blocked=Boolean(impact.resourcePresetId&&!impact.resourceAvailable);
-  return {id:`guide-${impact.id}`,dedupeKey:impact.id,createdAt:now,updatedAt:now,sourceEventIds:related.map(e=>e.id),domain:impact.source==="chemistry"?"chemistry":impact.source,parameter:impact.source==="chemistry"?impact.id.replace("impact-chem-",""):undefined,level:impact.level,priority:impact.weight,confidence:impact.confidence,status:blocked?"blocked":"ready",page:impact.suggestedPage,titleAr:impact.ar,titleEn:impact.en,reasonAr:impact.ar,reasonEn:impact.en,resourcePresetId:impact.resourcePresetId,blockedReasonAr:blocked?"المورد المطلوب غير متوفر بالمخزون.":undefined,blockedReasonEn:blocked?"Required resource is not available in inventory.":undefined};
- });
+ const guidanceActions:GuidanceAction[]=deriveGuidanceActions(tank);
  const rank={danger:0,warn:1,info:2};
  const actions:IntelligenceAction[]=alerts.map(a=>({
   id:a.id,domain:a.domain,level:a.level,page:a.actionPage??pageByDomain[a.domain],
