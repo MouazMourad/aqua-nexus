@@ -52,6 +52,7 @@ export interface TankIntelligenceCore{
  memory:ReturnType<typeof biologicalMemory>;
  actions:IntelligenceAction[];
  impacts:CrossPageImpact[];
+ guidanceActions:GuidanceAction[];
  dataConfidence:number;
  critical:boolean;
 }
