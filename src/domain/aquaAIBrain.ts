@@ -11,7 +11,7 @@ import { reasonLocally } from "./aquaAILocalReasoner";
 import { compatibilityCheck } from "./compatibility";
 import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
 import { answerAquaQuery } from "./aquaAIQueryEngine";
-import { systemAlerts } from "./alertEngine";
+import { tankIntelligenceCore } from "./intelligenceCore";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
 
 export type AquaAIConfidence="low"|"medium"|"high";
@@ -102,7 +102,8 @@ export function nextBestAction(tank:Tank):AquaAIAction{
   if(activeEmergency)return {page:"emergency",ar:"أكمل بروتوكول الطوارئ النشط",en:"Continue the active emergency protocol"};
   const chemistry=chemistryGuidance(tank);
   if(chemistry.dataIssues.length){const issue=chemistry.dataIssues[0];return {page:"chemistry",ar:issue.actionAr,en:issue.actionEn};}
-  const alerts=systemAlerts(tank);
+  const core=tankIntelligenceCore(tank);
+  const alerts=core.alerts;
   const critical=alerts.find(x=>x.level==="danger"&&x.actionPage);
   if(critical?.actionPage)return {page:critical.actionPage,ar:critical.ar,en:critical.en};
   const oldChem=tank.chemistry[0]?Math.floor((Date.now()-new Date(tank.chemistry[0].timestamp).getTime())/DAY):999;
