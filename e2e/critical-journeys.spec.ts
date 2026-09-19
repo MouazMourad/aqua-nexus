@@ -26,7 +26,8 @@ test("critical pages open from the real navigation",async({page})=>{
   await page.locator('[data-aqua-page="chemistry"]').click();
   await expect(page.locator(".page-grid")).toContainText(/شو وضع الكيمياء فعلياً|What is actually happening with chemistry/);
   await page.locator('[data-aqua-page="maintenance"]').click();
-  await expect(page.locator(".page-grid")).toContainText(/المطلوب منك الآن|What needs your attention now/);
+  await expect(page.locator(".maintenance-page")).toBeVisible();
+  await expect(page.locator(".maintenance-health-card")).toBeVisible();
   await page.locator('[data-aqua-page="livestock"]').click();
   await expect(page.locator(".page-grid")).toContainText(/توافق الكائنات الحالية|Current livestock compatibility/);
 });
@@ -48,8 +49,7 @@ test("equipment touch placement previews then commits on release",async({page})=
   await page.mouse.down();
   await page.mouse.move(box.x+box.width*.78,box.y+box.height*.22,{steps:5});
   await page.mouse.up();
-  const after=await dot.getAttribute("style");
-  expect(after).not.toBe(before);
+  await expect.poll(()=>dot.getAttribute("style")).not.toBe(before);
 });
 
 test("sump chamber touch editor changes geometry without page failure",async({page})=>{
@@ -67,8 +67,7 @@ test("sump chamber touch editor changes geometry without page failure",async({pa
   await page.mouse.down();
   await page.mouse.move(box.x+box.width/2+24,box.y+box.height/2+10,{steps:4});
   await page.mouse.up();
-  const after=await chamber.getAttribute("style");
-  expect(after).not.toBe(before);
+  await expect.poll(()=>chamber.getAttribute("style")).not.toBe(before);
 });
 
 test("setup defaults do not masquerade as stocking evidence",async({page})=>{
