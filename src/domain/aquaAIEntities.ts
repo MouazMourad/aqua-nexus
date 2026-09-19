@@ -32,6 +32,7 @@ const KIND_ALIASES:Partial<Record<EquipmentKind,string[]>>={
  refugiumLight:["اضاءه ريفيجيوم","لايت ريفيجيوم","refugium light"],
  turfScrubber:["الجي سكرابر","algae scrubber","turf scrubber"],
  probe:["بروب","مجس","probe","sensor"],
+ co2:["co2","ثاني اكسيد الكربون","ثاني أكسيد الكربون","كربون","منظم co2","co2 system"],
  overflow:["اوفر فلو","overflow"]
 };
 
@@ -75,13 +76,13 @@ export function equipmentKindLabel(kind:EquipmentKind,lang:"ar"|"en"){
   lighting:"الإضاءة",waveMaker:"مضخة الموج",skimmer:"السكيمر",returnPump:"مضخة الرجوع",
   filterSock:"جورب الفلترة",rollerFilter:"الرولر فلتر",reactor:"الرياكتور",heater:"السخان",
   doser:"الدوزر",uv:"UV",ozone:"الأوزون",ato:"ATO",refugiumLight:"إضاءة الريفيجيوم",
-  turfScrubber:"Algae Scrubber",probe:"المجس",overflow:"الأوفر فلو",other:"الجهاز"
+  turfScrubber:"Algae Scrubber",probe:"المجس",co2:"نظام CO₂",overflow:"الأوفر فلو",other:"الجهاز"
  };
  const en:Record<EquipmentKind,string>={
   lighting:"lighting",waveMaker:"wave maker",skimmer:"skimmer",returnPump:"return pump",
   filterSock:"filter sock",rollerFilter:"roller filter",reactor:"reactor",heater:"heater",
   doser:"doser",uv:"UV",ozone:"ozone",ato:"ATO",refugiumLight:"refugium light",
-  turfScrubber:"algae scrubber",probe:"probe",overflow:"overflow",other:"equipment"
+  turfScrubber:"algae scrubber",probe:"probe",co2:"CO₂ system",overflow:"overflow",other:"equipment"
  };
  return (lang==="ar"?ar:en)[kind];
 }
