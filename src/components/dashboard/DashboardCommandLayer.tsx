@@ -3,7 +3,7 @@
 import { useEffect,useMemo,useState } from "react";
 import { createPortal } from "react-dom";
 import type { AppPage } from "@/components/navigation/MainNav";
-import { chemistryAgeDays,chemistryHealth,maintenanceHealth } from "@/domain/health";
+import { chemistryAgeDays,chemistryHealthAssessment,maintenanceHealth } from "@/domain/health";
 import { healthTimeline,tankStateView } from "@/domain/tankIntelligence";
 import { useAquaStore } from "@/store/useAquaStore";
 import { nowISO,uid } from "@/lib/appUtils";
@@ -94,7 +94,7 @@ export function DashboardCommandLayer(){
 
  const data=useMemo(()=>{
   if(!tank)return null;
-  const state=tankStateView(tank),chem=chemistryHealth(tank),maint=maintenanceHealth(tank),chemAge=chemistryAgeDays(tank);
+  const state=tankStateView(tank),chemistry=chemistryHealthAssessment(tank),chem=chemistry.score,maint=maintenanceHealth(tank),chemAge=chemistryAgeDays(tank);
   const now=Date.now();
   const overdue=tank.maintenance.filter(x=>!x.done&&x.nextDue&&new Date(x.nextDue).getTime()<now);
   const equipment=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
@@ -103,14 +103,10 @@ export function DashboardCommandLayer(){
   const activeEmergency=(tank.emergencySessions??[]).filter(x=>x.status==="active");
   const activeQuarantine=tank.quarantine.filter(x=>x.status==="active");
 
-  let confidence=100;
-  if(!tank.chemistry.length)confidence-=50;
-  else if(chemAge>10)confidence-=38;else if(chemAge>7)confidence-=24;else if(chemAge>3)confidence-=8;
-  if(tank.chemistry[0]?.usingDefaults)confidence-=15;
+  let confidence=chemistry.score===null?Math.min(55,chemistry.dataConfidence):chemistry.dataConfidence;
   if((tank.healthSnapshots?.length??0)<3)confidence-=10;
-  if(overdue.length)confidence-=Math.min(18,overdue.length*5);
-  if(!tank.photos.length)confidence-=4;
-  confidence=clamp(Math.max(25,confidence));
+  if(overdue.length)confidence-=Math.min(12,overdue.length*3);
+  confidence=clamp(Math.max(0,confidence));
 
   const confidenceTip=chemAge>10
    ? {ar:"ابدأ بفحص كيميائي جديد؛ آخر فحص تجاوز 10 أيام.",en:"Start with a new chemistry test; the last one is over 10 days old."}
@@ -139,17 +135,22 @@ export function DashboardCommandLayer(){
     en:alert.en
    }));
 
-  const today:{page:AppPage;ar:string;en:string;icon:string}[]=[];
-  if(chemAge>7)today.push({page:"chemistry",icon:"⚗",ar:`تحديث فحص الكيمياء — آخر فحص منذ ${Math.floor(chemAge)} يوم`,en:`Refresh chemistry — last test ${Math.floor(chemAge)} days ago`});
-  if(overdue[0])today.push({page:"maintenance",icon:"✓",ar:`صيانة مستحقة: ${overdue[0].title}`,en:`Maintenance due: ${overdue[0].titleEn||overdue[0].title}`});
-  if(treatment.length||watch.length)today.push({page:"diseases",icon:"✚",ar:`متابعة ${treatment.length+watch.length} كائن تحت المراقبة/العلاج`,en:`Review ${treatment.length+watch.length} livestock item(s) under watch/treatment`});
-  if(equipment.length)today.push({page:"equipment",icon:"⚙",ar:`فحص ${equipment.length} تجهيزات تحتاج انتباه`,en:`Check ${equipment.length} equipment item(s) needing attention`});
-  if((tank.acclimationSessions??[]).some(x=>x.status!=="completed"))today.push({page:"acclimation",icon:"⇄",ar:"متابعة جلسة الأقلمة النشطة",en:"Continue the active acclimation session"});
+  const today:{page:AppPage;ar:string;en:string;icon:string;priority:number}[]=[];
+  const dangerRisks=risks.filter(x=>x.level==="danger").slice(0,2);
+  dangerRisks.forEach(x=>today.push({page:x.page,icon:"!",ar:x.ar,en:x.en,priority:0}));
+  if(chemAge>7)today.push({page:"chemistry",icon:"⚗",ar:`تحديث فحص الكيمياء — آخر فحص منذ ${Math.floor(chemAge)} يوم`,en:`Refresh chemistry — last test ${Math.floor(chemAge)} days ago`,priority:1});
+  if(overdue[0])today.push({page:"maintenance",priority:2,icon:"✓",ar:`صيانة مستحقة: ${overdue[0].title}`,en:`Maintenance due: ${overdue[0].titleEn||overdue[0].title}`});
+  if(treatment.length||watch.length)today.push({page:"diseases",priority:1,icon:"✚",ar:`متابعة ${treatment.length+watch.length} كائن تحت المراقبة/العلاج`,en:`Review ${treatment.length+watch.length} livestock item(s) under watch/treatment`});
+  if(equipment.length)today.push({page:"equipment",priority:2,icon:"⚙",ar:`فحص ${equipment.length} تجهيزات تحتاج انتباه`,en:`Check ${equipment.length} equipment item(s) needing attention`});
+  if((tank.acclimationSessions??[]).some(x=>x.status!=="completed"))today.push({page:"acclimation",priority:3,icon:"⇄",ar:"متابعة جلسة الأقلمة النشطة",en:"Continue the active acclimation session"});
 
+  today.sort((a,b)=>a.priority-b.priority);
   const history=healthTimeline(tank);
   const previous=history.at(-2),latest=history.at(-1);
   const change=previous&&latest?latest.score-previous.score:0;
-  const latestEvent=[...tank.timeline].sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime())[0];
+  const latestEvent=previous&&latest?tank.timeline
+   .filter(e=>{const t=new Date(e.timestamp).getTime();return t>=new Date(previous.timestamp).getTime()&&t<=new Date(latest.timestamp).getTime();})
+   .sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime())[0]:undefined;
 
   const weekStart=now-7*DAY;
   const weekPoints=history.filter(x=>new Date(x.timestamp).getTime()>=weekStart);
@@ -171,9 +172,10 @@ export function DashboardCommandLayer(){
 
   const photos=[...tank.photos].sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime()).slice(0,2);
   const nearestScore=(ts:string)=>{
-   if(!history.length)return state.score;
+   if(!history.length)return null;
    const target=new Date(ts).getTime();
-   return history.reduce((a,b)=>Math.abs(new Date(b.timestamp).getTime()-target)<Math.abs(new Date(a.timestamp).getTime()-target)?b:a,history[0]).score;
+   const nearest=history.reduce((a,b)=>Math.abs(new Date(b.timestamp).getTime()-target)<Math.abs(new Date(a.timestamp).getTime()-target)?b:a,history[0]);
+   return Math.abs(new Date(nearest.timestamp).getTime()-target)<=48*3600000?nearest.score:null;
   };
 
   return {state,chem,maint,chemAge,confidence,confidenceTip,risks,today,history,previous,latest,change,latestEvent,weekDelta,weekEvents,weekPhotos,weekTests,weekMaint,guards,photos,nearestScore};
@@ -183,7 +185,7 @@ export function DashboardCommandLayer(){
 
  const goalDefs:Record<GoalKey,{ar:string;en:string;value:number}>={
   stability:{ar:"تثبيت صحة الحوض",en:"Stabilize tank health",value:data.state.score},
-  chemistry:{ar:"تثبيت الكيمياء",en:"Stabilize chemistry",value:data.chem},
+  chemistry:{ar:"تثبيت الكيمياء",en:"Stabilize chemistry",value:data.chem??0},
   maintenance:{ar:"رفع انتظام الصيانة",en:"Improve maintenance",value:data.maint},
   confidence:{ar:"رفع ثقة البيانات",en:"Improve data confidence",value:data.confidence}
  };
@@ -229,7 +231,7 @@ export function DashboardCommandLayer(){
     <article><small>{language==="ar"?"ملخص آخر 7 أيام":"Last 7 days"}</small><div className="weekly-kpis"><span><b>{data.weekDelta>0?`+${data.weekDelta}`:data.weekDelta}</b>{language==="ar"?"تغير الصحة":"health delta"}</span><span><b>{data.weekTests}</b>{language==="ar"?"فحوص":"tests"}</span><span><b>{data.weekMaint}</b>{language==="ar"?"صيانة":"maintenance"}</span><span><b>{data.weekPhotos}</b>{language==="ar"?"صور":"photos"}</span><span><b>{data.weekEvents}</b>{language==="ar"?"أحداث":"events"}</span></div></article>
     <article><small>{language==="ar"?"حارس الأخطاء":"Mistake Guard"}</small>{data.guards.length?data.guards.slice(0,3).map((g,i)=><p className="guard-line" key={i}>⚠ {language==="ar"?g.ar:g.en}</p>):<p className="guard-clear">✓ {language==="ar"?"ما في نمط خطر واضح من البيانات الحالية.":"No clear risky pattern in the current data."}</p>}</article>
    </div>
-   {latestPhoto&&olderPhoto&&<article className="photo-compare"><div className="photo-compare-head"><div><small>{language==="ar"?"مقارنة الصور":"Before / After photos"}</small><b>{new Date(olderPhoto.timestamp).toLocaleDateString()} ↔ {new Date(latestPhoto.timestamp).toLocaleDateString()}</b></div><span>{data.nearestScore(olderPhoto.timestamp)}% → {data.nearestScore(latestPhoto.timestamp)}%</span></div><div className="photo-stage"><img src={olderPhoto.dataUrl} alt={olderPhoto.caption||"Older aquarium"}/><div className="photo-new" style={{clipPath:`inset(0 ${100-compare}% 0 0)`}}><img src={latestPhoto.dataUrl} alt={latestPhoto.caption||"Newer aquarium"}/></div><div className="photo-divider" style={{left:`${compare}%`}}/></div><input className="photo-slider" type="range" min="0" max="100" value={compare} onChange={e=>setCompare(Number(e.target.value))}/><div className="photo-notes"><span><b>{language==="ar"?"قبل":"Before"}</b>{olderPhoto.caption||"—"}</span><span><b>{language==="ar"?"بعد":"After"}</b>{latestPhoto.caption||"—"}</span></div></article>}
+   {latestPhoto&&olderPhoto&&<article className="photo-compare"><div className="photo-compare-head"><div><small>{language==="ar"?"مقارنة الصور":"Before / After photos"}</small><b>{new Date(olderPhoto.timestamp).toLocaleDateString()} ↔ {new Date(latestPhoto.timestamp).toLocaleDateString()}</b></div><span>{data.nearestScore(olderPhoto.timestamp)??"N/A"}{data.nearestScore(olderPhoto.timestamp)!==null?"%":""} → {data.nearestScore(latestPhoto.timestamp)??"N/A"}{data.nearestScore(latestPhoto.timestamp)!==null?"%":""}</span></div><div className="photo-stage"><img src={olderPhoto.dataUrl} alt={olderPhoto.caption||"Older aquarium"}/><div className="photo-new" style={{clipPath:`inset(0 ${100-compare}% 0 0)`}}><img src={latestPhoto.dataUrl} alt={latestPhoto.caption||"Newer aquarium"}/></div><div className="photo-divider" style={{left:`${compare}%`}}/></div><input className="photo-slider" type="range" min="0" max="100" value={compare} onChange={e=>setCompare(Number(e.target.value))}/><div className="photo-notes"><span><b>{language==="ar"?"قبل":"Before"}</b>{olderPhoto.caption||"—"}</span><span><b>{language==="ar"?"بعد":"After"}</b>{latestPhoto.caption||"—"}</span></div></article>}
    </details>
   </section>
 
