@@ -12,7 +12,7 @@ import { deviceEnergy,equipmentProfile,tankEnergy } from "@/domain/equipmentInte
 import { equipmentAdequacy } from "@/domain/equipmentAdequacy";
 import { createDefaultConsumables,equipmentLife,equipmentReliability,syncEquipmentSystem } from "@/domain/equipmentLifecycle";
 
-const kinds:EquipmentKind[]=["lighting","waveMaker","overflow","skimmer","returnPump","filterSock","rollerFilter","reactor","heater","doser","uv","ozone","ato","refugiumLight","turfScrubber","probe","other"];
+const kinds:EquipmentKind[]=["lighting","waveMaker","overflow","skimmer","returnPump","filterSock","rollerFilter","reactor","heater","doser","uv","ozone","ato","refugiumLight","turfScrubber","probe","co2","other"];
 
 export function EquipmentPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
