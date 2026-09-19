@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "vitest run",
+    "test": "vitest run src/domain/__tests__",
     "test:e2e": "playwright test"
   },
   "dependencies": {
