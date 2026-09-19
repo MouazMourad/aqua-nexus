@@ -249,7 +249,7 @@ export interface HealthSnapshot {
   id: string;
   timestamp: string;
   score: number;
-  chemistry: number;
+  chemistry: number | null;
   maintenance: number;
   state: "excellent" | "stable" | "watch" | "stressed" | "critical";
   reasonAr: string;
