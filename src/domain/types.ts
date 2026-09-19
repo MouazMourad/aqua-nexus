@@ -40,6 +40,11 @@ export interface Equipment {
   ratedVolumeLiters?: number;
   /** Nominal water flow in liters/hour for pumps, wavemakers, filters, etc. */
   flowLph?: number;
+  /** Measured/estimated PAR at the livestock target depth for aquarium lighting. */
+  parAtTargetDepth?: number;
+  /** Manufacturer or measured lighting coverage dimensions. */
+  coverageLengthCm?: number;
+  coverageWidthCm?: number;
 }
 
 export interface EnergySettings {
@@ -303,6 +308,8 @@ export interface Tank {
   /** Start of the current hands-on training run; reset with the training tank. */
   trainingStartedAt?: string;
   type: TankType;
+  /** Optional explicit ecosystem profile. When omitted Aqua Nexus infers it from livestock/history/name. */
+  ecosystemProfile?: "fishOnly" | "reef" | "planted" | "mixed";
   status: TankStatus;
   ageMonths?: number;
   display: DimensionsCm & {

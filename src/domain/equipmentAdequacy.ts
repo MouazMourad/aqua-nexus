@@ -1,6 +1,7 @@
 import type { EquipmentKind,Tank } from "./types";
 
 export type EquipmentAdequacyLevel="good"|"info"|"warn"|"danger";
+export type EquipmentSystemProfile="marine-fish"|"marine-reef"|"freshwater"|"freshwater-planted";
 
 export interface EquipmentAdequacyIssue{
   id:string;
@@ -19,140 +20,146 @@ export interface EquipmentAdequacyResult{
   suggestions:EquipmentAdequacyIssue[];
   sizingCoverage:number;
   checked:number;
+  presenceScore:number;
+  capacityScore:number;
+  statusScore:number;
+  dataConfidence:number;
+  profile:EquipmentSystemProfile;
+  basisAr:string;
+  basisEn:string;
 }
 
+function clamp(n:number){return Math.max(0,Math.min(100,Math.round(n)));}
+function levelFromScore(score:number):EquipmentAdequacyLevel{return score<50?"danger":score<75?"warn":score<90?"info":"good";}
+function active(tank:Tank,kind:EquipmentKind){return tank.equipment.filter(x=>x.kind===kind&&x.status!=="off");}
+function has(tank:Tank,kind:EquipmentKind){return active(tank,kind).length>0;}
 function loadRatio(tank:Tank){
   const load=tank.livestock.reduce((s,x)=>s+(x.load??1)*x.quantity,0);
   const capacity=Math.max(1,tank.systemVolumeLiters/35);
   return load/capacity;
 }
-function kinds(tank:Tank){return new Set(tank.equipment.filter(x=>x.status!=="off").map(x=>x.kind));}
-function hasAny(set:Set<EquipmentKind>,list:EquipmentKind[]){return list.some(x=>set.has(x));}
-function levelFromScore(score:number):EquipmentAdequacyLevel{return score<50?"danger":score<75?"warn":score<90?"info":"good";}
+function allKnownLivestock(tank:Tank){
+  const current=tank.livestock;
+  const acclimation=(tank.acclimationSessions??[]).flatMap(s=>s.items).filter(x=>x.status!=="deferred");
+  return [...current,...acclimation];
+}
+
+export function inferEquipmentProfile(tank:Tank):EquipmentSystemProfile{
+  if(tank.ecosystemProfile==="reef")return "marine-reef";
+  if(tank.ecosystemProfile==="planted")return "freshwater-planted";
+  if(tank.ecosystemProfile==="fishOnly")return tank.type==="marine"?"marine-fish":"freshwater";
+  if(tank.ecosystemProfile==="mixed")return tank.type==="marine"?"marine-reef":"freshwater-planted";
+  const livestock=allKnownLivestock(tank);
+  const name=(tank.name||"").toLowerCase();
+  const coral=livestock.some(x=>x.category==="coral")||/reef|مرجان|ريف/.test(name);
+  const plant=livestock.some(x=>x.category==="plant")||/planted|مزروع|نبات/.test(name);
+  if(tank.type==="marine")return coral?"marine-reef":"marine-fish";
+  return plant?"freshwater-planted":"freshwater";
+}
 
 export function equipmentAdequacy(tank:Tank):EquipmentAdequacyResult{
   const issues:EquipmentAdequacyIssue[]=[];
   const suggestions:EquipmentAdequacyIssue[]=[];
-  const activeKinds=kinds(tank);
+  const profile=inferEquipmentProfile(tank);
   const volume=Math.max(1,tank.systemVolumeLiters);
   const bio=loadRatio(tank);
-  const hasCoral=tank.livestock.some(x=>x.category==="coral");
-  const hasPlant=tank.livestock.some(x=>x.category==="plant");
-  const sumpEnabled=Boolean(tank.sump?.enabled);
+  const sump=Boolean(tank.sump?.enabled);
+  let presenceScore=100,statusScore=100;
+  const capacityScores:number[]=[];
+  let expectedSizing=0,knownSizing=0,checked=0;
 
-  const issue=(x:EquipmentAdequacyIssue)=>{if(!issues.some(i=>i.id===x.id))issues.push(x);};
+  const issue=(x:EquipmentAdequacyIssue,penalty=0)=>{if(!issues.some(i=>i.id===x.id)){issues.push(x);presenceScore-=penalty;}};
   const suggest=(x:EquipmentAdequacyIssue)=>{if(!suggestions.some(i=>i.id===x.id))suggestions.push(x);};
+  const capacity=(score:number,known:boolean)=>{capacityScores.push(clamp(score));expectedSizing++;if(known)knownSizing++;checked++;};
 
-  // Core system architecture.
-  if(sumpEnabled&&!activeKinds.has("returnPump")){
-    issue({id:"missing-return",kind:"returnPump",level:"danger",ar:"السامب مفعّل لكن ما في مضخة رجوع فعّالة مسجلة.",en:"The sump is enabled but no active return pump is registered.",recommendationAr:"أضف مضخة رجوع مناسبة لحجم النظام واربط قدرتها الفعلية بالبرنامج.",recommendationEn:"Add a return pump sized for the system and record its real flow."});
-  }
-  if(sumpEnabled&&!activeKinds.has("overflow")){
-    issue({id:"missing-overflow",kind:"overflow",level:"danger",ar:"السامب مفعّل لكن ما في Overflow/مسار نزول مسجل.",en:"The sump is enabled but no overflow/drain path is registered.",recommendationAr:"سجل مسار الـOverflow لأن سلامة الصرف جزء أساسي من صحة النظام.",recommendationEn:"Register the overflow/drain path because drainage safety is part of system health."});
-  }
+  // Required/important architecture by aquarium profile.
+  if(sump&&!has(tank,"returnPump"))issue({id:"missing-return",kind:"returnPump",level:"danger",ar:"السامب مفعّل لكن ما في مضخة رجوع فعّالة مسجلة.",en:"The sump is enabled but no active return pump is registered.",recommendationAr:"أضف مضخة رجوع وسجّل Flow L/h حتى ينحسب التدفق الفعلي مقابل حجم النظام.",recommendationEn:"Add a return pump and record Flow L/h so real turnover can be compared with system volume."},28);
+  if(sump&&!has(tank,"overflow"))issue({id:"missing-overflow",kind:"overflow",level:"danger",ar:"السامب مفعّل لكن ما في Overflow/مسار نزول مسجل.",en:"The sump is enabled but no overflow/drain path is registered.",recommendationAr:"سجل/أضف مسار Overflow مناسب لأن استمرارية الصرف جزء من سلامة النظام.",recommendationEn:"Register/add an appropriate overflow because safe drainage is part of system reliability."},22);
 
-  if(!hasAny(activeKinds,["heater"])){
-    suggest({id:"missing-heater",kind:"heater",level:"warn",ar:"ما في سخان فعّال مسجل.",en:"No active heater is registered.",recommendationAr:"إذا الحوض استوائي، أضف/سجل تسخيناً مناسباً مع كنترول أو مراقبة مستقلة.",recommendationEn:"For a tropical tank, add/register suitable heating with independent control or monitoring."});
-  }
-  if(tank.type==="marine"&&!hasAny(activeKinds,["waveMaker","returnPump"])){
-    issue({id:"missing-flow",kind:"waveMaker",level:"danger",ar:"ما في مصدر حركة ماء فعّال مسجل للحوض البحري.",en:"No active water-movement source is registered for this marine tank.",recommendationAr:"أضف حركة ماء مناسبة لتجنب المناطق الراكدة وتحسين الأكسجة.",recommendationEn:"Add appropriate water movement to avoid dead zones and improve oxygenation."});
-  }
-  if((hasCoral||hasPlant)&&!activeKinds.has("lighting")){
-    issue({id:"missing-light",kind:"lighting",level:"danger",ar:hasCoral?"يوجد مرجان لكن ما في إضاءة فعّالة مسجلة.":"يوجد نباتات لكن ما في إضاءة فعّالة مسجلة.",en:hasCoral?"Corals are present but no active lighting is registered.":"Plants are present but no active lighting is registered.",recommendationAr:"سجل/أضف إضاءة مناسبة للكائنات الضوئية وحدد قدرتها أو قياس PAR عند توفره.",recommendationEn:"Register/add lighting suitable for photosynthetic livestock and record its capacity or PAR when available."});
-  }
-  if(tank.type==="marine"&&!activeKinds.has("ato")){
-    suggest({id:"missing-ato",kind:"ato",level:"info",ar:"ما في ATO مسجل؛ ثبات الملوحة سيعتمد على التعويض اليدوي.",en:"No ATO is registered; salinity stability depends on manual top-off.",recommendationAr:"ATO مو إلزامي، لكنه مفيد جداً لثبات الملوحة خصوصاً مع تبخر يومي ملحوظ.",recommendationEn:"ATO is not mandatory, but it strongly helps salinity stability when evaporation is significant."});
-  }
-  if(tank.type==="marine"&&(bio>.45||volume>=150)&&!activeKinds.has("skimmer")){
-    suggest({id:"missing-skimmer",kind:"skimmer",level:"warn",ar:"الحوض البحري عنده حجم/حمل يستفيد من سكيمر، لكن ما في سكيمر فعّال مسجل.",en:"This marine tank's size/bioload would benefit from a skimmer, but none is registered.",recommendationAr:"فكّر بإضافة سكيمر مناسب للحجم والحمل الحيوي، خصوصاً إذا NO3/PO4 يميلوا للارتفاع.",recommendationEn:"Consider a skimmer sized to volume and bioload, especially if NO3/PO4 trend upward."});
-  }
-  if(bio>.85&&!hasAny(activeKinds,["skimmer","rollerFilter","filterSock","reactor"])){
-    issue({id:"high-load-low-export",level:"warn",ar:"الحمل الحيوي مرتفع وما في وسيلة تصدير/فلترة قوية مسجلة تكفي كطبقة دعم واضحة.",en:"Bioload is high and no strong export/filtration support is registered.",recommendationAr:"راجع كفاءة الفلترة الميكانيكية/العضوية والتصدير قبل زيادة الكائنات.",recommendationEn:"Review mechanical/organic filtration and nutrient export before adding livestock."});
-  }
+  if(profile==="marine-reef"&&!has(tank,"lighting"))issue({id:"missing-light",kind:"lighting",level:"danger",ar:"هذا الحوض مصنف Reef لكن ما في إضاءة فعّالة مسجلة.",en:"This tank is classified as Reef but no active aquarium lighting is registered.",recommendationAr:"أضف إضاءة Reef مناسبة وسجّل PAR أو مساحة التغطية؛ حذف الإنارة لازم يخفض تقييم التجهيزات فوراً.",recommendationEn:"Add reef-capable lighting and record PAR or coverage; removing lighting must immediately reduce equipment adequacy."},30);
+  if(profile==="freshwater-planted"&&!has(tank,"lighting"))issue({id:"missing-light",kind:"lighting",level:"danger",ar:"هذا الحوض مصنف Planted لكن ما في إضاءة فعّالة مسجلة.",en:"This tank is classified as Planted but no active aquarium lighting is registered.",recommendationAr:"أضف إضاءة مناسبة للنباتات وسجّل PAR أو مساحة التغطية.",recommendationEn:"Add plant-suitable lighting and record PAR or coverage."},30);
 
-  // Current equipment status directly affects adequacy.
+  if(profile==="marine-reef"&&!has(tank,"waveMaker"))issue({id:"missing-wave",kind:"waveMaker",level:"danger",ar:"حوض Reef بدون Wave Maker فعّال؛ حركة الماء داخل العرض ما بتكفي تُفترض من مضخة الرجوع وحدها.",en:"A Reef tank has no active wave maker; display circulation should not be assumed from the return pump alone.",recommendationAr:"أضف Wave Maker وسجّل Flow L/h حتى تنحسب الحركة مقارنةً بحجم الحوض.",recommendationEn:"Add a wave maker and record Flow L/h so circulation can be sized against tank volume."},24);
+  if(profile==="marine-fish"&&!has(tank,"waveMaker")&&!has(tank,"returnPump"))issue({id:"missing-flow",kind:"waveMaker",level:"danger",ar:"ما في مصدر حركة ماء فعّال مسجل للحوض البحري.",en:"No active water-movement source is registered for this marine tank.",recommendationAr:"أضف حركة ماء مناسبة وسجّل التدفق.",recommendationEn:"Add appropriate water movement and record its flow."},24);
+
+  if(!has(tank,"heater")){
+    const p=tank.type==="marine"?12:8;
+    issue({id:"missing-heater",kind:"heater",level:"warn",ar:"ما في سخان فعّال مسجل؛ ما بقدر اعتبر منظومة الحرارة مكتملة.",en:"No active heater is registered, so temperature control cannot be considered complete.",recommendationAr:"إذا الحوض استوائي، أضف/سجل سخان مناسب مع قدرة W ومراقبة حرارة مستقلة.",recommendationEn:"For a tropical tank, add/register suitable heating with wattage and independent temperature monitoring."},p);
+  }
+  if(tank.type==="marine"&&!has(tank,"ato"))suggest({id:"missing-ato",kind:"ato",level:"info",ar:"ما في ATO مسجل؛ ثبات الملوحة يعتمد على التعويض اليدوي.",en:"No ATO is registered; salinity stability depends on manual top-off.",recommendationAr:"ATO مو إلزامي لكنه إضافة موصى بها لثبات الملوحة.",recommendationEn:"ATO is optional but recommended for salinity stability."});
+  if(tank.type==="marine"&&(bio>.45||volume>=150)&&!has(tank,"skimmer"))issue({id:"missing-skimmer",kind:"skimmer",level:"warn",ar:"حجم/حمل الحوض يستفيد من Skimmer لكن ما في واحد فعّال مسجل.",en:"This tank size/bioload would benefit from a skimmer, but none is active.",recommendationAr:"أضف Skimmer مناسب وسجّل Rated Volume من مواصفات الشركة.",recommendationEn:"Add a suitable skimmer and record the manufacturer rated volume."},10);
+
+  // Device condition affects adequacy independently from presence.
   for(const e of tank.equipment){
     if(e.status==="warning"||e.status==="service"){
       const critical=["returnPump","heater","overflow"].includes(e.kind);
+      statusScore-=critical?24:10;
       issue({id:`status-${e.id}`,kind:e.kind,level:critical?"danger":"warn",ar:`${e.name}: الحالة ${e.status==="warning"?"تحذير":"صيانة"}.`,en:`${e.name}: status is ${e.status}.`,recommendationAr:"افحص الجهاز وحدّث حالته بعد التأكد من أدائه.",recommendationEn:"Inspect the device and update its status after verifying performance."});
     }
-    if(e.status==="off"&&["returnPump","heater","overflow"].includes(e.kind)){
-      issue({id:`off-${e.id}`,kind:e.kind,level:"danger",ar:`${e.name} جهاز حرج ومسجل حالياً Off.`,en:`${e.name} is a critical device currently marked Off.`,recommendationAr:"تأكد أن إيقافه مقصود وأن هناك بديل يحافظ على الوظيفة الحرجة.",recommendationEn:"Confirm the shutdown is intentional and that backup capacity covers the critical function."});
+    if(e.status==="off"&&["returnPump","heater","overflow","lighting","waveMaker"].includes(e.kind)){
+      statusScore-=20;
+      issue({id:`off-${e.id}`,kind:e.kind,level:"danger",ar:`${e.name} مسجل Off وتأثيره يدخل مباشرة بكفاية النظام.`,en:`${e.name} is marked Off and directly reduces system adequacy.`,recommendationAr:"تأكد أن الإيقاف مقصود وأن وظيفة الجهاز مغطاة ببديل.",recommendationEn:"Confirm the shutdown is intentional and the function is covered by another device."});
     }
   }
 
-  // Sizing checks where the user provided real capacity data.
-  let sizingFields=0, sizingKnown=0, checked=0;
-
-  const returns=tank.equipment.filter(x=>x.kind==="returnPump"&&x.status!=="off");
-  if(returns.length){
-    sizingFields++;checked++;
-    const flow=returns.reduce((s,x)=>s+Number(x.flowLph||0),0);
-    if(flow>0){
-      sizingKnown++;
-      const turnover=flow/volume;
-      if(turnover<3){
-        issue({id:"return-undersized",kind:"returnPump",level:"danger",ar:`تدفق مضخة الرجوع المسجل حوالي ${flow.toFixed(0)} L/h = ${turnover.toFixed(1)}× حجم النظام/ساعة، وهو منخفض.`,en:`Registered return flow is about ${flow.toFixed(0)} L/h = ${turnover.toFixed(1)}× system volume/hour, which is low.`,recommendationAr:"استهدف تقريباً 4–8× حجم النظام/ساعة كتدفق فعلي بعد الرفع والفواقد، حسب تصميم السامب.",recommendationEn:"Target roughly 4–8× system volume/hour as real post-head-loss flow, depending on sump design."});
-      }else if(turnover<4){
-        issue({id:"return-borderline",kind:"returnPump",level:"warn",ar:`تدفق الرجوع ${turnover.toFixed(1)}×/ساعة قريب من الحد الأدنى.`,en:`Return turnover of ${turnover.toFixed(1)}×/hour is close to the low end.`,recommendationAr:"راجع التدفق الفعلي بعد ارتفاع الضخ والأكواع قبل الحكم النهائي.",recommendationEn:"Verify real flow after head height and plumbing losses before final judgment."});
-      }
-    }else{
-      suggest({id:"return-flow-missing",kind:"returnPump",level:"info",ar:"مضخة الرجوع موجودة لكن قيمة Flow L/h غير مسجلة، لذلك ما بقدر أحكم على حجمها.",en:"A return pump exists but Flow L/h is not recorded, so sizing cannot be verified.",recommendationAr:"أدخل التدفق الفعلي أو الاسمي للمضخة حتى يدخل حجمها بحساب الصحة.",recommendationEn:"Enter nominal or measured flow so pump sizing can contribute to health."});
-    }
+  // Capacity / sizing checks. Unknown capacity is NOT treated as 100%.
+  if(sump){
+    const list=active(tank,"returnPump"),flow=list.reduce((s,x)=>s+Number(x.flowLph||0),0);
+    if(!list.length)capacity(0,false);
+    else if(flow<=0){capacity(55,false);suggest({id:"return-flow-missing",kind:"returnPump",level:"warn",ar:"مضخة الرجوع موجودة لكن Flow L/h غير مسجل؛ ما في أساس كافي لإعطاء 100%.",en:"A return pump exists but Flow L/h is missing; there is not enough evidence for a 100% score.",recommendationAr:"أدخل التدفق الاسمي أو الأفضل التدفق الفعلي بعد الرفع والأكواع.",recommendationEn:"Enter nominal flow, preferably measured post-head-loss flow."});}
+    else {const t=flow/volume;knownSizing++;expectedSizing++;checked++;capacityScores.push(t<3?35:t<4?70:t<=10?100:85);if(t<4)issue({id:"return-under",kind:"returnPump",level:t<3?"danger":"warn",ar:`تدفق الرجوع ${flow.toFixed(0)} L/h = ${t.toFixed(1)}× حجم النظام/ساعة.`,en:`Return flow ${flow.toFixed(0)} L/h = ${t.toFixed(1)}× system volume/hour.`,recommendationAr:"راجع هدف تقريبي 4–8×/ساعة كتدفق فعلي بعد الفواقد.",recommendationEn:"Review a rough target of 4–8×/hour as real flow after losses."});}
   }
 
-  const waves=tank.equipment.filter(x=>x.kind==="waveMaker"&&x.status!=="off");
-  if(tank.type==="marine"&&waves.length){
-    sizingFields++;checked++;
-    const flow=waves.reduce((s,x)=>s+Number(x.flowLph||0),0);
-    if(flow>0){
-      sizingKnown++;
-      const turnover=flow/volume;
-      const min=hasCoral?15:10;
-      if(turnover<min){
-        issue({id:"wave-underflow",kind:"waveMaker",level:"warn",ar:`إجمالي حركة الـWave Maker المسجلة حوالي ${turnover.toFixed(1)}× حجم الحوض/ساعة، وهي منخفضة نسبياً للكائنات الحالية.`,en:`Registered wave-maker flow is about ${turnover.toFixed(1)}× tank volume/hour, relatively low for current livestock.`,recommendationAr:hasCoral?"لـLPS/Soft كمرجع عام، راجع توزيع حركة تقريباً 15–30×/ساعة بدون ضرب المرجان مباشرة.":"راجع وجود حركة موزعة كافية ومنع المناطق الراكدة.",recommendationEn:hasCoral?"For LPS/soft systems, a general reference is roughly 15–30×/hour distributed flow without blasting corals directly.":"Review distributed circulation and eliminate dead zones."});
-      }
-    }else{
-      suggest({id:"wave-flow-missing",kind:"waveMaker",level:"info",ar:"الـWave Maker موجود لكن Flow L/h غير مسجل.",en:"Wave makers exist but Flow L/h is not recorded.",recommendationAr:"أدخل تدفق كل مضخة حتى نقدر نقارن الحركة بحجم الحوض.",recommendationEn:"Enter each pump's flow so circulation can be compared with tank volume."});
-    }
+  if(tank.type==="marine"){
+    const list=active(tank,"waveMaker"),flow=list.reduce((s,x)=>s+Number(x.flowLph||0),0),target=profile==="marine-reef"?15:10;
+    if(profile==="marine-reef"&&!list.length)capacity(0,false);
+    else if(list.length&&flow<=0){capacity(55,false);suggest({id:"wave-flow-missing",kind:"waveMaker",level:"warn",ar:"الـWave Maker موجود لكن Flow L/h غير مسجل، لذلك قوة الحركة غير محسوبة فعلياً.",en:"Wave makers exist but Flow L/h is missing, so circulation strength is not actually verified.",recommendationAr:"أدخل Flow L/h لكل Wave Maker.",recommendationEn:"Enter Flow L/h for each wave maker."});}
+    else if(flow>0){const t=flow/volume;knownSizing++;expectedSizing++;checked++;capacityScores.push(t<target*.6?35:t<target?70:t<=40?100:85);if(t<target)issue({id:"wave-under",kind:"waveMaker",level:"warn",ar:`حركة الـWave Maker حوالي ${t.toFixed(1)}× حجم النظام/ساعة مقابل مرجع أولي ${target}× أو أكثر لهذا البروفايل.`,en:`Wave-maker circulation is about ${t.toFixed(1)}× system volume/hour versus an initial reference of ${target}× or more for this profile.`,recommendationAr:"ارفع/وزع الحركة تدريجياً وتأكد من عدم ضرب المرجان مباشرة.",recommendationEn:"Increase/distribute flow gradually without blasting livestock directly."});}
   }
 
-  const skimmers=tank.equipment.filter(x=>x.kind==="skimmer"&&x.status!=="off");
-  if(skimmers.length){
-    sizingFields++;checked++;
-    const rated=Math.max(...skimmers.map(x=>Number(x.ratedVolumeLiters||0)));
-    if(rated>0){
-      sizingKnown++;
-      const target=volume*(bio>.85?1.3:1);
-      if(rated<target*.8){
-        issue({id:"skimmer-undersized",kind:"skimmer",level:"warn",ar:`تصنيف السكيمر المسجل ${rated.toFixed(0)} لتر مقابل نظام ${volume.toFixed(0)} لتر وحمله الحالي؛ قد يكون صغيراً.`,en:`Registered skimmer rating is ${rated.toFixed(0)} L versus a ${volume.toFixed(0)} L system and current load; it may be undersized.`,recommendationAr:"راجع تصنيف الشركة للحمل الفعلي، ولا تعتمد على رقم الحجم الاسمي وحده.",recommendationEn:"Review the manufacturer rating for actual bioload rather than relying only on nominal tank size."});
-      }
-    }else{
-      suggest({id:"skimmer-rating-missing",kind:"skimmer",level:"info",ar:"السكيمر موجود لكن Rated Volume غير مسجل، لذلك ما بقدر أقيّم حجمه.",en:"A skimmer is present but its rated volume is not recorded, so sizing cannot be evaluated.",recommendationAr:"أدخل Rated Volume من مواصفات الشركة.",recommendationEn:"Enter the manufacturer's rated aquarium volume."});
-    }
+  const sk=active(tank,"skimmer");
+  if(sk.length){
+    const rated=Math.max(...sk.map(x=>Number(x.ratedVolumeLiters||0)));
+    if(rated<=0){capacity(60,false);suggest({id:"skimmer-rating-missing",kind:"skimmer",level:"warn",ar:"السكيمر موجود لكن Rated Volume غير مسجل؛ حجمه غير مثبت ضمن التقييم.",en:"A skimmer exists but Rated Volume is missing, so its sizing is unverified.",recommendationAr:"أدخل Rated Volume من مواصفات الشركة.",recommendationEn:"Enter the manufacturer rated volume."});}
+    else {const target=volume*(bio>.85?1.3:1);knownSizing++;expectedSizing++;checked++;const r=rated/target;capacityScores.push(r<.6?40:r<.8?70:r<=2.5?100:90);if(r<.8)issue({id:"skimmer-under",kind:"skimmer",level:"warn",ar:`Rated Volume للسكيمر ${rated.toFixed(0)}L مقابل حاجة تقديرية ${target.toFixed(0)}L.`,en:`Skimmer rated volume is ${rated.toFixed(0)}L versus an estimated need of ${target.toFixed(0)}L.`,recommendationAr:"راجع موديل أكبر أو قدرة تصدير أعلى حسب الحمل الفعلي.",recommendationEn:"Review a larger model or stronger export capacity for the actual load."});}
   }
 
-  const heaters=tank.equipment.filter(x=>x.kind==="heater"&&x.status!=="off");
+  const heaters=active(tank,"heater");
   if(heaters.length){
-    sizingFields++;checked++;
     const watts=heaters.reduce((s,x)=>s+Number(x.powerWatts||0),0);
-    if(watts>0){
-      sizingKnown++;
-      const wpl=watts/volume;
-      if(wpl<.35){
-        issue({id:"heater-undersized",kind:"heater",level:"warn",ar:`قدرة التسخين المسجلة ${watts.toFixed(0)}W = ${wpl.toFixed(2)} W/L، وقد تكون منخفضة حسب فرق حرارة الغرفة.`,en:`Registered heating power is ${watts.toFixed(0)} W = ${wpl.toFixed(2)} W/L, which may be low depending on room-to-tank temperature difference.`,recommendationAr:"اعتبر تقريباً 0.5–1 W/L مرجعاً أولياً فقط، والأهم ثبات الحرارة الفعلي ووجود تحكم آمن.",recommendationEn:"Use roughly 0.5–1 W/L only as a starting reference; actual temperature stability and safe control matter more."});
+    if(watts<=0){capacity(60,false);suggest({id:"heater-power-missing",kind:"heater",level:"warn",ar:"السخان موجود لكن قدرته W غير مسجلة، لذلك حجمه غير محسوب.",en:"A heater exists but wattage is missing, so sizing is not verified.",recommendationAr:"أدخل قدرة السخان بالواط.",recommendationEn:"Enter heater wattage."});}
+    else {const wpl=watts/volume;knownSizing++;expectedSizing++;checked++;capacityScores.push(wpl<.25?35:wpl<.5?70:wpl<=1.5?100:90);if(wpl<.5)issue({id:"heater-under",kind:"heater",level:"warn",ar:`قدرة التسخين ${watts.toFixed(0)}W = ${wpl.toFixed(2)} W/L وقد تكون منخفضة حسب حرارة الغرفة.`,en:`Heating power is ${watts.toFixed(0)}W = ${wpl.toFixed(2)} W/L and may be low depending on room temperature.`,recommendationAr:"اعتبر 0.5–1 W/L مرجعاً أولياً فقط وراقب ثبات الحرارة الفعلي.",recommendationEn:"Use 0.5–1 W/L only as a starting reference and verify actual temperature stability."});}
+  }
+
+  if(profile==="marine-reef"||profile==="freshwater-planted"){
+    const lights=active(tank,"lighting");
+    if(!lights.length)capacity(0,false);
+    else {
+      const par=Math.max(...lights.map(x=>Number(x.parAtTargetDepth||0)));
+      const covL=Math.max(...lights.map(x=>Number(x.coverageLengthCm||0)));
+      const covW=Math.max(...lights.map(x=>Number(x.coverageWidthCm||0)));
+      const hasData=par>0||(covL>0&&covW>0);
+      if(!hasData){capacity(50,false);suggest({id:"light-sizing-missing",kind:"lighting",level:"warn",ar:"الإنارة موجودة لكن ما في PAR أو Coverage؛ الواط وحده ما بكفي للحكم على قوة الإنارة.",en:"Lighting exists but PAR or coverage is missing; wattage alone is not enough to judge lighting adequacy.",recommendationAr:"سجّل PAR عند عمق الكائنات أو أبعاد Coverage من الشركة/القياس.",recommendationEn:"Record PAR at livestock depth or fixture coverage dimensions."});}
+      else {
+        knownSizing++;expectedSizing++;checked++;let s=100;
+        if(par>0){const min=profile==="marine-reef"?60:30;if(par<min*.6)s=Math.min(s,35);else if(par<min)s=Math.min(s,70);}
+        if(covL>0&&covW>0){const lr=covL/Math.max(1,tank.display.length),wr=covW/Math.max(1,tank.display.width),r=Math.min(lr,wr);if(r<.6)s=Math.min(s,40);else if(r<.85)s=Math.min(s,70);}
+        capacityScores.push(s);
+        if(s<80)issue({id:"light-under",kind:"lighting",level:"warn",ar:"بيانات PAR/Coverage الحالية تشير إن تغطية أو شدة الإنارة قد تكون أقل من حاجة البروفايل.",en:"Current PAR/coverage data suggests lighting intensity or coverage may be below this profile needs.",recommendationAr:"راجع PAR عند مواقع الكائنات والتغطية الفعلية قبل زيادة الشدة عشوائياً.",recommendationEn:"Review PAR at livestock positions and real coverage before increasing intensity blindly."});
       }
-    }else{
-      suggest({id:"heater-power-missing",kind:"heater",level:"info",ar:"السخان موجود لكن قدرته بالواط غير مسجلة، لذلك ما بقدر أقارن حجمه بحجم الحوض.",en:"A heater is present but wattage is not recorded, so sizing cannot be compared with tank volume.",recommendationAr:"أدخل قدرة السخان W حتى تدخل بالحساب.",recommendationEn:"Enter heater wattage so sizing can be included."});
     }
   }
 
-  const penalized=[...issues,...suggestions.filter(x=>x.level==="warn")];
-  let score=100;
-  for(const x of penalized){
-    score-=x.level==="danger"?18:x.level==="warn"?8:0;
-  }
-  score=Math.max(0,Math.round(score));
-  const sizingCoverage=sizingFields?Math.round(sizingKnown/sizingFields*100):100;
-  return {score,level:levelFromScore(score),issues,suggestions,sizingCoverage,checked};
+  const capacityScore=capacityScores.length?clamp(capacityScores.reduce((a,b)=>a+b,0)/capacityScores.length):70;
+  const dataConfidence=expectedSizing?clamp(knownSizing/expectedSizing*100):0;
+  const sizingCoverage=dataConfidence;
+  presenceScore=clamp(presenceScore);statusScore=clamp(statusScore);
+  // 100% now requires presence + verified sizing/capacity + healthy device status.
+  let score=clamp(presenceScore*.45+capacityScore*.40+statusScore*.15);
+  if(dataConfidence<50)score=Math.min(score,86);
+  if(dataConfidence===0&&capacityScores.length)score=Math.min(score,82);
+  const level=levelFromScore(score);
+  const basisAr=`${Math.round(score)}% = وجود التجهيزات ${presenceScore}% ×45% + ملاءمة القدرة/الحجم ${capacityScore}% ×40% + حالة الأجهزة ${statusScore}% ×15%. ثقة بيانات السعة ${dataConfidence}%.`;
+  const basisEn=`${Math.round(score)}% = equipment presence ${presenceScore}% ×45% + sizing/capacity ${capacityScore}% ×40% + device condition ${statusScore}% ×15%. Capacity-data confidence ${dataConfidence}%.`;
+  return {score,level,issues,suggestions,sizingCoverage,checked,presenceScore,capacityScore,statusScore,dataConfidence,profile,basisAr,basisEn};
 }
