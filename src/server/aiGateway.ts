@@ -70,24 +70,31 @@ export async function runAquaVision(input:{workspace:string;tank:Tank;imageDataU
 
   const context=buildTankAIContext(input.tank);
   const language=input.language||"ar";
-  const prompt=input.question||"Assess the visible aquarium organism condition. Give a differential assessment, confidence, relevant tank-context links, and safe next observations/actions. Do not claim a definitive diagnosis.";
+  const basePrompt=language==="ar"
+    ?"حلل الصورة كـ رأي بصري ثانٍ لحوض أسماك. افصل بوضوح بين ما تراه فعلاً وبين الاحتمالات. لا تعتبر الصورة تشخيصاً مؤكداً، ولا توصي بدواء أو جرعة اعتماداً على الصورة وحدها. اربط الملاحظات ببيانات الحوض المرفقة، واذكر مستوى الاستعجال وما الذي يجب فحصه أو مراقبته قبل أي علاج."
+    :"Analyze this as a second visual opinion for an aquarium. Clearly separate visible findings from differential possibilities. Do not treat the image as a confirmed diagnosis and do not recommend medication or dosing from the image alone. Link findings to the supplied tank context, state urgency, and list the safest checks or observations needed before treatment.";
+  const requested=input.question?.trim();
+  const prompt=`${basePrompt}\n\n${requested?"LOCAL AQUA NEXUS CONTEXT / USER NOTES:\n"+requested:""}\n\nReturn a concise response with these sections: Visible findings; Differential possibilities; Tank-context links; Safe next checks; Urgency and confidence.`;
   const response=await fetch(`${cfg.base}/chat/completions`,{
     method:"POST",
     headers:{"content-type":"application/json","authorization":`Bearer ${cfg.key}`},
     body:JSON.stringify({
       model:cfg.model,
-      temperature:.15,
+      temperature:.1,
+      max_tokens:900,
       messages:[
         {role:"system",content:aquaAISystemPrompt(language)},
+        {role:"system",content:"You are an aquarium visual triage assistant. Never overstate image certainty. Do not prescribe medication solely from an image. Use the supplied Aqua Nexus tank context as evidence, not as permission to infer missing facts."},
         {role:"system",content:`AQUA_NEXUS_TANK_CONTEXT\n${JSON.stringify(context)}`},
         {role:"user",content:[{type:"text",text:prompt},{type:"image_url",image_url:{url:input.imageDataUrl}}]}
       ]
     })
   });
-  if(!response.ok)throw new Error(`Vision provider returned ${response.status}`);
+  if(!response.ok)throw Object.assign(new Error(`Vision provider returned ${response.status}`),{status:502});
   const json:any=await response.json();
-  const text=json?.choices?.[0]?.message?.content??json?.output_text??json;
-  const answer={text,contextSchema:context.schema};
+  const raw=json?.choices?.[0]?.message?.content??json?.output_text??json;
+  const text=typeof raw==="string"?raw.slice(0,12000):JSON.stringify(raw).slice(0,12000);
+  const answer={text,contextSchema:context.schema,secondOpinion:true};
   await audit(input.workspace,input.tank.id,"vision",input.question,"external",cfg.model,answer);
   return {mode:"external",provider:"configured AI provider",model:cfg.model,answer};
 }
