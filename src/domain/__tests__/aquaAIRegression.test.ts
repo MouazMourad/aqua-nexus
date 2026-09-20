@@ -345,6 +345,13 @@ describe("Biological cycling gate",()=>{
     expect(cycleRelevantMaintenanceTask({id:"c",title:"فحص كيمياء الدورة البيولوجية",cadence:"weekly",done:false,sourceDomain:"system",sourceId:"cycle:chemistry"})).toBe(true);
     expect(cycleRelevantMaintenanceTask({id:"x",title:"Clean display glass",cadence:"weekly",done:false})).toBe(false);
   });
+  it("keeps Local Best AI from recommending dosing while cycling",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.isTraining=false;t.status="cycling";t.biologicalCycle={startedAt:new Date().toISOString()};
+    const answer=aquaAIAnswer("قديش جرعة KH حط هلا؟",t,"dashboard");
+    expect(answer.titleEn).toMatch(/Biological cycle/i);
+    expect(answer.action?.page).not.toBe("dosing");
+  });
 });
 
 describe("AI Vision request safety",()=>{
