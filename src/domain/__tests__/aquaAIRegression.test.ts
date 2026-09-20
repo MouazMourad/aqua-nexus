@@ -19,6 +19,8 @@ import { deriveIntelligenceEvents } from "@/domain/eventIntelligence";
 import { coralTransferGate } from "@/domain/acclimationSafety";
 import { allowedAcclimationCategories,livestockCategoryFromAcclimation,normalizeAcclimationCategory } from "@/domain/acclimationCategories";
 import { correctiveDosingInventory,inventoryForConsumer,inventoryProfile,routineDosingInventory } from "@/domain/inventoryIntelligence";
+import { consumeInventory } from "@/domain/inventoryConsumption";
+import { fitChamberToSump,sumpChamberContents } from "@/domain/sumpOperations";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -242,6 +244,55 @@ describe("Inventory data-integrity regression",()=>{
   });
 });
 
+
+
+describe("Operations consumables regression",()=>{
+  it("consumes multiple inventory requests atomically without going negative",()=>{
+    const inventory=[
+      {id:"a",name:"Conditioner",quantity:100,unit:"mL",minimum:10},
+      {id:"b",name:"Aquarium Salt",quantity:500,unit:"g",minimum:50}
+    ];
+    const result=consumeInventory(inventory,[
+      {inventoryItemId:"a",quantity:5,role:"conditioner"},
+      {inventoryItemId:"b",quantity:20,role:"freshwater_salt"}
+    ]);
+    expect(result.ok).toBe(true);
+    if(result.ok){
+      expect(result.inventory.find(x=>x.id==="a")?.quantity).toBe(95);
+      expect(result.inventory.find(x=>x.id==="b")?.quantity).toBe(480);
+      expect(result.uses).toHaveLength(2);
+    }
+  });
+  it("blocks inventory consumption when any requested item is insufficient",()=>{
+    const inventory=[{id:"x",name:"DI Resin",quantity:2,unit:"L",minimum:0}];
+    const result=consumeInventory(inventory,[{inventoryItemId:"x",quantity:3,role:"rodi_di"}]);
+    expect(result.ok).toBe(false);
+    expect(inventory[0].quantity).toBe(2);
+  });
+  it("keeps sump chambers inside resized sump dimensions",()=>{
+    const fitted=fitChamberToSump({id:"c",name:"C",x:80,y:30,length:40,width:30,height:50,waterHeight:45,media:[]},{length:90,width:40,height:35});
+    expect(fitted.x+fitted.length).toBeLessThanOrEqual(90);
+    expect(fitted.y+fitted.width).toBeLessThanOrEqual(40);
+    expect(fitted.height).toBe(35);
+    expect(fitted.waterHeight).toBeLessThanOrEqual(35);
+  });
+  it("shows real sump equipment and tracked media in chamber contents",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.sump.enabled=true;
+    t.sump.chambers=[{id:"c1",name:"Skimmer",x:0,y:0,length:30,width:30,height:35,waterHeight:25,media:[],items:["Probe rack"]}];
+    t.equipment=[{id:"eq1",name:"Protein Skimmer",kind:"skimmer",location:"sump:c1",status:"on"}];
+    t.filterMedia=[{id:"fm1",name:"GFO",kind:"gfo",amountGrams:100,installedAt:"2026-09-20",referenceLifeDays:30,chamberId:"c1"}];
+    const contents=sumpChamberContents(t,t.sump.chambers[0]);
+    expect(contents.equipment).toContain("Protein Skimmer");
+    expect(contents.filterMedia).toContain("GFO");
+    expect(contents.manual).toContain("Probe rack");
+  });
+  it("recognizes legacy water prep and RODI stock by purpose",()=>{
+    expect(inventoryProfile({id:"c",name:"Water Conditioner",quantity:100,unit:"mL",minimum:10}).subcategory).toBe("conditioner");
+    expect(inventoryProfile({id:"s",name:"Sediment Filter 5 micron",quantity:2,unit:"pc",minimum:1}).subcategory).toBe("sediment_filter");
+    expect(inventoryProfile({id:"d",name:"DI Resin",quantity:2,unit:"L",minimum:.2}).subcategory).toBe("di_resin");
+  });
+});
 
 describe("Tank-aware acclimation categories",()=>{
   it("never exposes freshwater plants as a marine acclimation category",()=>{
