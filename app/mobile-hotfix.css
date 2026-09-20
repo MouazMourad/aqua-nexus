@@ -81,7 +81,7 @@ html,body{max-width:100%;overflow-x:hidden}
 .maintenance-state-dot.done{background:rgba(31,128,91,.32);border-color:rgba(93,222,166,.58);color:#9ff0c7}
 .maintenance-task-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}
 .maintenance-checklist-btn,.maintenance-complete-btn{
-  min-width:0!important;width:auto!important;min-height:34px;padding:6px 9px;border-radius:10px;
+  min-width:0!important;width:auto!important;min-height:40px;padding:6px 9px;border-radius:10px;
   border:1px solid rgba(101,193,211,.32);background:rgba(7,38,51,.82);color:#dff9ff;
   display:inline-flex;align-items:center;justify-content:center;gap:5px;font:inherit;font-weight:800;cursor:pointer
 }
