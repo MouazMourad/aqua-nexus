@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,6 +28,20 @@ jobs:
           name: package-lock-generated
           path: package-lock.json
           retention-days: 1
+      - name: Commit generated lockfile to release branch
+        if: github.event_name == 'pull_request' && github.head_ref == 'hardening/release-candidate'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
+            echo "package-lock.json already tracked"
+            exit 0
+          fi
+          CONTENT="$(base64 -w0 package-lock.json)"
+          gh api --method PUT "repos/${{ github.repository }}/contents/package-lock.json" \
+            -f message="Add reproducible npm lockfile" \
+            -f content="$CONTENT" \
+            -f branch="${{ github.head_ref }}"
       - name: Regression tests
         run: npm test
       - name: Build
