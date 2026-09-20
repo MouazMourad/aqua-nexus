@@ -46,7 +46,7 @@ function dockScale(index:number,hoverIndex:number|null){
   return 1;
 }
 
-export function MainNav({active,onChange,lang}:{active:AppPage;onChange:(p:AppPage)=>void;lang:Language}) {
+export function MainNav({active,onChange,lang,lockedPages=[]}:{active:AppPage;onChange:(p:AppPage)=>void;lang:Language;lockedPages?:AppPage[]}) {
   const viewport=useRef<HTMLDivElement>(null);
   const [hoverIndex,setHoverIndex]=useState<number|null>(null);
   const move=(dir:-1|1)=>viewport.current?.scrollBy({left:dir*420,behavior:"smooth"});
@@ -65,9 +65,9 @@ export function MainNav({active,onChange,lang}:{active:AppPage;onChange:(p:AppPa
       <div className="dock-viewport" ref={viewport} dir="ltr">
         <nav className="main-nav full-modules-nav mac-dock" onMouseLeave={()=>setHoverIndex(null)}>
           {items.map((item,index)=>{
-            const scale=dockScale(index,hoverIndex);
-            return <button type="button" data-aqua-page={item.key} key={item.key} className={`nav-item dock-item ${active===item.key?"active":""}`} style={{"--dock-scale":scale,"--dock-color":item.color} as React.CSSProperties} onMouseEnter={()=>setHoverIndex(index)} onFocus={()=>setHoverIndex(index)} onBlur={()=>setHoverIndex(null)} onClick={(e)=>{e.preventDefault();e.stopPropagation();onChange(item.key)}}>
-              <span className="nav-icon">{item.icon}</span>
+            const scale=dockScale(index,hoverIndex),locked=lockedPages.includes(item.key);
+            return <button type="button" data-aqua-page={item.key} key={item.key} disabled={locked} aria-disabled={locked} title={locked?(lang==="ar"?"مقفل خلال الدورة البيولوجية":"Locked during biological cycling"):undefined} className={`nav-item dock-item ${active===item.key?"active":""} ${locked?"cycle-locked":""}`} style={{"--dock-scale":scale,"--dock-color":item.color} as React.CSSProperties} onMouseEnter={()=>!locked&&setHoverIndex(index)} onFocus={()=>!locked&&setHoverIndex(index)} onBlur={()=>setHoverIndex(null)} onClick={(e)=>{e.preventDefault();e.stopPropagation();if(!locked)onChange(item.key)}}>
+              <span className="nav-icon">{locked?"🔒":item.icon}</span>
               <span className="dock-label" dir={lang==="ar"?"rtl":"ltr"}>{tr(lang,item.label)}</span>
             </button>;
           })}
