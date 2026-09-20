@@ -6,7 +6,7 @@ import { bioload } from "@/domain/health";
 import { auditTankCompatibility } from "@/domain/compatibility";
 import { stockingReadiness } from "@/domain/stockingReadiness";
 import { useAquaStore } from "@/store/useAquaStore";
-import { tr,categoryText } from "@/i18n";
+import { tr,bi,categoryText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Modal } from "@/components/ui/Modal";
 import { uid,today,nowISO } from "@/lib/appUtils";
@@ -61,7 +61,7 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
 
   <div className="card panel full-span">
    <div className="table-wrap"><table><thead><tr><th>{tr(lang,"name")}</th><th>{tr(lang,"category")}</th><th>{tr(lang,"quantity")}</th><th>{lang==="ar"?"الصحة":"Health"}</th><th>{tr(lang,"load")}</th><th></th></tr></thead>
-   <tbody>{tank.livestock.map(x=><tr key={x.id}><td>{lang==="ar"?x.name:(x.nameEn||x.name)}{x.sizeCm&&<small style={{display:"block"}}>{x.sizeCm} cm</small>}</td><td>{categoryText(lang,x.category)}</td><td>{x.quantity}</td><td><span className={`status ${x.health!=="good"?"warn":""}`}>{x.health}</span></td><td>{((x.load??1)*x.quantity).toFixed(1)}</td><td><button className="btn" onClick={()=>startEdit(x)}>✎</button> <button className="btn danger" onClick={()=>remove(x.id)}>×</button></td></tr>)}</tbody></table></div>
+   <tbody>{tank.livestock.map(x=><tr key={x.id}><td>{lang==="ar"?x.name:(x.nameEn||x.name)}{x.sizeCm&&<small style={{display:"block"}}>{x.sizeCm} cm</small>}</td><td>{x.subtype==="macroalgae"?bi(lang,"ماكرو ألجي","Macroalgae"):categoryText(lang,x.category)}</td><td>{x.quantity}</td><td><span className={`status ${x.health!=="good"?"warn":""}`}>{x.health}</span></td><td>{((x.load??1)*x.quantity).toFixed(1)}</td><td><button className="btn" onClick={()=>startEdit(x)}>✎</button> <button className="btn danger" onClick={()=>remove(x.id)}>×</button></td></tr>)}</tbody></table></div>
   </div>
 
   <Modal open={!!editId} title={lang==="ar"?"تحديث حالة الكائن":"Update livestock"} onClose={()=>setEditId(null)}><div className="form-grid"><label className="field"><span>{tr(lang,"quantity")}</span><input type="number" min="1" value={editQty} onChange={e=>setEditQty(Number(e.target.value))}/></label><label className="field"><span>{lang==="ar"?"الصحة":"Health"}</span><select value={editHealth} onChange={e=>setEditHealth(e.target.value as LivestockItem["health"])}><option value="good">{lang==="ar"?"جيدة":"Good"}</option><option value="watch">{lang==="ar"?"مراقبة":"Watch"}</option><option value="treatment">{lang==="ar"?"علاج":"Treatment"}</option></select></label><label className="field"><span>{lang==="ar"?"الحجم التقريبي cm":"Estimated size cm"}</span><input type="number" min="0" step=".1" value={editSize||""} onChange={e=>setEditSize(Number(e.target.value))}/></label><label className="field full-field"><span>{tr(lang,"notes")}</span><textarea value={editNotes} onChange={e=>setEditNotes(e.target.value)}/></label></div><div className="modal-actions"><button className="btn" onClick={()=>setEditId(null)}>{tr(lang,"cancel")}</button><button className="btn primary" onClick={saveEdit}>{tr(lang,"save")}</button></div></Modal>
@@ -70,7 +70,7 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
 
   <Modal open={open} title={tr(lang,"addLivestock")} onClose={close}>
    <div className="form-grid">
-    <label className="field"><span>{tr(lang,"category")}</span><select value={category} onChange={e=>{setCategory(e.target.value as LivestockItem["category"]);setSelected("");setRiskConfirmed(false)}}><option value="fish">{tr(lang,"fish")}</option><option value="coral">{tr(lang,"coral")}</option><option value="invert">{tr(lang,"invert")}</option><option value="plant">{tr(lang,"plant")}</option><option value="other">{tr(lang,"other")}</option></select></label>
+    <label className="field"><span>{tr(lang,"category")}</span><select value={category} onChange={e=>{setCategory(e.target.value as EntryCategory);setSelected("");setRiskConfirmed(false)}}><option value="fish">{tr(lang,"fish")}</option>{tank.type==="marine"&&<option value="coral">{tr(lang,"coral")}</option>}<option value="invert">{tr(lang,"invert")}</option>{tank.type==="marine"?<option value="macroalgae">{bi(lang,"ماكرو ألجي","Macroalgae")}</option>:<option value="plant">{tr(lang,"plant")}</option>}<option value="other">{tr(lang,"other")}</option></select></label>
     <label className="field"><span>{tr(lang,"selectOrganism")}</span><select value={selected} onChange={e=>{setSelected(e.target.value);setRiskConfirmed(false)}}><option value="">—</option>{list.map((x:any)=><option value={x.id} key={x.id}>{lang==="ar"?x.ar:x.en}</option>)}<option value="__other__">{tr(lang,"otherEntry")}</option></select></label>
     {selected==="__other__"&&<label className="field full-field"><span>{tr(lang,"name")}</span><input value={custom} onChange={e=>setCustom(e.target.value)}/></label>}
     <label className="field"><span>{tr(lang,"quantity")}</span><input type="number" min="1" value={qty} onChange={e=>{setQty(Number(e.target.value));setRiskConfirmed(false)}}/></label>
