@@ -6,7 +6,7 @@ import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { downloadText,today } from "@/lib/appUtils";
 import { syncPushReminders } from "@/lib/pushNotifications";
-import { validateBackupPayload } from "@/domain/backupValidation";
+import { CURRENT_BACKUP_SCHEMA,validateBackupPayload } from "@/domain/backupValidation";
 
 export function SettingsPage({tank}:{tank:Tank}) {
  const state=useAquaStore(),patch=useAquaStore(s=>s.patchTank),del=useAquaStore(s=>s.deleteTank),replace=useAquaStore(s=>s.replaceData),[name,setName]=useState(tank.name),file=useRef<HTMLInputElement>(null),lang=state.language;
@@ -15,7 +15,7 @@ export function SettingsPage({tank}:{tank:Tank}) {
  const [backupNote,setBackupNote]=useState<{kind:"good"|"danger";text:string}|null>(null);
  const profile=tank.ecosystemProfile??"auto";
  const energy=tank.energySettings??{pricePerKwh:0,currency:"USD"};
- const exportBackup=()=>downloadText(`Aqua_Nexus_Backup_${today()}.json`,JSON.stringify({language:state.language,selectedTankId:state.selectedTankId,tanks:state.tanks},null,2));
+ const exportBackup=()=>downloadText(`Aqua_Nexus_Backup_${today()}.json`,JSON.stringify({app:"Aqua Nexus",schemaVersion:CURRENT_BACKUP_SCHEMA,exportedAt:new Date().toISOString(),language:state.language,selectedTankId:state.selectedTankId,tanks:state.tanks},null,2));
 
  useEffect(()=>{
   if(typeof window==="undefined")return;
