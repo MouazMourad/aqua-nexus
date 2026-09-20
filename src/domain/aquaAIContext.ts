@@ -1,4 +1,5 @@
 import type { Tank } from "./types";
+import { buildTankBrainSnapshot } from "./tankBrainSnapshot";
 import { tankStateView,tankForecast } from "./tankIntelligence";
 import { tankMood,biologicalMemory,proactivePredictions,eventChemistryLinks } from "./tankLearning";
 import { learnedTankSignals,tankBaselines,tankLearningMaturity } from "./tankPatterns";
@@ -21,6 +22,7 @@ export function buildAquaAIContext(tank:Tank){
  return {
   schemaVersion:2,
   generatedAt:new Date().toISOString(),
+  brain:buildTankBrainSnapshot(tank),
   tank:{id:tank.id,name:tank.name,type:tank.type,status:tank.status,ageMonths:tank.ageMonths,systemVolumeLiters:tank.systemVolumeLiters},
   biologicalCycle:biologicalCycleStatus(tank),
   biologicalCycleKnowledge:biologicalCycleKnowledgeSnapshot(tank),
