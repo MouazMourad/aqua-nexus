@@ -85,7 +85,8 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const [timerAlerts,setTimerAlerts]=useState<{id:string;lane:string;batch?:number;message:string}[]>([]);
  const [exceptionPickerOpen,setExceptionPickerOpen]=useState(false);
  const [selectedExceptionIds,setSelectedExceptionIds]=useState<string[]>([]);
- const [exceptionBoxExpanded,setExceptionBoxExpanded]=useState(false);\n const [showItemAdvanced,setShowItemAdvanced]=useState(false);
+ const [exceptionBoxExpanded,setExceptionBoxExpanded]=useState(false);
+ const [showItemAdvanced,setShowItemAdvanced]=useState(false);
  const audioCtxRef=useRef<AudioContext|null>(null);
  const notifiedTimersRef=useRef<Set<string>>(new Set());
  const lib:any[]=LIVESTOCK_LIBRARY.filter((x:any)=>x.type===tank.type);
