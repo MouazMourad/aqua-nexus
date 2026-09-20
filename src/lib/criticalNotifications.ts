@@ -5,8 +5,6 @@ export async function showCriticalAquariumNotification(title:string,body:string,
       const registration=await navigator.serviceWorker.ready;
       await registration.showNotification(title,{
         body,tag,renotify:true,requireInteraction:true,
-        icon:"/icons/icon-192.png",
-        badge:"/icons/icon-192.png",
         data:{url:"/"}
       } as NotificationOptions);
       return true;
