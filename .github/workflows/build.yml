@@ -2,7 +2,7 @@ name: Aqua Nexus Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, hardening/release-candidate]
   pull_request:
     branches: [main]
 
@@ -29,7 +29,7 @@ jobs:
           path: package-lock.json
           retention-days: 1
       - name: Commit generated lockfile to release branch
-        if: github.event_name == 'pull_request' && github.head_ref == 'hardening/release-candidate'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/hardening/release-candidate'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -41,7 +41,7 @@ jobs:
           gh api --method PUT "repos/${{ github.repository }}/contents/package-lock.json" \
             -f message="Add reproducible npm lockfile" \
             -f content="$CONTENT" \
-            -f branch="${{ github.head_ref }}"
+            -f branch="${{ github.ref_name }}"
       - name: Regression tests
         run: npm test
       - name: Build
