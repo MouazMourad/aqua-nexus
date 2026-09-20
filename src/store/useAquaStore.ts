@@ -10,6 +10,7 @@ import { chemistryHealthAssessment, maintenanceHealth } from "@/domain/health";
 import { tankStateScore,tankStateView } from "@/domain/tankIntelligence";
 import { tankIntelligenceCore } from "@/domain/intelligenceCore";
 import { deriveIntelligenceEvents,mergeIntelligenceEvents,reconcileGuidanceActions } from "@/domain/eventIntelligence";
+import { deriveExtendedIntelligenceEvents } from "@/domain/extendedEventIntelligence";
 
 interface AquaStore extends AquaState {
   setLanguage: (language: Language) => void;
@@ -97,6 +98,10 @@ function changeReason(before:Tank,after:Tank):ChangeReason|null{
   if(after.waterChanges.length!==before.waterChanges.length)return {ar:"تم تسجيل تغيير ماء.",en:"A water change was logged."};
   if(after.dosing.length!==before.dosing.length)return {ar:"تم تسجيل جرعة جديدة.",en:"A dosing event was logged."};
   if(after.feeding.length!==before.feeding.length)return {ar:"تم تسجيل تغذية.",en:"A feeding event was logged."};
+  if((after.plantCare?.length??0)!==(before.plantCare?.length??0))return {ar:"تم تسجيل إجراء رعاية للنباتات.",en:"A plant-care action was logged."};
+  if((after.rodiServiceEvents?.length??0)!==(before.rodiServiceEvents?.length??0))return {ar:"تم تسجيل صيانة لنظام RO/DI.",en:"RO/DI service was logged."};
+  if(fingerprint(after.doserChannels.map(x=>[x.id,x.material,x.capacityMl,x.currentMl,x.consumption,x.period]))!==fingerprint(before.doserChannels.map(x=>[x.id,x.material,x.capacityMl,x.currentMl,x.consumption,x.period])))return {ar:"تغير إعداد أو مستوى إحدى قنوات الدوزر.",en:"A doser channel configuration or level changed."};
+  if(before.ecosystemProfile!==after.ecosystemProfile||before.plantedMode!==after.plantedMode||before.substrateType!==after.substrateType||before.substrateStartedAt!==after.substrateStartedAt||before.systemVolumeLiters!==after.systemVolumeLiters)return {ar:"تغيرت معلومات تشغيلية أساسية للحوض.",en:"Core tank operating information changed."};
   if(fingerprint(after.quarantine.map(x=>[x.id,x.status,x.reason,x.dosesGiven,x.nextDoseAt]))!==fingerprint(before.quarantine.map(x=>[x.id,x.status,x.reason,x.dosesGiven,x.nextDoseAt])))return {ar:"تغيرت حالة الحجر أو العلاج.",en:"Quarantine or treatment status changed."};
   if(fingerprint((after.emergencySessions??[]).map(x=>[x.id,x.status,x.completedSteps.length]))!==fingerprint((before.emergencySessions??[]).map(x=>[x.id,x.status,x.completedSteps.length])))return {ar:"تغيرت حالة بروتوكول طوارئ.",en:"Emergency protocol status changed."};
   if(fingerprint((after.acclimationSessions??[]).map(x=>[x.id,x.status,x.completedAt]))!==fingerprint((before.acclimationSessions??[]).map(x=>[x.id,x.status,x.completedAt])))return {ar:"تغيرت حالة جلسة الإقلمة.",en:"Acclimation session status changed."};
@@ -182,7 +187,7 @@ export const useAquaStore = create<AquaStore>()(
           if(t.id!==tankId)return t;
           const nextRaw=typeof updater==="function" ? updater(t) : {...t,...updater};
           let next=normalize(nextRaw);
-          const events=deriveIntelligenceEvents(t,next);
+          const events=[...deriveIntelligenceEvents(t,next),...deriveExtendedIntelligenceEvents(t,next)];
           if(events.length)next={...next,intelligenceEvents:mergeIntelligenceEvents(t.intelligenceEvents,events)};
           const core=tankIntelligenceCore(next);
           next={...next,guidanceActions:reconcileGuidanceActions(t.guidanceActions,core.guidanceActions,next.intelligenceEvents)};
@@ -194,7 +199,7 @@ export const useAquaStore = create<AquaStore>()(
         tanks:state.tanks.map(t=>{
           if(t.id!==tankId)return t;
           let next=normalize({...t,chemistry:[reading,...(t.chemistry??[])]});
-          const events=deriveIntelligenceEvents(t,next);
+          const events=[...deriveIntelligenceEvents(t,next),...deriveExtendedIntelligenceEvents(t,next)];
           next={...next,intelligenceEvents:mergeIntelligenceEvents(t.intelligenceEvents,events)};
           const core=tankIntelligenceCore(next);
           next={...next,guidanceActions:reconcileGuidanceActions(t.guidanceActions,core.guidanceActions,next.intelligenceEvents)};
