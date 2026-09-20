@@ -27,6 +27,8 @@ import { buildVisionTriage } from "@/domain/visionIntelligence";
 import { sanitizeVisionQuestion,validateVisionDataUrl } from "@/domain/visionRequestSafety";
 import { biologicalCycleStatus,cycleRelevantMaintenanceTask,isCyclePageAllowed } from "@/domain/biologicalCycle";
 import { biologicalCycleKnowledgeSnapshot } from "@/domain/biologicalCycleKnowledge";
+import { isAquariumScopedQuestion } from "@/domain/aquaAIScope";
+import { diseaseEntriesFor,diseaseGroupCounts } from "@/domain/diseaseCatalog";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -72,8 +74,35 @@ describe("Local Best AI behavior regression",()=>{
     const a=aquaAIAnswer("شو وضع الحوض بشكل عام",tank,"dashboard");
     expect(a.summaryAr).toMatch(/الصحة|الحوض|النظام/);
   });
+  it("keeps off-topic questions outside the aquarium scope with a playful redirect",()=>{
+    expect(isAquariumScopedQuestion("مين فاز بكأس العالم؟",tank)).toBe(false);
+    const a=aquaAIAnswer("مين فاز بكأس العالم؟",tank,"dashboard");
+    expect(a.titleAr).toMatch(/الحوض/);
+    expect(a.summaryAr).toMatch(/😄/);
+    expect(a.action?.page).toBe("dashboard");
+  });
+  it("still accepts aquarium questions and current livestock names",()=>{
+    expect(isAquariumScopedQuestion("شو وضع السكيمر؟",tank)).toBe(true);
+    const named=tank.livestock[0]?.name;
+    if(named)expect(isAquariumScopedQuestion("شو وضع "+named+"؟",tank)).toBe(true);
+  });
 });
 
+
+describe("Disease taxonomy regression",()=>{
+  it("returns marine fish diseases when fish category is selected",()=>{
+    const rows=diseaseEntriesFor("marine","fish","");
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every(x=>x.group==="fish")).toBe(true);
+  });
+  it("preserves non-fish disease categories instead of returning an empty catalog",()=>{
+    const marine=diseaseGroupCounts("marine");
+    expect(marine.crustacean).toBeGreaterThan(0);
+    expect(marine.coral).toBeGreaterThan(0);
+    const freshwater=diseaseGroupCounts("freshwater");
+    expect(freshwater.plant).toBeGreaterThan(0);
+  });
+});
 
 describe("Core system regression",()=>{
   it("recurring maintenance becomes due again on its next cycle",()=>{
