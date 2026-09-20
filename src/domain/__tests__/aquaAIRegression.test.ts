@@ -549,6 +549,17 @@ describe("Backup and taxonomy hardening",()=>{
     expect(inventorySubcategoryOptions("fertilizer").map(x=>x.value)).toContain("potassium");
     expect(inventorySubcategoryOptions("dosing").map(x=>x.value)).toContain("balanced_reef");
   });
+
+  it("rejects a backup created by a newer unsupported schema",()=>{
+    const source=structuredClone(demoMarineTank);
+    expect(validateBackupPayload({schemaVersion:999,language:"en",selectedTankId:source.id,tanks:[source]}).ok).toBe(false);
+  });
+  it("rejects nested corrupted inventory before restore",()=>{
+    const source=structuredClone(demoMarineTank);
+    source.inventory=[{id:"bad-stock",name:"Bad stock",quantity:-5,unit:"g",minimum:0} as any];
+    const result=validateBackupPayload({schemaVersion:10,language:"en",selectedTankId:source.id,tanks:[source]});
+    expect(result.ok).toBe(false);
+  });
 });
 
 describe("Operations consumables regression",()=>{
