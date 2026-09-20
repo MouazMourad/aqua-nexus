@@ -17,6 +17,7 @@ import { biologicalCycleStatus } from "./biologicalCycle";
 import { buildAquaAIQueryPlan } from "./aquaAIQueryPlan";
 import { answerBiologicalCycleQuestion } from "./biologicalCycleKnowledge";
 import { isAquariumScopedQuestion,offTopicAquaAnswer } from "./aquaAIScope";
+import { tankLearningMaturity } from "./tankPatterns";
 
 export type AquaAIConfidence="low"|"medium"|"high";
 export type AquaAIPage="dashboard"|"chemistry"|"maintenance"|"equipment"|"livestock"|"timeline"|"dosing"|"quarantine"|"emergency"|"rodi"|"journal"|"acclimation"|"inventory"|"feeding"|"waterchange"|"expenses"|"sump"|"diseases"|"alerts";
@@ -158,15 +159,16 @@ function parameterAnswer(tank:Tank,param:Param):AquaAIAnswer{
 function memoryAnswer(tank:Tank):AquaAIAnswer{
   const memory=biologicalMemory(tank);
   const links=eventChemistryLinks(tank);
+  const maturity=tankLearningMaturity(tank);
   const rows=memory.slice(0,4);
   return {
     titleAr:"الذاكرة البيولوجية للحوض",titleEn:"Tank biological memory",
-    summaryAr:rows.length?"أربط القرارات السابقة بالأثر الذي ظهر بعدها على الصحة والكيمياء، مع اعتبارها علاقة زمنية لا إثباتاً للسببية.":"التاريخ ما يزال قصيراً. كل جرعة وتغيير ماء وصيانة وقراءة جديدة تقوّي ذاكرة الحوض.",
-    summaryEn:rows.length?"I am linking past actions with the health and chemistry changes that followed, treating these as temporal associations rather than proof of causation.":"The history is still short. Each dose, water change, maintenance action and new reading strengthens the tank memory.",
+    summaryAr:rows.length?`${maturity.ar} أربط القرارات السابقة بما ظهر بعدها على الصحة والكيمياء كعلاقة زمنية، مو كإثبات سببية.`:maturity.ar,
+    summaryEn:rows.length?`${maturity.en} I link past actions with later health and chemistry changes as temporal associations, not proof of causation.`:maturity.en,
     detailsAr:rows.map(x=>x.ar),detailsEn:rows.map(x=>x.en),
-    evidenceAr:[`${memory.length} نمط متعلم`,`${links.length} ربط كيميائي مع أحداث`],
-    evidenceEn:[`${memory.length} learned pattern(s)`,`${links.length} chemistry-event link(s)`],
-    confidence:confidence(tank),action:{page:"timeline",ar:"افتح الخط الزمني",en:"Open timeline"}
+    evidenceAr:[`نضج التعلم ${maturity.score}% • ${maturity.level}`,`${maturity.measuredReadings} قراءة عبر ${maturity.observedDays} يوم`,`${maturity.repeatedPatterns} نمط استجابة متكرر`,`${maturity.linkedEvents} ربط كيميائي مع أحداث`],
+    evidenceEn:[`Learning maturity ${maturity.score}% • ${maturity.level}`,`${maturity.measuredReadings} readings across ${maturity.observedDays} days`,`${maturity.repeatedPatterns} repeated response pattern(s)`,`${maturity.linkedEvents} chemistry-event link(s)`],
+    confidence:maturity.confidence,action:{page:"timeline",ar:"افتح الخط الزمني",en:"Open timeline"}
   };
 }
 
