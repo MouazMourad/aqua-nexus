@@ -15,6 +15,7 @@ import { tankIntelligenceCore } from "./intelligenceCore";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
 import { biologicalCycleStatus } from "./biologicalCycle";
 import { buildAquaAIQueryPlan } from "./aquaAIQueryPlan";
+import { answerBiologicalCycleQuestion } from "./biologicalCycleKnowledge";
 
 export type AquaAIConfidence="low"|"medium"|"high";
 export type AquaAIPage="dashboard"|"chemistry"|"maintenance"|"equipment"|"livestock"|"timeline"|"dosing"|"quarantine"|"emergency"|"rodi"|"journal"|"acclimation"|"inventory"|"feeding"|"waterchange"|"expenses"|"sump"|"diseases"|"alerts";
@@ -493,14 +494,26 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   const q=(question||"").trim().toLowerCase();
   const intent=parseAquaQuestion(question);
   const cycle=biologicalCycleStatus(tank);
+  const explicitCycleQuestion=/cycle|cycling|nitrogen cycle|دورة بيولوج|الدورة البيولوج|دورة النيتروجين/.test(q);
+  const cycleTroubleshootingQuestion=cycle.active&&/ammonia|nh3|nh4|nitrite|no2|nitrate|no3|امونيا|أمونيا|نتريت|نترات|chlorine|chloramine|كلور|bacteria|بكتيريا|cloudy|bloom|عكر|diatom|دياتوم|water change|تغيير مي|تغيير ماء|filter|فلتر|oxygen|اكسج|أكسج|power|كهربا/.test(q);
+  if(explicitCycleQuestion||cycleTroubleshootingQuestion){
+    const k=answerBiologicalCycleQuestion(tank,question);
+    return{
+      titleAr:k.titleAr,titleEn:k.titleEn,
+      summaryAr:k.summaryAr,summaryEn:k.summaryEn,
+      detailsAr:k.detailsAr,detailsEn:k.detailsEn,
+      evidenceAr:k.evidenceAr,evidenceEn:k.evidenceEn,
+      confidence:"high",
+      action:{page:k.actionPage as AquaAIPage,ar:cycle.active?cycle.nextAr:"افتح الصفحة المرتبطة للمراجعة",en:cycle.active?cycle.nextEn:"Open the related page to review"}
+    };
+  }
   if(cycle.active){
     const plan=buildAquaAIQueryPlan(intent);
-    const cycleQuestion=/cycle|cycling|nitrogen|ammonia|nitrite|nitrate|دورة|امونيا|أمونيا|نتريت|نترات/.test(q);
     const dosingQuestion=/جرعه|جرعة|جرعات|دوز|dose|dosing|supplement|مكمل/.test(q);
     const allowedDomains=new Set(["system","chemistry","equipment","maintenance","emergency","rodi","inventory","water","sump","journal"]);
-    const mustStayInCycle=cycleQuestion||dosingQuestion||plan.primary==="system"||!allowedDomains.has(plan.primary)||intent.mode==="canAdd"||intent.mode==="dose";
+    const mustStayInCycle=dosingQuestion||plan.primary==="system"||!allowedDomains.has(plan.primary)||intent.mode==="canAdd"||intent.mode==="dose";
     if(mustStayInCycle){
-      const blocked=!cycleQuestion&&plan.primary!=="system"&&(!allowedDomains.has(plan.primary)||intent.mode==="canAdd"||intent.mode==="dose");
+      const blocked=plan.primary!=="system"&&(!allowedDomains.has(plan.primary)||intent.mode==="canAdd"||intent.mode==="dose");
       return{
         titleAr:`الدورة البيولوجية — اليوم ${cycle.day}`,titleEn:`Biological cycle — day ${cycle.day}`,
         summaryAr:(blocked||dosingQuestion)?`هالعملية موقوفة مؤقتاً لأن الحوض ضمن الدورة البيولوجية. ${cycle.nextAr}`:`${cycle.nextAr}`,
