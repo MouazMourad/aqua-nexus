@@ -1,6 +1,6 @@
 import { NextRequest,NextResponse } from "next/server";
 import type { Tank } from "@/domain/types";
-import { deleteTank,getTank,upsertTank } from "@/server/tankRepository";
+import { deleteTankVersioned,getTank,upsertTank } from "@/server/tankRepository";
 import { workspaceKey } from "@/server/workspace";
 
 export const runtime="nodejs";
@@ -30,7 +30,11 @@ export async function PUT(request:NextRequest,{params}:Params){
 export async function DELETE(request:NextRequest,{params}:Params){
   try{
     const workspace=workspaceKey(request),{id}=await params;
-    const deleted=await deleteTank(workspace,id);
-    return NextResponse.json({ok:true,deleted});
+    const raw=request.nextUrl.searchParams.get("expectedVersion");
+    const expectedVersion=raw!==null&&raw!==""?Number(raw):undefined;
+    if(expectedVersion!==undefined&&!Number.isFinite(expectedVersion))return NextResponse.json({ok:false,error:"expectedVersion must be numeric"},{status:400});
+    const result=await deleteTankVersioned(workspace,id,expectedVersion);
+    if(result.conflict)return NextResponse.json({ok:false,conflict:true,current:result.current},{status:409});
+    return NextResponse.json({ok:true,deleted:result.deleted});
   }catch(error){return fail(error);}
 }
