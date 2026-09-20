@@ -89,24 +89,28 @@ test("visual health intake is discoverable from diseases, analyzes locally and e
   await expect(visual).toContainText(/مزود AI Vision|external AI Vision provider|رأي ثانٍ|second opinion/,{timeout:15_000});
 });
 
-test("setup defaults do not masquerade as stocking evidence",async({page})=>{
+test("new wizard tank enters biological cycling and locks non-cycle workflows",async({page})=>{
   await page.goto("/");
   await page.locator(".empty-tank-cta").click();
   const modal=page.locator(".modal-card");
   await expect(modal).toBeVisible();
-  await modal.locator('input').first().fill("E2E Safety Tank");
+  await modal.locator('input').first().fill("E2E Cycling Tank");
   for(let i=0;i<6;i++){
     await modal.locator(".modal-actions .btn.primary").click();
     await page.waitForTimeout(40);
   }
+  await expect(modal).toContainText(/الدورة البيولوجية ستبدأ تلقائياً|Biological Cycling Mode will start automatically/);
   await modal.locator(".modal-actions .btn.primary").click();
-  await expect(page.locator(".progressive-dashboard")).toBeVisible();
 
-  await page.locator('[data-aqua-page="livestock"]').click();
-  await page.locator(".page-grid button.btn.primary").first().click();
-  const addModal=page.locator(".modal-card");
-  await expect(addModal).toBeVisible();
-  const selects=addModal.locator("select");
-  await selects.nth(1).selectOption({index:1});
-  await expect(addModal).toContainText(/بيانات غير كافية|Insufficient evidence|معلومة ناقصة|Missing evidence/);
+  await expect(page.locator(".cycle-panel")).toContainText(/الدورة البيولوجية|Biological cycle/);
+  await expect(page.locator(".cycle-panel")).toContainText(/اليوم 1|day 1/i);
+  await expect(page.locator('[data-aqua-page="livestock"]')).toBeDisabled();
+  await expect(page.locator('[data-aqua-page="feeding"]')).toBeDisabled();
+  await expect(page.locator('[data-aqua-page="dosing"]')).toBeDisabled();
+  await expect(page.locator('[data-aqua-page="chemistry"]')).toBeEnabled();
+  await expect(page.locator('[data-aqua-page="maintenance"]')).toBeEnabled();
+
+  await page.locator('[data-aqua-page="maintenance"]').click();
+  await expect(page.locator(".maintenance-page")).toContainText(/Cycle-only mode/);
+  await expect(page.locator(".maintenance-page")).toContainText(/الدورة البيولوجية|Biological cycle/);
 });
