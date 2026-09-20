@@ -38,6 +38,7 @@ import { deriveExtendedIntelligenceEvents } from "@/domain/extendedEventIntellig
 import { buildTankBrainSnapshot } from "@/domain/tankBrainSnapshot";
 import { validateRodiEntry } from "@/domain/inputSanity";
 import { photoNeedsExternalization } from "@/lib/photoStorage";
+import { interventionDensityAlert,interventionGate } from "@/domain/interventionSafety";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -738,5 +739,35 @@ describe("Full audit hardening regressions",()=>{
     const small:any={...large,id:"p2",dataUrl:"data:image/jpeg;base64,"+"A".repeat(1000)};
     expect(photoNeedsExternalization(large)).toBe(true);
     expect(photoNeedsExternalization(small)).toBe(false);
+  });
+});
+
+
+describe("Whole-tank intervention safety",()=>{
+  it("warns before stacking a second major intervention",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.intelligenceEvents=[{id:"e1",timestamp:new Date().toISOString(),kind:"action",domain:"waterChange",verb:"water_changed",value:20,unit:"%",confidence:100,sourcePage:"waterchange",textAr:"تغيير ماء",textEn:"Water change"}];
+    const gate=interventionGate(t,"correctiveDosing");
+    expect(gate.level).toBe("warn");
+    expect(gate.recent).toHaveLength(1);
+  });
+  it("escalates several different recent interventions",()=>{
+    const now=new Date().toISOString(),t=structuredClone(demoMarineTank);
+    t.intelligenceEvents=[
+      {id:"e1",timestamp:now,kind:"action",domain:"waterChange",verb:"water_changed",value:20,unit:"%",confidence:100,sourcePage:"waterchange",textAr:"تغيير ماء",textEn:"Water change"},
+      {id:"e2",timestamp:now,kind:"action",domain:"sump",verb:"media_replaced",confidence:100,sourcePage:"sump",textAr:"ميديا",textEn:"Media"},
+      {id:"e3",timestamp:now,kind:"action",domain:"livestock",verb:"added",confidence:100,sourcePage:"livestock",textAr:"كائن",textEn:"Livestock"}
+    ];
+    const gate=interventionGate(t,"correctiveDosing");
+    expect(gate.level).toBe("danger");
+    expect(interventionDensityAlert(t)?.level).toBe("danger");
+  });
+  it("does not hard-block documented emergency work",()=>{
+    const now=new Date().toISOString(),t=structuredClone(demoMarineTank);
+    t.intelligenceEvents=[{id:"e1",timestamp:now,kind:"action",domain:"waterChange",verb:"water_changed",confidence:100,sourcePage:"waterchange",textAr:"تغيير ماء",textEn:"Water change"}];
+    t.emergencySessions=[{id:"em1",protocolId:"x",titleAr:"طوارئ",titleEn:"Emergency",startedAt:now,status:"active",completedSteps:[]} as any];
+    const gate=interventionGate(t,"correctiveDosing");
+    expect(gate.blocked).toBe(false);
+    expect(gate.en).toMatch(/emergency/i);
   });
 });
