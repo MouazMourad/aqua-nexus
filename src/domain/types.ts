@@ -411,6 +411,10 @@ export interface DosingLog {
   inventoryItemId?: string;
   reason?: string;
   sourceReadingTimestamp?: string;
+  /** System volume snapshot used when this corrective dose was calculated. */
+  systemVolumeLiters?: number;
+  /** Actual execution timestamp; for multi-step plans this advances on every executed step. */
+  lastExecutedAt?: string;
   plannedSteps?: number;
   steps?: number;
   perStep?: number;
