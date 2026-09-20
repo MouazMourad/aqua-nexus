@@ -146,26 +146,42 @@ export function tankStateView(tank:Tank):TankStateView {
   return {score,band,ar:text.ar,en:text.en,drivers:drivers.slice(0,8)};
 }
 
-function nearestEvent(tank:Tank,timestamp:string,maxHours=48){
+function nearestEventFrom(events:TimelineEvent[],timestamp:string,maxHours=48){
   const target=new Date(timestamp).getTime();
   if(!Number.isFinite(target))return undefined;
   let best:TimelineEvent|undefined;
   let bestDistance=Infinity;
-  for(const event of tank.timeline){
+  for(const event of events){
     const d=Math.abs(new Date(event.timestamp).getTime()-target);
     if(Number.isFinite(d)&&d<bestDistance&&d<=maxHours*3600000){best=event;bestDistance=d;}
   }
   return best;
 }
+function recentTimelineEvents(tank:Tank,limit=1000){
+  return [...tank.timeline]
+    .filter(x=>Number.isFinite(new Date(x.timestamp).getTime()))
+    .sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime())
+    .slice(0,limit);
+}
+function nearestEvent(tank:Tank,timestamp:string,maxHours=48){
+  return nearestEventFrom(recentTimelineEvents(tank),timestamp,maxHours);
+}
 
 function estimatedPoints(tank:Tank):HealthTimelinePoint[]{
-  // Historical estimates must not be recomputed from today's equipment,
-  // livestock or maintenance state. A chemistry-only estimate is explicitly
-  // marked estimated; real HealthSnapshots remain the authoritative history.
-  return tank.chemistry.filter(reading=>!reading.usingDefaults).map((reading,index)=>{
-    const originalIndex=tank.chemistry.indexOf(reading);
+  // Dashboard/forecast rendering must stay bounded even after years of use.
+  // Full chemistry history remains stored; only a recent working window is
+  // evaluated here because the public timeline itself is capped to 60 points.
+  const indexByReading=new Map(tank.chemistry.map((reading,index)=>[reading,index]));
+  const events=recentTimelineEvents(tank,1000);
+  const measured=tank.chemistry
+    .filter(reading=>!reading.usingDefaults&&Number.isFinite(new Date(reading.timestamp).getTime()))
+    .slice()
+    .sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime())
+    .slice(0,240);
+  return measured.map((reading,index)=>{
+    const originalIndex=indexByReading.get(reading)??0;
     const chem=chemistryHistoryScore(tank,originalIndex)??0;
-    const event=nearestEvent(tank,reading.timestamp);
+    const event=nearestEventFrom(events,reading.timestamp);
     return {
       id:`chem-${index}-${reading.timestamp}`,
       timestamp:reading.timestamp,
@@ -182,10 +198,12 @@ function estimatedPoints(tank:Tank):HealthTimelinePoint[]{
 }
 
 function snapshotPoints(tank:Tank):HealthTimelinePoint[]{
-  return (tank.healthSnapshots??[]).map((s:HealthSnapshot)=>({
+  const events=recentTimelineEvents(tank,1000);
+  const eventById=new Map(events.map(e=>[e.id,e]));
+  return (tank.healthSnapshots??[]).slice(-365).map((s:HealthSnapshot)=>({
     id:s.id,timestamp:s.timestamp,score:s.score,chemistry:s.chemistry,maintenance:s.maintenance,
     source:"snapshot" as const,reasonAr:s.reasonAr,reasonEn:s.reasonEn,delta:0,
-    event:s.relatedEventId?tank.timeline.find(e=>e.id===s.relatedEventId):nearestEvent(tank,s.timestamp,24)
+    event:s.relatedEventId?eventById.get(s.relatedEventId):nearestEventFrom(events,s.timestamp,24)
   }));
 }
 
