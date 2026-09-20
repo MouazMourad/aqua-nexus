@@ -1,4 +1,5 @@
 import type { Tank } from "./types";
+import { buildTankBrainSnapshot } from "./tankBrainSnapshot";
 import { bioload,chemistryHealth,maintenanceHealth } from "./health";
 import { tankForecast,tankStateView } from "./tankIntelligence";
 import { biologicalMemory,eventChemistryLinks,proactivePredictions,tankMood } from "./tankLearning";
@@ -20,6 +21,7 @@ import { biologicalCycleKnowledgeSnapshot } from "./biologicalCycleKnowledge";
 export interface TankAIContext {
   schema:"aqua-nexus-ai-context/v1";
   generatedAt:string;
+  brain:ReturnType<typeof buildTankBrainSnapshot>;
   tank:{id:string;name:string;type:string;status:string;ageMonths?:number;systemVolumeLiters:number};
   biologicalCycle:ReturnType<typeof biologicalCycleStatus>;
   biologicalCycleKnowledge:ReturnType<typeof biologicalCycleKnowledgeSnapshot>;
@@ -47,6 +49,7 @@ export function buildTankAIContext(tank:Tank):TankAIContext{
   return {
     schema:"aqua-nexus-ai-context/v1",
     generatedAt:new Date().toISOString(),
+    brain:buildTankBrainSnapshot(tank),
     tank:{id:tank.id,name:tank.name,type:tank.type,status:tank.status,ageMonths:tank.ageMonths,systemVolumeLiters:tank.systemVolumeLiters},
     biologicalCycle:cycle,
     biologicalCycleKnowledge:cycleKnowledge,
