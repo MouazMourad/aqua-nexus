@@ -25,6 +25,7 @@ import { validateBackupPayload,validateTankImportPayload } from "@/domain/backup
 import { visionDiseaseCandidates } from "@/domain/visionDifferential";
 import { buildVisionTriage } from "@/domain/visionIntelligence";
 import { sanitizeVisionQuestion,validateVisionDataUrl } from "@/domain/visionRequestSafety";
+import { biologicalCycleStatus,cycleRelevantMaintenanceTask,isCyclePageAllowed } from "@/domain/biologicalCycle";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -288,6 +289,61 @@ describe("AI Vision safety and differential regression",()=>{
     const candidates=visionDiseaseCandidates(t,"coral1",["tissueLoss"]);
     expect(candidates.some(x=>x.id==="c_tissue"||x.id==="c_brownjelly"||x.id==="c_rtn")).toBe(true);
     expect(candidates.every(x=>x.score>0)).toBe(true);
+  });
+});
+
+describe("Biological cycling gate",()=>{
+  it("does not treat elapsed time alone as cycle readiness",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.isTraining=false;t.status="cycling";t.createdAt=new Date(Date.now()-35*86400000).toISOString();
+    t.biologicalCycle={startedAt:t.createdAt};
+    t.chemistry=[];
+    const state=biologicalCycleStatus(t);
+    expect(state.active).toBe(true);
+    expect(state.day).toBeGreaterThanOrEqual(35);
+    expect(state.ready).toBe(false);
+  });
+  it("unlocks only after source evidence and two spaced clear marine readings",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.isTraining=false;t.status="cycling";
+    const now=Date.now();
+    t.createdAt=new Date(now-4*86400000).toISOString();
+    t.biologicalCycle={startedAt:t.createdAt,sourceAddedAt:new Date(now-3*86400000).toISOString(),method:"fishless"};
+    t.chemistry=[
+      {timestamp:new Date(now-1*3600000).toISOString(),usingDefaults:false,values:{NH3:0,NO3:8}},
+      {timestamp:new Date(now-14*3600000).toISOString(),usingDefaults:false,values:{NH3:0,NO3:6}},
+      {timestamp:new Date(now-30*3600000).toISOString(),usingDefaults:false,values:{NH3:1.0,NO3:0}}
+    ];
+    const state=biologicalCycleStatus(t);
+    expect(state.processingEvidence).toBe(true);
+    expect(state.twoConsecutiveClear).toBe(true);
+    expect(state.ready).toBe(true);
+  });
+  it("requires nitrite clearance for freshwater confirmation",()=>{
+    const t=structuredClone(demoFreshwaterTank);
+    t.isTraining=false;t.status="cycling";
+    const now=Date.now();
+    t.biologicalCycle={startedAt:new Date(now-3*86400000).toISOString(),sourceAddedAt:new Date(now-2*86400000).toISOString()};
+    t.chemistry=[
+      {timestamp:new Date(now-1*3600000).toISOString(),usingDefaults:false,values:{NH3:0,NO2:.10,NO3:15}},
+      {timestamp:new Date(now-14*3600000).toISOString(),usingDefaults:false,values:{NH3:0,NO2:0,NO3:12}},
+      {timestamp:new Date(now-30*3600000).toISOString(),usingDefaults:false,values:{NH3:.5,NO2:.3,NO3:2}}
+    ];
+    expect(biologicalCycleStatus(t).ready).toBe(false);
+  });
+  it("locks stocking and non-cycle workflow pages during cycling",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.isTraining=false;t.status="cycling";t.biologicalCycle={startedAt:new Date().toISOString()};
+    expect(stockingReadiness(t).state).toBe("not_now");
+    expect(isCyclePageAllowed("chemistry")).toBe(true);
+    expect(isCyclePageAllowed("emergency")).toBe(true);
+    expect(isCyclePageAllowed("livestock")).toBe(false);
+    expect(isCyclePageAllowed("feeding")).toBe(false);
+    expect(isCyclePageAllowed("dosing")).toBe(false);
+  });
+  it("keeps only cycle-related maintenance tasks in cycle-only mode",()=>{
+    expect(cycleRelevantMaintenanceTask({id:"c",title:"فحص كيمياء الدورة البيولوجية",cadence:"weekly",done:false,sourceDomain:"system",sourceId:"cycle:chemistry"})).toBe(true);
+    expect(cycleRelevantMaintenanceTask({id:"x",title:"Clean display glass",cadence:"weekly",done:false})).toBe(false);
   });
 });
 
