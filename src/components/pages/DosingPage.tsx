@@ -12,6 +12,7 @@ import { latestParameterSample,validateChemistryValue,validateDosingTarget } fro
 import { correctiveDosingInventory,inventoryProfile,routineDosingInventory } from "@/domain/inventoryIntelligence";
 import { requiresPostDoseRetest } from "@/domain/dosingSafety";
 import { claimCriticalAction } from "@/lib/actionGuard";
+import { interventionGate } from "@/domain/interventionSafety";
 
 const colors=["#27c2dc","#62d48f","#f6c85f","#c877ff","#ff7e79","#4b8bff"];
 function idealTarget(tank:Tank,param:DosingParameter){const meta:any=chemistryCatalogForTank(tank)?.[param];return meta?.ideal?(Number(meta.ideal[0])+Number(meta.ideal[1]))/2:param==="KH"?8:param==="Ca"?430:1325;}
@@ -35,6 +36,12 @@ export function DosingPage({tank}:{tank:Tank}) {
  function log(){
   if(!calc.valid||!dosingReady||current===undefined||targetCheck.blocked)return;
   if(targetCheck.level==="warn"&&!window.confirm(lang==="ar"?`${targetCheck.ar} هل تريد المتابعة ضمن المجال الآمن؟`:`${targetCheck.en} Continue within the safe range?`))return;
+  const intervention=interventionGate(tank,"correctiveDosing");
+  if(intervention.level==="warn"&&!window.confirm(lang==="ar"?intervention.ar+" هل تريد المتابعة بعد مراجعة السبب؟":intervention.en+" Continue after reviewing the reason?"))return;
+  if(intervention.level==="danger"){
+   if(!window.confirm(lang==="ar"?"⚠️ "+intervention.ar+" هل يوجد سبب واضح يستدعي الجرعة الآن؟":"⚠️ "+intervention.en+" Is there a clear reason this dose is needed now?"))return;
+   if(!window.confirm(lang==="ar"?"تأكيد أخير: نفّذ عامل واحد فقط قدر الإمكان، ثم أعد القياس قبل أي تدخل كبير إضافي. متابعة؟":"Final confirmation: change only one major factor when possible, then retest before another major intervention. Continue?"))return;
+  }
   const stockItem=inventoryItemId?correctiveStock.find(x=>x.id===inventoryItemId):undefined;
   if(inventoryItemId&&!stockItem){window.alert(lang==="ar"?"مادة المخزون المختارة لا تطابق نوع الجرعة الحالية. أعد اختيار المادة.":"The selected inventory item does not match the current dosing setup. Select it again.");return}
   if(stockItem&&stockItem.unit.toLowerCase()!==calc.unit.toLowerCase()){window.alert(lang==="ar"?`وحدة المخزون ${stockItem.unit} لا تطابق وحدة الجرعة ${calc.unit}.`:`Inventory unit ${stockItem.unit} does not match dose unit ${calc.unit}.`);return}
