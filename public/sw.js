@@ -1,4 +1,4 @@
-const CACHE_NAME="aqua-nexus-pwa-v5";
+const CACHE_NAME="aqua-nexus-pwa-v6";
 const APP_SHELL=["/","/manifest.webmanifest"];
 
 self.addEventListener("install",event=>{
