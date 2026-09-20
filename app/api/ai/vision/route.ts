@@ -11,7 +11,9 @@ const WINDOW_MS=60_000,MAX_REQUESTS=8;
 const buckets=new Map<string,{startedAt:number;count:number}>();
 
 function allowVisionRequest(key:string){
-  const now=Date.now(),entry=buckets.get(key);
+  const now=Date.now();
+  if(buckets.size>2000)for(const [bucketKey,value] of buckets)if(now-value.startedAt>=WINDOW_MS)buckets.delete(bucketKey);
+  const entry=buckets.get(key);
   if(!entry||now-entry.startedAt>=WINDOW_MS){buckets.set(key,{startedAt:now,count:1});return true}
   if(entry.count>=MAX_REQUESTS)return false;
   entry.count++;return true;
