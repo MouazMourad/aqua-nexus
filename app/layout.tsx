@@ -18,6 +18,7 @@ export const metadata: Metadata = {
   title: "Aqua Nexus 3D",
   description: "Smart Aquarium Management Platform",
   manifest: "/manifest.webmanifest",
+  icons: { icon: "/aqua-nexus-icon.svg", apple: "/aqua-nexus-icon.svg" },
 };
 
 export const viewport: Viewport = {
