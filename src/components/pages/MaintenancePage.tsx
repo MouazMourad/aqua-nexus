@@ -36,7 +36,8 @@ export function MaintenancePage({tank}:{tank:Tank}) {
   if(task?.sourceDomain==="dosing"&&task.sourceId?.startsWith("dose-step:")){
     const parts=task.sourceId.split(":"),doseId=parts[1],step=Number(parts[2]);
     const dose=tank.dosing.find(x=>x.id===doseId);
-    if(!dose||!dose.steps||!dose.perStep||!Number.isFinite(step)){window.alert(bi(lang,"تعذر ربط مهمة الجرعة بخطة الجرعات. افتح صفحة الجرعات وراجع الخطة.","This dose task is no longer linked correctly. Open Dosing and review the plan."));return}
+    if(!dose||!totalSteps||!perStep||!Number.isFinite(step)){window.alert(bi(lang,"تعذر ربط مهمة الجرعة بخطة الجرعات. افتح صفحة الجرعات وراجع الخطة.","This dose task is no longer linked correctly. Open Dosing and review the plan."));return}
+    const totalSteps=dose.steps,perStep=dose.perStep;
     const expected=(dose.stepIndex??0)+1;
     if(step!==expected){window.alert(bi(lang,`يجب تنفيذ الجرعات بالترتيب. الخطوة التالية المطلوبة هي ${expected}.`,`Dose steps must be executed in order. The next required step is ${expected}.`));return}
     if(step>1){
@@ -45,13 +46,13 @@ export function MaintenancePage({tank}:{tank:Tank}) {
     }
     const inv=dose.inventoryItemId?tank.inventory.find(x=>x.id===dose.inventoryItemId):undefined;
     if(dose.inventoryItemId&&!inv){window.alert(bi(lang,"مادة المخزون المرتبطة بخطة الجرعات غير موجودة. راجع المخزون قبل التنفيذ.","The inventory item linked to this dosing plan is missing. Review inventory before execution."));return}
-    if(inv&&inv.quantity<dose.perStep){window.alert(bi(lang,`المخزون غير كافٍ لهذه الخطوة. المطلوب ${dose.perStep.toFixed(2)} ${dose.unit||inv.unit} والمتوفر ${inv.quantity} ${inv.unit}.`,`Insufficient stock for this step. Required ${dose.perStep.toFixed(2)} ${dose.unit||inv.unit}; available ${inv.quantity} ${inv.unit}.`));return}
-    const ts=nowISO(),last=step>=dose.steps;
+    if(inv&&inv.quantity<perStep){window.alert(bi(lang,`المخزون غير كافٍ لهذه الخطوة. المطلوب ${perStep.toFixed(2)} ${dose.unit||inv.unit} والمتوفر ${inv.quantity} ${inv.unit}.`,`Insufficient stock for this step. Required ${perStep.toFixed(2)} ${dose.unit||inv.unit}; available ${inv.quantity} ${inv.unit}.`));return}
+    const ts=nowISO(),last=step>=totalSteps;
     patch(tank.id,t=>({...t,
-      inventory:inv?t.inventory.map(x=>x.id===inv.id?{...x,quantity:Math.max(0,x.quantity-(dose.perStep||0))}:x):t.inventory,
+      inventory:inv?t.inventory.map(x=>x.id===inv.id?{...x,quantity:Math.max(0,x.quantity-(perStep||0))}:x):t.inventory,
       dosing:t.dosing.map(x=>x.id===doseId?{...x,stepIndex:step,status:last?"logged" as const:"in_progress" as const}:x),
       maintenance:t.maintenance.map(x=>x.id===id?completeMaintenanceTask(x,today()):x),
-      timeline:[{id:uid("ev"),timestamp:ts,type:"dosing-step",textAr:`تم تنفيذ الجرعة ${step}/${dose.steps}: ${dose.perStep.toFixed(2)} ${dose.unit||""} من ${dose.material||dose.parameter}${inv?` • المتبقي بالمخزون ${Math.max(0,inv.quantity-dose.perStep)} ${inv.unit}`:""}.`,textEn:`Executed dose step ${step}/${dose.steps}: ${dose.perStep.toFixed(2)} ${dose.unit||""} of ${dose.material||dose.parameter}${inv?` • inventory remaining ${Math.max(0,inv.quantity-dose.perStep)} ${inv.unit}`:""}.`},...t.timeline]
+      timeline:[{id:uid("ev"),timestamp:ts,type:"dosing-step",textAr:`تم تنفيذ الجرعة ${step}/${totalSteps}: ${perStep.toFixed(2)} ${dose.unit||""} من ${dose.material||dose.parameter}${inv?` • المتبقي بالمخزون ${Math.max(0,inv.quantity-perStep)} ${inv.unit}`:""}.`,textEn:`Executed dose step ${step}/${totalSteps}: ${perStep.toFixed(2)} ${dose.unit||""} of ${dose.material||dose.parameter}${inv?` • inventory remaining ${Math.max(0,inv.quantity-perStep)} ${inv.unit}`:""}.`},...t.timeline]
     }));
     return;
   }
