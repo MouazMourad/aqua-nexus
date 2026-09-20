@@ -425,8 +425,60 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   setExceptionPickerOpen(false);
   setExceptionBoxExpanded(false);
  }
+ function startCoralDipForItems(batchId:string,itemIds:string[],labelAr:string,labelEn:string){
+  if(!active||!active.coralDipEnabled||!itemIds.length)return;
+  if(coralDipBatchRun(active,batchId)){window.alert(bi(lang,"لهذه الدفعة Coral Dip مسجل مسبقاً.","A Coral Dip is already recorded for this batch."));return;}
+  const inv=tank.inventory.find(i=>i.id===active.coralDipInventoryItemId);
+  const qty=Number(active.coralDipQuantityPerPrep||0),mins=Math.max(1,Number(active.coralDipMinutes||0));
+  if(!inv||qty<=0){window.alert(bi(lang,"اربط منتج Coral Dip بالمخزون وحدد كمية كل تحضير أولاً.","Link the Coral Dip product to inventory and set the quantity per preparation first."));return;}
+  if(inv.quantity<qty){window.alert(bi(lang,`المخزون غير كافي. المتوفر ${inv.quantity} ${inv.unit} والمطلوب ${qty} ${inv.unit}.`,`Inventory is insufficient. Available: ${inv.quantity} ${inv.unit}; required: ${qty} ${inv.unit}.`));return;}
+  const ts=nowISO();
+  const run:CoralDipRun={id:uid("dip"),batchId,itemIds,productName:lang==="ar"?inv.name:(inv.nameEn||inv.name),inventoryItemId:inv.id,quantityUsed:qty,unit:inv.unit,durationMinutes:mins,status:"running",startedAt:ts,remainingMs:mins*60000,endAt:Date.now()+mins*60000};
+  unlockAudio();
+  patch(tank.id,t=>{
+   const session=(t.acclimationSessions??[]).find(s=>s.id===active.id)??active;
+   const updated={...session,coralDipRuns:[run,...(session.coralDipRuns??[])],events:[ev(`بدأ Coral Dip لـ ${labelAr}: ${qty} ${inv.unit} من ${inv.name} لمدة ${mins} دقيقة. تم خصم التحضير مرة واحدة من المخزون.`,`Started Coral Dip for ${labelEn}: ${qty} ${inv.unit} of ${inv.nameEn||inv.name} for ${mins} minutes. One prepared bath was deducted from inventory.`),...session.events]};
+   return {...t,inventory:t.inventory.map(i=>i.id===inv.id?{...i,quantity:Math.max(0,i.quantity-qty)}:i),acclimationSessions:[updated,...(t.acclimationSessions??[]).filter(s=>s.id!==active.id)],timeline:[{id:uid("ev"),timestamp:ts,type:"coral-dip-start",textAr:`بدأ Coral Dip لـ ${labelAr} باستخدام ${qty} ${inv.unit} من ${inv.name}.`,textEn:`Coral Dip started for ${labelEn} using ${qty} ${inv.unit} of ${inv.nameEn||inv.name}.`},...t.timeline]};
+  });
+ }
+ function startCoralDip(batch:any){
+  if(!active||batch.lane!=="coral")return;
+  const runtime=batchRuntime(batch);
+  const items=runtime.remainingItems.filter((i:AcclimationItem)=>!i.emergency&&i.status==="ready");
+  if(!items.length||items.length!==runtime.remainingItems.filter((i:AcclimationItem)=>!i.emergency).length){window.alert(bi(lang,"انتظر حتى تصبح كل قطع هذه الدفعة جاهزة قبل بدء الـCoral Dip.","Wait until every coral in this batch is ready before starting Coral Dip."));return;}
+  startCoralDipForItems(batch.id,items.map((i:AcclimationItem)=>i.id),`دفعة المرجان ${batch.batch}`,`Coral Batch ${batch.batch}`);
+ }
+ function startEmergencyCoralDip(item:AcclimationItem){
+  if(!active||item.category!=="coral"||!item.emergency||item.status!=="ready")return;
+  startCoralDipForItems(`emergency-${item.id}`,[item.id],item.name,item.nameEn||item.name);
+ }
+ function confirmCoralRinse(runId:string){
+  if(!active)return;
+  const run=(active.coralDipRuns??[]).find(r=>r.id===runId);
+  if(!run||run.status!=="ready_to_rinse")return;
+  const ts=nowISO();
+  patch(tank.id,t=>{
+   const session=(t.acclimationSessions??[]).find(s=>s.id===active.id)??active;
+   const updated={...session,coralDipRuns:(session.coralDipRuns??[]).map(r=>r.id===runId?{...r,status:"rinsed" as const,rinsedAt:ts}:r),events:[ev(`تم تأكيد شطف المرجان بعد Coral Dip لـ ${run.productName} بماء منفصل. أصبح جاهزاً لقرار النقل.`,`Separate-water rinse confirmed after Coral Dip with ${run.productName}. Coral is now ready for the transfer decision.`),...session.events]};
+   return {...t,acclimationSessions:[updated,...(t.acclimationSessions??[]).filter(s=>s.id!==active.id)],timeline:[{id:uid("ev"),timestamp:ts,type:"coral-dip-rinse",textAr:`تم تأكيد شطف Coral Dip (${run.productName}).`,textEn:`Coral Dip rinse confirmed (${run.productName}).`},...t.timeline]};
+  });
+ }
+ function skipCoralDipForStress(item:AcclimationItem){
+  if(!active||item.category!=="coral"||!item.emergency)return;
+  const ok=window.confirm(bi(lang,`تجاوز Coral Dip لـ ${item.name} بسبب حالته المجهدة؟ سيتم تسجيل القرار صراحة في السجل، وليس اعتباره Dip مكتمل.`,`Skip Coral Dip for ${item.nameEn||item.name} because of its distressed condition? The exception will be explicitly logged, not treated as a completed dip.`));
+  if(!ok)return;
+  const ts=nowISO();
+  patch(tank.id,t=>{
+   const session=(t.acclimationSessions??[]).find(s=>s.id===active.id)??active;
+   const skipped=[...new Set([...(session.coralDipSkippedItemIds??[]),item.id])];
+   const updated={...session,coralDipSkippedItemIds:skipped,events:[ev(`تم تسجيل تجاوز Coral Dip لـ ${item.name} بسبب حالة الإجهاد ضمن المسار الاستثنائي.`,`Coral Dip was explicitly skipped for ${item.nameEn||item.name} because of distress in the exception track.`),...session.events]};
+   return {...t,acclimationSessions:[updated,...(t.acclimationSessions??[]).filter(s=>s.id!==active.id)],timeline:[{id:uid("ev"),timestamp:ts,type:"coral-dip-skip",textAr:`تجاوز Coral Dip لـ ${item.name} بسبب الإجهاد — قرار مسجل.`,textEn:`Coral Dip skipped for ${item.nameEn||item.name} because of distress — explicitly logged.`},...t.timeline]};
+  });
+ }
  function markAdded(item:AcclimationItem){
   if(!active)return;
+  const dipGate=coralTransferGate(active,item);
+  if(!dipGate.allowed){window.alert(lang==="ar"?dipGate.reasonAr:dipGate.reasonEn);return;}
   const catalog:any=lib.find((x:any)=>x.id===item.libraryId);
   const readiness=stockingReadiness(tank,{candidate:catalog,quantity:item.quantity,candidateKnown:Boolean(catalog),candidateLabelAr:item.name,candidateLabelEn:item.nameEn||item.name});
   let riskOverride=false;
