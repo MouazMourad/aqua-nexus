@@ -124,10 +124,10 @@ function significant(parameter:string,before:number,after:number){
   return delta>=(fixed[parameter]??Math.max(.1,Math.abs(before)*.15));
 }
 
-export function eventChemistryLinks(tank:Tank):EventImpact[]{
+export function eventChemistryLinks(tank:Tank,maxLinks=6,eventWindow=250):EventImpact[]{
   const readings=sortedReadings(tank);
   if(readings.length<2)return [];
-  const events=[...tank.timeline].sort((a,b)=>ts(b.timestamp)-ts(a.timestamp)).slice(0,40);
+  const events=[...tank.timeline].sort((a,b)=>ts(b.timestamp)-ts(a.timestamp)).slice(0,Math.max(1,eventWindow));
   const out:EventImpact[]=[];
   for(const event of events){
     const t=ts(event.timestamp); if(!Number.isFinite(t))continue;
@@ -157,14 +157,14 @@ export function eventChemistryLinks(tank:Tank):EventImpact[]{
     }
     out.push({id:`impact-${event.id}`,event,chemistryChanges:changes,level,ar,en});
   }
-  return out.slice(0,6);
+  return out.slice(0,Math.max(1,maxLinks));
 }
 
 export function biologicalMemory(tank:Tank):EventImpact[]{
   const points=healthTimeline(tank);
-  const chemistryLinks=eventChemistryLinks(tank);
+  const chemistryLinks=eventChemistryLinks(tank,200,250);
   const byEvent=new Map(chemistryLinks.map(x=>[x.event.id,x]));
-  const events=[...tank.timeline].sort((a,b)=>ts(b.timestamp)-ts(a.timestamp)).slice(0,50);
+  const events=[...tank.timeline].sort((a,b)=>ts(b.timestamp)-ts(a.timestamp)).slice(0,250);
   const out:EventImpact[]=[];
   for(const event of events){
     const t=ts(event.timestamp); if(!Number.isFinite(t))continue;
