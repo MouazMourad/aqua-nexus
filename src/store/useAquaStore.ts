@@ -66,6 +66,8 @@ function normalize(tank: Tank): Tank {
     expenses:tank.expenses ?? [],
     waterChanges:tank.waterChanges ?? [],
     rodi:tank.rodi ?? [],
+    rodiServiceEvents:tank.rodiServiceEvents ?? [],
+    plantCare:tank.plantCare ?? [],
     acclimationSessions:tank.acclimationSessions ?? [],
     createdAt:tank.createdAt ?? new Date().toISOString()
   });
