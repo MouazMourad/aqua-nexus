@@ -249,7 +249,7 @@ export function AquaDashboard() {
   {reminderNote&&<div className="toast-note">{reminderNote}</div>}
   <header className="topbar topbar-v12 interactive-header"><div className="brand"><div className="brand-mark">AN</div><div><strong>Aqua Nexus 3D</strong><small>{tr(language,"brand")}</small></div></div>
    <div className="top-actions"><select className="select" value={tank.id} onChange={e=>handleSelectTank(e.target.value)}>{tanks.map(t=><option key={t.id} value={t.id}>{t.isTraining?(language==="ar"?(t.type==="marine"?"🎓 حوض التدريب البحري":"🎓 حوض التدريب النهري"):(t.type==="marine"?"🎓 Marine Training Tank":"🎓 Freshwater Training Tank")):t.name}</option>)}</select><button className="btn" onClick={()=>setLanguage(language==="ar"?"en":"ar")}>{language==="ar"?"EN":"AR"}</button><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(language,"addTank")}</button></div>
-   <MainNav active={page} onChange={navigatePage} lang={language} lockedPages={lockedPages}/>
+   <MainNav active={page} onChange={navigatePage} lang={language} tank={tank} lockedPages={lockedPages}/>
   </header>
   {page==="dashboard"&&tank.isTraining&&<TrainingCoach tank={tank} onNavigate={navigatePage}/>}
   {page==="dashboard"&&cycle?.active&&<BiologicalCyclePanel tank={tank} onNavigate={navigatePage}/>}
