@@ -50,6 +50,23 @@ test("critical pages open from the real navigation",async({page})=>{
   await expect(page.locator(".page-grid")).toContainText(/توافق الكائنات الحالية|Current livestock compatibility/);
 });
 
+test("maintenance controls stay compact and disease category filters keep results",async({page})=>{
+  await openTrainingDashboard(page);
+  await page.locator('[data-aqua-page="maintenance"]').click();
+  const complete=page.locator(".maintenance-complete-btn").first();
+  await expect(complete).toBeVisible();
+  const box=await complete.boundingBox();
+  expect(box).not.toBeNull();
+  if(box)expect(box.width).toBeLessThan(120);
+
+  await page.locator('[data-aqua-page="diseases"]').click();
+  const category=page.locator('.filter-bar select').nth(1);
+  await expect(category.locator('option[value="fish"]')).toHaveCount(1);
+  await category.selectOption("fish");
+  await expect(page.locator(".disease-card").first()).toBeVisible();
+  await expect(page.locator(".disease-card")).not.toHaveCount(0);
+});
+
 test("equipment touch placement previews then commits on release",async({page})=>{
   await openTrainingDashboard(page);
   await page.locator('[data-aqua-page="equipment"]').click();
