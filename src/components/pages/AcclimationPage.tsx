@@ -1,11 +1,12 @@
 "use client";
 import { useEffect,useMemo,useRef,useState } from "react";
-import type { AcclimationItem,AcclimationSession,LivestockItem,Tank } from "@/domain/types";
+import type { AcclimationItem,AcclimationSession,CoralDipRun,LivestockItem,Tank } from "@/domain/types";
 import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi,categoryText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { stockingReadiness } from "@/domain/stockingReadiness";
+import { coralDipBatchRun,coralTransferGate } from "@/domain/acclimationSafety";
 import { uid,nowISO,today } from "@/lib/appUtils";
 import { buildDelimitedText,downloadDelimitedFile,field,numberField,parseDelimitedText } from "@/lib/tabularImport";
 
@@ -166,6 +167,14 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   })};
   if(active.floatStatus==="running"&&active.floatEndAt&&active.floatEndAt<=now){changed=true;next={...next,floatStatus:"ready",floatEndAt:null,floatRemainingMs:0};}
   if(active.bucketStatus==="running"&&active.bucketEndAt&&active.bucketEndAt<=now){changed=true;next={...next,bucketStatus:"ready",bucketEndAt:null,bucketRemainingMs:0};}
+  const coralDipRuns=(active.coralDipRuns??[]).map(run=>{
+   if(run.status==="running"&&run.endAt&&run.endAt<=now){
+    changed=true;
+    return {...run,status:"ready_to_rinse" as const,endAt:null,remainingMs:0,completedAt:nowISO()};
+   }
+   return run;
+  });
+  next={...next,coralDipRuns};
   if(changed)saveSession(next,false);
  },[now]);
  useEffect(()=>{
@@ -216,7 +225,18 @@ export function AcclimationPage({tank}:{tank:Tank}) {
     }
    }
   }
- },[active?.items,active?.floatStatus,active?.bucketStatus,active?.dripStartedAt,releaseBatches,emergencyItems,exceptionAllItems,step,lang]);
+  for(const run of active.coralDipRuns??[]){
+   if(run.status!=="ready_to_rinse")continue;
+   const key=`${active.id}:coral-dip:${run.id}`;
+   if(notifiedTimersRef.current.has(key))continue;
+   notifiedTimersRef.current.add(key);
+   const message=bi(lang,`انتهى عداد Coral Dip لـ ${run.productName} — انقل المرجان إلى ماء الشطف المنفصل ثم أكد الشطف.`,`Coral Dip timer for ${run.productName} finished — move the coral to separate rinse water, then confirm the rinse.`);
+   setTimerAlerts(prev=>[{id:uid("alert"),lane:"coral",message},...prev].slice(0,5));
+   playTimerSound("coral");
+   try{if("vibrate" in navigator)(navigator as any).vibrate([180,80,180,80,260]);}catch{}
+   try{if("Notification" in window&&Notification.permission==="granted")new Notification("Aqua Nexus",{body:message});}catch{}
+  }
+ },[active?.items,active?.floatStatus,active?.bucketStatus,active?.dripStartedAt,active?.coralDipRuns,releaseBatches,emergencyItems,exceptionAllItems,step,lang]);
 
  function ev(ar:string,en:string){return{id:uid("ace"),timestamp:nowISO(),textAr:ar,textEn:en}}
  function unlockAudio(){
@@ -324,7 +344,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   saveSession({...active,items:active.items.map(x=>ids.has(x.id)?{...x,status:"acclimating" as const,startedAt:nowISO(),remainingMs:x.remainingMs??itemDuration(x),endAt:start+(x.remainingMs??itemDuration(x))}:x),events:[ev(`بدأت الدفعة ${batch} من مسار ${releaseLaneLabel("ar",laneKey)}.`,`Started Batch ${batch} of the ${releaseLaneLabel("en",laneKey)} lane.`),...active.events]});
  }
  function saveSession(s:AcclimationSession,withLog=true){patch(tank.id,t=>({...t,acclimationSessions:[s,...(t.acclimationSessions??[]).filter(x=>x.id!==s.id)]}));}
- function newSession(){const s:AcclimationSession={id:uid("acs"),startedAt:nowISO(),status:"setup",wizardStep:1,categories:[],tankSalinity:tank.type==="marine"?1.025:undefined,bagSalinity:tank.type==="marine"?1.020:undefined,temperature:25,existingNotes:"",coralDipEnabled:false,coralDipMinutes:10,floatConfirmed:false,floatStatus:"waiting",floatRemainingMs:15*60000,bucketStatus:"waiting",bucketRemainingMs:5*60000,preflight:{},items:[],events:[ev("بدأت جلسة أقلمة جديدة.","New acclimation session started.")]};saveSession(s);}
+ function newSession(){const s:AcclimationSession={id:uid("acs"),startedAt:nowISO(),status:"setup",wizardStep:1,categories:[],tankSalinity:tank.type==="marine"?1.025:undefined,bagSalinity:tank.type==="marine"?1.020:undefined,temperature:25,existingNotes:"",coralDipEnabled:false,coralDipMinutes:10,coralDipQuantityPerPrep:0,coralDipRuns:[],coralDipSkippedItemIds:[],floatConfirmed:false,floatStatus:"waiting",floatRemainingMs:15*60000,bucketStatus:"waiting",bucketRemainingMs:5*60000,preflight:{},items:[],events:[ev("بدأت جلسة أقلمة جديدة.","New acclimation session started.")]};saveSession(s);}
  function sessionPatch(p:Partial<AcclimationSession>){if(!active)return;saveSession({...active,...p});}
  function setStep(n:number){sessionPatch({wizardStep:n})}
  function toggleCat(c:Cat){if(!active)return;const cats=active.categories??[];sessionPatch({categories:cats.includes(c)?cats.filter(x=>x!==c):[...cats,c]});}
@@ -336,9 +356,25 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  function moveItem(id:string,dir:number){if(!active)return;const a=[...active.items],i=a.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];saveSession({...active,items:a});}
  function autoOrder(){if(!active)return;saveSession({...active,items:[...active.items].sort((a,b)=>score(a)-score(b)),events:[ev("تم تطبيق ترتيب التنزيل المقترح.","Suggested release order applied."),...active.events]});}
 
- const preflight=useMemo(()=>{const base=lang==="ar"?["سطل/وعاء نظيف ومخصص لكل مجموعة","خرطوم تنقيط مع محبس تحكم","شبكة / وعاء نقل منفصل","Refractometer أو جهاز قياس الملوحة","ميزان حرارة","مناشف ومكان عمل جاف","اختبار صوت التنبيهات"]:["Clean dedicated container(s)","Airline / drip line + valve","Net / specimen container","Refractometer or salinity meter","Thermometer","Towels + dry working area","Timer/sound volume checked"];if(active?.items.some(i=>i.category==="coral"))base.push(lang==="ar"?"ماء Coral Dip وماء شطف منفصل جاهزان":"Coral dip + separate rinse water prepared");if(active?.items.some(i=>i.category==="plant"))base.push(lang==="ar"?"وعاء فحص/شطف النباتات جاهز":"Plant rinse/inspection container");return base},[active?.items,lang]);
+ const preflight=useMemo(()=>{const base=lang==="ar"?["سطل/وعاء نظيف ومخصص لكل مجموعة","خرطوم تنقيط مع محبس تحكم","شبكة / وعاء نقل منفصل","Refractometer أو جهاز قياس الملوحة","ميزان حرارة","مناشف ومكان عمل جاف","اختبار صوت التنبيهات"]:["Clean dedicated container(s)","Airline / drip line + valve","Net / specimen container","Refractometer or salinity meter","Thermometer","Towels + dry working area","Timer/sound volume checked"];if(active?.items.some(i=>i.category==="coral")&&active.coralDipEnabled)base.push(lang==="ar"?"ماء Coral Dip وماء شطف منفصل جاهزان":"Coral dip + separate rinse water prepared");if(active?.items.some(i=>i.category==="plant"))base.push(lang==="ar"?"وعاء فحص/شطف النباتات جاهز":"Plant rinse/inspection container");return base},[active?.items,active?.coralDipEnabled,lang]);
  function toggleCheck(i:number){if(!active)return;sessionPatch({preflight:{...(active.preflight??{}),[i]:!(active.preflight??{})[i]}})}
- function startSession(){if(!active||!active.items.length)return;const start=Date.now(),left=active.floatRemainingMs??15*60000;saveSession({...active,status:"floating",wizardStep:5,floatStatus:"running",floatStartedAt:nowISO(),floatEndAt:start+left,events:[ev("بدأت موازنة حرارة الأكياس المغلقة لمدة 15 دقيقة.","Started sealed-bag temperature equalization for 15 minutes."),...active.events]});}
+ function startSession(){
+  if(!active||!active.items.length)return;
+  if(active.coralDipEnabled&&active.items.some(i=>i.category==="coral")){
+   const inv=tank.inventory.find(i=>i.id===active.coralDipInventoryItemId);
+   const qty=Number(active.coralDipQuantityPerPrep||0),mins=Number(active.coralDipMinutes||0);
+   if(!inv||qty<=0||mins<=0){
+    window.alert(bi(lang,"قبل بدء الجلسة: اربط Coral Dip بالمخزون وحدد كمية كل تحضير ومدة الـDip من ملصق المنتج.","Before starting: link Coral Dip to inventory and set the quantity per preparation and the label-based dip duration."));
+    return;
+   }
+   if(inv.quantity<qty){
+    window.alert(bi(lang,"المخزون الحالي لا يكفي حتى لتحضير أول Coral Dip. حدّث المخزون أو أوقف خيار الـDip قبل بدء الجلسة.","Current inventory is not enough for even the first Coral Dip preparation. Replenish inventory or disable dip before starting."));
+    return;
+   }
+  }
+  const start=Date.now(),left=active.floatRemainingMs??15*60000;
+  saveSession({...active,status:"floating",wizardStep:5,floatStatus:"running",floatStartedAt:nowISO(),floatEndAt:start+left,events:[ev("بدأت موازنة حرارة الأكياس المغلقة لمدة 15 دقيقة.","Started sealed-bag temperature equalization for 15 minutes."),...active.events]});
+ }
  function floatAction(action:"pause"|"resume"|"plus5"|"plus15"|"done"){
   if(!active)return;let s={...active},r=s.floatRemainingMs??15*60000;
   if(s.floatStatus==="running"&&s.floatEndAt)r=Math.max(0,s.floatEndAt-Date.now());
