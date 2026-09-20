@@ -1,4 +1,5 @@
 "use client";
+import { showCriticalAquariumNotification } from "@/lib/criticalNotifications";
 import { useEffect,useMemo,useRef,useState } from "react";
 import type { AcclimationItem,AcclimationSession,CoralDipRun,LivestockItem,Tank } from "@/domain/types";
 import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
@@ -264,7 +265,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    setTimerAlerts(prev=>[{id:uid("alert"),lane:"coral",message},...prev].slice(0,5));
    playTimerSound("coral");
    try{if("vibrate" in navigator)(navigator as any).vibrate([180,80,180,80,260]);}catch{}
-   try{if("Notification" in window&&Notification.permission==="granted")new Notification("Aqua Nexus",{body:message});}catch{}
+   void showCriticalAquariumNotification("Aqua Nexus",message,`acclimation-coral-${run.id}`);
   }
  },[active?.items,active?.floatStatus,active?.bucketStatus,active?.dripStartedAt,active?.coralDipRuns,releaseBatches,emergencyItems,exceptionAllItems,step,lang]);
 
@@ -310,7 +311,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   setTimerAlerts(prev=>[{id:uid("alert"),lane,batch,message},...prev].slice(0,5));
   playTimerSound(lane);
   try{if("vibrate" in navigator)(navigator as any).vibrate(lane==="emergency"?[220,90,220,90,300]:[160,80,160]);}catch{}
-  try{if("Notification" in window&&Notification.permission==="granted")new Notification("Aqua Nexus",{body:message});}catch{}
+  void showCriticalAquariumNotification("Aqua Nexus",message,`acclimation-${active?.id||"session"}-${lane}-${batch??emergencyName??"timer"}`);
  }
  function laneRuntime(lane:any){
   const unfinished=lane.entries.filter((e:any)=>!["added","deferred"].includes(e.item.status));
