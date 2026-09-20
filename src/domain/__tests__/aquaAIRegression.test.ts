@@ -34,6 +34,10 @@ import { waterChangeIntelligence } from "@/domain/waterChangeIntelligence";
 import { biologicalMemory,eventChemistryLinks } from "@/domain/tankLearning";
 import { repeatedResponsePatterns,tankLearningMaturity } from "@/domain/tankPatterns";
 import { claimCriticalAction,releaseCriticalAction } from "@/lib/actionGuard";
+import { deriveExtendedIntelligenceEvents } from "@/domain/extendedEventIntelligence";
+import { buildTankBrainSnapshot } from "@/domain/tankBrainSnapshot";
+import { validateRodiEntry } from "@/domain/inputSanity";
+import { photoNeedsExternalization } from "@/lib/photoStorage";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -677,3 +681,62 @@ describe("Acclimation coral dip safety",()=>{
   });
 });
 
+
+
+describe("Full audit hardening regressions",()=>{
+  it("exposes previously isolated domains in the canonical Tank Brain",()=>{
+    const t=structuredClone(demoFreshwaterTank);
+    t.plantedMode="highTech";
+    t.substrateType="nutrient";
+    t.rodiServiceEvents=[{id:"rs1",timestamp:"2026-09-20T10:00:00Z",component:"di"}];
+    t.plantCare=[{id:"pc1",timestamp:"2026-09-20T11:00:00Z",kind:"fertilizer"}];
+    t.doserChannels=[{id:"dc1",name:"Channel 1",material:"KH",capacityMl:1000,currentMl:700,consumption:10,period:"daily",color:"#fff"}];
+    const brain=buildTankBrainSnapshot(t);
+    expect(brain.identity.plantedMode).toBe("highTech");
+    expect(brain.identity.substrateType).toBe("nutrient");
+    expect(brain.operations.rodiServiceEvents).toHaveLength(1);
+    expect(brain.operations.plantCare).toHaveLength(1);
+    expect(brain.equipment.doserChannels).toHaveLength(1);
+  });
+
+  it("turns plant care and RODI service into first-class intelligence events",()=>{
+    const before=structuredClone(demoFreshwaterTank),after=structuredClone(demoFreshwaterTank);
+    after.plantCare=[{id:"pc-event",timestamp:"2026-09-20T11:00:00Z",kind:"fertilizer",notes:"test"}];
+    after.rodiServiceEvents=[{id:"rodi-service-event",timestamp:"2026-09-20T12:00:00Z",component:"di"}];
+    const events=deriveExtendedIntelligenceEvents(before,after);
+    expect(events.some(x=>x.domain==="plantCare"&&x.verb==="fertilized")).toBe(true);
+    expect(events.some(x=>x.domain==="rodi"&&x.verb==="service_completed")).toBe(true);
+  });
+
+  it("captures detailed acclimation item state changes in Tank Brain memory",()=>{
+    const before=structuredClone(demoMarineTank),after=structuredClone(demoMarineTank);
+    const item:any={id:"a1",name:"Sensitive Shrimp",category:"invert",quantity:1,health:"fair",dripMinutes:45,intervalMinutes:15,placement:"",status:"acclimating",remainingMs:600000};
+    const session:any={id:"s1",startedAt:"2026-09-20T10:00:00Z",status:"drip",floatConfirmed:true,items:[item],events:[]};
+    before.acclimationSessions=[session];
+    after.acclimationSessions=[{...session,items:[{...item,status:"emergency",health:"stressed",emergency:true,remainingMs:180000}]}];
+    const events=deriveExtendedIntelligenceEvents(before,after);
+    expect(events.some(x=>x.domain==="acclimation"&&x.verb==="item_exception"&&x.entityId==="a1")).toBe(true);
+  });
+
+  it("uses a cross-domain evidence plan for chemistry cause questions",()=>{
+    const plan=buildAquaAIQueryPlan(parseAquaQuestion("ليش NO3 ارتفع؟"));
+    expect(plan.primary).toBe("chemistry");
+    expect(plan.crossDomain).toBe(true);
+    expect(plan.allowedSources).toContain("maintenance");
+    expect(plan.allowedSources).toContain("equipment");
+    expect(plan.allowedSources).toContain("livestock");
+  });
+
+  it("blocks implausible RODI data before it can enter tank history",()=>{
+    expect(validateRodiEntry({tdsIn:150,tdsOut:3,liters:20,wasteLiters:60,productionMinutes:60,sourcePressurePsi:60}).ok).toBe(true);
+    expect(validateRodiEntry({tdsIn:150,tdsOut:9000,liters:20,wasteLiters:60,productionMinutes:60,sourcePressurePsi:60}).ok).toBe(false);
+    expect(validateRodiEntry({tdsIn:150,tdsOut:200,liters:20,wasteLiters:60,productionMinutes:60,sourcePressurePsi:60}).ok).toBe(false);
+  });
+
+  it("moves large photo payloads out of persisted tank state",()=>{
+    const large:any={id:"p1",timestamp:"2026-09-20T12:00:00Z",caption:"test",dataUrl:"data:image/jpeg;base64,"+"A".repeat(150000)};
+    const small:any={...large,id:"p2",dataUrl:"data:image/jpeg;base64,"+"A".repeat(1000)};
+    expect(photoNeedsExternalization(large)).toBe(true);
+    expect(photoNeedsExternalization(small)).toBe(false);
+  });
+});
