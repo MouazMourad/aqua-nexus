@@ -59,3 +59,42 @@ html,body{max-width:100%;overflow-x:hidden}
   .equipment-system-scene,.display-layout-scene,.dashboard-scene-card{height:520px!important;min-height:520px!important}
   .dashboard-scene-card canvas{min-height:520px!important}
 }
+
+
+/* ===== Maintenance task controls — compact mobile-safe layout ===== */
+.maintenance-task-list{gap:2px}
+.maintenance-task-row{
+  grid-template-columns:34px minmax(0,1fr) auto!important;
+  gap:10px!important;
+  align-items:center!important;
+  min-height:58px;
+  padding:10px 4px!important;
+}
+.maintenance-task-copy{min-width:0}
+.maintenance-task-copy b{font-size:11px;line-height:1.45;overflow-wrap:anywhere}
+.maintenance-task-copy small{font-size:8px;line-height:1.45}
+.maintenance-state-dot{
+  width:30px;height:30px;border:1px solid rgba(120,204,220,.36);border-radius:50%;
+  display:grid;place-items:center;color:#bff8e0;background:rgba(5,35,46,.72);
+  box-shadow:inset 0 0 0 3px rgba(255,255,255,.015)
+}
+.maintenance-state-dot.done{background:rgba(31,128,91,.32);border-color:rgba(93,222,166,.58);color:#9ff0c7}
+.maintenance-task-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}
+.maintenance-checklist-btn,.maintenance-complete-btn{
+  min-width:0!important;width:auto!important;min-height:34px;padding:6px 9px;border-radius:10px;
+  border:1px solid rgba(101,193,211,.32);background:rgba(7,38,51,.82);color:#dff9ff;
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;font:inherit;font-weight:800;cursor:pointer
+}
+.maintenance-checklist-btn span,.maintenance-complete-btn em{font-size:8px;font-style:normal}
+.maintenance-complete-btn{border-color:rgba(81,210,153,.42);background:rgba(15,73,56,.72);color:#caffdf}
+.maintenance-complete-btn>span{font-size:16px;line-height:1}
+.maintenance-task-row.is-complete{opacity:.76}
+.maintenance-task-row.is-complete .maintenance-task-copy b{text-decoration:none;color:#b8d2d9}
+
+@media (max-width:700px){
+  .maintenance-task-row{grid-template-columns:32px minmax(0,1fr)!important;align-items:start!important;padding:12px 2px!important}
+  .maintenance-task-actions{grid-column:2;justify-content:flex-start;gap:6px;margin-top:3px}
+  .maintenance-task-actions .task-print-status{order:3}
+  .maintenance-checklist-btn,.maintenance-complete-btn{min-height:32px;padding:5px 8px}
+  .maintenance-complete-btn em{display:inline}
+}
