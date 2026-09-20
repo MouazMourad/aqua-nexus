@@ -6,10 +6,12 @@ import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { uid,nowISO } from "@/lib/appUtils";
 import { feedingIntelligence } from "@/domain/feedingIntelligence";
+import { inventoryForConsumer } from "@/domain/inventoryIntelligence";
 
 export function FeedingPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),[food,setFood]=useState(""),[amount,setAmount]=useState(""),[notes,setNotes]=useState(""),[inventoryItemId,setInventoryItemId]=useState(""),[used,setUsed]=useState(""),[showDetails,setShowDetails]=useState(false),[showHistory,setShowHistory]=useState(false);
  const plan=useMemo(()=>feedingIntelligence(tank),[tank]);
+ const feedingStock=useMemo(()=>inventoryForConsumer(tank,"feeding"),[tank]);
  const todayKey=new Date().toDateString();
  const todayFeedings=tank.feeding.filter(x=>new Date(x.timestamp).toDateString()===todayKey).length;
  const latest=tank.feeding[0];
@@ -62,7 +64,7 @@ export function FeedingPage({tank}:{tank:Tank}) {
   <div className="feeding-guided-grid">
    <label className="field"><span>{tr(lang,"food")}</span><input autoFocus value={food} onChange={e=>setFood(e.target.value)} placeholder={bi(lang,"مثال: Mysis / Pellets","e.g. Mysis / Pellets")}/></label>
    <label className="field"><span>{tr(lang,"feedAmount")}</span><input value={amount} onChange={e=>setAmount(e.target.value)} placeholder={bi(lang,"مثال: مكعب واحد / رشة صغيرة","e.g. 1 cube / small pinch")}/></label>
-   <label className="field"><span>{bi(lang,"مادة الطعام من المخزون","Food item from inventory")}</span><select value={inventoryItemId} onChange={e=>{const id=e.target.value;setInventoryItemId(id);const inv=tank.inventory.find(x=>x.id===id);if(inv&&!food.trim())setFood(lang==="ar"?inv.name:(inv.nameEn||inv.name));}}><option value="">{bi(lang,"اختر من المخزون","Select from inventory")}</option>{tank.inventory.map(x=><option key={x.id} value={x.id}>{lang==="ar"?x.name:(x.nameEn||x.name)} • {x.quantity} {x.unit}</option>)}</select>{selectedInventory&&<small>{bi(lang,`المتوفر: ${selectedInventory.quantity} ${selectedInventory.unit}`,`Available: ${selectedInventory.quantity} ${selectedInventory.unit}`)}</small>}</label>
+   <label className="field"><span>{bi(lang,"مادة الطعام من المخزون","Food item from inventory")}</span><select value={inventoryItemId} onChange={e=>{const id=e.target.value;setInventoryItemId(id);const inv=tank.inventory.find(x=>x.id===id);if(inv&&!food.trim())setFood(lang==="ar"?inv.name:(inv.nameEn||inv.name));}}><option value="">{bi(lang,"اختر من المخزون","Select from inventory")}</option>{feedingStock.map(x=><option key={x.id} value={x.id}>{lang==="ar"?x.name:(x.nameEn||x.name)} • {x.quantity} {x.unit}</option>)}</select>{selectedInventory&&<small>{bi(lang,`المتوفر: ${selectedInventory.quantity} ${selectedInventory.unit}`,`Available: ${selectedInventory.quantity} ${selectedInventory.unit}`)}</small>}</label>
    <label className="field"><span>{bi(lang,"الكمية التي ستُخصم","Quantity to deduct")}</span><input type="number" min="0" step="any" value={used} onChange={e=>setUsed(e.target.value)} disabled={!selectedInventory} placeholder={selectedInventory?selectedInventory.unit:bi(lang,"اختر المادة أولاً","Select item first")}/></label>
   </div>
 
