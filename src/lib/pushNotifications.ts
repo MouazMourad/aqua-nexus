@@ -2,6 +2,7 @@ import type { Language, Tank } from "@/domain/types";
 import { systemHealth,systemHealthTrend } from "@/domain/systemHealth";
 import { systemAlerts } from "@/domain/alertEngine";
 import { maintenanceEffectiveState } from "@/domain/maintenanceSchedule";
+import { biologicalCycleStatus } from "@/domain/biologicalCycle";
 import { aquaWorkspaceHeaders,getAquaDeviceId } from "@/lib/anonymousWorkspace";
 
 const FALLBACK_VAPID_PUBLIC_KEY="BD9A5jEWZLVFsG8PGXEIZyM4OCv1H4QHOJyXTi26-AyWb8Cm-b9q0wuQZiMG4SVAdoQYsrMGu5SBPcmsxu1_c20";
@@ -48,6 +49,7 @@ function stabilityState(t:Tank){
 }
 
 function backgroundAlertState(t:Tank){
+  const cycle=biologicalCycleStatus(t);
   const activeEmergency=(t.emergencySessions??[]).find(x=>x.status==="active");
   const activeQuarantine=t.quarantine.filter(x=>x.status==="active");
   const nextDose=[...activeQuarantine]
@@ -63,7 +65,12 @@ function backgroundAlertState(t:Tank){
     emergencyTitleAr:activeEmergency?.titleAr??null,
     emergencyTitleEn:activeEmergency?.titleEn??null,
     nextDoseAt:nextDose?.nextDoseAt??null,
-    doseOrganism:nextDose?.organism??null
+    doseOrganism:nextDose?.organism??null,
+    cyclingActive:cycle.active,
+    cycleDay:cycle.day,
+    cycleReady:cycle.ready,
+    cycleNextAr:cycle.active?cycle.nextAr:null,
+    cycleNextEn:cycle.active?cycle.nextEn:null
   };
 }
 
