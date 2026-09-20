@@ -19,6 +19,12 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Capture generated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-lock-generated
+          path: package-lock.json
+          retention-days: 1
       - name: Regression tests
         run: npm test
       - name: Build
