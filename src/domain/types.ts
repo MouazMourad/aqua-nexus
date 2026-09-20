@@ -234,7 +234,7 @@ export interface InventoryItem {
 }
 
 export type IntelligenceEventKind = "fact"|"observation"|"action"|"omission"|"outcome";
-export type IntelligenceEventDomain = "chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|"waterChange"|"rodi"|"quarantine"|"emergency"|"acclimation"|"sump"|"journal"|"expense"|"system";
+export type IntelligenceEventDomain = "chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|"waterChange"|"rodi"|"plantCare"|"quarantine"|"emergency"|"acclimation"|"sump"|"journal"|"expense"|"system";
 export interface IntelligenceEvent {
   id:string;
   timestamp:string;
@@ -453,6 +453,15 @@ export interface RODIServiceEvent {
   notes?: string;
 }
 
+export interface PlantCareLog {
+  id: string;
+  timestamp: string;
+  kind: "fertilizer" | "co2_refill";
+  inventoryUse?: InventoryUsage;
+  equipmentId?: string;
+  notes?: string;
+}
+
 export interface AcclimationItem {
   id: string;
   libraryId?: string;
@@ -585,6 +594,7 @@ export interface Tank {
   waterChanges: WaterChangeLog[];
   rodi: RODILog[];
   rodiServiceEvents?: RODIServiceEvent[];
+  plantCare?: PlantCareLog[];
   acclimationSessions?: AcclimationSession[];
   createdAt: string;
 }
