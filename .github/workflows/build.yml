@@ -37,11 +37,14 @@ jobs:
             echo "package-lock.json already tracked"
             exit 0
           fi
-          CONTENT="$(base64 -w0 package-lock.json)"
-          gh api --method PUT "repos/${{ github.repository }}/contents/package-lock.json" \
-            -f message="Add reproducible npm lockfile" \
-            -f content="$CONTENT" \
-            -f branch="${{ github.ref_name }}"
+          python - <<'PY'
+          import base64,json,os
+          with open("package-lock.json","rb") as handle:
+              content=base64.b64encode(handle.read()).decode("ascii")
+          with open("/tmp/package-lock-payload.json","w",encoding="utf-8") as handle:
+              json.dump({"message":"Add reproducible npm lockfile","content":content,"branch":os.environ["GITHUB_REF_NAME"]},handle)
+          PY
+          gh api --method PUT "repos/${{ github.repository }}/contents/package-lock.json" --input /tmp/package-lock-payload.json
       - name: Regression tests
         run: npm test
       - name: Build
