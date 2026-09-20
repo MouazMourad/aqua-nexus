@@ -12,6 +12,10 @@ export interface VisionDiseaseCandidate{
   score:number;
 }
 
+const symptomWeights:Record<VisionSymptom,number>={
+  whiteSpots:4,tissueLoss:4,paleColor:3,darkColor:3,closedPolyps:3,lesion:3,finDamage:4,rapidBreathing:2,algaeFilm:3,unknown:0
+};
+
 const symptomPatterns:Record<VisionSymptom,RegExp[]>={
   whiteSpots:[/white spot|white patch|gold.*dust|dusting|نقاط بيضاء|بقع بيضاء|غبار.*ذهبي|غبار.*رمادي/i],
   tissueLoss:[/tissue loss|tissue recession|brown jelly|rtn|stn|تراجع.*نسيج|فقد.*نسيج|براون جيلي/i],
@@ -20,7 +24,7 @@ const symptomPatterns:Record<VisionSymptom,RegExp[]>={
   closedPolyps:[/closed|closure|contraction|polyps|انغلاق|انكماش|بوليبات/i],
   lesion:[/lesion|ulcer|wound|red sore|redness|آفة|تقرح|جروح|احمرار/i],
   finDamage:[/fin|frayed|زعانف|تآكل.*زعانف/i],
-  rapidBreathing:[/rapid breathing|severe breathing|labored breathing|gill|تنفس سريع|تنفس شديد|تنفس متعب|خياشيم/i],
+  rapidBreathing:[/rapid breathing|increased breathing|severe breathing|labored breathing|breathing.*fast|gill|تنفس سريع|تنفس أسرع|تنفس شديد|تنفس متعب|خياشيم/i],
   algaeFilm:[/algae|film|طحالب|غشاء/i],
   unknown:[]
 };
@@ -44,7 +48,7 @@ export function visionDiseaseCandidates(tank:Tank,livestockId:string|undefined,s
     let score=0;
     for(const symptom of symptoms){
       const patterns=symptomPatterns[symptom]??[];
-      if(patterns.some(pattern=>pattern.test(haystack)))score+=symptom==="rapidBreathing"||symptom==="tissueLoss"?3:2;
+      if(patterns.some(pattern=>pattern.test(haystack)))score+=symptomWeights[symptom]??1;
     }
     if(x.urgent&&score>0)score+=.25;
     return {id:x.id,ar:x.ar,en:x.en,symptomsAr:x.symAr,symptomsEn:x.symEn,urgent:Boolean(x.urgent),score};
