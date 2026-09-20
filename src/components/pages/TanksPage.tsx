@@ -48,6 +48,8 @@ export function TanksPage({tanks,selectedTankId,onSelect}:{tanks:Tank[];selected
  }
  function saveEdit(){
   if(!editTarget)return;
+  const setupCheck=validateTankSetupEntry({length:l,width:w,height:h,displacementPercent:loss,ageMonths,sumpEnabled:hasSump,sumpLength:sl,sumpWidth:sw,sumpHeight:sh,sumpFillPercent:fill});
+  if(!setupCheck.ok){const issue=setupCheck.issues[0];window.alert(lang==="ar"?issue.ar:issue.en);return;}
   if(editCycle?.active&&status==="established"&&!editCycle.ready){
    window.alert(lang==="ar"?"ما فيك تحول الحوض إلى Established قبل ما تحقق شروط الدورة البيولوجية. كمّل القراءات من Dashboard/Chemistry أولاً.":"You cannot mark the tank Established before biological-cycle readiness is proven. Complete the measured cycle checks first.");
    return;
