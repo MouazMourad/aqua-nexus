@@ -179,6 +179,7 @@ export type InventoryCategory =
   | "supplement"
   | "filter_media"
   | "coral_treatment"
+  | "medication"
   | "water_prep"
   | "equipment"
   | "testing"
@@ -191,6 +192,7 @@ export type InventoryConsumer =
   | "co2"
   | "dosing"
   | "acclimation"
+  | "quarantine"
   | "waterChange"
   | "sump"
   | "equipment"
@@ -211,6 +213,9 @@ export interface InventoryItem {
   tankCompatibility?: "marine" | "freshwater" | "both";
   consumedBy?: InventoryConsumer[];
   stockBehavior?: "consumable" | "asset";
+  /** Optional exact mapping used by the corrective dosing calculator. */
+  dosingParameter?: "KH" | "Ca" | "Mg";
+  dosingCompoundId?: string;
   quantity: number;
   unit: string;
   minimum: number;
@@ -315,13 +320,19 @@ export interface DosingLog {
   current?: number;
   target?: number;
   ml: number;
+  amount?: number;
+  unit?: string;
   chamberMaterial?: string;
   material?: string;
   inventoryItemId?: string;
   reason?: string;
   sourceReadingTimestamp?: string;
   plannedSteps?: number;
+  steps?: number;
+  perStep?: number;
   stepIndex?: number;
+  calculatorMode?: "dry" | "stock" | "product" | "routine";
+  status?: "planned" | "in_progress" | "logged";
   verifyAfter?: string;
 }
 
