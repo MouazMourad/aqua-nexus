@@ -7,7 +7,7 @@ import { completeMaintenanceTask,maintenanceEffectiveState } from "@/domain/main
 import { systemAlerts } from "@/domain/alertEngine";
 import { chemistryGuidance } from "@/domain/chemistryGuidance";
 import { chemistryHealthAssessment } from "@/domain/health";
-import { latestParameterSample,validateChemistryValue,validateDosingTarget,weeklyChemistryCoverage } from "@/domain/chemistryDataQuality";
+import { findNearDuplicateChemistryReading,latestParameterSample,validateChemistryValue,validateDosingTarget,weeklyChemistryCoverage } from "@/domain/chemistryDataQuality";
 import { rodiIntelligence } from "@/domain/rodiIntelligence";
 import { sumpIntelligence } from "@/domain/sumpIntelligence";
 import { stockingReadiness } from "@/domain/stockingReadiness";
@@ -29,6 +29,11 @@ import { biologicalCycleStatus,cycleRelevantMaintenanceTask,isCyclePageAllowed }
 import { biologicalCycleKnowledgeSnapshot } from "@/domain/biologicalCycleKnowledge";
 import { isAquariumScopedQuestion } from "@/domain/aquaAIScope";
 import { diseaseEntriesFor,diseaseGroupCounts } from "@/domain/diseaseCatalog";
+import { requiresPostDoseRetest } from "@/domain/dosingSafety";
+import { waterChangeIntelligence } from "@/domain/waterChangeIntelligence";
+import { biologicalMemory,eventChemistryLinks } from "@/domain/tankLearning";
+import { repeatedResponsePatterns } from "@/domain/tankPatterns";
+import { claimCriticalAction,releaseCriticalAction } from "@/lib/actionGuard";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -142,6 +147,86 @@ describe("Safety and data-integrity regression",()=>{
     const audit=sumpIntelligence(t);
     expect(audit.drainbackSource).toBe("measured");
     expect(audit.drainbackEstimate).toBe(42);
+  });
+});
+
+describe("Cross-workflow catastrophe prevention",()=>{
+  it("requires a fresh chemistry reading after a corrective dose",()=>{
+    const t=structuredClone(demoMarineTank);
+    const readingAt="2026-09-20T10:00:00.000Z";
+    t.chemistry=[{timestamp:readingAt,values:{KH:6.8},confidence:"high",source:"manual"}];
+    t.dosing=[{id:"dose-1",timestamp:"2026-09-20T10:05:00.000Z",lastExecutedAt:"2026-09-20T10:06:00.000Z",parameter:"KH",current:6.8,target:8,ml:10,amount:10,unit:"mL",calculatorMode:"product",status:"logged",sourceReadingTimestamp:readingAt}];
+    expect(requiresPostDoseRetest(t,"KH",readingAt)).toBe(true);
+    t.chemistry.unshift({timestamp:"2026-09-20T12:00:00.000Z",values:{KH:7.2},confidence:"high",source:"manual"});
+    expect(requiresPostDoseRetest(t,"KH",t.chemistry[0].timestamp)).toBe(false);
+  });
+  it("classifies very large or compounded water changes as dangerous",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.chemistry=[{timestamp:new Date().toISOString(),values:{salinity:1.025,temperature:25,NO3:35,PO4:.25},confidence:"high",source:"manual"}];
+    expect(waterChangeIntelligence(t,60,1.025,25).risk).toBe("danger");
+    expect(waterChangeIntelligence(t,40,1.020,21).risk).toBe("danger");
+    expect(waterChangeIntelligence(t,15,1.025,25).risk).toBe("normal");
+  });
+  it("detects a likely accidental duplicate chemistry reading",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.chemistry=[{timestamp:new Date().toISOString(),values:{KH:7.1,Ca:450},confidence:"high",source:"manual"}];
+    expect(findNearDuplicateChemistryReading(t,{KH:7.1,Ca:450},10)).toBeTruthy();
+    expect(findNearDuplicateChemistryReading(t,{KH:7.2,Ca:450},10)).toBeFalsy();
+  });
+  it("rejects immediate duplicate execution claims for the same critical action",()=>{
+    const key="test-action-"+Date.now();
+    releaseCriticalAction(key);
+    expect(claimCriticalAction(key,2000)).toBe(true);
+    expect(claimCriticalAction(key,2000)).toBe(false);
+    releaseCriticalAction(key);
+    expect(claimCriticalAction(key,2000)).toBe(true);
+    releaseCriticalAction(key);
+  });
+});
+
+describe("Realistic tank-story intelligence",()=>{
+  it("connects livestock death, nutrient rise, overdue maintenance, water change and recovery without claiming causation",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.timeline=[];t.chemistry=[];t.waterChanges=[];t.livestockExits=[];t.maintenance=[];
+    t.chemistry=[
+      {timestamp:"2026-09-05T12:00:00.000Z",values:{NO3:22,PO4:.12,KH:7.4},confidence:"high",source:"manual"},
+      {timestamp:"2026-09-03T12:00:00.000Z",values:{NO3:35,PO4:.20,KH:7.4},confidence:"high",source:"manual"},
+      {timestamp:"2026-09-01T12:00:00.000Z",values:{NO3:20,PO4:.12,KH:7.5},confidence:"high",source:"manual"}
+    ];
+    t.timeline=[
+      {id:"wc",timestamp:"2026-09-04T12:00:00.000Z",type:"waterchange",textAr:"تم تغيير 20% من الماء",textEn:"20% water change completed"},
+      {id:"death",timestamp:"2026-09-02T12:00:00.000Z",type:"livestock-death",textAr:"وفاة Candy Cane وإزالة الأنسجة الميتة",textEn:"Candy Cane death and dead tissue removed"}
+    ];
+    t.waterChanges=[{id:"wc1",timestamp:"2026-09-04T12:00:00.000Z",liters:100,percent:20}];
+    t.livestockExits=[{id:"exit1",timestamp:"2026-09-02T12:00:00.000Z",livestockId:"candy",name:"Candy Cane",category:"coral",quantity:1,reason:"death",bodyRemoved:true}];
+    t.maintenance=[{id:"socks",title:"تنظيف الجرابات",titleEn:"Clean filter socks",cadence:"weekly",done:false,nextDue:"2026-09-02"}];
+    const links=eventChemistryLinks(t);
+    const death=links.find(x=>x.event.id==="death");
+    const wc=links.find(x=>x.event.id==="wc");
+    expect(death?.chemistryChanges.some(x=>x.parameter==="NO3"&&x.delta>0)).toBe(true);
+    expect(wc?.chemistryChanges.some(x=>x.parameter==="NO3"&&x.delta<0)).toBe(true);
+    expect((wc?.en||"").toLowerCase()).toContain("after");
+    expect(biologicalMemory(t).some(x=>x.event.id==="death"||x.event.id==="wc")).toBe(true);
+    expect(maintenanceEffectiveState(t.maintenance[0],"2026-09-05").overdue).toBe(true);
+  });
+
+  it("learns a repeated tank-specific maintenance response instead of presenting it as causation",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.timeline=[
+      {id:"m2",timestamp:"2026-08-20T12:00:00.000Z",type:"maintenance",textAr:"تنظيف الفلتر",textEn:"Filter cleaning"},
+      {id:"m1",timestamp:"2026-08-10T12:00:00.000Z",type:"maintenance",textAr:"تنظيف الفلتر",textEn:"Filter cleaning"}
+    ];
+    t.chemistry=[
+      {timestamp:"2026-08-22T12:00:00.000Z",values:{NO3:20},confidence:"high",source:"manual"},
+      {timestamp:"2026-08-19T12:00:00.000Z",values:{NO3:30},confidence:"high",source:"manual"},
+      {timestamp:"2026-08-12T12:00:00.000Z",values:{NO3:24},confidence:"high",source:"manual"},
+      {timestamp:"2026-08-09T12:00:00.000Z",values:{NO3:34},confidence:"high",source:"manual"}
+    ];
+    const patterns=repeatedResponsePatterns(t);
+    const p=patterns.find(x=>x.eventType==="maintenance"&&x.parameter==="NO3");
+    expect(p).toBeTruthy();
+    expect(p?.direction).toBe("down");
+    expect((p?.en||"").toLowerCase()).toContain("not proof of causation");
   });
 });
 
