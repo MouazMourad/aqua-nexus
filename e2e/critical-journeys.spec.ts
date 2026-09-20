@@ -57,7 +57,7 @@ test("maintenance controls stay compact and disease category filters keep result
   await expect(complete).toBeVisible();
   const box=await complete.boundingBox();
   expect(box).not.toBeNull();
-  if(box)expect(box.width).toBeLessThan(120);
+  if(box){expect(box.width).toBeLessThan(120);expect(box.height).toBeGreaterThanOrEqual(40);}
 
   await page.locator('[data-aqua-page="diseases"]').click();
   const category=page.locator('.filter-bar select').nth(1);
