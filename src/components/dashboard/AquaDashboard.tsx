@@ -94,21 +94,23 @@ export function AquaDashboard() {
  }
 
  function create(){
-  const id=uid("tank"),each=sl/Math.max(1,count);
+  const id=uid("tank"),each=sl/Math.max(1,count),createdAt=nowISO();
+  const cycleMode=status==="new"||status==="cycling";
   const chamberRows=hasSump?Array.from({length:count},(_,i)=>({id:uid("ch"),name:`حجرة ${i+1}`,nameEn:`Chamber ${i+1}`,x:i*each,y:0,length:each,width:sw,height:sh,waterHeight:sh*fill/100,media:[]})):[];
   const returnChamberId=chamberRows[chamberRows.length-1]?.id;
   const values:Record<string,number|null>={};
   Object.entries(chemCfg).forEach(([k,m]:[string,any])=>values[k]=chem[k] ?? (useDefaults ? m.def : null));
-  const weeklyTask = {id:uid("task"),title:"قياس النسب الكيميائية الأسبوعي",titleEn:"Weekly chemistry measurement",cadence:"weekly" as const,done:false,nextDue:new Date(Date.now()+7*86400000).toISOString().slice(0,10),manual:false};
+  const weeklyTask = {id:uid("task"),title:cycleMode?"فحص كيمياء الدورة البيولوجية":"قياس النسب الكيميائية الأسبوعي",titleEn:cycleMode?"Biological cycle chemistry test":"Weekly chemistry measurement",cadence:"weekly" as const,done:false,nextDue:new Date(Date.now()+(cycleMode?1:7)*86400000).toISOString().slice(0,10),manual:false,sourceDomain:cycleMode?"system" as const:undefined,sourceId:cycleMode?"cycle:chemistry":undefined};
+  const inspectTask = {id:uid("task"),title:cycleMode?"فحص تشغيل الفلترة والمضخات أثناء الدورة":"تنظيف وفحص النظام",titleEn:cycleMode?"Check filtration and pumps during cycling":"Inspect and clean system",cadence:"weekly" as const,done:false,nextDue:new Date(Date.now()+(cycleMode?1:7)*86400000).toISOString().slice(0,10),manual:false,sourceDomain:cycleMode?"system" as const:undefined,sourceId:cycleMode?"cycle:equipment":undefined};
   const newTank:Tank={
-   id,name:name||tr(language,"addTank"),type,ecosystemProfile:profile==="auto"?undefined:profile,status,ageMonths,
+   id,name:name||tr(language,"addTank"),type,ecosystemProfile:profile==="auto"?undefined:profile,status:cycleMode?"cycling":status,ageMonths,
    display:{length:l,width:w,height:h,displacementPercent:loss,grossLiters:preview.gross,netLiters:preview.net},
    sump:{enabled:hasSump,dimensions:{length:sl,width:sw,height:sh},operatingFillPercent:fill,chambers:chamberRows},
    systemVolumeLiters:preview.system,
    equipment:equipment.map((kind)=>({id:uid("eq"),name:equipOptions.find(x=>x.kind===kind)?.en||kind,kind,location:kind==="lighting"||kind==="waveMaker"||kind==="overflow"?"display":hasSump&&kind==="returnPump"&&returnChamberId?`sump:${returnChamberId}`:"external",status:"on",displayPosition:undefined} as any)),
    chemistry:[{timestamp:nowISO(),values,usingDefaults:useDefaults}],
-   maintenance:maintenanceDone?[weeklyTask,{id:uid("task"),title:"تنظيف وفحص النظام",titleEn:"Inspect and clean system",cadence:"weekly",done:false,nextDue:new Date(Date.now()+7*86400000).toISOString().slice(0,10)}]:[weeklyTask],
-   livestock:[],inventory:[],timeline:[{id:uid("ev"),timestamp:nowISO(),type:"setup",textAr:"تم إنشاء الحوض عبر معالج الإعداد الذكي.",textEn:"Tank created using the Smart Setup Wizard."}],photos:[],feeding:[],dosing:[],doserChannels:[],quarantine:[],expenses:[],waterChanges:[],rodi:[],createdAt:nowISO()
+   maintenance:maintenanceDone?[weeklyTask,inspectTask]:[weeklyTask],
+   livestock:[],inventory:[],timeline:[{id:uid("ev"),timestamp:createdAt,type:"setup",textAr:cycleMode?"تم إنشاء الحوض وبدأت الدورة البيولوجية تلقائياً — اليوم 1.":"تم إنشاء الحوض عبر معالج الإعداد الذكي.",textEn:cycleMode?"Tank created and Biological Cycling Mode started automatically — day 1.":"Tank created using the Smart Setup Wizard."}],photos:[],feeding:[],dosing:[],doserChannels:[],quarantine:[],expenses:[],waterChanges:[],rodi:[],biologicalCycle:cycleMode?{startedAt:createdAt,method:"fishless"}:undefined,createdAt
   };
   addTank(newTank);setTrainingPreviewId(null);setOpen(false);resetWizard();setPage("dashboard");
  }
@@ -150,6 +152,7 @@ export function AquaDashboard() {
      <div><small>{tr(language,"displayVolume")}</small><b>{preview.net.toFixed(1)} L</b></div>
      <div><small>{tr(language,"systemVolume")}</small><b>{preview.system.toFixed(1)} L</b></div>
      <div><small>{tr(language,"equipment")}</small><b>{equipment.length}</b></div>
+     {(status==="new"||status==="cycling")&&<div className="full-field inline-alert warn"><b>{bi(language,"الدورة البيولوجية ستبدأ تلقائياً من اليوم 1.","Biological Cycling Mode will start automatically on day 1.")}</b><br/>{bi(language,"خلالها Aqua Nexus يوقف العمليات غير المرتبطة بالدورة حتى تثبت الجاهزية من القياسات.","During cycling, Aqua Nexus locks non-cycle workflows until readiness is proven by measured tests.")}</div>}
    </div>}
 
    <div className="modal-actions">{step>1&&<button className="btn" onClick={()=>setStep(step-1)}>{tr(language,"back")}</button>}{step<7?<button className="btn primary" onClick={()=>setStep(step+1)}>{tr(language,"next")}</button>:<button className="btn primary" onClick={create}>{tr(language,"finish")}</button>}</div>
