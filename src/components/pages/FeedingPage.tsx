@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { uid,nowISO } from "@/lib/appUtils";
 import { feedingIntelligence } from "@/domain/feedingIntelligence";
 import { inventoryForConsumer } from "@/domain/inventoryIntelligence";
+import { claimCriticalAction } from "@/lib/actionGuard";
 
 export function FeedingPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),[food,setFood]=useState(""),[amount,setAmount]=useState(""),[notes,setNotes]=useState(""),[inventoryItemId,setInventoryItemId]=useState(""),[used,setUsed]=useState(""),[showDetails,setShowDetails]=useState(false),[showHistory,setShowHistory]=useState(false);
@@ -34,6 +35,7 @@ export function FeedingPage({tank}:{tank:Tank}) {
   if(!selected){window.alert(bi(lang,"اختر مادة الطعام من المخزون قبل تسجيل التغذية.","Select the food item from inventory before logging feeding."));return}
   if(!Number.isFinite(q)||q<=0){window.alert(bi(lang,"أدخل الكمية المستهلكة من المخزون.","Enter the quantity consumed from inventory."));return}
   if(q>selected.quantity){window.alert(bi(lang,"الكمية المستخدمة أكبر من المخزون المتوفر.","Used quantity exceeds available stock."));return}
+  if(!claimCriticalAction(`feeding:${tank.id}:${selected.id}`))return;
   patch(tank.id,t=>{
    const inv=t.inventory.find(x=>x.id===inventoryItemId);
    if(!inv)return t;
