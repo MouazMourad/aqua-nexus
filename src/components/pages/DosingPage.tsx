@@ -10,6 +10,7 @@ import { calculateDose,DOSING_PRESETS,type DosingForm,type DosingParameter } fro
 import { chemistryGuidance } from "@/domain/chemistryGuidance";
 import { latestParameterSample,validateChemistryValue,validateDosingTarget } from "@/domain/chemistryDataQuality";
 import { correctiveDosingInventory,inventoryProfile,routineDosingInventory } from "@/domain/inventoryIntelligence";
+import { requiresPostDoseRetest } from "@/domain/dosingSafety";
 
 const colors=["#27c2dc","#62d48f","#f6c85f","#c877ff","#ff7e79","#4b8bff"];
 function idealTarget(tank:Tank,param:DosingParameter){const meta:any=chemistryCatalogForTank(tank)?.[param];return meta?.ideal?(Number(meta.ideal[0])+Number(meta.ideal[1]))/2:param==="KH"?8:param==="Ca"?430:1325;}
@@ -25,13 +26,7 @@ export function DosingPage({tank}:{tank:Tank}) {
  const routineItem=routineStock.find(x=>x.id===routineItemId);
  useEffect(()=>{if(inventoryItemId&&!correctiveStock.some(x=>x.id===inventoryItemId))setInventoryItemId("");},[inventoryItemId,correctiveStock]);
  const current=sample?.value,readingAgeHours=sample?Math.max(0,(Date.now()-new Date(sample.timestamp).getTime())/3600000):99999,currentIssue=current===undefined?undefined:validateChemistryValue(tank,param,current),dataIssue=guide.dataIssues.find(x=>x.key===param),targetCheck=useMemo(()=>validateDosingTarget(tank,param,target),[tank,param,target]);
- const latestCorrectiveExecution=useMemo(()=>tank.dosing
-  .filter(x=>x.parameter===param&&x.calculatorMode!=="routine"&&x.status!=="planned")
-  .map(x=>({log:x,at:new Date(x.lastExecutedAt||x.timestamp).getTime()}))
-  .filter(x=>Number.isFinite(x.at))
-  .sort((a,b)=>b.at-a.at)[0],[tank.dosing,param]);
- const sampleTime=sample?new Date(sample.timestamp).getTime():0;
- const needsPostDoseRetest=Boolean(sample&&latestCorrectiveExecution&&latestCorrectiveExecution.at>=sampleTime);
+ const needsPostDoseRetest=useMemo(()=>requiresPostDoseRetest(tank,param,sample?.timestamp),[tank,param,sample?.timestamp]);
  const dosingReady=current!==undefined&&readingAgeHours<=48&&sample?.confidence!=="low"&&!currentIssue&&!dataIssue&&!needsPostDoseRetest&&!targetCheck.blocked;
  const calc=useMemo(()=>calculateDose({parameter:param,current:current??Number.NaN,target,volumeLiters:tank.systemVolumeLiters,form,presetId:chosen?.id,purityPercent:purity,stockGramsPerLiter,productRaisePerMlPer100L:productRaise}),[param,current,target,tank.systemVolumeLiters,form,chosen?.id,purity,stockGramsPerLiter,productRaise]);
  function setCount(n:number){patch(tank.id,t=>{const channels=[...t.doserChannels];while(channels.length<n)channels.push({id:uid("dc"),name:`Channel ${channels.length+1}`,material:"",capacityMl:1000,currentMl:1000,consumption:0,period:"daily",color:colors[channels.length%colors.length]});return {...t,doserChannels:channels.slice(0,n)};});}
