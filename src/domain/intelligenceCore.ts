@@ -26,7 +26,7 @@ export interface IntelligenceAction{
 
 const pageByDomain:Record<IntelligenceDomain,string>={
  chemistry:"chemistry",dosing:"dosing",maintenance:"maintenance",equipment:"equipment",livestock:"livestock",inventory:"inventory",feeding:"feeding",
- waterChange:"water-change",rodi:"rodi",plantCare:"livestock",quarantine:"quarantine",emergency:"emergency",acclimation:"acclimation",sump:"sump",journal:"journal",expense:"expenses",system:"dashboard"
+ waterChange:"waterchange",rodi:"rodi",plantCare:"livestock",quarantine:"quarantine",emergency:"emergency",acclimation:"acclimation",sump:"sump",journal:"journal",expense:"expenses",system:"dashboard"
 };
 
 export interface TankIntelligenceCore{
