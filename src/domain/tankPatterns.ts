@@ -38,6 +38,18 @@ export interface RepeatedResponsePattern {
   en:string;
 }
 
+export interface TankLearningMaturity {
+  score:number;
+  level:"early"|"growing"|"mature";
+  confidence:"low"|"medium"|"high";
+  measuredReadings:number;
+  observedDays:number;
+  repeatedPatterns:number;
+  linkedEvents:number;
+  ar:string;
+  en:string;
+}
+
 function ts(x:string){return new Date(x).getTime();}
 function finite(v:unknown):v is number{return typeof v==="number"&&Number.isFinite(v);}
 function median(values:number[]){
@@ -61,10 +73,12 @@ function paramsFor(tank:Tank):Parameter[]{
   return tank.type==="marine"?["KH","Ca","Mg","NO3","PO4","pH","salinity","temperature"]:["KH","NO3","pH","temperature"];
 }
 function declineRates(tank:Tank,param:Parameter){
-  const readings=[...tank.chemistry]
+  const all=[...tank.chemistry]
     .filter(x=>!x.usingDefaults&&finite(x.values[param])&&Number.isFinite(ts(x.timestamp)))
-    .sort((a,b)=>ts(a.timestamp)-ts(b.timestamp))
-    .slice(-14);
+    .sort((a,b)=>ts(a.timestamp)-ts(b.timestamp));
+  const cutoff=Date.now()-365*DAY;
+  const recent=all.filter(x=>ts(x.timestamp)>=cutoff);
+  const readings=(recent.length>=2?recent:all).slice(-120);
   const rates:{rate:number;end:number}[]=[];
   for(let i=1;i<readings.length;i++){
     const a=readings[i-1],b=readings[i],ta=ts(a.timestamp),tb=ts(b.timestamp),days=(tb-ta)/DAY;
@@ -94,10 +108,13 @@ function eventLabel(type:string,lang:"ar"|"en"){
 export function tankBaselines(tank:Tank):TankBaseline[]{
   const out:TankBaseline[]=[];
   for(const parameter of paramsFor(tank)){
-    const values=[...tank.chemistry]
-      .filter(x=>!x.usingDefaults&&finite(x.values[parameter]))
-      .slice(0,12)
-      .map(x=>Number(x.values[parameter]));
+    const all=[...tank.chemistry]
+      .filter(x=>!x.usingDefaults&&finite(x.values[parameter])&&Number.isFinite(ts(x.timestamp)))
+      .sort((a,b)=>ts(b.timestamp)-ts(a.timestamp));
+    const cutoff=Date.now()-365*DAY;
+    const recent=all.filter(x=>ts(x.timestamp)>=cutoff);
+    const rows=(recent.length>=3?recent:all).slice(0,120);
+    const values=rows.map(x=>Number(x.values[parameter]));
     if(values.length<3)continue;
     const center=median(values),mad=median(values.map(x=>Math.abs(x-center)));
     const low=quantile(values,.15),high=quantile(values,.85),current=values[0];
@@ -120,7 +137,7 @@ export function tankBaselines(tank:Tank):TankBaseline[]{
 }
 
 export function repeatedResponsePatterns(tank:Tank):RepeatedResponsePattern[]{
-  const links=eventChemistryLinks(tank);
+  const links=eventChemistryLinks(tank,200,250);
   const groups=new Map<string,{type:string;parameter:string;deltas:number[]}>();
   for(const link of links){
     const type=normalizedEventType(`${link.event.type} ${link.event.textEn} ${link.event.textAr}`);
@@ -147,6 +164,32 @@ export function repeatedResponsePatterns(tank:Tank):RepeatedResponsePattern[]{
     });
   }
   return out.sort((a,b)=>(b.confidence==="high"?2:1)-(a.confidence==="high"?2:1)||b.sameDirectionCount-a.sameDirectionCount).slice(0,5);
+}
+
+export function tankLearningMaturity(tank:Tank):TankLearningMaturity{
+  const measured=tank.chemistry.filter(x=>!x.usingDefaults&&Number.isFinite(ts(x.timestamp))).slice().sort((a,b)=>ts(a.timestamp)-ts(b.timestamp));
+  const measuredReadings=measured.length;
+  const observedDays=measured.length>=2?Math.max(0,Math.round((ts(measured[measured.length-1].timestamp)-ts(measured[0].timestamp))/DAY)):0;
+  const repeatedPatterns=repeatedResponsePatterns(tank).length;
+  const linkedEvents=eventChemistryLinks(tank,200,250).length;
+  const readingScore=Math.min(35,measuredReadings/36*35);
+  const spanScore=Math.min(30,observedDays/365*30);
+  const patternScore=Math.min(25,repeatedPatterns/4*25);
+  const eventScore=Math.min(10,linkedEvents/20*10);
+  const score=Math.max(0,Math.min(100,Math.round(readingScore+spanScore+patternScore+eventScore)));
+  const level:TankLearningMaturity["level"]=score>=70?"mature":score>=35?"growing":"early";
+  const confidence:TankLearningMaturity["confidence"]=level==="mature"?"high":level==="growing"?"medium":"low";
+  const ar=level==="mature"
+    ?`Tank Brain صار عنده ذاكرة ناضجة لهالحوض: ${measuredReadings} قراءة عبر ${observedDays} يوم و${repeatedPatterns} نمط متكرر موثق.`
+    :level==="growing"
+      ?`Tank Brain عم يبني بصمة الحوض: ${measuredReadings} قراءة عبر ${observedDays} يوم. دقته الشخصية رح تزيد مع الاستمرار بالتسجيل.`
+      :`Tank Brain لسا بمرحلة التعلم المبكر: عنده ${measuredReadings} قراءة موثقة. النصائح حالياً تعتمد أكثر على قواعد الأمان العامة.`;
+  const en=level==="mature"
+    ?`Tank Brain has a mature tank-specific memory: ${measuredReadings} measured readings across ${observedDays} days and ${repeatedPatterns} repeated response pattern(s).`
+    :level==="growing"
+      ?`Tank Brain is building this tank's fingerprint: ${measuredReadings} readings across ${observedDays} days. Personal confidence increases with continued logging.`
+      :`Tank Brain is still in early learning: ${measuredReadings} measured reading(s). Guidance currently relies more heavily on general safety rules.`;
+  return{score,level,confidence,measuredReadings,observedDays,repeatedPatterns,linkedEvents,ar,en};
 }
 
 export function learnedTankSignals(tank:Tank):LearnedSignal[]{
