@@ -1,4 +1,4 @@
-import type { Language,Tank } from "./types";
+import type { IntelligenceEventDomain,Language,Tank } from "./types";
 import { chemistryGuidance } from "./chemistryGuidance";
 import { systemHealth } from "./systemHealth";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
@@ -8,7 +8,7 @@ export type SystemAlertLevel="info"|"warn"|"danger";
 export interface SystemAlert{
   id:string;
   level:SystemAlertLevel;
-  domain:"chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|"waterChange"|"rodi"|"quarantine"|"emergency"|"acclimation"|"sump"|"journal"|"expense"|"system";
+  domain:IntelligenceEventDomain;
   ar:string;
   en:string;
   actionPage?:string;
