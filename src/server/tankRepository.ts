@@ -55,6 +55,19 @@ export async function deleteTank(workspace:string,id:string){
   return (result.rowCount??0)>0;
 }
 
+export async function deleteTankVersioned(workspace:string,id:string,expectedVersion?:number){
+  await ensureWorkspace(workspace);
+  if(expectedVersion===undefined){
+    const deleted=await deleteTank(workspace,id);
+    return {conflict:false as const,deleted};
+  }
+  const result=await query("DELETE FROM aqua_tanks WHERE workspace_key=$1 AND tank_id=$2 AND version=$3",[workspace,id,expectedVersion]);
+  if((result.rowCount??0)>0)return {conflict:false as const,deleted:true};
+  const current=await getTank(workspace,id);
+  if(!current)return {conflict:false as const,deleted:false};
+  return {conflict:true as const,current};
+}
+
 export async function importTanks(workspace:string,tanks:Tank[]){
   await ensureWorkspace(workspace);
   return transaction(async client=>{
