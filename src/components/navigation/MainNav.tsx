@@ -46,7 +46,7 @@ function dockScale(index:number,hoverIndex:number|null){
   if(distance===1)return 1.20;
   return 1;
 }
-function norm(s:string){return s.toLowerCase().normalize("NFKD").replace(/[ً-ٰٟ]/g,"").replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/s+/g," ").trim();}
+function norm(s:string){return s.toLowerCase().normalize("NFKD").replace(/[ً-ٰٟ]/g,"").replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/\s+/g," ").trim();}
 
 export function MainNav({active,onChange,lang,lockedPages=[]}:{active:AppPage;onChange:(p:AppPage)=>void;lang:Language;lockedPages?:AppPage[]}) {
   const viewport=useRef<HTMLDivElement>(null);
