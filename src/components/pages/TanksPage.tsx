@@ -56,7 +56,7 @@ export function TanksPage({tanks,selectedTankId,onSelect}:{tanks:Tank[];selected
   patchTank(editTarget.id,t=>({
    ...t,name:name.trim()||t.name,type,status:wantsCycle?"cycling":status,ageMonths,
    biologicalCycle:wantsCycle
-    ?{...(t.biologicalCycle??{startedAt:ts}),startedAt:t.biologicalCycle?.startedAt??ts}
+    ?(editCycle?.active?{...(t.biologicalCycle??{startedAt:t.createdAt||ts}),startedAt:t.biologicalCycle?.startedAt??t.createdAt??ts}:{startedAt:ts,method:"fishless"})
     :(editCycle?.active&&editCycle.ready?{...(t.biologicalCycle??{startedAt:t.createdAt}),completedAt:t.biologicalCycle?.completedAt??ts,completionReadingTimestamps:[editCycle.latestMeasured?.timestamp,editCycle.previousMeasured?.timestamp].filter(Boolean) as string[]}:t.biologicalCycle),
    display:{...t.display,length:l,width:w,height:h,displacementPercent:loss},
    sump:{...t.sump,enabled:hasSump,dimensions:{length:sl,width:sw,height:sh},operatingFillPercent:fill},
