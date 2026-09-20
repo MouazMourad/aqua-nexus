@@ -14,6 +14,8 @@ import { systemHealth } from "@/domain/systemHealth";
 import { biologicalCycleStatus,isCyclePageAllowed } from "@/domain/biologicalCycle";
 import { BiologicalCyclePanel } from "@/components/cycle/BiologicalCyclePanel";
 import { syncPushReminders } from "@/lib/pushNotifications";
+import { validateTankSetupEntry } from "@/domain/inputSanity";
+import { validateChemistryValues } from "@/domain/chemistryDataQuality";
 
 const equipOptions: {kind:EquipmentKind;ar:string;en:string}[] = [
  {kind:"lighting",ar:"إضاءة",en:"Lighting"},
@@ -104,6 +106,24 @@ export function AquaDashboard() {
    return {gross,net,system:net+sumpNet};
  },[l,w,h,loss,hasSump,sl,sw,sh,fill]);
 
+ const setupCheck=useMemo(()=>validateTankSetupEntry({
+  length:l,width:w,height:h,displacementPercent:loss,ageMonths,
+  sumpEnabled:hasSump,sumpLength:sl,sumpWidth:sw,sumpHeight:sh,sumpFillPercent:fill
+ }),[l,w,h,loss,ageMonths,hasSump,sl,sw,sh,fill]);
+ const wizardValues=useMemo(()=>{
+  const values:Record<string,number|null>={};
+  Object.entries(chemCfg).forEach(([k,m]:[string,any])=>values[k]=chem[k] ?? (useDefaults?m.def:null));
+  return values;
+ },[chemCfg,chem,useDefaults]);
+ const wizardValidationTank=useMemo(()=>({
+  id:"wizard-validation",name:name||"Wizard",type,ecosystemProfile:profile==="auto"?undefined:profile,status:status==="new"?"cycling":status,ageMonths,
+  display:{length:l,width:w,height:h,displacementPercent:loss,grossLiters:preview.gross,netLiters:preview.net},
+  sump:{enabled:hasSump,dimensions:{length:sl,width:sw,height:sh},operatingFillPercent:fill,chambers:[]},
+  systemVolumeLiters:preview.system,equipment:[],chemistry:[],maintenance:[],livestock:[],inventory:[],timeline:[],photos:[],feeding:[],dosing:[],doserChannels:[],quarantine:[],expenses:[],waterChanges:[],rodi:[],createdAt:nowISO()
+ } as Tank),[name,type,profile,status,ageMonths,l,w,h,loss,preview.gross,preview.net,preview.system,hasSump,sl,sw,sh,fill]);
+ const wizardChemIssues=useMemo(()=>validateChemistryValues(wizardValidationTank,wizardValues),[wizardValidationTank,wizardValues]);
+ const wizardStepIssue=step<=3?setupCheck.issues[0]:step===6?wizardChemIssues[0]:undefined;
+
  function resetWizard(){
   setStep(1);setName("");setType("marine");setProfile("auto");setStatus("new");setAgeMonths(0);
   setL(120);setW(60);setH(60);setLoss(15);setHasSump(true);setSl(100);setSw(40);setSh(35);setFill(75);setCount(3);
@@ -111,12 +131,14 @@ export function AquaDashboard() {
  }
 
  function create(){
+  if(!setupCheck.ok){const issue=setupCheck.issues[0];window.alert(language==="ar"?issue.ar:issue.en);return;}
+  if(!Number.isFinite(count)||count<1||count>12){window.alert(language==="ar"?"عدد حجرات السامب يجب أن يكون بين 1 و12.":"Sump chamber count must be between 1 and 12.");return;}
+  if(wizardChemIssues.length){const issue=wizardChemIssues[0];window.alert(language==="ar"?issue.ar:issue.en);return;}
   const id=uid("tank"),each=sl/Math.max(1,count),createdAt=nowISO();
   const cycleMode=status==="new"||status==="cycling";
   const chamberRows=hasSump?Array.from({length:count},(_,i)=>({id:uid("ch"),name:`حجرة ${i+1}`,nameEn:`Chamber ${i+1}`,x:i*each,y:0,length:each,width:sw,height:sh,waterHeight:sh*fill/100,media:[]})):[];
   const returnChamberId=chamberRows[chamberRows.length-1]?.id;
-  const values:Record<string,number|null>={};
-  Object.entries(chemCfg).forEach(([k,m]:[string,any])=>values[k]=chem[k] ?? (useDefaults ? m.def : null));
+  const values:Record<string,number|null>={...wizardValues};
   const weeklyTask = {id:uid("task"),title:cycleMode?"فحص كيمياء الدورة البيولوجية":"قياس النسب الكيميائية الأسبوعي",titleEn:cycleMode?"Biological cycle chemistry test":"Weekly chemistry measurement",cadence:"weekly" as const,done:false,nextDue:new Date(Date.now()+(cycleMode?1:7)*86400000).toISOString().slice(0,10),manual:false,sourceDomain:cycleMode?"system" as const:undefined,sourceId:cycleMode?"cycle:chemistry":undefined};
   const inspectTask = {id:uid("task"),title:cycleMode?"فحص تشغيل الفلترة والمضخات أثناء الدورة":"تنظيف وفحص النظام",titleEn:cycleMode?"Check filtration and pumps during cycling":"Inspect and clean system",cadence:"weekly" as const,done:false,nextDue:new Date(Date.now()+(cycleMode?1:7)*86400000).toISOString().slice(0,10),manual:false,sourceDomain:cycleMode?"system" as const:undefined,sourceId:cycleMode?"cycle:equipment":undefined};
   const newTank:Tank={
@@ -172,7 +194,9 @@ export function AquaDashboard() {
      {(status==="new"||status==="cycling")&&<div className="full-field inline-alert warn"><b>{bi(language,"الدورة البيولوجية ستبدأ تلقائياً من اليوم 1.","Biological Cycling Mode will start automatically on day 1.")}</b><br/>{bi(language,"خلالها Aqua Nexus يوقف العمليات غير المرتبطة بالدورة حتى تثبت الجاهزية من القياسات.","During cycling, Aqua Nexus locks non-cycle workflows until readiness is proven by measured tests.")}</div>}
    </div>}
 
-   <div className="modal-actions">{step>1&&<button className="btn" onClick={()=>setStep(step-1)}>{tr(language,"back")}</button>}{step<7?<button className="btn primary" onClick={()=>setStep(step+1)}>{tr(language,"next")}</button>:<button className="btn primary" onClick={create}>{tr(language,"finish")}</button>}</div>
+   {wizardStepIssue&&<div className="inline-alert danger" role="alert">{language==="ar"?wizardStepIssue.ar:wizardStepIssue.en}</div>}
+   {step===3&&(!Number.isFinite(count)||count<1||count>12)&&<div className="inline-alert danger" role="alert">{bi(language,"عدد حجرات السامب يجب أن يكون بين 1 و12.","Sump chamber count must be between 1 and 12.")}</div>}
+   <div className="modal-actions">{step>1&&<button className="btn" onClick={()=>setStep(step-1)}>{tr(language,"back")}</button>}{step<7?<button className="btn primary" disabled={Boolean(wizardStepIssue)||(step===3&&(!Number.isFinite(count)||count<1||count>12))} onClick={()=>setStep(step+1)}>{tr(language,"next")}</button>:<button className="btn primary" disabled={!setupCheck.ok||wizardChemIssues.length>0||!Number.isFinite(count)||count<1||count>12} onClick={create}>{tr(language,"finish")}</button>}</div>
   </Modal>
  );
 
