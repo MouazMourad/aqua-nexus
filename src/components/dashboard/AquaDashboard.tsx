@@ -11,6 +11,8 @@ import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
 import { tr,bi } from "@/i18n";
 import { uid,nowISO } from "@/lib/appUtils";
 import { systemHealth } from "@/domain/systemHealth";
+import { biologicalCycleStatus,isCyclePageAllowed } from "@/domain/biologicalCycle";
+import { BiologicalCyclePanel } from "@/components/cycle/BiologicalCyclePanel";
 
 const equipOptions: {kind:EquipmentKind;ar:string;en:string}[] = [
  {kind:"lighting",ar:"إضاءة",en:"Lighting"},
@@ -31,6 +33,14 @@ export function AquaDashboard() {
  const tank=(trainingPreviewId?trainingTanks.find(t=>t.id===trainingPreviewId):undefined)??selectedTank;
  const system=tank?systemHealth(tank):null;
  const showOnboarding=realTanks.length===0&&!trainingPreviewId;
+ const cycle=tank?biologicalCycleStatus(tank):null;
+ const allPages:AppPage[]=["dashboard","tanks","equipment","sump","livestock","acclimation","library","chemistry","maintenance","inventory","diseases","timeline","journal","waterchange","feeding","dosing","quarantine","emergency","rodi","expenses","alerts","reports","settings"];
+ const lockedPages:AppPage[]=cycle?.active?allPages.filter(p=>!isCyclePageAllowed(p)):[];
+ const navigatePage=(next:AppPage)=>{if(cycle?.active&&!isCyclePageAllowed(next)){setPage("dashboard");return;}setPage(next)};
+
+ useEffect(()=>{
+  if(cycle?.active&&!isCyclePageAllowed(page))setPage("dashboard");
+ },[cycle?.active,page,tank?.id]);
 
  useEffect(()=>{
   if(reminderChecked.current||!tank||typeof window==="undefined")return;
@@ -232,13 +242,15 @@ export function AquaDashboard() {
   {reminderNote&&<div className="toast-note">{reminderNote}</div>}
   <header className="topbar topbar-v12 interactive-header"><div className="brand"><div className="brand-mark">AN</div><div><strong>Aqua Nexus 3D</strong><small>{tr(language,"brand")}</small></div></div>
    <div className="top-actions"><select className="select" value={tank.id} onChange={e=>handleSelectTank(e.target.value)}>{tanks.map(t=><option key={t.id} value={t.id}>{t.isTraining?(language==="ar"?(t.type==="marine"?"🎓 حوض التدريب البحري":"🎓 حوض التدريب النهري"):(t.type==="marine"?"🎓 Marine Training Tank":"🎓 Freshwater Training Tank")):t.name}</option>)}</select><button className="btn" onClick={()=>setLanguage(language==="ar"?"en":"ar")}>{language==="ar"?"EN":"AR"}</button><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(language,"addTank")}</button></div>
-   <MainNav active={page} onChange={setPage} lang={language}/>
+   <MainNav active={page} onChange={navigatePage} lang={language} lockedPages={lockedPages}/>
   </header>
-  {page==="dashboard"&&tank.isTraining&&<TrainingCoach tank={tank} onNavigate={setPage}/>}
-  {system&&system.compatibilityAudit.issues.length>0&&<div className={`tank-attention-banner compatibility-global-banner ${system.compatibilityAudit.level==="danger"?"danger":"warn"}`}><div><b>⚠ {language==="ar"?"تعارض مستمر بين كائنات الحوض":"Persistent livestock compatibility conflict"}</b><span>{language==="ar"?system.compatibilityAudit.issues[0].ar:system.compatibilityAudit.issues[0].en}{system.compatibilityAudit.issues.length>1?(language==="ar"?` • +${system.compatibilityAudit.issues.length-1} ملاحظة أخرى`:` • +${system.compatibilityAudit.issues.length-1} more`):""}</span></div><button className="btn" onClick={()=>setPage("livestock")}>{language==="ar"?"مراجعة التوافق":"Review compatibility"}</button></div>}
-  <PageRouter page={page} tank={tank} tanks={tanks} selectedTankId={selectedTankId} onSelectTank={id=>{handleSelectTank(id);setPage("dashboard")}} onNavigate={setPage}/>
+  {page==="dashboard"&&tank.isTraining&&<TrainingCoach tank={tank} onNavigate={navigatePage}/>}
+  {page==="dashboard"&&cycle?.active&&<BiologicalCyclePanel tank={tank} onNavigate={navigatePage}/>}
+  {cycle?.active&&<div className="tank-attention-banner cycle-global-banner"><div><b>🧪 {language==="ar"?`الدورة البيولوجية — اليوم ${cycle.day}`:`Biological cycle — day ${cycle.day}`}</b><span>{language==="ar"?cycle.nextAr:cycle.nextEn}</span></div><span className="status warn">{cycle.progress}%</span></div>}
+  {!cycle?.active&&system&&system.compatibilityAudit.issues.length>0&&<div className={`tank-attention-banner compatibility-global-banner ${system.compatibilityAudit.level==="danger"?"danger":"warn"}`}><div><b>⚠ {language==="ar"?"تعارض مستمر بين كائنات الحوض":"Persistent livestock compatibility conflict"}</b><span>{language==="ar"?system.compatibilityAudit.issues[0].ar:system.compatibilityAudit.issues[0].en}{system.compatibilityAudit.issues.length>1?(language==="ar"?` • +${system.compatibilityAudit.issues.length-1} ملاحظة أخرى`:` • +${system.compatibilityAudit.issues.length-1} more`):""}</span></div><button className="btn" onClick={()=>navigatePage("livestock")}>{language==="ar"?"مراجعة التوافق":"Review compatibility"}</button></div>}
+  <PageRouter page={page} tank={tank} tanks={tanks} selectedTankId={selectedTankId} onSelectTank={id=>{handleSelectTank(id);setPage("dashboard")}} onNavigate={navigatePage}/>
 
-  <AquaAIAssistant tank={tank} page={page} onNavigate={setPage}/>
+  <AquaAIAssistant tank={tank} page={page} onNavigate={navigatePage}/>
 
   {wizardModal}
  </main>;
