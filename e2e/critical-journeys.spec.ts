@@ -168,7 +168,15 @@ test("progressive navigation keeps every module reachable and supports keyboard 
   await page.keyboard.press("Control+K");
   const dialog=page.getByRole("dialog",{name:/بحث Aqua Nexus|Aqua Nexus search/});
   await expect(dialog).toBeVisible();
+  await expect(dialog.locator('[data-quick-action="chemistry"]')).toBeVisible();
+  await dialog.locator("input").fill("lighting");
+  await expect(dialog.locator('[data-command-kind="equipment"]').first()).toBeVisible();
   await dialog.locator("input").fill("RO/DI");
-  await dialog.locator('[data-command-page="rodi"]').click();
+  await dialog.locator('[data-command-page="rodi"]').first().click();
   await expect(page.locator(".page-grid")).toContainText(/RO\/DI/);
+
+  await page.getByRole("button",{name:/إجراءات سريعة|Quick actions/}).click();
+  const quick=page.getByRole("dialog",{name:/بحث Aqua Nexus|Aqua Nexus search/});
+  await quick.locator('[data-quick-action="chemistry"]').click();
+  await expect(page.locator(".page-grid")).toContainText(/شو وضع الكيمياء فعلياً|What is actually happening with chemistry/);
 });
