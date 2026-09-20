@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Modal } from "@/components/ui/Modal";
 import { biologicalCycleStatus } from "@/domain/biologicalCycle";
 import { nowISO,uid } from "@/lib/appUtils";
+import { validateTankSetupEntry } from "@/domain/inputSanity";
 
 function SwipeTankCard({tank,selected,onSelect,onEdit,onDelete}:{tank:Tank;selected:boolean;onSelect:()=>void;onEdit:()=>void;onDelete:()=>void}){
  const lang=useAquaStore(s=>s.language);
