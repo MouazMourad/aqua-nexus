@@ -11,15 +11,17 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Modal } from "@/components/ui/Modal";
 import { uid,today,nowISO } from "@/lib/appUtils";
 
+type EntryCategory=LivestockItem["category"]|"macroalgae";
+
 export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
- const [open,setOpen]=useState(false),[category,setCategory]=useState<LivestockItem["category"]>("fish"),[selected,setSelected]=useState(""),[custom,setCustom]=useState(""),[qty,setQty]=useState(1),[riskConfirmed,setRiskConfirmed]=useState(false),[editId,setEditId]=useState<string|null>(null),[editQty,setEditQty]=useState(1),[editHealth,setEditHealth]=useState<LivestockItem["health"]>("good"),[editSize,setEditSize]=useState(0),[editNotes,setEditNotes]=useState(""),[removeId,setRemoveId]=useState<string|null>(null),[exitReason,setExitReason]=useState<"death"|"sold"|"transferred"|"returned"|"removed"|"unknown">("removed"),[bodyRemoved,setBodyRemoved]=useState(true),[exitSymptoms,setExitSymptoms]=useState(""),[exitNotes,setExitNotes]=useState("");
+ const [open,setOpen]=useState(false),[category,setCategory]=useState<EntryCategory>("fish"),[selected,setSelected]=useState(""),[custom,setCustom]=useState(""),[qty,setQty]=useState(1),[riskConfirmed,setRiskConfirmed]=useState(false),[editId,setEditId]=useState<string|null>(null),[editQty,setEditQty]=useState(1),[editHealth,setEditHealth]=useState<LivestockItem["health"]>("good"),[editSize,setEditSize]=useState(0),[editNotes,setEditNotes]=useState(""),[removeId,setRemoveId]=useState<string|null>(null),[exitReason,setExitReason]=useState<"death"|"sold"|"transferred"|"returned"|"removed"|"unknown">("removed"),[bodyRemoved,setBodyRemoved]=useState(true),[exitSymptoms,setExitSymptoms]=useState(""),[exitNotes,setExitNotes]=useState("");
  const b=bioload(tank);
  const audit=useMemo(()=>auditTankCompatibility(tank),[tank]);
  const library:any[]=LIVESTOCK_LIBRARY.filter((x:any)=>x.type===tank.type);
  const list=useMemo(()=>library.filter((x:any)=>{
    const c=String(x.cat).toLowerCase();
-   const mapped=c==="fish"?"fish":c==="coral"?"coral":c==="invert"?"invert":c==="plant"?"plant":"other";
+   const mapped:EntryCategory=c==="fish"?"fish":c==="coral"?"coral":c==="invert"?"invert":c==="plant"?(tank.type==="marine"?"macroalgae":"plant"):"other";
    return mapped===category;
  }),[category,tank.type]);
  const chosen:any=list.find(x=>x.id===selected);
@@ -34,7 +36,7 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
   if(readinessNeedsConfirm&&!riskConfirmed)return;
   const name=selected==="__other__"?(custom||tr(lang,"otherEntry")):(chosen?.ar||custom);
   const nameEn=selected==="__other__"?(custom||"Other"):(chosen?.en||custom);
-  const item:LivestockItem={id:uid("live"),libraryId:chosen?.id,name,nameEn,category,quantity:qty,health:"good",load:chosen?.load??1,addedAt:today()};
+  const item:LivestockItem={id:uid("live"),libraryId:chosen?.id,name,nameEn,category:category==="macroalgae"?"plant":category,subtype:category==="macroalgae"?"macroalgae":undefined,quantity:qty,health:"good",load:chosen?.load??1,addedAt:today()};
   patch(tank.id,t=>({...t,livestock:[...t.livestock,item],timeline:[{id:uid("ev"),timestamp:nowISO(),type:"livestock",textAr:`تمت إضافة ${qty} × ${name}.`,textEn:`Added ${qty} × ${nameEn}.`},...t.timeline]}));
   close();
  }
