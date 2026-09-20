@@ -92,6 +92,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const [showItemAdvanced,setShowItemAdvanced]=useState(false);
  const audioCtxRef=useRef<AudioContext|null>(null);
  const notifiedTimersRef=useRef<Set<string>>(new Set());
+ const wakeLockRef=useRef<any>(null);
  const lib:any[]=LIVESTOCK_LIBRARY.filter((x:any)=>x.type===tank.type);
  const acclimationStock=useMemo(()=>inventoryForConsumer(tank,"acclimation"),[tank]);
  const allowedCats:Cat[]=allowedAcclimationCategories(tank.type);
@@ -120,6 +121,22 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   });
  },[active?.items]);
  const releasePlan=useMemo(()=>releaseLanes.flatMap(x=>x.entries),[releaseLanes]);
+ const criticalTimerRunning=Boolean(active&&(active.floatStatus==="running"||active.bucketStatus==="running"||(active.items??[]).some(i=>i.status==="acclimating"&&Boolean(i.endAt))||(active.coralDipRuns??[]).some(r=>r.status==="running")));
+ useEffect(()=>{
+  if(!criticalTimerRunning||typeof navigator==="undefined"||!("wakeLock" in navigator))return;
+  let cancelled=false;
+  const acquire=async()=>{
+   if(cancelled||document.visibilityState!=="visible"||wakeLockRef.current)return;
+   try{
+    wakeLockRef.current=await (navigator as any).wakeLock.request("screen");
+    wakeLockRef.current?.addEventListener?.("release",()=>{wakeLockRef.current=null;});
+   }catch{}
+  };
+  const onVisibility=()=>{if(document.visibilityState==="visible")void acquire();};
+  void acquire();
+  document.addEventListener("visibilitychange",onVisibility);
+  return()=>{cancelled=true;document.removeEventListener("visibilitychange",onVisibility);try{wakeLockRef.current?.release?.();}catch{}wakeLockRef.current=null;};
+ },[criticalTimerRunning]);
  const releaseBatches=useMemo(()=>releaseLanes.flatMap(lane=>lane.batches.map(meta=>{
   const entries=lane.entries.filter(x=>x.batch===meta.batch);
   const items=entries.map(x=>x.item);
@@ -369,7 +386,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  function moveItem(id:string,dir:number){if(!active)return;const a=[...active.items],i=a.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];saveSession({...active,items:a});}
  function autoOrder(){if(!active)return;saveSession({...active,items:[...active.items].sort((a,b)=>score(a)-score(b)),events:[ev("تم تطبيق ترتيب التنزيل المقترح.","Suggested release order applied."),...active.events]});}
 
- const preflight=useMemo(()=>{const base=lang==="ar"?["سطل/وعاء نظيف ومخصص لكل مجموعة","خرطوم تنقيط مع محبس تحكم","شبكة / وعاء نقل منفصل","Refractometer أو جهاز قياس الملوحة","ميزان حرارة","مناشف ومكان عمل جاف","اختبار صوت التنبيهات"]:["Clean dedicated container(s)","Airline / drip line + valve","Net / specimen container","Refractometer or salinity meter","Thermometer","Towels + dry working area","Timer/sound volume checked"];if(active?.items.some(i=>i.category==="coral")&&active.coralDipEnabled)base.push(lang==="ar"?"ماء Coral Dip وماء شطف منفصل جاهزان":"Coral dip + separate rinse water prepared");if(active?.items.some(i=>i.category==="plant"))base.push(lang==="ar"?"وعاء فحص/شطف النباتات جاهز":"Plant rinse/inspection container");
+ const preflight=useMemo(()=>{const base=lang==="ar"?["سطل/وعاء نظيف ومخصص لكل مجموعة","خرطوم تنقيط مع محبس تحكم","شبكة / وعاء نقل منفصل","Refractometer أو جهاز قياس الملوحة","ميزان حرارة","مناشف ومكان عمل جاف","اختبار صوت التنبيهات","أبقِ Aqua Nexus مفتوحاً أثناء العدادات الحرجة؛ التطبيق يحاول إبقاء الشاشة مستيقظة عند دعم الجهاز"]:["Clean dedicated container(s)","Airline / drip line + valve","Net / specimen container","Refractometer or salinity meter","Thermometer","Towels + dry working area","Timer/sound volume checked","Keep Aqua Nexus open during critical timers; the app requests screen wake-lock when supported"];if(active?.items.some(i=>i.category==="coral")&&active.coralDipEnabled)base.push(lang==="ar"?"ماء Coral Dip وماء شطف منفصل جاهزان":"Coral dip + separate rinse water prepared");if(active?.items.some(i=>i.category==="plant"))base.push(lang==="ar"?"وعاء فحص/شطف النباتات جاهز":"Plant rinse/inspection container");
  if(active?.items.some(i=>i.category==="macroalgae"||i.subtype==="macroalgae"))base.push(lang==="ar"?"وعاء فحص/شطف الماكرو ألجي جاهز":"Macroalgae rinse/inspection container");return base},[active?.items,active?.coralDipEnabled,lang]);
  function toggleCheck(i:number){if(!active)return;sessionPatch({preflight:{...(active.preflight??{}),[i]:!(active.preflight??{})[i]}})}
  function startSession(){
