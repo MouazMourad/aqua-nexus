@@ -1,0 +1,33 @@
+name: Hardening lockfile refresh
+
+on:
+  push:
+    branches:
+      - feature/full-audit-hardening
+    paths:
+      - package.json
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/full-audit-hardening
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Refresh lockfile from pinned package.json
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Commit lockfile
+        run: |
+          if git diff --quiet package-lock.json; then exit 0; fi
+          git config user.name "aqua-nexus-ci"
+          git config user.email "actions@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "Refresh lockfile for security patch"
+          git push origin HEAD:feature/full-audit-hardening
