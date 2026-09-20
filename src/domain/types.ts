@@ -203,6 +203,14 @@ export type InventoryConsumer =
   | "testing"
   | "rodi";
 
+export interface InventoryUsage {
+  inventoryItemId: string;
+  quantity: number;
+  unit: string;
+  role?: string;
+  name?: string;
+}
+
 export interface InventoryItem {
   id: string;
   presetId?: string;
@@ -360,6 +368,9 @@ export interface FilterMediaItem {
   referenceLifeDays: number;
   chamberId?: string;
   notes?: string;
+  inventoryItemId?: string;
+  inventoryQuantityPerReplacement?: number;
+  inventoryUnit?: string;
 }
 
 export interface QuarantineCase {
@@ -420,6 +431,7 @@ export interface WaterChangeLog {
   saltInventoryItemId?: string;
   saltQuantityUsed?: number;
   rodiBatchId?: string;
+  inventoryUses?: InventoryUsage[];
 }
 
 export interface RODILog {
@@ -431,6 +443,14 @@ export interface RODILog {
   wasteLiters?: number;
   productionMinutes?: number;
   sourcePressurePsi?: number;
+}
+
+export interface RODIServiceEvent {
+  id: string;
+  timestamp: string;
+  component: "sediment" | "carbon" | "di";
+  inventoryUse?: InventoryUsage;
+  notes?: string;
 }
 
 export interface AcclimationItem {
@@ -564,6 +584,7 @@ export interface Tank {
   expenses: ExpenseItem[];
   waterChanges: WaterChangeLog[];
   rodi: RODILog[];
+  rodiServiceEvents?: RODIServiceEvent[];
   acclimationSessions?: AcclimationSession[];
   createdAt: string;
 }
