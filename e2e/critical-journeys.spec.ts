@@ -71,9 +71,10 @@ test("sump chamber touch editor changes geometry without page failure",async({pa
 });
 
 
-test("visual health intake analyzes an image locally and exposes safe AI second opinion",async({page})=>{
+test("visual health intake is discoverable from diseases, analyzes locally and exposes safe AI second opinion",async({page})=>{
   await openTrainingDashboard(page);
-  await page.locator('[data-aqua-page="journal"]').click();
+  await page.locator('[data-aqua-page="diseases"]').click();
+  await page.getByRole("button",{name:/تحليل صورة|Analyze photo/}).first().click();
   const visual=page.locator(".card.panel").filter({hasText:/Local Best Visual Insight/}).first();
   await expect(visual).toBeVisible();
 
