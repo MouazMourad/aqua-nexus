@@ -9,6 +9,7 @@ import { chemistryCatalogForTank } from "@/domain/chemistryProfile";
 import { calculateDose,DOSING_PRESETS,type DosingForm,type DosingParameter } from "@/domain/dosingCalculator";
 import { chemistryGuidance } from "@/domain/chemistryGuidance";
 import { latestParameterSample,validateChemistryValue,validateDosingTarget } from "@/domain/chemistryDataQuality";
+import { inventoryForConsumer } from "@/domain/inventoryIntelligence";
 
 const colors=["#27c2dc","#62d48f","#f6c85f","#c877ff","#ff7e79","#4b8bff"];
 function idealTarget(tank:Tank,param:DosingParameter){const meta:any=chemistryCatalogForTank(tank)?.[param];return meta?.ideal?(Number(meta.ideal[0])+Number(meta.ideal[1]))/2:param==="KH"?8:param==="Ca"?430:1325;}
@@ -19,6 +20,7 @@ export function DosingPage({tank}:{tank:Tank}) {
  const [param,setParam]=useState<DosingParameter>("KH"),[target,setTarget]=useState(()=>idealTarget(tank,"KH")),[form,setForm]=useState<DosingForm>("dry"),[presetId,setPresetId]=useState("nahco3"),[purity,setPurity]=useState(100),[stockGramsPerLiter,setStockGramsPerLiter]=useState(84),[productRaise,setProductRaise]=useState(0),[inventoryItemId,setInventoryItemId]=useState(""),[showAdvanced,setShowAdvanced]=useState(false),[showDoser,setShowDoser]=useState(false);
  useEffect(()=>{setTarget(idealTarget(tank,param));const first=DOSING_PRESETS.find(x=>x.parameter===param);if(first)setPresetId(first.id);},[param,tank.id]);
  const presets=DOSING_PRESETS.filter(x=>x.parameter===param),chosen=presets.find(x=>x.id===presetId)??presets[0],guide=useMemo(()=>chemistryGuidance(tank),[tank]),sample=useMemo(()=>latestParameterSample(tank,param),[tank,param]);
+ const dosingStock=useMemo(()=>inventoryForConsumer(tank,"dosing"),[tank]);
  const current=sample?.value,readingAgeHours=sample?Math.max(0,(Date.now()-new Date(sample.timestamp).getTime())/3600000):99999,currentIssue=current===undefined?undefined:validateChemistryValue(tank,param,current),dataIssue=guide.dataIssues.find(x=>x.key===param),targetCheck=useMemo(()=>validateDosingTarget(tank,param,target),[tank,param,target]);
  const dosingReady=current!==undefined&&readingAgeHours<=48&&sample?.confidence!=="low"&&!currentIssue&&!dataIssue&&!targetCheck.blocked;
  const calc=useMemo(()=>calculateDose({parameter:param,current:current??Number.NaN,target,volumeLiters:tank.systemVolumeLiters,form,presetId:chosen?.id,purityPercent:purity,stockGramsPerLiter,productRaisePerMlPer100L:productRaise}),[param,current,target,tank.systemVolumeLiters,form,chosen?.id,purity,stockGramsPerLiter,productRaise]);
@@ -91,7 +93,7 @@ export function DosingPage({tank}:{tank:Tank}) {
    <div className="module-head"><div><h4>{lang==="ar"?"ضبط دقيق وحسابات متقدمة":"Fine tuning & advanced calculation"}</h4><p className="note">{lang==="ar"?"هاي التفاصيل مو مطلوبة لمعظم الاستخدام اليومي، لكنها موجودة للمستخدم الخبير وللمواد غير القياسية.":"These details are not needed for most daily use, but remain available for expert and non-standard setups."}</p></div></div>
    <div className="form-grid">
     {form!=="product"&&<label className="field"><span>{lang==="ar"?"النقاوة الفعلية للمادة %":"Actual material purity %"}</span><input type="number" min="1" max="100" step="1" value={purity} onChange={e=>setPurity(Number(e.target.value))}/></label>}
-    <label className="field"><span>{lang==="ar"?"ربط المادة بالمخزون":"Link material to inventory"}</span><select value={inventoryItemId} onChange={e=>setInventoryItemId(e.target.value)}><option value="">{lang==="ar"?"بدون ربط":"Not linked"}</option>{tank.inventory.map(x=><option key={x.id} value={x.id}>{lang==="ar"?x.name:(x.nameEn||x.name)} • {x.quantity} {x.unit}</option>)}</select></label>
+    <label className="field"><span>{lang==="ar"?"ربط المادة بالمخزون":"Link material to inventory"}</span><select value={inventoryItemId} onChange={e=>setInventoryItemId(e.target.value)}><option value="">{lang==="ar"?"بدون ربط":"Not linked"}</option>{dosingStock.map(x=><option key={x.id} value={x.id}>{lang==="ar"?x.name:(x.nameEn||x.name)} • {x.quantity} {x.unit}</option>)}</select></label>
    </div>
    <div className="summary-strip" style={{marginTop:12}}>
     <div className="summary"><small>{lang==="ar"?"فرق التصحيح":"Required change"}</small><b>{current===undefined?"—":Math.max(0,target-current).toFixed(2)} {param==="KH"?"dKH":"ppm"}</b></div>
