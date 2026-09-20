@@ -37,6 +37,7 @@ export async function runAquaChat(input:{workspace:string;tank:Tank;question:str
   const context=buildTankAIContext(input.tank);
   const response=await fetch(`${cfg.base}/chat/completions`,{
     method:"POST",
+    signal:AbortSignal.timeout(45_000),
     headers:{"content-type":"application/json","authorization":`Bearer ${cfg.key}`},
     body:JSON.stringify({
       model:cfg.model,
