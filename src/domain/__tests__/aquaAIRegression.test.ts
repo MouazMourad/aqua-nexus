@@ -18,9 +18,10 @@ import { deriveGuidanceActions } from "@/domain/impactEngine";
 import { deriveIntelligenceEvents } from "@/domain/eventIntelligence";
 import { coralTransferGate } from "@/domain/acclimationSafety";
 import { allowedAcclimationCategories,livestockCategoryFromAcclimation,normalizeAcclimationCategory } from "@/domain/acclimationCategories";
-import { correctiveDosingInventory,inventoryForConsumer,inventoryProfile,routineDosingInventory } from "@/domain/inventoryIntelligence";
+import { correctiveDosingInventory,inventoryForConsumer,inventoryProfile,inventorySubcategoryOptions,routineDosingInventory } from "@/domain/inventoryIntelligence";
 import { consumeInventory } from "@/domain/inventoryConsumption";
 import { fitChamberToSump,sumpChamberContents } from "@/domain/sumpOperations";
+import { validateBackupPayload,validateTankImportPayload } from "@/domain/backupValidation";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -245,6 +246,28 @@ describe("Inventory data-integrity regression",()=>{
 });
 
 
+
+describe("Backup and taxonomy hardening",()=>{
+  it("accepts a structurally valid backup and preserves the selected tank",()=>{
+    const source=structuredClone(demoMarineTank);
+    const result=validateBackupPayload({language:"en",selectedTankId:source.id,tanks:[source]});
+    expect(result.ok).toBe(true);
+    if(result.ok)expect(result.data.selectedTankId).toBe(source.id);
+  });
+  it("rejects malformed tank data before replacing local state",()=>{
+    const bad={...structuredClone(demoMarineTank),systemVolumeLiters:-5};
+    expect(validateBackupPayload({language:"ar",selectedTankId:bad.id,tanks:[bad]}).ok).toBe(false);
+    expect(validateTankImportPayload({tanks:[bad]}).ok).toBe(false);
+  });
+  it("rejects duplicate tank ids in a backup",()=>{
+    const a=structuredClone(demoMarineTank),b=structuredClone(demoMarineTank);
+    expect(validateBackupPayload({language:"ar",selectedTankId:a.id,tanks:[a,b]}).ok).toBe(false);
+  });
+  it("offers standardized fertilizer and dosing subcategories",()=>{
+    expect(inventorySubcategoryOptions("fertilizer").map(x=>x.value)).toContain("potassium");
+    expect(inventorySubcategoryOptions("dosing").map(x=>x.value)).toContain("balanced_reef");
+  });
+});
 
 describe("Operations consumables regression",()=>{
   it("consumes multiple inventory requests atomically without going negative",()=>{
