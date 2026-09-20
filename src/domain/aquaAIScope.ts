@@ -1,5 +1,6 @@
 import type { Tank } from "./types";
 import type { AquaAIAnswer } from "./aquaAIBrain";
+import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
 
 function norm(s:string){
   return (s||"").toLowerCase().normalize("NFKD")
@@ -9,14 +10,44 @@ function norm(s:string){
     .replace(/[^a-z0-9\u0600-\u06ff]+/g," ").replace(/\s+/g," ").trim();
 }
 
-const AQUARIUM_TERMS=/حوض|احواض|اكواريوم|اكوا|سمك|اسماك|مرجان|مرجان|روبيان|جمبري|حلزون|نبات|مائي|مياه|بحري|نهري|ريف|reef|aquarium|tank|fish|coral|shrimp|snail|plant|marine|freshwater|livestock|sump|فلتر|فلتره|مضخ|سكيمر|heater|سخان|wave|overflow|return pump|filter|skimmer|rodi|ato|اضاء|lighting|ملوح|salinity|kh|alkal|calcium|كالسيوم|magnesium|مغنيسيوم|no3|nitrate|نترات|po4|phosphate|فوسفات|nh3|nh4|ammonia|امونيا|no2|nitrite|نتريت|ph|tds|gh|كيمياء|جرع|دوز|dosing|تغذ|feeding|اقلم|acclim|حجر|quarantine|مرض|علاج|disease|treatment|صيانه|maintenance|دوره بيولوج|cycling|bacteria|بكتيريا|ميديا|water change|تغيير ماء|تغيير مي|bioload|حمل حيوي|طحالب|algae|دياتوم|diatom|bubble|torch|mushroom|zoa|anemone|كلون|tang|goby|wrasse|chromis|nemo/;
+const RAW_AQUARIUM_KEYWORDS=[
+  "حوض","أحواض","اكواريوم","Aqua Nexus","سمك","أسماك","مرجان","روبيان","جمبري","حلزون",
+  "نبات مائي","بحري","نهري","ريف","reef","aquarium","tank","fish","coral","shrimp","snail",
+  "marine","freshwater","livestock","sump","فلتر","فلترة","مضخة","سكيمر","سخان","heater","wave",
+  "overflow","return pump","filter","skimmer","rodi","ato","إضاءة","lighting","ملوحة","salinity",
+  "KH","alkalinity","calcium","كالسيوم","magnesium","مغنيسيوم","NO3","nitrate","نترات","PO4",
+  "phosphate","فوسفات","NH3","NH4","ammonia","أمونيا","NO2","nitrite","نتريت","pH","TDS","GH",
+  "كيمياء","كيميا","جرعة","جرعات","دوز","dosing","تغذية","feeding","أقلمة","acclimation","حجر صحي",
+  "quarantine","مرض","أمراض","علاج","disease","treatment","صيانة","maintenance","دورة بيولوجية",
+  "دورة النيتروجين","cycling","bacteria","بكتيريا","ميديا","water change","تغيير ماء","تغيير مي",
+  "غيرت مي","بدلت مي","bioload","حمل حيوي","طحالب","algae","دياتوم","diatom","bubble","torch",
+  "mushroom","zoa","anemone","كلون","تانغ","tang","goby","wrasse","chromis","nemo"
+].map(norm);
 
-const AQUA_META=/شو اسمك|اسمك شو|مين انت|من انت|مين حضرتك|who are you|what is your name|hello|hi|hey|مرحبا|اهلا|أهلا|السلام عليكم/;
+const META_KEYWORDS=[
+  "شو اسمك","اسمك شو","مين انت","من انت","مين حضرتك","who are you","what is your name",
+  "hello","hi","hey","مرحبا","أهلا","السلام عليكم"
+].map(norm);
+
+const SHORT_ASCII=new Set(["kh","ph","gh"]);
+
+function containsKeyword(q:string,k:string){
+  if(SHORT_ASCII.has(k))return q.split(" ").includes(k);
+  return k.length>=2&&q.includes(k);
+}
 
 export function isAquariumScopedQuestion(question:string,tank?:Tank){
   const q=norm(question);
   if(!q)return true;
-  if(AQUA_META.test(q)||AQUARIUM_TERMS.test(q))return true;
+  if(META_KEYWORDS.some(k=>containsKeyword(q,k)))return true;
+  if(RAW_AQUARIUM_KEYWORDS.some(k=>containsKeyword(q,k)))return true;
+
+  const libraryNames=(LIVESTOCK_LIBRARY as readonly any[])
+    .flatMap(x=>[x.ar,x.en,x.id])
+    .map((x:string)=>norm(x||""))
+    .filter((x:string)=>x.length>=3);
+  if(libraryNames.some((x:string)=>q.includes(x)))return true;
+
   if(tank){
     const named=[
       tank.name,
@@ -49,7 +80,7 @@ export function offTopicAquaAnswer(question:string):AquaAIAnswer{
   ];
   const i=variant(question);
   return{
-    titleAr:"🐠 رجّعني للحوض",titleEn:"🐠 Bring me back to the tank",
+    titleAr:"🐠 خلّينا بالحوض",titleEn:"🐠 Bring me back to the tank",
     summaryAr:repliesAr[i],summaryEn:repliesEn[i],
     detailsAr:["اختصاصي هو الحوض الحالي وبياناته داخل Aqua Nexus.","بقدر أساعدك بالكيمياء، الدورة البيولوجية، الكائنات، التغذية، الجرعات، المعدات، الصيانة، الأمراض والطوارئ."],
     detailsEn:["My scope is the current aquarium and its Aqua Nexus data.","I can help with chemistry, biological cycling, livestock, feeding, dosing, equipment, maintenance, disease and emergencies."],
