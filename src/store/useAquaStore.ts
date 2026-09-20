@@ -57,6 +57,7 @@ function normalize(tank: Tank): Tank {
     guidanceActions:tank.guidanceActions ?? [],
     healthSnapshots:tank.healthSnapshots ?? [],
     photos:tank.photos ?? [],
+    visionAssessments:tank.visionAssessments ?? [],
     feeding:tank.feeding ?? [],
     dosing:tank.dosing ?? [],
     doserChannels:tank.doserChannels ?? [],
