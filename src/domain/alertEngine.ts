@@ -2,6 +2,7 @@ import type { IntelligenceEventDomain,Language,Tank } from "./types";
 import { chemistryGuidance } from "./chemistryGuidance";
 import { systemHealth } from "./systemHealth";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
+import { biologicalCycleAlert,biologicalCycleStatus } from "./biologicalCycle";
 
 export type SystemAlertLevel="info"|"warn"|"danger";
 
@@ -23,6 +24,16 @@ export function systemAlerts(tank:Tank):SystemAlert[]{
   const guide=chemistryGuidance(tank);
   const system=systemHealth(tank);
   const today=new Date().toISOString().slice(0,10);
+  const cycle=biologicalCycleStatus(tank);
+  if(cycle.active){
+    const alert=biologicalCycleAlert(tank);
+    if(alert)pushUnique(out,{id:"biological-cycle",level:alert.level,domain:"system",ar:alert.ar,en:alert.en,actionPage:alert.page});
+    for(const issue of system.equipmentAudit.issues.slice(0,6)){
+      pushUnique(out,{id:`cycle-eq-${issue.id}`,level:issue.level==="danger"?"danger":"warn",domain:"equipment",ar:issue.ar,en:issue.en,actionPage:"equipment"});
+    }
+    const order={danger:0,warn:1,info:2};
+    return out.sort((a,b)=>order[a.level]-order[b.level]);
+  }
 
   if(guide.health===null)pushUnique(out,{id:"chem-unknown",level:"warn",domain:"chemistry",ar:"بيانات الكيمياء غير كافية لتحديد Chemistry Health موثوق.",en:"Chemistry data is insufficient for a reliable Chemistry Health state.",actionPage:"chemistry"});
   for(const x of guide.dataIssues.slice(0,5)){
