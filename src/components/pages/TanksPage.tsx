@@ -6,7 +6,7 @@ import { tr,statusText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Modal } from "@/components/ui/Modal";
 import { biologicalCycleStatus } from "@/domain/biologicalCycle";
-import { nowISO } from "@/lib/appUtils";
+import { nowISO,uid } from "@/lib/appUtils";
 
 function SwipeTankCard({tank,selected,onSelect,onEdit,onDelete}:{tank:Tank;selected:boolean;onSelect:()=>void;onEdit:()=>void;onDelete:()=>void}){
  const lang=useAquaStore(s=>s.language);
@@ -53,15 +53,29 @@ export function TanksPage({tanks,selectedTankId,onSelect}:{tanks:Tank[];selected
    return;
   }
   const ts=nowISO(),wantsCycle=status==="new"||status==="cycling";
-  patchTank(editTarget.id,t=>({
-   ...t,name:name.trim()||t.name,type,status:wantsCycle?"cycling":status,ageMonths,
-   biologicalCycle:wantsCycle
-    ?(editCycle?.active?{...(t.biologicalCycle??{startedAt:t.createdAt||ts}),startedAt:t.biologicalCycle?.startedAt??t.createdAt??ts}:{startedAt:ts,method:"fishless"})
-    :(editCycle?.active&&editCycle.ready?{...(t.biologicalCycle??{startedAt:t.createdAt}),completedAt:t.biologicalCycle?.completedAt??ts,completionReadingTimestamps:[editCycle.latestMeasured?.timestamp,editCycle.previousMeasured?.timestamp].filter(Boolean) as string[]}:t.biologicalCycle),
-   display:{...t.display,length:l,width:w,height:h,displacementPercent:loss},
-   sump:{...t.sump,enabled:hasSump,dimensions:{length:sl,width:sw,height:sh},operatingFillPercent:fill},
-   equipment:hasSump?t.equipment:t.equipment.map(eq=>eq.location.startsWith("sump:")?{...eq,location:"external" as const}:eq)
-  }));
+  patchTank(editTarget.id,t=>{
+   const displayGross=l*w*h/1000;
+   const displayNet=displayGross*(1-loss/100);
+   const sumpGross=hasSump?sl*sw*sh/1000:0;
+   const nextVolume=Math.round((displayNet+sumpGross*(fill/100))*10)/10;
+   const previousVolume=t.systemVolumeLiters;
+   const volumeChanged=Math.abs(nextVolume-previousVolume)>=0.1;
+   const volumeEvent=volumeChanged?{
+    id:uid("ev"),timestamp:ts,type:"tank-volume-changed",
+    textAr:`تم تعديل حجم النظام من ${previousVolume.toFixed(1)} L إلى ${nextVolume.toFixed(1)} L. الحسابات الجديدة تعتمد الحجم الجديد من هذا التاريخ فقط.`,
+    textEn:`System volume changed from ${previousVolume.toFixed(1)} L to ${nextVolume.toFixed(1)} L. New calculations use the new volume from this timestamp onward.`
+   }:null;
+   return {
+    ...t,name:name.trim()||t.name,type,status:wantsCycle?"cycling":status,ageMonths,
+    biologicalCycle:wantsCycle
+     ?(editCycle?.active?{...(t.biologicalCycle??{startedAt:t.createdAt||ts}),startedAt:t.biologicalCycle?.startedAt??t.createdAt??ts}:{startedAt:ts,method:"fishless"})
+     :(editCycle?.active&&editCycle.ready?{...(t.biologicalCycle??{startedAt:t.createdAt}),completedAt:t.biologicalCycle?.completedAt??ts,completionReadingTimestamps:[editCycle.latestMeasured?.timestamp,editCycle.previousMeasured?.timestamp].filter(Boolean) as string[]}:t.biologicalCycle),
+    display:{...t.display,length:l,width:w,height:h,displacementPercent:loss},
+    sump:{...t.sump,enabled:hasSump,dimensions:{length:sl,width:sw,height:sh},operatingFillPercent:fill},
+    equipment:hasSump?t.equipment:t.equipment.map(eq=>eq.location.startsWith("sump:")?{...eq,location:"external" as const}:eq),
+    timeline:volumeEvent?[volumeEvent,...t.timeline]:t.timeline
+   };
+  });
   setEditTarget(null);
  }
  function confirmDelete(){
