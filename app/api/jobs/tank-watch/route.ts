@@ -39,6 +39,14 @@ function alertsFor(tank:PushTankState):WatchAlert[]{
       ar:tank.cycleReady?`الدورة البيولوجية — اليوم ${tank.cycleDay??1}: شروط الجاهزية تحققت؛ راجع القراءات وأنهِ Cycling Mode.`:`الدورة البيولوجية — اليوم ${tank.cycleDay??1}: ${tank.cycleNextAr||"تابع الفحوصات وخطوات الدورة."}`,
       en:tank.cycleReady?`Biological cycle — day ${tank.cycleDay??1}: readiness criteria are met; review the tests and complete Cycling Mode.`:`Biological cycle — day ${tank.cycleDay??1}: ${tank.cycleNextEn||"Continue cycle testing and follow-up."}`
     });
+    if((tank.activeEmergencyCount??0)>0){
+      alerts.unshift({
+        level:"danger",page:"emergency",
+        ar:tank.emergencyTitleAr?`حالة طارئة نشطة: ${tank.emergencyTitleAr}`:"حالة طارئة نشطة بالحوض.",
+        en:tank.emergencyTitleEn?`Active emergency: ${tank.emergencyTitleEn}`:"An active tank emergency is in progress."
+      });
+    }
+    return alerts;
   }
 
   if((tank.activeEmergencyCount??0)>0){
