@@ -33,3 +33,12 @@ export async function backupTank(tank:Tank,expectedVersion?:number){
   if(!response.ok)throw new Error(json?.error||`Tank backup failed (${response.status})`);
   return json;
 }
+
+export async function deleteCloudTank(tankId:string,expectedVersion?:number){
+  const suffix=expectedVersion===undefined?"":`?expectedVersion=${encodeURIComponent(String(expectedVersion))}`;
+  const response=await fetch(`/api/tanks/${encodeURIComponent(tankId)}${suffix}`,{method:"DELETE",headers:aquaWorkspaceHeaders()});
+  const json=await response.json();
+  if(response.status===409)return {ok:false,conflict:true,...json};
+  if(!response.ok)throw new Error(json?.error||`Tank delete failed (${response.status})`);
+  return json as {ok:true;deleted:boolean};
+}
