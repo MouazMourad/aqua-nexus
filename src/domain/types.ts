@@ -138,12 +138,16 @@ export interface MaintenanceTask {
   sourceId?: string;
 }
 
+export type AcclimationCategory = "fish" | "coral" | "invert" | "plant" | "macroalgae" | "other";
+
 export interface LivestockItem {
   id: string;
   libraryId?: string;
   name: string;
   nameEn?: string;
   category: "fish" | "coral" | "invert" | "plant" | "other";
+  /** Keeps meaningful sub-types such as marine macroalgae after transfer from acclimation. */
+  subtype?: string;
   quantity: number;
   health: "good" | "watch" | "treatment";
   load?: number;
@@ -434,7 +438,7 @@ export interface AcclimationItem {
   libraryId?: string;
   name: string;
   nameEn?: string;
-  category: "fish" | "coral" | "invert" | "plant" | "other";
+  category: AcclimationCategory;
   quantity: number;
   dripMinutes: number;
   intervalMinutes: number;
@@ -487,7 +491,7 @@ export interface AcclimationSession {
   completedAt?: string;
   status: "setup" | "floating" | "transfer" | "drip" | "release" | "completed";
   wizardStep?: number;
-  categories?: ("fish" | "coral" | "invert" | "plant" | "other")[];
+  categories?: AcclimationCategory[];
   tankSalinity?: number;
   bagSalinity?: number;
   temperature?: number;
