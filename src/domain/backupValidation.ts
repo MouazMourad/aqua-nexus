@@ -30,7 +30,7 @@ function validDimensions(value:unknown){
     && Number(value.length)>0&&Number(value.width)>0&&Number(value.height)>0;
 }
 function arraysAreArrays(tank:Record<string,unknown>){
-  const fields=["equipment","chemistry","maintenance","livestock","inventory","timeline","photos","visionAssessments","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi","rodiServiceEvents","plantCare","acclimationSessions","emergencySessions","filterMedia","livestockExits"];
+  const fields=["equipment","chemistry","maintenance","livestock","inventory","timeline","intelligenceEvents","guidanceActions","healthSnapshots","photos","visionAssessments","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi","rodiServiceEvents","plantCare","acclimationSessions","emergencySessions","filterMedia","livestockExits"];
   return fields.every(key=>tank[key]===undefined||Array.isArray(tank[key]));
 }
 
@@ -82,6 +82,43 @@ function nestedDataIssue(tank:Record<string,unknown>){
   }
   for(const [i,row] of (((tank.equipment as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validText(row.name,300)||!validText(row.kind,80))return `equipment #${i+1} is invalid`;
+  }
+
+  for(const [i,row] of (((tank.rodi as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp))return `rodi #${i+1} is invalid`;
+    for(const key of ["tdsIn","tdsOut","liters","wasteLiters","productionMinutes","sourcePressurePsi"]){
+      const value=row[key];if(value!==undefined&&(!finite(value)||Number(value)<0))return `rodi #${i+1} has an invalid ${key}`;
+    }
+  }
+  for(const [i,row] of (((tank.rodiServiceEvents as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp)||!["sediment","carbon","di"].includes(String(row.component)))return `rodiServiceEvents #${i+1} is invalid`;
+  }
+  for(const [i,row] of (((tank.plantCare as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp)||!["fertilizer","co2_refill"].includes(String(row.kind)))return `plantCare #${i+1} is invalid`;
+  }
+  for(const [i,row] of (((tank.expenses as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validText(row.description,500)||!finite(row.amount)||Number(row.amount)<0||!validText(row.currency,20))return `expenses #${i+1} is invalid`;
+  }
+  for(const [i,row] of (((tank.doserChannels as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validText(row.name,300))return `doserChannels #${i+1} is invalid`;
+    for(const key of ["capacityMl","currentMl","consumption"]){const value=row[key];if(value!==undefined&&(!finite(value)||Number(value)<0))return `doserChannels #${i+1} has an invalid ${key}`;}
+  }
+  for(const [i,row] of (((tank.filterMedia as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validText(row.name,300)||!finite(row.amountGrams)||Number(row.amountGrams)<0)return `filterMedia #${i+1} is invalid`;
+  }
+  for(const [i,row] of (((tank.photos as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp)||typeof row.dataUrl!=="string")return `photos #${i+1} is invalid`;
+    if(row.dataUrl.length>60*1024*1024)return `photos #${i+1} exceeds the per-photo recovery limit`;
+  }
+  for(const [i,row] of (((tank.acclimationSessions as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.startedAt)||!Array.isArray(row.items)||!Array.isArray(row.events))return `acclimationSessions #${i+1} is invalid`;
+    for(const [j,item] of row.items.entries()){
+      if(!isObject(item)||!validText(item.id,160)||!validText(item.name,300)||!finite(item.quantity)||Number(item.quantity)<=0)return `acclimationSessions #${i+1} item #${j+1} is invalid`;
+      for(const key of ["dripMinutes","intervalMinutes","remainingMs"]){const value=item[key];if(value!==undefined&&(!finite(value)||Number(value)<0))return `acclimationSessions #${i+1} item #${j+1} has an invalid ${key}`;}
+    }
+  }
+  for(const [i,row] of (((tank.maintenance as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validText(row.title,500)||!validText(row.cadence,80))return `maintenance #${i+1} is invalid`;
   }
   for(const [i,row] of (((tank.livestockExits as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp)||!validText(row.name,300)||!finite(row.quantity)||Number(row.quantity)<=0)return `livestockExits #${i+1} is invalid`;
