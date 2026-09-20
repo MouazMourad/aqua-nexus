@@ -9,6 +9,7 @@ import { inventoryForConsumer,inventoryProfile } from "@/domain/inventoryIntelli
 import { consumeInventory,inventoryConsumptionMessage } from "@/domain/inventoryConsumption";
 import { waterChangeIntelligence } from "@/domain/waterChangeIntelligence";
 import { claimCriticalAction } from "@/lib/actionGuard";
+import { interventionGate } from "@/domain/interventionSafety";
 
 export function WaterChangePage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),[liters,setLiters]=useState(Math.round(tank.systemVolumeLiters*.15)),[sal,setSal]=useState(1.025),[temp,setTemp]=useState(25),[notes,setNotes]=useState(""),[saltItemId,setSaltItemId]=useState(""),[saltUsed,setSaltUsed]=useState(""),[conditionerItemId,setConditionerItemId]=useState(""),[conditionerUsed,setConditionerUsed]=useState(""),[freshSaltItemId,setFreshSaltItemId]=useState(""),[freshSaltUsed,setFreshSaltUsed]=useState(""),[rodiBatchId,setRodiBatchId]=useState("");
@@ -20,6 +21,9 @@ export function WaterChangePage({tank}:{tank:Tank}) {
  const freshwaterSaltStock=useMemo(()=>waterPrepStock.filter(x=>inventoryProfile(x).subcategory==="freshwater_salt"),[waterPrepStock]);
  const save=()=>{
   if(intel.blocked){window.alert(lang==="ar"?"حجم تغيير الماء غير صالح. راجع كمية اللترات وحجم النظام قبل التسجيل.":"Water-change volume is invalid. Review liters and system volume before logging.");return}
+  const intervention=interventionGate(tank,"waterChange");
+  if(intervention.level==="warn"&&!window.confirm(lang==="ar"?intervention.ar+" هل تريد المتابعة بعد مراجعة السبب؟":intervention.en+" Continue after reviewing the reason?"))return;
+  if(intervention.level==="danger"&&!window.confirm(lang==="ar"?"⚠️ "+intervention.ar+" هل تغيير الماء ضروري الآن؟":"⚠️ "+intervention.en+" Is this water change necessary now?"))return;
   if(intel.risk==="warn"&&!window.confirm(lang==="ar"?"التغيير أكبر أو أسرع من الروتين المعتاد. راجع السبب ومطابقة ماء التعويض. هل تريد المتابعة؟":"This change is larger or faster than routine. Review the reason and replacement-water match. Continue?"))return;
   if(intel.risk==="danger"){
    if(!window.confirm(lang==="ar"?"⚠️ تغيير ماء عالي الخطورة: الحجم كبير أو في أكثر من عامل اختلاف. لا تكمل إلا إذا عندك سبب واضح وماء التعويض مضبوط. متابعة؟":"⚠️ High-risk water change: the volume is large or multiple mismatch factors are present. Continue only with a clear reason and properly matched replacement water. Continue?"))return;
