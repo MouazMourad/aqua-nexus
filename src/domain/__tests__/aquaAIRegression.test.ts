@@ -17,6 +17,7 @@ import { systemHealthTrend } from "@/domain/systemHealth";
 import { deriveGuidanceActions } from "@/domain/impactEngine";
 import { deriveIntelligenceEvents } from "@/domain/eventIntelligence";
 import { coralTransferGate } from "@/domain/acclimationSafety";
+import { correctiveDosingInventory,inventoryForConsumer,inventoryProfile,routineDosingInventory } from "@/domain/inventoryIntelligence";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -207,6 +208,37 @@ describe("Aqua AI expert evaluation matrix",()=>{
   const a=aquaAIAnswer("شو وضع الكيميا",tank,"chemistry");
   expect(a.factsAr?.length).toBeGreaterThan(0);expect(Array.isArray(a.inferencesAr)).toBe(true);
  });
+});
+
+
+describe("Inventory data-integrity regression",()=>{
+  it("keeps feeding stock isolated from dosing stock",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.inventory=[
+      {id:"food",name:"Mysis",inventoryCategory:"feeding",inventorySubcategory:"frozen_food",tankCompatibility:"marine",consumedBy:["feeding"],stockBehavior:"consumable",quantity:20,unit:"cube",minimum:2},
+      {id:"afr",name:"All For Reef",inventoryCategory:"dosing",inventorySubcategory:"balanced_reef",tankCompatibility:"marine",consumedBy:["dosing"],stockBehavior:"consumable",quantity:500,unit:"mL",minimum:50}
+    ];
+    expect(inventoryForConsumer(t,"feeding").map(x=>x.id)).toEqual(["food"]);
+  });
+  it("keeps All For Reef out of corrective KH/Ca/Mg inventory",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.inventory=[
+      {id:"afr",presetId:"allForReef",name:"All For Reef",quantity:500,unit:"mL",minimum:50},
+      {id:"bicarb",name:"Sodium bicarbonate",inventoryCategory:"dosing",inventorySubcategory:"alkalinity",tankCompatibility:"marine",consumedBy:["dosing"],stockBehavior:"consumable",dosingParameter:"KH",dosingCompoundId:"nahco3",quantity:200,unit:"g",minimum:20}
+    ];
+    expect(correctiveDosingInventory(t,"KH","dry","nahco3").map(x=>x.id)).toEqual(["bicarb"]);
+    expect(routineDosingInventory(t).map(x=>x.id)).toContain("afr");
+  });
+  it("classifies medication for quarantine and not general dosing",()=>{
+    const med={id:"med",name:"Cupramine copper medication",quantity:100,unit:"mL",minimum:10};
+    const profile=inventoryProfile(med);
+    expect(profile.category).toBe("medication");
+    expect(profile.consumedBy).toContain("quarantine");
+  });
+  it("classifies phosphate remover as filter media rather than fertilizer",()=>{
+    const profile=inventoryProfile({id:"po4",name:"Phosphate Remover",quantity:100,unit:"g",minimum:10});
+    expect(profile.category).toBe("filter_media");
+  });
 });
 
 describe("Acclimation coral dip safety",()=>{

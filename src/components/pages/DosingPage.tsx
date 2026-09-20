@@ -1,6 +1,6 @@
 "use client";
 import { useEffect,useMemo,useState } from "react";
-import type { DoserChannel,Tank } from "@/domain/types";
+import type { DoserChannel,DosingLog,Tank } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -9,7 +9,7 @@ import { chemistryCatalogForTank } from "@/domain/chemistryProfile";
 import { calculateDose,DOSING_PRESETS,type DosingForm,type DosingParameter } from "@/domain/dosingCalculator";
 import { chemistryGuidance } from "@/domain/chemistryGuidance";
 import { latestParameterSample,validateChemistryValue,validateDosingTarget } from "@/domain/chemistryDataQuality";
-import { inventoryForConsumer } from "@/domain/inventoryIntelligence";
+import { correctiveDosingInventory,inventoryProfile,routineDosingInventory } from "@/domain/inventoryIntelligence";
 
 const colors=["#27c2dc","#62d48f","#f6c85f","#c877ff","#ff7e79","#4b8bff"];
 function idealTarget(tank:Tank,param:DosingParameter){const meta:any=chemistryCatalogForTank(tank)?.[param];return meta?.ideal?(Number(meta.ideal[0])+Number(meta.ideal[1]))/2:param==="KH"?8:param==="Ca"?430:1325;}
@@ -17,10 +17,13 @@ function datePlusDays(days:number){return new Date(Date.now()+days*86400000).toI
 
 export function DosingPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),availableParams:DosingParameter[]=tank.type==="marine"?["KH","Ca","Mg"]:["KH"];
- const [param,setParam]=useState<DosingParameter>("KH"),[target,setTarget]=useState(()=>idealTarget(tank,"KH")),[form,setForm]=useState<DosingForm>("dry"),[presetId,setPresetId]=useState("nahco3"),[purity,setPurity]=useState(100),[stockGramsPerLiter,setStockGramsPerLiter]=useState(84),[productRaise,setProductRaise]=useState(0),[inventoryItemId,setInventoryItemId]=useState(""),[showAdvanced,setShowAdvanced]=useState(false),[showDoser,setShowDoser]=useState(false);
+ const [param,setParam]=useState<DosingParameter>("KH"),[target,setTarget]=useState(()=>idealTarget(tank,"KH")),[form,setForm]=useState<DosingForm>("dry"),[presetId,setPresetId]=useState("nahco3"),[purity,setPurity]=useState(100),[stockGramsPerLiter,setStockGramsPerLiter]=useState(84),[productRaise,setProductRaise]=useState(0),[productName,setProductName]=useState(""),[inventoryItemId,setInventoryItemId]=useState(""),[routineItemId,setRoutineItemId]=useState(""),[routineAmount,setRoutineAmount]=useState(""),[showAdvanced,setShowAdvanced]=useState(false),[showDoser,setShowDoser]=useState(false);
  useEffect(()=>{setTarget(idealTarget(tank,param));const first=DOSING_PRESETS.find(x=>x.parameter===param);if(first)setPresetId(first.id);},[param,tank.id]);
  const presets=DOSING_PRESETS.filter(x=>x.parameter===param),chosen=presets.find(x=>x.id===presetId)??presets[0],guide=useMemo(()=>chemistryGuidance(tank),[tank]),sample=useMemo(()=>latestParameterSample(tank,param),[tank,param]);
- const dosingStock=useMemo(()=>inventoryForConsumer(tank,"dosing"),[tank]);
+ const correctiveStock=useMemo(()=>correctiveDosingInventory(tank,param,form,chosen?.id),[tank,param,form,chosen?.id]);
+ const routineStock=useMemo(()=>routineDosingInventory(tank),[tank]);
+ const routineItem=routineStock.find(x=>x.id===routineItemId);
+ useEffect(()=>{if(inventoryItemId&&!correctiveStock.some(x=>x.id===inventoryItemId))setInventoryItemId("");},[inventoryItemId,correctiveStock]);
  const current=sample?.value,readingAgeHours=sample?Math.max(0,(Date.now()-new Date(sample.timestamp).getTime())/3600000):99999,currentIssue=current===undefined?undefined:validateChemistryValue(tank,param,current),dataIssue=guide.dataIssues.find(x=>x.key===param),targetCheck=useMemo(()=>validateDosingTarget(tank,param,target),[tank,param,target]);
  const dosingReady=current!==undefined&&readingAgeHours<=48&&sample?.confidence!=="low"&&!currentIssue&&!dataIssue&&!targetCheck.blocked;
  const calc=useMemo(()=>calculateDose({parameter:param,current:current??Number.NaN,target,volumeLiters:tank.systemVolumeLiters,form,presetId:chosen?.id,purityPercent:purity,stockGramsPerLiter,productRaisePerMlPer100L:productRaise}),[param,current,target,tank.systemVolumeLiters,form,chosen?.id,purity,stockGramsPerLiter,productRaise]);
@@ -29,8 +32,45 @@ export function DosingPage({tank}:{tank:Tank}) {
  function log(){
   if(!calc.valid||!dosingReady||current===undefined||targetCheck.blocked)return;
   if(targetCheck.level==="warn"&&!window.confirm(lang==="ar"?`${targetCheck.ar} هل تريد المتابعة ضمن المجال الآمن؟`:`${targetCheck.en} Continue within the safe range?`))return;
-  const material=form==="product"?(lang==="ar"?"محلول تجاري":"Commercial product"):(lang==="ar"?chosen?.ar:chosen?.en)||chosen?.formula||param,ts=nowISO(),stockItem=tank.inventory.find(x=>x.id===inventoryItemId);if(stockItem&&stockItem.unit!==calc.unit){window.alert(lang==="ar"?`وحدة المخزون ${stockItem.unit} لا تطابق وحدة الجرعة ${calc.unit}.`:`Inventory unit ${stockItem.unit} does not match dose unit ${calc.unit}.`);return}if(stockItem&&stockItem.quantity<calc.amount){window.alert(lang==="ar"?"الكمية المطلوبة أكبر من المخزون المتوفر.":"Required dose exceeds available inventory.");return}
-  patch(tank.id,t=>{const linked=t.inventory.find(x=>x.id===inventoryItemId),consume=linked&&calc.steps===1?calc.amount:0;const channels=calc.steps===1&&calc.unit==="mL"?t.doserChannels.map(ch=>ch.material.trim().toLowerCase()===material.trim().toLowerCase()?{...ch,currentMl:Math.max(0,ch.currentMl-calc.amount)}:ch):t.doserChannels;const dose:any={id:uid("dose"),timestamp:ts,parameter:param,current,target,ml:calc.unit==="mL"?calc.amount:0,amount:calc.amount,unit:calc.unit,material,calculatorMode:form,steps:calc.steps,perStep:calc.perStep,status:calc.steps>1?"planned":"logged",sourceReadingTimestamp:sample?.timestamp,inventoryItemId:linked?.id,verifyAfter:new Date(Date.now()+24*3600000).toISOString()};const amountText=`${calc.amount.toFixed(calc.unit==="g"?2:1)} ${calc.unit}`,perStepText=`${calc.perStep.toFixed(calc.unit==="g"?2:1)} ${calc.unit}`;const stepTasks=Array.from({length:calc.steps},(_,i)=>({id:uid("task"),title:`جرعة ${param} ${i+1}/${calc.steps}: ${perStepText}`,titleEn:`${param} dose ${i+1}/${calc.steps}: ${perStepText}`,cadence:"once" as const,done:false,nextDue:datePlusDays(i),manual:true}));const retestTasks=Array.from({length:calc.steps},(_,i)=>({id:uid("task"),title:`إعادة قياس ${param} بعد الجرعة ${i+1}/${calc.steps}`,titleEn:`Retest ${param} after dose ${i+1}/${calc.steps}`,cadence:"once" as const,done:false,nextDue:datePlusDays(i+1),manual:true}));return {...t,inventory:consume?t.inventory.map(x=>x.id===linked?.id?{...x,quantity:Math.max(0,x.quantity-consume)}:x):t.inventory,doserChannels:channels,dosing:[dose,...t.dosing],timeline:[{id:uid("ev"),timestamp:ts,type:"dosing",textAr:calc.steps>1?`تم إنشاء خطة تصحيح ${param} من القراءة الموثقة ${current} إلى ${target}: ${amountText} من ${material} على ${calc.steps} جرعات.`:`تم تسجيل جرعة ${material}: ${amountText} اعتماداً على القراءة الموثقة ${current} للوصول إلى ${target}.`,textEn:calc.steps>1?`Created ${param} correction plan from verified reading ${current} to ${target}: ${amountText} of ${material} over ${calc.steps} doses.`:`Logged ${material} dose: ${amountText}, based on verified reading ${current} toward ${target}.`},...t.timeline],maintenance:[...t.maintenance,...stepTasks,...retestTasks]};});
+  const stockItem=inventoryItemId?correctiveStock.find(x=>x.id===inventoryItemId):undefined;
+  if(inventoryItemId&&!stockItem){window.alert(lang==="ar"?"مادة المخزون المختارة لا تطابق نوع الجرعة الحالية. أعد اختيار المادة.":"The selected inventory item does not match the current dosing setup. Select it again.");return}
+  if(stockItem&&stockItem.unit.toLowerCase()!==calc.unit.toLowerCase()){window.alert(lang==="ar"?`وحدة المخزون ${stockItem.unit} لا تطابق وحدة الجرعة ${calc.unit}.`:`Inventory unit ${stockItem.unit} does not match dose unit ${calc.unit}.`);return}
+  const neededNow=calc.steps>1?calc.perStep:calc.amount;
+  if(stockItem&&stockItem.quantity<neededNow){window.alert(lang==="ar"?`المخزون غير كافٍ لأول جرعة. المطلوب ${neededNow.toFixed(calc.unit==="g"?2:1)} ${calc.unit} والمتوفر ${stockItem.quantity} ${stockItem.unit}.`:`Insufficient stock for the next dose. Required ${neededNow.toFixed(calc.unit==="g"?2:1)} ${calc.unit}; available ${stockItem.quantity} ${stockItem.unit}.`);return}
+  const material=stockItem
+   ?(lang==="ar"?stockItem.name:(stockItem.nameEn||stockItem.name))
+   :form==="product"?(productName.trim()||(lang==="ar"?"منتج تجاري غير مسمى":"Unnamed commercial product"))
+   :(lang==="ar"?chosen?.ar:chosen?.en)||chosen?.formula||param;
+  const ts=nowISO(),doseId=uid("dose");
+  patch(tank.id,t=>{
+   const linked=t.inventory.find(x=>x.id===inventoryItemId);
+   const consume=linked&&calc.steps===1?calc.amount:0;
+   const channels=calc.steps===1&&calc.unit==="mL"?t.doserChannels.map(ch=>ch.material.trim().toLowerCase()===material.trim().toLowerCase()?{...ch,currentMl:Math.max(0,ch.currentMl-calc.amount)}:ch):t.doserChannels;
+   const dose:DosingLog={id:doseId,timestamp:ts,parameter:param,current,target,ml:calc.unit==="mL"?calc.amount:0,amount:calc.amount,unit:calc.unit,material,calculatorMode:form,steps:calc.steps,perStep:calc.perStep,stepIndex:calc.steps>1?0:1,status:calc.steps>1?"planned":"logged",sourceReadingTimestamp:sample?.timestamp,inventoryItemId:linked?.id,verifyAfter:new Date(Date.now()+24*3600000).toISOString()};
+   const amountText=`${calc.amount.toFixed(calc.unit==="g"?2:1)} ${calc.unit}`,perStepText=`${calc.perStep.toFixed(calc.unit==="g"?2:1)} ${calc.unit}`;
+   const stepTasks=calc.steps>1?Array.from({length:calc.steps},(_,i)=>({id:uid("task"),title:`جرعة ${param} ${i+1}/${calc.steps}: ${perStepText}`,titleEn:`${param} dose ${i+1}/${calc.steps}: ${perStepText}`,cadence:"once" as const,done:false,nextDue:datePlusDays(i),manual:true,sourceDomain:"dosing" as const,sourceId:`dose-step:${doseId}:${i+1}`})):[];
+   const retestTasks=Array.from({length:calc.steps},(_,i)=>({id:uid("task"),title:`إعادة قياس ${param} بعد الجرعة ${i+1}/${calc.steps}`,titleEn:`Retest ${param} after dose ${i+1}/${calc.steps}`,cadence:"once" as const,done:false,nextDue:datePlusDays(i+1),manual:true,sourceDomain:"dosing" as const,sourceId:`dose-retest:${doseId}:${i+1}`}));
+   return {...t,
+    inventory:consume?t.inventory.map(x=>x.id===linked?.id?{...x,quantity:Math.max(0,x.quantity-consume)}:x):t.inventory,
+    doserChannels:channels,
+    dosing:[dose,...t.dosing],
+    timeline:[{id:uid("ev"),timestamp:ts,type:"dosing",textAr:calc.steps>1?`تم إنشاء خطة تصحيح ${param}: ${amountText} من ${material} على ${calc.steps} جرعات. المخزون سيُخصم عند تنفيذ كل خطوة.`:`تم تسجيل جرعة ${material}: ${amountText} اعتماداً على القراءة الموثقة ${current} للوصول إلى ${target}.`,textEn:calc.steps>1?`Created a ${param} correction plan: ${amountText} of ${material} over ${calc.steps} doses. Inventory will be deducted as each step is executed.`:`Logged ${material} dose: ${amountText}, based on verified reading ${current} toward ${target}.`},...t.timeline],
+    maintenance:[...t.maintenance,...stepTasks,...retestTasks]
+   };
+  });
+ }
+ function logRoutineDose(){
+  const item=routineStock.find(x=>x.id===routineItemId),q=Number(routineAmount);
+  if(!item){window.alert(lang==="ar"?"اختر All For Reef أو المتمم من المخزون أولاً.":"Select All For Reef or a supplement from inventory first.");return}
+  if(!Number.isFinite(q)||q<=0){window.alert(lang==="ar"?"أدخل الكمية المستخدمة فعلياً.":"Enter the amount actually used.");return}
+  if(q>item.quantity){window.alert(lang==="ar"?`المخزون غير كافٍ. المتوفر ${item.quantity} ${item.unit}.`:`Insufficient stock. Available: ${item.quantity} ${item.unit}.`);return}
+  const profile=inventoryProfile(item),ts=nowISO(),material=lang==="ar"?item.name:(item.nameEn||item.name);
+  patch(tank.id,t=>({...t,
+   inventory:t.inventory.map(x=>x.id===item.id?{...x,quantity:Math.max(0,x.quantity-q)}:x),
+   dosing:[{id:uid("dose"),timestamp:ts,parameter:profile.subcategory==="balanced_reef"?"Balanced Reef":"Supplement",ml:item.unit.toLowerCase()==="ml"?q:0,amount:q,unit:item.unit,material,inventoryItemId:item.id,calculatorMode:"routine",steps:1,perStep:q,stepIndex:1,status:"logged"},...t.dosing],
+   timeline:[{id:uid("ev"),timestamp:ts,type:"dosing",textAr:`تم تسجيل جرعة روتينية من ${item.name}: ${q} ${item.unit} • المتبقي ${Math.max(0,item.quantity-q)} ${item.unit}.`,textEn:`Routine dose logged for ${item.nameEn||item.name}: ${q} ${item.unit} • remaining ${Math.max(0,item.quantity-q)} ${item.unit}.`},...t.timeline]
+  }));
+  setRoutineAmount("");
  }
  function projectedDays(ch:DoserChannel){const daily=ch.period==="daily"?ch.consumption:ch.period==="weekly"?ch.consumption/7:ch.consumption/30;return daily>0?Math.floor(ch.currentMl/daily):null;}
  const amountLabel=calc.valid?`${calc.amount.toFixed(calc.unit==="g"?2:1)} ${calc.unit}`:"—",stepLabel=calc.valid?`${calc.perStep.toFixed(calc.unit==="g"?2:1)} ${calc.unit}`:"—",safetyLimit=param==="KH"?"1 dKH/day":param==="Mg"?"100 ppm/day":"25 ppm/day";
@@ -83,17 +123,17 @@ export function DosingPage({tank}:{tank:Tank}) {
    <label className="field"><span>{lang==="ar"?"شو بدك تصحح؟":"What are you correcting?"}</span><select value={param} onChange={e=>setParam(e.target.value as DosingParameter)}>{availableParams.map(p=><option key={p} value={p}>{p}</option>)}</select></label>
    <label className="field"><span>{lang==="ar"?"القراءة الحالية":"Current reading"}</span><input type="number" step="any" value={current??""} readOnly placeholder={lang==="ar"?"سجّل قياس بالكيمياء أولاً":"Log a chemistry reading first"}/>{sample&&<small>{new Date(sample.timestamp).toLocaleString()}</small>}</label>
    <label className="field"><span>{lang==="ar"?"الهدف":"Target"}</span><input type="number" step="any" value={target} onChange={e=>setTarget(Number(e.target.value))}/></label>
-   <label className="field"><span>{lang==="ar"?"شو رح تستخدم؟":"What will you use?"}</span><select value={form} onChange={e=>setForm(e.target.value as DosingForm)}><option value="dry">{lang==="ar"?"بودرة / مادة جافة":"Dry compound"}</option><option value="stock">{lang==="ar"?"محلول أنا محضّره":"Prepared stock solution"}</option><option value="product">{lang==="ar"?"منتج تجاري جاهز":"Commercial product"}</option></select></label>
+   <label className="field"><span>{lang==="ar"?"شو رح تستخدم؟":"What will you use?"}</span><select value={form} onChange={e=>{setForm(e.target.value as DosingForm);setInventoryItemId("")}}><option value="dry">{lang==="ar"?"بودرة / مادة جافة":"Dry compound"}</option><option value="stock">{lang==="ar"?"محلول أنا محضّره":"Prepared stock solution"}</option><option value="product">{lang==="ar"?"منتج تجاري جاهز":"Commercial product"}</option></select></label>
+   <label className="field"><span>{lang==="ar"?"المادة المطابقة من المخزون":"Matching inventory item"}</span><select value={inventoryItemId} onChange={e=>setInventoryItemId(e.target.value)}><option value="">{lang==="ar"?"بدون ربط بالمخزون":"Not linked to inventory"}</option>{correctiveStock.map(x=><option key={x.id} value={x.id}>{lang==="ar"?x.name:(x.nameEn||x.name)} • {x.quantity} {x.unit}</option>)}</select><small>{correctiveStock.length?lang==="ar"?"يظهر فقط المخزون المطابق لنوع الجرعة الحالية.":"Only stock matching the current correction is shown.":lang==="ar"?"ما في مادة مطابقة بالمخزون؛ يمكنك الحساب بدون خصم أو إضافة المادة الدقيقة للمخزون.":"No matching stock item; you can calculate without deduction or add the exact material to inventory."}</small></label>
   </div>
 
   {form!=="product"&&<div className="form-grid" style={{marginTop:12}}><label className="field"><span>{lang==="ar"?"اسم المادة":"Material"}</span><select value={chosen?.id||""} onChange={e=>setPresetId(e.target.value)}>{presets.map(x=><option value={x.id} key={x.id}>{lang==="ar"?x.ar:x.en} — {x.formula}</option>)}</select></label>{form==="stock"&&<label className="field"><span>{lang==="ar"?"كم غرام حطيت بكل لتر من المحلول؟":"How many grams are in each liter?"}</span><input type="number" min="0" step="any" value={stockGramsPerLiter||""} onChange={e=>setStockGramsPerLiter(Number(e.target.value))}/><small>{lang==="ar"?"هاي المعلومة ضرورية لأن تركيز المحلول بيغيّر كمية الـmL المطلوبة.":"This is required because solution strength changes the required mL."}</small></label>}</div>}
-  {form==="product"&&<div className="form-grid" style={{marginTop:12}}><label className="field full-field"><span>{lang==="ar"?`من العبوة: 1 mL لكل 100 L بيرفع ${param} قديش؟`:`From the label: how much does 1 mL per 100 L raise ${param}?`}</span><input type="number" min="0" step="any" value={productRaise||""} onChange={e=>setProductRaise(Number(e.target.value))} placeholder={lang==="ar"?"اكتب الرقم الموجود على الملصق":"Enter the label value"}/></label></div>}
+  {form==="product"&&<div className="form-grid" style={{marginTop:12}}><label className="field"><span>{lang==="ar"?"اسم المنتج التجاري":"Commercial product name"}</span><input value={productName} onChange={e=>setProductName(e.target.value)} placeholder={lang==="ar"?"مثال: منتج KH محدد":"e.g. a specific KH product"}/></label><label className="field"><span>{lang==="ar"?`من العبوة: 1 mL لكل 100 L بيرفع ${param} قديش؟`:`From the label: how much does 1 mL per 100 L raise ${param}?`}</span><input type="number" min="0" step="any" value={productRaise||""} onChange={e=>setProductRaise(Number(e.target.value))} placeholder={lang==="ar"?"اكتب الرقم الموجود على الملصق":"Enter the label value"}/></label></div>}
 
   {showAdvanced&&<div className="dosing-advanced">
    <div className="module-head"><div><h4>{lang==="ar"?"ضبط دقيق وحسابات متقدمة":"Fine tuning & advanced calculation"}</h4><p className="note">{lang==="ar"?"هاي التفاصيل مو مطلوبة لمعظم الاستخدام اليومي، لكنها موجودة للمستخدم الخبير وللمواد غير القياسية.":"These details are not needed for most daily use, but remain available for expert and non-standard setups."}</p></div></div>
    <div className="form-grid">
     {form!=="product"&&<label className="field"><span>{lang==="ar"?"النقاوة الفعلية للمادة %":"Actual material purity %"}</span><input type="number" min="1" max="100" step="1" value={purity} onChange={e=>setPurity(Number(e.target.value))}/></label>}
-    <label className="field"><span>{lang==="ar"?"ربط المادة بالمخزون":"Link material to inventory"}</span><select value={inventoryItemId} onChange={e=>setInventoryItemId(e.target.value)}><option value="">{lang==="ar"?"بدون ربط":"Not linked"}</option>{dosingStock.map(x=><option key={x.id} value={x.id}>{lang==="ar"?x.name:(x.nameEn||x.name)} • {x.quantity} {x.unit}</option>)}</select></label>
    </div>
    <div className="summary-strip" style={{marginTop:12}}>
     <div className="summary"><small>{lang==="ar"?"فرق التصحيح":"Required change"}</small><b>{current===undefined?"—":Math.max(0,target-current).toFixed(2)} {param==="KH"?"dKH":"ppm"}</b></div>
@@ -113,6 +153,11 @@ export function DosingPage({tank}:{tank:Tank}) {
    <div><small>{lang==="ar"?"الإجراء الحالي":"CURRENT ACTION"}</small><b>{doseAction}</b></div>
    <button className="btn primary" onClick={log} disabled={doseState!=="ready"||!calc.valid||targetCheck.blocked}>{calc.steps>1?(lang==="ar"?"إنشاء الخطة الآمنة":"Create safe plan"):(lang==="ar"?"تسجيل الجرعة":"Log dose")}</button>
   </div>
+ </section>
+
+ <section className="card panel full-span">
+  <div className="module-head"><div><small className="eyebrow-mini">BALANCED REEF & SUPPLEMENTS</small><h3>{lang==="ar"?"جرعات روتينية منفصلة عن التصحيح":"Routine dosing, separate from corrective dosing"}</h3><p className="note">{lang==="ar"?"All For Reef والعناصر النادرة والأحماض الأمينية والبكتيريا لا تدخل في حاسبة تصحيح KH/Ca/Mg. سجّل هنا فقط الكمية التي استخدمتها فعلياً، وسيُخصم المخزون مباشرة.":"All For Reef, trace elements, amino acids and bacteria do not use the KH/Ca/Mg correction calculator. Log only the amount actually used here; inventory is deducted immediately."}</p></div></div>
+  {routineStock.length===0?<div className="inline-alert info">{lang==="ar"?"ما في All For Reef أو متممات مصنفة بالمخزون حالياً.":"No balanced reef products or supplements are currently classified in inventory."}</div>:<div className="form-grid"><label className="field"><span>{lang==="ar"?"المادة":"Material"}</span><select value={routineItemId} onChange={e=>setRoutineItemId(e.target.value)}><option value="">{lang==="ar"?"اختر من المخزون":"Select from inventory"}</option>{routineStock.map(x=><option key={x.id} value={x.id}>{lang==="ar"?x.name:(x.nameEn||x.name)} • {x.quantity} {x.unit}</option>)}</select></label><label className="field"><span>{lang==="ar"?"الكمية المستخدمة":"Amount used"}</span><input type="number" min="0" step="any" value={routineAmount} disabled={!routineItem} onChange={e=>setRoutineAmount(e.target.value)} placeholder={routineItem?.unit||""}/></label><div className="field"><span>&nbsp;</span><button className="btn primary" disabled={!routineItem||!(Number(routineAmount)>0)} onClick={logRoutineDose}>{lang==="ar"?"تسجيل وخصم المخزون":"Log & deduct inventory"}</button></div></div>}
  </section>
 
  <section className="card panel full-span">

@@ -5,6 +5,7 @@ import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { uid,today,nowISO } from "@/lib/appUtils";
+import { inventoryForConsumer } from "@/domain/inventoryIntelligence";
 
 function addHoursISO(hours:number){return new Date(Date.now()+Math.max(1,hours)*3600000).toISOString();}
 function dateOnly(iso?:string){return iso?new Date(iso).toISOString().slice(0,10):today();}
@@ -14,12 +15,16 @@ export function QuarantinePage({tank}:{tank:Tank}) {
  const [organism,setOrganism]=useState(""),[subjectId,setSubjectId]=useState(""),[reason,setReason]=useState(""),[plan,setPlan]=useState("");
  const [volume,setVolume]=useState(Math.max(20,Math.round(tank.systemVolumeLiters*.12)));
  const [product,setProduct]=useState(""),[labelDose,setLabelDose]=useState(0),[intervalHours,setIntervalHours]=useState(24),[totalDoses,setTotalDoses]=useState(1),[medInventoryId,setMedInventoryId]=useState("");
+ const medicationStock=useMemo(()=>inventoryForConsumer(tank,"quarantine"),[tank]);
  const calculatedDose=useMemo(()=>labelDose>0&&volume>0?labelDose*(volume/100):0,[labelDose,volume]);
 
  function add(){
   if(!organism.trim())return;
   const ts=nowISO();
-  const treatment=product.trim()&&labelDose>0;
+  const treatment=Boolean(product.trim()&&labelDose>0);
+  const selectedMedication=medInventoryId?medicationStock.find(i=>i.id===medInventoryId):undefined;
+  if(medInventoryId&&!selectedMedication){window.alert(bi(lang,"الدواء المحدد لم يعد متاحاً ضمن مخزون العلاج.","The selected medication is no longer available in treatment inventory."));return}
+  if(selectedMedication&&selectedMedication.unit.toLowerCase()!=="ml"){window.alert(bi(lang,"حاسبة الحجر الحالية تعتمد mL. اختر دواء مخزون بوحدة mL أو اترك الربط فارغاً.","The current quarantine calculator uses mL. Select medication stock measured in mL or leave inventory unlinked."));return}
   const nextDoseAt=treatment?ts:undefined;
   patch(tank.id,t=>({...t,
    livestock:subjectId?t.livestock.map(x=>x.id===subjectId?{...x,health:"treatment" as const,lastObservedAt:ts}:x):t.livestock,
@@ -38,9 +43,10 @@ export function QuarantinePage({tank}:{tank:Tank}) {
   const more=dosesGiven<total;
   const nextDoseAt=more?addHoursISO(q.intervalHours??24):undefined;
   const ts=nowISO();
-  const inv=q.medicationInventoryItemId?tank.inventory.find(i=>i.id===q.medicationInventoryItemId):undefined;
+  const inv=q.medicationInventoryItemId?medicationStock.find(i=>i.id===q.medicationInventoryItemId):undefined;
   const consume=q.medicationQuantityPerDose??dose;
-  if(inv&&inv.quantity<consume)return;
+  if(q.medicationInventoryItemId&&!inv){window.alert(bi(lang,"الدواء المرتبط بهذه الحالة غير موجود ضمن مخزون العلاج.","The medication linked to this case is missing from treatment inventory."));return}
+  if(inv&&inv.quantity<consume){window.alert(bi(lang,`المخزون غير كافٍ. المطلوب ${consume.toFixed(2)} ${inv.unit} والمتوفر ${inv.quantity} ${inv.unit}.`,`Insufficient stock. Required ${consume.toFixed(2)} ${inv.unit}; available ${inv.quantity} ${inv.unit}.`));return}
   patch(tank.id,t=>({...t,
    inventory:inv?t.inventory.map(i=>i.id===inv.id?{...i,quantity:Math.max(0,i.quantity-consume)}:i):t.inventory,
    quarantine:t.quarantine.map(x=>x.id===id?{...x,dosesGiven,lastDoseAt:ts,nextDoseAt,responseObservedAt:undefined}:x),
@@ -69,7 +75,7 @@ export function QuarantinePage({tank}:{tank:Tank}) {
    <label className="field"><span>{bi(lang,"اسم المنتج / الدواء","Product / medication")}</span><input value={product} onChange={e=>setProduct(e.target.value)}/></label>
    <label className="field"><span>{bi(lang,"جرعة الملصق mL لكل 100L","Label dose mL per 100L")}</span><input type="number" min="0" step="any" value={labelDose||""} onChange={e=>setLabelDose(Number(e.target.value))}/></label>
    <label className="field"><span>{bi(lang,"الفاصل بين الجرعات (ساعة)","Dose interval (hours)")}</span><input type="number" min="1" value={intervalHours} onChange={e=>setIntervalHours(Number(e.target.value))}/></label>
-   <label className="field"><span>{bi(lang,"عدد الجرعات المخطط","Planned doses")}</span><input type="number" min="1" max="60" value={totalDoses} onChange={e=>setTotalDoses(Number(e.target.value))}/></label><label className="field"><span>{bi(lang,"ربط الدواء بالمخزون (اختياري)","Link medication to inventory (optional)")}</span><select value={medInventoryId} onChange={e=>setMedInventoryId(e.target.value)}><option value="">—</option>{tank.inventory.map(i=><option key={i.id} value={i.id}>{i.name} • {i.quantity} {i.unit}</option>)}</select></label>
+   <label className="field"><span>{bi(lang,"عدد الجرعات المخطط","Planned doses")}</span><input type="number" min="1" max="60" value={totalDoses} onChange={e=>setTotalDoses(Number(e.target.value))}/></label><label className="field"><span>{bi(lang,"ربط الدواء بالمخزون (اختياري)","Link medication to inventory (optional)")}</span><select value={medInventoryId} onChange={e=>setMedInventoryId(e.target.value)}><option value="">—</option>{medicationStock.map(i=><option key={i.id} value={i.id}>{lang==="ar"?i.name:(i.nameEn||i.name)} • {i.quantity} {i.unit}</option>)}</select></label>
    <label className="field full-field"><span>{tr(lang,"plan")}</span><textarea value={plan} onChange={e=>setPlan(e.target.value)}/></label>
   </div>
   {product&&labelDose>0&&<div className="summary-strip" style={{marginTop:12}}><div className="summary"><small>{bi(lang,"الجرعة المحسوبة من الملصق","Label-scaled dose")}</small><b>{calculatedDose.toFixed(2)} mL</b></div><div className="summary"><small>{bi(lang,"حجم الحجر","Quarantine volume")}</small><b>{volume} L</b></div><div className="summary"><small>{bi(lang,"كل","Every")}</small><b>{intervalHours} h</b></div></div>}
