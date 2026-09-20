@@ -312,6 +312,22 @@ export interface JournalPhoto {
   timestamp: string;
   caption: string;
   dataUrl: string;
+  livestockId?: string;
+  estimatedSizeCm?: number;
+  colorIndex?: number;
+  brightnessIndex?: number;
+  captureScore?: number;
+  contrastIndex?: number;
+  sharpnessIndex?: number;
+  clarityIndex?: number;
+  glarePercent?: number;
+  shadowPercent?: number;
+  palePixelPercent?: number;
+  greenDominancePercent?: number;
+  brightSpotPercent?: number;
+  redDominancePercent?: number;
+  blueDominancePercent?: number;
+  edgeDensity?: number;
 }
 
 export interface VisionAssessmentRecord {
