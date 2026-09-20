@@ -2,7 +2,8 @@
 
 import { useCallback,useEffect,useRef,useState } from "react";
 import { useAquaStore } from "@/store/useAquaStore";
-import { backendHealth,backupTank,restoreTanks } from "@/lib/cloudSync";
+import { backendHealth,backupTank,deleteCloudTank,restoreTanks } from "@/lib/cloudSync";
+import { clearCloudDeleteTombstone,cloudDeleteTombstones } from "@/lib/cloudTombstones";
 import type { Tank } from "@/domain/types";
 
 function stableValue(value:unknown):unknown{
@@ -35,6 +36,16 @@ export function CloudSyncBridge(){
         if(cancelled)return;
         versionsRef.current=remote.versions??{};
         const remoteById=new Map((remote.tanks??[]).map(t=>[t.id,t]));
+        for(const deletedId of cloudDeleteTombstones()){
+          const cloud=remoteById.get(deletedId);
+          if(!cloud){clearCloudDeleteTombstone(deletedId);continue;}
+          const result=await deleteCloudTank(deletedId,remote.versions?.[deletedId]);
+          if(result.conflict){
+            setSyncState("error");setError("CONFLICT:"+deletedId);continue;
+          }
+          remoteById.delete(deletedId);clearCloudDeleteTombstone(deletedId);
+          delete versionsRef.current[deletedId];
+        }
         const baseline=new Map<string,string>();
         const conflicts=new Set<string>();
 
@@ -72,6 +83,11 @@ export function CloudSyncBridge(){
 
   const runBackup=useCallback(async()=>{
     if(!enabled||!initializedRef.current)return;
+    for(const deletedId of cloudDeleteTombstones()){
+      const result=await deleteCloudTank(deletedId,versionsRef.current[deletedId]);
+      if(result.conflict){conflictsRef.current.add(deletedId);setSyncState("error");setError("CONFLICT:"+deletedId);return;}
+      clearCloudDeleteTombstone(deletedId);delete versionsRef.current[deletedId];baselineRef.current.delete(deletedId);conflictsRef.current.delete(deletedId);
+    }
     const real=tanks.filter(t=>!t.isTraining);
     const changed=real.filter(t=>!conflictsRef.current.has(t.id)&&baselineRef.current.get(t.id)!==signature(t));
     if(!changed.length){
