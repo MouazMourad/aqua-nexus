@@ -93,7 +93,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const lib:any[]=LIVESTOCK_LIBRARY.filter((x:any)=>x.type===tank.type);
  const acclimationStock=useMemo(()=>inventoryForConsumer(tank,"acclimation"),[tank]);
  const allowedCats:Cat[]=tank.type==="marine"?["fish","invert","coral","plant"]:["fish","invert","plant"];
- const categoryLabel=(c:Cat)=>tank.type==="marine"&&c==="plant"?bi(lang,"ماكرو ألجي","Macroalgae"):categoryLabel(c);
+ const categoryLabel=(c:Cat):string=>tank.type==="marine"&&c==="plant"?bi(lang,"ماكرو ألجي","Macroalgae"):categoryText(lang,c);
  const choices=useMemo(()=>lib.filter((x:any)=>{const c=String(x.cat).toLowerCase(),m=c==="fish"?"fish":c==="coral"?"coral":c==="invert"?"invert":c==="plant"?"plant":"other";return m===category}),[category,tank.type]);
  const chosen:any=choices.find(x=>x.id===selected);
  const releaseLanes=useMemo(()=>{
