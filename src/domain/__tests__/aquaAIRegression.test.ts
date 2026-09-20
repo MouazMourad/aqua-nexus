@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import { demoMarineTank } from "@/data/demoTank";
+import { demoFreshwaterTank,demoMarineTank } from "@/data/demoTank";
 import { parseAquaQuestion,resolveAquaFollowup } from "@/domain/aquaAIIntent";
 import { buildAquaAIQueryPlan } from "@/domain/aquaAIQueryPlan";
 import { aquaAIAnswer } from "@/domain/aquaAIBrain";
