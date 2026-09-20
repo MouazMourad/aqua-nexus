@@ -78,6 +78,7 @@ export async function runAquaVision(input:{workspace:string;tank:Tank;imageDataU
   const prompt=`${basePrompt}\n\n${requested?"LOCAL AQUA NEXUS CONTEXT / USER NOTES:\n"+requested:""}\n\nReturn a concise response with these sections: Visible findings; Differential possibilities; Tank-context links; Safe next checks; Urgency and confidence.`;
   const response=await fetch(`${cfg.base}/chat/completions`,{
     method:"POST",
+    signal:AbortSignal.timeout(45_000),
     headers:{"content-type":"application/json","authorization":`Bearer ${cfg.key}`},
     body:JSON.stringify({
       model:cfg.model,
