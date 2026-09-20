@@ -13,6 +13,7 @@ type PushTankState={
   maintenanceTasks?:Array<{id?:string;title?:string;titleEn?:string;nextDue?:string|null}>;
   treatmentCount?:number;watchCount?:number;activeQuarantineCount?:number;activeEmergencyCount?:number;
   emergencyTitleAr?:string|null;emergencyTitleEn?:string|null;nextDoseAt?:string|null;doseOrganism?:string|null;
+  cyclingActive?:boolean;cycleDay?:number;cycleReady?:boolean;cycleNextAr?:string|null;cycleNextEn?:string|null;
 };
 type PushStateRow={workspace_key:string;language:string;tanks:PushTankState[]|string;updated_at:string};
 
@@ -31,6 +32,14 @@ function alertsFor(tank:PushTankState):WatchAlert[]{
   const alerts:WatchAlert[]=[];
   const now=Date.now();
   const today=new Date().toISOString().slice(0,10);
+
+  if(tank.cyclingActive){
+    alerts.push({
+      level:tank.cycleReady?"info":"warn",page:tank.cycleReady?"maintenance":"chemistry",
+      ar:tank.cycleReady?`الدورة البيولوجية — اليوم ${tank.cycleDay??1}: شروط الجاهزية تحققت؛ راجع القراءات وأنهِ Cycling Mode.`:`الدورة البيولوجية — اليوم ${tank.cycleDay??1}: ${tank.cycleNextAr||"تابع الفحوصات وخطوات الدورة."}`,
+      en:tank.cycleReady?`Biological cycle — day ${tank.cycleDay??1}: readiness criteria are met; review the tests and complete Cycling Mode.`:`Biological cycle — day ${tank.cycleDay??1}: ${tank.cycleNextEn||"Continue cycle testing and follow-up."}`
+    });
+  }
 
   if((tank.activeEmergencyCount??0)>0){
     alerts.push({
@@ -94,6 +103,7 @@ async function run(request:NextRequest){
   try{
     const rows=await query<PushStateRow>("SELECT workspace_key,language,tanks,updated_at FROM aqua_push_state ORDER BY updated_at DESC");
     const hourBucket=new Date().toISOString().slice(0,13);
+    const dayBucket=new Date().toISOString().slice(0,10);
     const result:any[]=[];
     let checked=0;
 
@@ -105,7 +115,7 @@ async function run(request:NextRequest){
         const alerts=alertsFor(tank);
         if(!alerts.length)continue;
         const primary=alerts.find(x=>x.level==="danger")??alerts[0];
-        const jobName=`tank-watch:${row.workspace_key}:${tank.id}:${hourBucket}`;
+        const jobName=tank.cyclingActive?`tank-cycle:${row.workspace_key}:${tank.id}:${dayBucket}`:`tank-watch:${row.workspace_key}:${tank.id}:${hourBucket}`;
         const prior=await query("SELECT 1 FROM aqua_job_runs WHERE job_name=$1 AND status='sent' LIMIT 1",[jobName]);
         if((prior.rowCount??0)>0){result.push({tankId:tank.id,status:"already-sent-this-hour"});continue;}
 
