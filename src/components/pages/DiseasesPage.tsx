@@ -1,7 +1,7 @@
 "use client";
 import { useMemo,useState } from "react";
 import type { Tank } from "@/domain/types";
-import { DISEASE_LIBRARY } from "@/data/legacyCatalogs";
+import { diseaseEntriesFor,diseaseGroupCounts } from "@/domain/diseaseCatalog";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,categoryText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -9,17 +9,10 @@ import { uid,today,nowISO } from "@/lib/appUtils";
 
 export function DiseasesPage({tank,onVisualInsight}:{tank:Tank;onVisualInsight?:()=>void}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),[group,setGroup]=useState("all"),[search,setSearch]=useState(""),[added,setAdded]=useState<string|null>(null),[subjectId,setSubjectId]=useState("");
- const entries:any[]=DISEASE_LIBRARY.filter((x:any)=>x.type===tank.type);
- const groups=[...new Set(entries.map(x=>String(x.group)))];
- const groupCounts=Object.fromEntries(groups.map(g=>[g,entries.filter(x=>String(x.group)===g).length]));
- const filtered=useMemo(()=>{
-  const q=search.trim().toLowerCase();
-  return entries.filter(x=>{
-   const groupMatch=group==="all"||String(x.group)===group;
-   const searchMatch=!q||(`${x.ar} ${x.en} ${x.symAr} ${x.symEn} ${x.txAr} ${x.txEn}`).toLowerCase().includes(q);
-   return groupMatch&&searchMatch;
-  });
- },[entries,group,search]);
+ const entries=useMemo(()=>diseaseEntriesFor(tank.type),[tank.type]);
+ const groupCounts=useMemo(()=>diseaseGroupCounts(tank.type),[tank.type]);
+ const groups=Object.keys(groupCounts);
+ const filtered=useMemo(()=>diseaseEntriesFor(tank.type,group,search),[tank.type,group,search]);
 
  function addTreatment(x:any){
   const due=new Date(Date.now()+2*86400000).toISOString().slice(0,10),subject=tank.livestock.find(y=>y.id===subjectId),ts=nowISO();
