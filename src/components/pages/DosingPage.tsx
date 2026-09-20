@@ -11,6 +11,7 @@ import { chemistryGuidance } from "@/domain/chemistryGuidance";
 import { latestParameterSample,validateChemistryValue,validateDosingTarget } from "@/domain/chemistryDataQuality";
 import { correctiveDosingInventory,inventoryProfile,routineDosingInventory } from "@/domain/inventoryIntelligence";
 import { requiresPostDoseRetest } from "@/domain/dosingSafety";
+import { claimCriticalAction } from "@/lib/actionGuard";
 
 const colors=["#27c2dc","#62d48f","#f6c85f","#c877ff","#ff7e79","#4b8bff"];
 function idealTarget(tank:Tank,param:DosingParameter){const meta:any=chemistryCatalogForTank(tank)?.[param];return meta?.ideal?(Number(meta.ideal[0])+Number(meta.ideal[1]))/2:param==="KH"?8:param==="Ca"?430:1325;}
@@ -43,6 +44,7 @@ export function DosingPage({tank}:{tank:Tank}) {
    ?(lang==="ar"?stockItem.name:(stockItem.nameEn||stockItem.name))
    :form==="product"?(productName.trim()||(lang==="ar"?"منتج تجاري غير مسمى":"Unnamed commercial product"))
    :(lang==="ar"?chosen?.ar:chosen?.en)||chosen?.formula||param;
+  if(!claimCriticalAction(`corrective-dose:${tank.id}:${param}`))return;
   const ts=nowISO(),doseId=uid("dose");
   patch(tank.id,t=>{
    const linked=t.inventory.find(x=>x.id===inventoryItemId);
@@ -66,6 +68,7 @@ export function DosingPage({tank}:{tank:Tank}) {
   if(!item){window.alert(lang==="ar"?"اختر All For Reef أو المتمم من المخزون أولاً.":"Select All For Reef or a supplement from inventory first.");return}
   if(!Number.isFinite(q)||q<=0){window.alert(lang==="ar"?"أدخل الكمية المستخدمة فعلياً.":"Enter the amount actually used.");return}
   if(q>item.quantity){window.alert(lang==="ar"?`المخزون غير كافٍ. المتوفر ${item.quantity} ${item.unit}.`:`Insufficient stock. Available: ${item.quantity} ${item.unit}.`);return}
+  if(!claimCriticalAction(`routine-dose:${tank.id}:${item.id}`))return;
   const profile=inventoryProfile(item),ts=nowISO(),material=lang==="ar"?item.name:(item.nameEn||item.name);
   patch(tank.id,t=>({...t,
    inventory:t.inventory.map(x=>x.id===item.id?{...x,quantity:Math.max(0,x.quantity-q)}:x),
