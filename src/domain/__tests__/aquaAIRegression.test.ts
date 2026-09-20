@@ -22,6 +22,8 @@ import { correctiveDosingInventory,inventoryForConsumer,inventoryProfile,invento
 import { consumeInventory } from "@/domain/inventoryConsumption";
 import { fitChamberToSump,sumpChamberContents } from "@/domain/sumpOperations";
 import { validateBackupPayload,validateTankImportPayload } from "@/domain/backupValidation";
+import { visionDiseaseCandidates } from "@/domain/visionDifferential";
+import { sanitizeVisionQuestion,validateVisionDataUrl } from "@/domain/visionRequestSafety";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -246,6 +248,32 @@ describe("Inventory data-integrity regression",()=>{
 });
 
 
+
+describe("AI Vision safety and differential regression",()=>{
+  it("accepts compact supported image data and rejects unsupported or oversized payloads",()=>{
+    expect(validateVisionDataUrl("data:image/jpeg;base64,AA==",1024).ok).toBe(true);
+    expect(validateVisionDataUrl("data:image/heic;base64,AA==",1024).ok).toBe(false);
+    const oversized="data:image/jpeg;base64,"+"A".repeat(5000);
+    expect(validateVisionDataUrl(oversized,100).ok).toBe(false);
+  });
+  it("sanitizes excessively long Vision questions",()=>{
+    expect(sanitizeVisionQuestion("x".repeat(5000),120).length).toBe(120);
+  });
+  it("maps marine fish white spots to marine disease references only",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.livestock=[{id:"fish1",name:"Test fish",category:"fish",quantity:1,health:"watch",load:1}];
+    const ids=visionDiseaseCandidates(t,"fish1",["whiteSpots","rapidBreathing"]).map(x=>x.id);
+    expect(ids).toContain("m_ich");
+    expect(ids.some(x=>x.startsWith("f_"))).toBe(false);
+  });
+  it("maps coral tissue loss to coral references without claiming a diagnosis",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.livestock=[{id:"coral1",name:"Test coral",category:"coral",quantity:1,health:"watch",load:1}];
+    const candidates=visionDiseaseCandidates(t,"coral1",["tissueLoss"]);
+    expect(candidates.some(x=>x.id==="c_tissue"||x.id==="c_brownjelly"||x.id==="c_rtn")).toBe(true);
+    expect(candidates.every(x=>x.score>0)).toBe(true);
+  });
+});
 
 describe("Backup and taxonomy hardening",()=>{
   it("accepts a structurally valid backup and preserves the selected tank",()=>{
