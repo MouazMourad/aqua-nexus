@@ -32,7 +32,7 @@ import { diseaseEntriesFor,diseaseGroupCounts } from "@/domain/diseaseCatalog";
 import { requiresPostDoseRetest } from "@/domain/dosingSafety";
 import { waterChangeIntelligence } from "@/domain/waterChangeIntelligence";
 import { biologicalMemory,eventChemistryLinks } from "@/domain/tankLearning";
-import { repeatedResponsePatterns } from "@/domain/tankPatterns";
+import { repeatedResponsePatterns,tankLearningMaturity } from "@/domain/tankPatterns";
 import { claimCriticalAction,releaseCriticalAction } from "@/lib/actionGuard";
 
 const tank=structuredClone(demoMarineTank);
@@ -208,6 +208,18 @@ describe("Realistic tank-story intelligence",()=>{
     expect((wc?.en||"").toLowerCase()).toContain("after");
     expect(biologicalMemory(t).some(x=>x.event.id==="death"||x.event.id==="wc")).toBe(true);
     expect(maintenanceEffectiveState(t.maintenance[0],"2026-09-05").overdue).toBe(true);
+  });
+
+  it("raises Tank Brain maturity as tank-specific evidence accumulates across months",()=>{
+    const t=structuredClone(demoMarineTank);
+    const now=Date.now();
+    t.chemistry=Array.from({length:40},(_,i)=>({timestamp:new Date(now-(39-i)*9*86400000).toISOString(),values:{KH:8-i*.01,NO3:15+(i%3)},confidence:"high" as const,source:"manual" as const}));
+    t.timeline=Array.from({length:20},(_,i)=>({id:"hist-"+i,timestamp:new Date(now-(19-i)*15*86400000).toISOString(),type:"maintenance",textAr:"صيانة دورية",textEn:"Routine maintenance"}));
+    const maturity=tankLearningMaturity(t);
+    expect(maturity.measuredReadings).toBe(40);
+    expect(maturity.observedDays).toBeGreaterThan(300);
+    expect(maturity.score).toBeGreaterThanOrEqual(50);
+    expect(maturity.level).not.toBe("early");
   });
 
   it("learns a repeated tank-specific maintenance response instead of presenting it as causation",()=>{
