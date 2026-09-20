@@ -8,6 +8,7 @@ import { uid,nowISO } from "@/lib/appUtils";
 import { buildVisionTriage,captureConsistency,type VisionMetrics,type VisionSymptom } from "@/domain/visionIntelligence";
 import { visionDiseaseCandidates } from "@/domain/visionDifferential";
 import { askAquaVision } from "@/lib/aquaAIClient";
+import { externalizePhoto,resolveFullPhoto } from "@/lib/photoStorage";
 
 type GrowthPhoto=JournalPhoto&{livestockId?:string;estimatedSizeCm?:number;colorIndex?:number;brightnessIndex?:number;captureScore?:number;clarityIndex?:number;greenDominancePercent?:number;palePixelPercent?:number};
 
@@ -101,7 +102,8 @@ export function JournalPage({tank}:{tank:Tank}) {
   try{
    const prepared=await prepareImage(file),ts=nowISO(),subject=tank.livestock.find(x=>x.id===livestockId);
    const photo:any={id:uid("ph"),timestamp:ts,caption,dataUrl:prepared.dataUrl,livestockId:livestockId||undefined,estimatedSizeCm:sizeCm>0?sizeCm:undefined,...prepared.metrics};
-   patch(tank.id,t=>({...t,photos:[photo,...t.photos],timeline:subject?[{id:uid("ev"),timestamp:ts,type:"growth-photo",textAr:`تمت إضافة صورة متابعة لـ ${subject.name}${sizeCm>0?` بحجم تقديري ${sizeCm} سم`:""}.`,textEn:`Growth photo added for ${subject.nameEn||subject.name}${sizeCm>0?` with estimated size ${sizeCm} cm`:""}.`},...t.timeline]:t.timeline}));
+   const storedPhoto=await externalizePhoto(photo);
+   patch(tank.id,t=>({...t,photos:[storedPhoto,...t.photos],timeline:subject?[{id:uid("ev"),timestamp:ts,type:"growth-photo",textAr:`تمت إضافة صورة متابعة لـ ${subject.name}${sizeCm>0?` بحجم تقديري ${sizeCm} سم`:""}.`,textEn:`Growth photo added for ${subject.nameEn||subject.name}${sizeCm>0?` with estimated size ${sizeCm} cm`:""}.`},...t.timeline]:t.timeline}));
    setCaption("");setSizeCm(0);
   }catch{}
  }
@@ -117,8 +119,9 @@ export function JournalPage({tank}:{tank:Tank}) {
    const candidates=visionDiseaseCandidates(tank,visionLivestockId||undefined,selectedSymptoms);
    const photoId=uid("ph"),assessmentId=uid("vision");
    const photo:any={id:photoId,timestamp:ts,caption:`Local Best Visual Insight${subject?` • ${subject.name}`:" • Whole Tank"}`,dataUrl:prepared.dataUrl,livestockId:visionLivestockId||undefined,...prepared.metrics};
+   const storedPhoto=await externalizePhoto(photo);
    const assessment:VisionAssessmentRecord={id:assessmentId,timestamp:ts,photoId,livestockId:visionLivestockId||undefined,symptoms:selectedSymptoms,notes:visionNotes,metrics:prepared.metrics,triage,modelStatus:"local-best",engine:triage.engine,external:{status:"not_requested"},diseaseCandidateIds:candidates.map(x=>x.id)};
-   patch(tank.id,t=>({...t,photos:[photo,...t.photos],visionAssessments:[assessment,...(t.visionAssessments??[])],timeline:[{id:uid("ev"),timestamp:ts,type:"vision-assessment",textAr:`Local Best Visual Insight${subject?` لـ ${subject.name}`:" للحوض كامل"}: ${triage.summaryAr}`,textEn:`Local Best Visual Insight${subject?` for ${subject.nameEn||subject.name}`:" for the whole tank"}: ${triage.summaryEn}`},...t.timeline]}));
+   patch(tank.id,t=>({...t,photos:[storedPhoto,...t.photos],visionAssessments:[assessment,...(t.visionAssessments??[])],timeline:[{id:uid("ev"),timestamp:ts,type:"vision-assessment",textAr:`Local Best Visual Insight${subject?` لـ ${subject.name}`:" للحوض كامل"}: ${triage.summaryAr}`,textEn:`Local Best Visual Insight${subject?` for ${subject.nameEn||subject.name}`:" for the whole tank"}: ${triage.summaryEn}`},...t.timeline]}));
    setVisionSymptoms([]);setVisionNotes("");
   }catch{
    setVisionError(lang==="ar"?"ما قدرنا نحلل الصورة محلياً. جرّب صورة JPG/PNG/WEBP أو التقط صورة جديدة.":"Local image analysis failed. Try JPG/PNG/WEBP or capture a new photo.");
@@ -141,7 +144,8 @@ export function JournalPage({tank}:{tank:Tank}) {
     `Local Aqua Nexus triage: ${localSummary}`,
     candidateText?`Symptom-linked library references (not diagnoses): ${candidateText}`:""
    ].filter(Boolean).join("\n");
-   const result=await askAquaVision({tank,imageDataUrl:photo.dataUrl,question,language:lang});
+   const fullImage=await resolveFullPhoto(photo);
+   const result=await askAquaVision({tank,imageDataUrl:fullImage,question,language:lang});
    const ts=nowISO();
    if(result.mode!=="external"||!result.answer?.text){
     const message=result.answer?.messageAr&&lang==="ar"?result.answer.messageAr:result.answer?.messageEn||bi(lang,"ما في مزود AI Vision خارجي مربوط حالياً.","No external AI Vision provider is configured.");
