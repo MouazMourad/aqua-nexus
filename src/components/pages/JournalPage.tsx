@@ -193,6 +193,7 @@ export function JournalPage({tank}:{tank:Tank}) {
  const latest=assessments[0],latestObservations=latest?(lang==="ar"?latest.triage.observationsAr:latest.triage.observationsEn):[],latestPossibilities=latest?(lang==="ar"?latest.triage.possibilitiesAr:latest.triage.possibilitiesEn):[],latestNext=latest?(lang==="ar"?latest.triage.nextAr:latest.triage.nextEn):[];
  const latestCandidates=latest?visionDiseaseCandidates(tank,latest.livestockId,latest.symptoms as VisionSymptom[]):[];
  const confidenceText=latest?`${latest.triage.confidence==="medium"?(lang==="ar"?"متوسطة":"Medium"):(lang==="ar"?"أولية":"Early")} • ${latest.triage.confidenceScore??"—"}/100`:"";
+ const assessmentHistory=assessments.slice(0,8);
 
  return <section className="page-grid"><PageHeader eyebrow="PHOTO JOURNAL • LOCAL BEST AI • GROWTH" title={tr(lang,"journal")}/>
 
@@ -230,6 +231,14 @@ export function JournalPage({tank}:{tank:Tank}) {
    <div className="note" style={{marginTop:8}}>{bi(lang,"المؤشرات البصرية محلية واحتمالية وليست تشخيص مرض أو قياس مخبري. قوة النظام الأساسية هي المقارنة الزمنية والربط مع سياق نفس الحوض.","Visual signals are local and probabilistic, not a disease diagnosis or laboratory measurement. The strongest value is time-series comparison and fusion with this tank's context.")}</div>
   </div>}
  </div>
+
+ {assessmentHistory.length>0&&<div className="card panel full-span">
+  <div className="module-head"><div><h3>{bi(lang,"سجل Visual Insight","Visual Insight history")}</h3><p className="note">{bi(lang,"كل تحليل محفوظ مع الصورة والسياق والإجراءات الناتجة عنه حتى تقدر تراجع تطور الحالة زمنياً.","Each assessment stays linked to its image, context and resulting actions so progression remains auditable over time.")}</p></div><span className="scene-badge">{assessments.length}</span></div>
+  <div className="history-list">{assessmentHistory.map(a=>{const subject=tank.livestock.find(x=>x.id===a.livestockId),candidate=visionDiseaseCandidates(tank,a.livestockId,a.symptoms as VisionSymptom[])[0];return <div className="history-row" key={a.id} style={{alignItems:"flex-start",gap:10}}>
+   <div style={{flex:1,display:"grid",gap:4}}><b>{subject?(lang==="ar"?subject.name:(subject.nameEn||subject.name)):bi(lang,"الحوض كامل","Whole tank")} • {a.triage.level}</b><small>{new Date(a.timestamp).toLocaleString()} • {bi(lang,"ثقة","confidence")} {a.triage.confidenceScore}/100 • Capture {a.metrics.captureScore}/100</small><span>{lang==="ar"?a.triage.summaryAr:a.triage.summaryEn}</span>{candidate&&<small>{bi(lang,"أقرب مرجع أعراض:","Top symptom reference:")} {lang==="ar"?candidate.ar:candidate.en}</small>}</div>
+   <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}><button className="btn" disabled={deepVisionBusyId===a.id} onClick={()=>void runDeepVision(a)}>{a.external?.status==="completed"?bi(lang,"إعادة الرأي الثاني","Repeat second opinion"):bi(lang,"AI رأي ثانٍ","AI second opinion")}</button>{a.livestockId&&<button className="btn" onClick={()=>markVisionWatch(a)}>👁</button>}<button className="btn" disabled={Boolean(a.followUpTaskId)} onClick={()=>createVisionFollowUp(a)}>{a.followUpTaskId?"✓":"＋24h"}</button>{a.livestockId&&<button className="btn" disabled={Boolean(a.quarantineCaseId)} onClick={()=>createVisionQuarantine(a)}>{a.quarantineCaseId?"✓ Q":"＋ Q"}</button>}</div>
+  </div>})}</div>
+ </div>}
 
  <div className="card panel full-span"><div className="module-head"><div><h3>{bi(lang,"بروتوكول تصوير ثابت","Consistent capture protocol")}</h3><p className="note">{bi(lang,"لحتى مقارنة اللون والنمو يكون إلها معنى: نفس الكائن، نفس الزاوية والمسافة، نفس برنامج الإضاءة تقريباً، نظف الزجاج، وتجنب انعكاس الفلاش. اعتبر أول صورة واضحة Reference للمقارنات التالية.","For meaningful color/growth comparison: use the same subject, angle and distance, similar light schedule, clean glass, and avoid flash reflections. Treat the first clear capture as the reference.")}</p></div><span className="scene-badge">{photos.length?bi(lang,"Reference موجود","Reference available"):bi(lang,"بانتظار أول صورة","Awaiting first capture")}</span></div>{photos[photos.length-1]&&<div className="inline-alert info"><b>{bi(lang,"مرجع أقدم صورة محفوظة:","Oldest saved reference:")}</b> {new Date(photos[photos.length-1].timestamp).toLocaleString()} • Capture {photos[photos.length-1].captureScore??"—"}/100</div>}</div>
 
