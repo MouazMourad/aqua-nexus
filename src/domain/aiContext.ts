@@ -2,7 +2,7 @@ import type { Tank } from "./types";
 import { bioload,chemistryHealth,maintenanceHealth } from "./health";
 import { tankForecast,tankStateView } from "./tankIntelligence";
 import { biologicalMemory,eventChemistryLinks,proactivePredictions,tankMood } from "./tankLearning";
-import { learnedTankSignals,repeatedResponsePatterns,tankBaselines } from "./tankPatterns";
+import { learnedTankSignals,repeatedResponsePatterns,tankBaselines,tankLearningMaturity } from "./tankPatterns";
 import { analyzeNutrients } from "./nutrientEngine";
 import { mediaPredictions } from "./mediaPredictor";
 import { tankEnergy } from "./equipmentIntelligence";
@@ -26,7 +26,7 @@ export interface TankAIContext {
   state:{health:number;chemistry:number;maintenance:number;bioloadPercent:number;stateScore:number;stateBand:string;mood:string;forecast7d:number|null;forecastDirection:string;forecastConfidence:string};
   chemistry:{latest:Record<string,number|null>;readingCount:number;recent:Array<{timestamp:string;values:Record<string,number|null>}>;guidance:ReturnType<typeof chemistryGuidance>};
   systemHealth:ReturnType<typeof systemHealth>;
-  learning:{baselines:ReturnType<typeof tankBaselines>;signals:ReturnType<typeof learnedTankSignals>;predictions:ReturnType<typeof proactivePredictions>;repeatedPatterns:ReturnType<typeof repeatedResponsePatterns>;memory:ReturnType<typeof biologicalMemory>;eventLinks:ReturnType<typeof eventChemistryLinks>};
+  learning:{maturity:ReturnType<typeof tankLearningMaturity>;baselines:ReturnType<typeof tankBaselines>;signals:ReturnType<typeof learnedTankSignals>;predictions:ReturnType<typeof proactivePredictions>;repeatedPatterns:ReturnType<typeof repeatedResponsePatterns>;memory:ReturnType<typeof biologicalMemory>;eventLinks:ReturnType<typeof eventChemistryLinks>};
   nutrients:ReturnType<typeof analyzeNutrients>;
   maintenance:{due:Array<{id:string;title:string;titleEn?:string;nextDue?:string}>;total:number};
   equipment:{warnings:Array<{id:string;name:string;kind:string;status:string}>;energy:{dailyKwh:number;monthlyKwh:number;monthlyCost:number;configured:number;currency:string};media:ReturnType<typeof mediaPredictions>};
@@ -53,7 +53,7 @@ export function buildTankAIContext(tank:Tank):TankAIContext{
     state:{health:system.score,chemistry:chemistryHealth(tank),maintenance:maintenanceHealth(tank),bioloadPercent:Math.round(bio.ratio*100),stateScore:state.score,stateBand:state.band,mood:mood.key,forecast7d:forecast.projected7d,forecastDirection:forecast.direction,forecastConfidence:forecast.confidence},
     chemistry:{latest:tank.chemistry[0]?.values??{},readingCount:tank.chemistry.length,recent:tank.chemistry.slice(0,12).map(x=>({timestamp:x.timestamp,values:x.values})),guidance:chemistryGuidance(tank)},
     systemHealth:system,
-    learning:{baselines:tankBaselines(tank),signals:learnedTankSignals(tank),predictions:proactivePredictions(tank),repeatedPatterns:repeatedResponsePatterns(tank),memory:biologicalMemory(tank),eventLinks:eventChemistryLinks(tank)},
+    learning:{maturity:tankLearningMaturity(tank),baselines:tankBaselines(tank),signals:learnedTankSignals(tank),predictions:proactivePredictions(tank),repeatedPatterns:repeatedResponsePatterns(tank),memory:biologicalMemory(tank),eventLinks:eventChemistryLinks(tank)},
     nutrients:analyzeNutrients(tank),
     maintenance:{due,total:tank.maintenance.length},
     equipment:{warnings:tank.equipment.filter(x=>x.status==="warning"||x.status==="service").map(x=>({id:x.id,name:x.name,kind:x.kind,status:x.status})),energy:{dailyKwh:energy.dailyKwh,monthlyKwh:energy.monthlyKwh,monthlyCost:energy.monthlyCost,configured:energy.configured,currency:tank.energySettings?.currency||""},media:mediaPredictions(tank)},
