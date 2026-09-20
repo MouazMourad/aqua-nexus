@@ -111,6 +111,9 @@ test("new wizard tank enters biological cycling and locks non-cycle workflows",a
 
   await expect(page.locator(".cycle-panel")).toContainText(/الدورة البيولوجية|Biological cycle/);
   await expect(page.locator(".cycle-panel")).toContainText(/اليوم 1|day 1/i);
+  await expect(page.locator(".progressive-dashboard")).toHaveCount(0);
+  await expect(page.locator(".pd-health-score")).toHaveCount(0);
+  await expect(page.locator(".cycle-global-banner")).toHaveCount(0);
   await expect(page.locator('[data-aqua-page="livestock"]')).toBeDisabled();
   await expect(page.locator('[data-aqua-page="feeding"]')).toBeDisabled();
   await expect(page.locator('[data-aqua-page="dosing"]')).toBeDisabled();
