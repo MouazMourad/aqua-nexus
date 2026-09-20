@@ -16,6 +16,7 @@ function photoMeta(photo:JournalPhoto){
  * it was entered.
  */
 export function buildTankBrainSnapshot(tank:Tank){
+  const extended=tank as Tank & {aiActionPlans?:unknown[]};
   const activeAcclimation=(tank.acclimationSessions??[]).filter(x=>x.status!=="completed");
   const recentAcclimation=(tank.acclimationSessions??[]).filter(x=>x.status==="completed").slice(0,8);
   return {
@@ -62,7 +63,8 @@ export function buildTankBrainSnapshot(tank:Tank){
       events:tail(tank.intelligenceEvents,250),
       guidance:tail(tank.guidanceActions,120),
       healthSnapshots:tail(tank.healthSnapshots,120),
-      timeline:tail(tank.timeline,120)
+      timeline:tail(tank.timeline,120),
+      aiActionPlans:tail(extended.aiActionPlans,40)
     },
     vision:{
       photos:tail(tank.photos,40).map(photoMeta),
@@ -83,7 +85,8 @@ export function buildTankBrainSnapshot(tank:Tank){
       rodi:tank.rodi.length,
       rodiServiceEvents:tank.rodiServiceEvents?.length??0,
       plantCare:tank.plantCare?.length??0,
-      acclimationSessions:tank.acclimationSessions?.length??0
+      acclimationSessions:tank.acclimationSessions?.length??0,
+      aiActionPlans:extended.aiActionPlans?.length??0
     }
   };
 }
