@@ -13,6 +13,8 @@ import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
 import { answerAquaQuery } from "./aquaAIQueryEngine";
 import { tankIntelligenceCore } from "./intelligenceCore";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
+import { biologicalCycleStatus } from "./biologicalCycle";
+import { buildAquaAIQueryPlan } from "./aquaAIQueryPlan";
 
 export type AquaAIConfidence="low"|"medium"|"high";
 export type AquaAIPage="dashboard"|"chemistry"|"maintenance"|"equipment"|"livestock"|"timeline"|"dosing"|"quarantine"|"emergency"|"rodi"|"journal"|"acclimation"|"inventory"|"feeding"|"waterchange"|"expenses"|"sump"|"diseases"|"alerts";
@@ -490,6 +492,28 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   const meta=metaAnswer(question);if(meta)return meta;
   const q=(question||"").trim().toLowerCase();
   const intent=parseAquaQuestion(question);
+  const cycle=biologicalCycleStatus(tank);
+  if(cycle.active){
+    const plan=buildAquaAIQueryPlan(intent);
+    const cycleQuestion=/cycle|cycling|nitrogen|ammonia|nitrite|nitrate|دورة|امونيا|أمونيا|نتريت|نترات/.test(q);
+    const dosingQuestion=/جرعه|جرعة|جرعات|دوز|dose|dosing|supplement|مكمل/.test(q);
+    const allowedDomains=new Set(["system","chemistry","equipment","maintenance","emergency","rodi","inventory","water","sump","journal"]);
+    const mustStayInCycle=cycleQuestion||dosingQuestion||plan.primary==="system"||!allowedDomains.has(plan.primary)||intent.mode==="canAdd"||intent.mode==="dose";
+    if(mustStayInCycle){
+      const blocked=!cycleQuestion&&plan.primary!=="system"&&(!allowedDomains.has(plan.primary)||intent.mode==="canAdd"||intent.mode==="dose");
+      return{
+        titleAr:`الدورة البيولوجية — اليوم ${cycle.day}`,titleEn:`Biological cycle — day ${cycle.day}`,
+        summaryAr:(blocked||dosingQuestion)?`هالعملية موقوفة مؤقتاً لأن الحوض ضمن الدورة البيولوجية. ${cycle.nextAr}`:`${cycle.nextAr}`,
+        summaryEn:(blocked||dosingQuestion)?`This workflow is temporarily paused while the tank is cycling. ${cycle.nextEn}`:`${cycle.nextEn}`,
+        detailsAr:[...cycle.blockersAr.slice(0,4),"الوقت وحده لا يكفي لاعتبار الحوض جاهزاً؛ لازم تثبت الجاهزية بالقياسات."],
+        detailsEn:[...cycle.blockersEn.slice(0,4),"Elapsed time alone does not make the tank ready; readiness must be proven by measured tests."],
+        evidenceAr:[`اليوم ${cycle.day} من الدورة`,`تقدم الدورة ${cycle.progress}%`],
+        evidenceEn:[`Cycle day ${cycle.day}`,`Cycle progress ${cycle.progress}%`],
+        confidence:"high",
+        action:{page:cycle.actionPage as AquaAIPage,ar:cycle.nextAr,en:cycle.nextEn}
+      };
+    }
+  }
 
   // High-specificity handlers stay explicit; every normal aquarium question
   // is planned generically by domain + operation, so one signal cannot hijack unrelated topics.

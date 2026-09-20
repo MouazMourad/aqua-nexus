@@ -14,11 +14,13 @@ import { rodiIntelligence } from "./rodiIntelligence";
 import { sumpIntelligence } from "./sumpIntelligence";
 import { systemAlerts } from "./alertEngine";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
+import { biologicalCycleStatus } from "./biologicalCycle";
 
 export interface TankAIContext {
   schema:"aqua-nexus-ai-context/v1";
   generatedAt:string;
   tank:{id:string;name:string;type:string;status:string;ageMonths?:number;systemVolumeLiters:number};
+  biologicalCycle:ReturnType<typeof biologicalCycleStatus>;
   state:{health:number;chemistry:number;maintenance:number;bioloadPercent:number;stateScore:number;stateBand:string;mood:string;forecast7d:number|null;forecastDirection:string;forecastConfidence:string};
   chemistry:{latest:Record<string,number|null>;readingCount:number;recent:Array<{timestamp:string;values:Record<string,number|null>}>;guidance:ReturnType<typeof chemistryGuidance>};
   systemHealth:ReturnType<typeof systemHealth>;
@@ -36,7 +38,7 @@ const DAY=86400000;
 export function buildTankAIContext(tank:Tank):TankAIContext{
   const today=new Date().toISOString().slice(0,10),now=Date.now();
   const state=tankStateView(tank),forecast=tankForecast(tank),mood=tankMood(tank),energy=tankEnergy(tank);
-  const system=systemHealth(tank);
+  const system=systemHealth(tank),cycle=biologicalCycleStatus(tank);
   const due=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).due).slice(0,12).map(x=>({id:x.id,title:x.title,titleEn:x.titleEn,nextDue:x.nextDue}));
   const within=(timestamp:string,days:number)=>{const t=new Date(timestamp).getTime();return Number.isFinite(t)&&now-t<=days*DAY;};
   const bio=bioload(tank);
@@ -44,6 +46,7 @@ export function buildTankAIContext(tank:Tank):TankAIContext{
     schema:"aqua-nexus-ai-context/v1",
     generatedAt:new Date().toISOString(),
     tank:{id:tank.id,name:tank.name,type:tank.type,status:tank.status,ageMonths:tank.ageMonths,systemVolumeLiters:tank.systemVolumeLiters},
+    biologicalCycle:cycle,
     state:{health:system.score,chemistry:chemistryHealth(tank),maintenance:maintenanceHealth(tank),bioloadPercent:Math.round(bio.ratio*100),stateScore:state.score,stateBand:state.band,mood:mood.key,forecast7d:forecast.projected7d,forecastDirection:forecast.direction,forecastConfidence:forecast.confidence},
     chemistry:{latest:tank.chemistry[0]?.values??{},readingCount:tank.chemistry.length,recent:tank.chemistry.slice(0,12).map(x=>({timestamp:x.timestamp,values:x.values})),guidance:chemistryGuidance(tank)},
     systemHealth:system,
@@ -71,7 +74,8 @@ export function aquaAISystemPrompt(language:"ar"|"en"){
     "Treat suspected data-format errors as data-quality problems first. Do not recommend physical tank corrections until the recorded value is validated.",
     "When chemistry health is reduced, identify the specific parameters lowering the score and give prioritized, gradual next actions.",
     "Treat the aquarium as one interconnected system: chemistry, maintenance, bioload, equipment adequacy, livestock compatibility and livestock condition all contribute to overall health.",
-    "Always surface active livestock compatibility conflicts and equipment-sizing gaps when they materially affect the answer or overall system health."
+    "Always surface active livestock compatibility conflicts and equipment-sizing gaps when they materially affect the answer or overall system health.",
+    "If biologicalCycle.active is true, treat Cycling Mode as a hard operational gate: do not recommend stocking, acclimation, feeding, routine dosing, treatment, travel routines, or other non-cycle workflows. Keep actions focused on cycling, measured chemistry, filtration/equipment, source water and emergencies until biologicalCycle.ready is confirmed and the cycle is completed."
   ];
   if(language==="ar")shared.push("Respond in clear Modern Arabic with familiar aquarium terminology; keep technical parameter names such as KH, Ca, Mg, NO3 and PO4 as written.");
   else shared.push("Respond in clear concise English using standard aquarium terminology.");

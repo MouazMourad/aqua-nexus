@@ -312,6 +312,78 @@ export interface JournalPhoto {
   timestamp: string;
   caption: string;
   dataUrl: string;
+  livestockId?: string;
+  estimatedSizeCm?: number;
+  colorIndex?: number;
+  brightnessIndex?: number;
+  captureScore?: number;
+  contrastIndex?: number;
+  sharpnessIndex?: number;
+  clarityIndex?: number;
+  glarePercent?: number;
+  shadowPercent?: number;
+  palePixelPercent?: number;
+  greenDominancePercent?: number;
+  brightSpotPercent?: number;
+  redDominancePercent?: number;
+  blueDominancePercent?: number;
+  edgeDensity?: number;
+}
+
+export interface VisionAssessmentRecord {
+  id: string;
+  timestamp: string;
+  photoId: string;
+  livestockId?: string;
+  symptoms: string[];
+  notes?: string;
+  metrics: {
+    colorIndex: number;
+    brightnessIndex: number;
+    captureScore: number;
+    contrastIndex?: number;
+    sharpnessIndex?: number;
+    clarityIndex?: number;
+    glarePercent?: number;
+    shadowPercent?: number;
+    palePixelPercent?: number;
+    greenDominancePercent?: number;
+    brightSpotPercent?: number;
+    redDominancePercent?: number;
+    blueDominancePercent?: number;
+    edgeDensity?: number;
+  };
+  triage: {
+    level: "monitor" | "attention" | "urgent";
+    confidence: "low" | "medium";
+    confidenceScore: number;
+    summaryAr: string;
+    summaryEn: string;
+    observationsAr: string[];
+    observationsEn: string[];
+    possibilitiesAr: string[];
+    possibilitiesEn: string[];
+    nextAr: string[];
+    nextEn: string[];
+    contextAr: string[];
+    contextEn: string[];
+    comparisonAr?: string;
+    comparisonEn?: string;
+    engine: string;
+  };
+  modelStatus: "local-best";
+  engine: string;
+  external?: {
+    status: "not_requested" | "unavailable" | "completed" | "error";
+    provider?: string;
+    model?: string;
+    text?: string;
+    error?: string;
+    analyzedAt?: string;
+  };
+  diseaseCandidateIds?: string[];
+  followUpTaskId?: string;
+  quarantineCaseId?: string;
 }
 
 export interface FeedingLog {
@@ -453,6 +525,25 @@ export interface RODIServiceEvent {
   notes?: string;
 }
 
+export interface PlantCareLog {
+  id: string;
+  timestamp: string;
+  kind: "fertilizer" | "co2_refill";
+  inventoryUse?: InventoryUsage;
+  equipmentId?: string;
+  notes?: string;
+}
+
+export interface BiologicalCycleState {
+  startedAt: string;
+  sourceAddedAt?: string;
+  bacteriaSeededAt?: string;
+  method?: "fishless" | "seeded_media" | "bottled_bacteria" | "other";
+  completedAt?: string;
+  completionReadingTimestamps?: string[];
+  notes?: string;
+}
+
 export interface AcclimationItem {
   id: string;
   libraryId?: string;
@@ -575,6 +666,7 @@ export interface Tank {
   guidanceActions?: GuidanceAction[];
   healthSnapshots?: HealthSnapshot[];
   photos: JournalPhoto[];
+  visionAssessments?: VisionAssessmentRecord[];
   feeding: FeedingLog[];
   dosing: DosingLog[];
   doserChannels: DoserChannel[];
@@ -585,6 +677,8 @@ export interface Tank {
   waterChanges: WaterChangeLog[];
   rodi: RODILog[];
   rodiServiceEvents?: RODIServiceEvent[];
+  plantCare?: PlantCareLog[];
+  biologicalCycle?: BiologicalCycleState;
   acclimationSessions?: AcclimationSession[];
   createdAt: string;
 }

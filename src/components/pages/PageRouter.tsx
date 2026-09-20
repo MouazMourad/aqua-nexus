@@ -26,10 +26,16 @@ import { ExpensesPage } from "./ExpensesPage";
 import { AlertsPage } from "./AlertsPage";
 import { ReportsPage } from "./ReportsPage";
 import { SettingsPage } from "./SettingsPage";
+import { biologicalCycleStatus,isCyclePageAllowed } from "@/domain/biologicalCycle";
+import { useAquaStore } from "@/store/useAquaStore";
+import { bi } from "@/i18n";
 
 export function PageRouter({page,tank,tanks,selectedTankId,onSelectTank,onNavigate}:{page:AppPage;tank:Tank;tanks:Tank[];selectedTankId:string;onSelectTank:(id:string)=>void;onNavigate:(p:AppPage)=>void}) {
+ const lang=useAquaStore(s=>s.language),cycle=biologicalCycleStatus(tank);
  let content:ReactNode;
- switch(page){
+ if(cycle.active&&!isCyclePageAllowed(page)){
+  content=<section className="page-grid"><div className="card panel full-span"><div className="inline-alert warn"><b>🔒 {bi(lang,"هالوحدة مقفلة خلال الدورة البيولوجية.","This module is locked during biological cycling.")}</b><p>{bi(lang,"Aqua Nexus عم يوقف العمليات غير المرتبطة بالدورة لحماية الحوض. كمّل خطوات الدورة والقياسات أولاً.","Aqua Nexus pauses non-cycle workflows to protect the tank. Complete cycling steps and measured tests first.")}</p><button className="btn primary" onClick={()=>onNavigate("dashboard")}>{bi(lang,"العودة لمتابعة الدورة","Back to cycle tracking")}</button></div></div></section>;
+ }else switch(page){
   case"tanks":content=<TanksPage tanks={tanks} selectedTankId={selectedTankId} onSelect={onSelectTank}/>;break;
   case"equipment":content=<EquipmentPage tank={tank}/>;break;
   case"sump":content=<SumpPage tank={tank}/>;break;
@@ -39,7 +45,7 @@ export function PageRouter({page,tank,tanks,selectedTankId,onSelectTank,onNaviga
   case"chemistry":content=<ChemistryPage tank={tank}/>;break;
   case"maintenance":content=<MaintenancePage tank={tank}/>;break;
   case"inventory":content=<InventoryPage tank={tank}/>;break;
-  case"diseases":content=<DiseasesPage tank={tank}/>;break;
+  case"diseases":content=<DiseasesPage tank={tank} onVisualInsight={()=>onNavigate("journal")}/>;break;
   case"timeline":content=<TimelinePage tank={tank}/>;break;
   case"journal":content=<JournalPage tank={tank}/>;break;
   case"waterchange":content=<WaterChangePage tank={tank}/>;break;

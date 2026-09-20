@@ -5,6 +5,8 @@ import { useAquaStore } from "@/store/useAquaStore";
 import { tr,statusText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Modal } from "@/components/ui/Modal";
+import { biologicalCycleStatus } from "@/domain/biologicalCycle";
+import { nowISO } from "@/lib/appUtils";
 
 function SwipeTankCard({tank,selected,onSelect,onEdit,onDelete}:{tank:Tank;selected:boolean;onSelect:()=>void;onEdit:()=>void;onDelete:()=>void}){
  const lang=useAquaStore(s=>s.language);
@@ -37,6 +39,7 @@ export function TanksPage({tanks,selectedTankId,onSelect}:{tanks:Tank[];selected
  const [l,setL]=useState(120),[w,setW]=useState(60),[h,setH]=useState(60),[loss,setLoss]=useState(15);
  const [hasSump,setHasSump]=useState(true),[sl,setSl]=useState(100),[sw,setSw]=useState(40),[sh,setSh]=useState(35),[fill,setFill]=useState(75);
  const typeLocked=Boolean(editTarget&&(editTarget.livestock.length>0||editTarget.chemistry.length>0||(editTarget.acclimationSessions??[]).length>0));
+ const editCycle=editTarget?biologicalCycleStatus(editTarget):null;
 
  function openEdit(t:Tank){
   setEditTarget(t);setName(t.name);setType(t.type);setStatus(t.status);setAgeMonths(t.ageMonths??0);
@@ -45,8 +48,16 @@ export function TanksPage({tanks,selectedTankId,onSelect}:{tanks:Tank[];selected
  }
  function saveEdit(){
   if(!editTarget)return;
+  if(editCycle?.active&&status==="established"&&!editCycle.ready){
+   window.alert(lang==="ar"?"ما فيك تحول الحوض إلى Established قبل ما تحقق شروط الدورة البيولوجية. كمّل القراءات من Dashboard/Chemistry أولاً.":"You cannot mark the tank Established before biological-cycle readiness is proven. Complete the measured cycle checks first.");
+   return;
+  }
+  const ts=nowISO(),wantsCycle=status==="new"||status==="cycling";
   patchTank(editTarget.id,t=>({
-   ...t,name:name.trim()||t.name,type,status,ageMonths,
+   ...t,name:name.trim()||t.name,type,status:wantsCycle?"cycling":status,ageMonths,
+   biologicalCycle:wantsCycle
+    ?(editCycle?.active?{...(t.biologicalCycle??{startedAt:t.createdAt||ts}),startedAt:t.biologicalCycle?.startedAt??t.createdAt??ts}:{startedAt:ts,method:"fishless"})
+    :(editCycle?.active&&editCycle.ready?{...(t.biologicalCycle??{startedAt:t.createdAt}),completedAt:t.biologicalCycle?.completedAt??ts,completionReadingTimestamps:[editCycle.latestMeasured?.timestamp,editCycle.previousMeasured?.timestamp].filter(Boolean) as string[]}:t.biologicalCycle),
    display:{...t.display,length:l,width:w,height:h,displacementPercent:loss},
    sump:{...t.sump,enabled:hasSump,dimensions:{length:sl,width:sw,height:sh},operatingFillPercent:fill},
    equipment:hasSump?t.equipment:t.equipment.map(eq=>eq.location.startsWith("sump:")?{...eq,location:"external" as const}:eq)
@@ -75,7 +86,7 @@ export function TanksPage({tanks,selectedTankId,onSelect}:{tanks:Tank[];selected
     <div className="tank-edit-section"><h4>{lang==="ar"?"معلومات الحوض":"Tank information"}</h4><div className="form-grid">
      <label className="field"><span>{lang==="ar"?"اسم الحوض":"Tank name"}</span><input value={name} onChange={e=>setName(e.target.value)}/></label>
      <label className="field"><span>{lang==="ar"?"النوع":"Type"}</span><select value={type} disabled={typeLocked} onChange={e=>setType(e.target.value as TankType)}><option value="marine">{tr(lang,"marine")}</option><option value="freshwater">{tr(lang,"freshwater")}</option></select></label>
-     <label className="field"><span>{lang==="ar"?"الحالة":"Status"}</span><select value={status} onChange={e=>setStatus(e.target.value as TankStatus)}><option value="new">{statusText(lang,"new")}</option><option value="cycling">{statusText(lang,"cycling")}</option><option value="established">{statusText(lang,"established")}</option></select></label>
+     <label className="field"><span>{lang==="ar"?"الحالة":"Status"}</span><select value={status} onChange={e=>setStatus(e.target.value as TankStatus)}><option value="new">{statusText(lang,"new")}</option><option value="cycling">{statusText(lang,"cycling")}</option><option value="established" disabled={Boolean(editCycle?.active&&!editCycle.ready)}>{statusText(lang,"established")}</option></select>{editCycle?.active&&!editCycle.ready&&<small>{lang==="ar"?`🔒 Established مقفول — الدورة يوم ${editCycle.day} ولسا شروط الجاهزية ناقصة.`:`🔒 Established is locked — cycle day ${editCycle.day} is not ready yet.`}</small>}</label>
      <label className="field"><span>{lang==="ar"?"عمر الحوض / شهر":"Age / months"}</span><input type="number" min="0" value={ageMonths} onChange={e=>setAgeMonths(Number(e.target.value))}/></label>
     </div>{typeLocked&&<div className="inline-alert warn">{lang==="ar"?"نوع الحوض مقفول لأن فيه بيانات/كائنات فعلية. لتجنب خلط Marine وFreshwater أنشئ حوضاً جديداً بدل تحويل هذا الحوض.":"Tank type is locked because real data/livestock exists. Create a new tank instead of converting this one between Marine and Freshwater."}</div>}</div>
     <div className="tank-edit-section"><h4>{lang==="ar"?"أبعاد الحوض":"Display dimensions"}</h4><div className="form-grid">

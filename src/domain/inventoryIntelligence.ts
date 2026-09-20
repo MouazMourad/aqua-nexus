@@ -122,6 +122,55 @@ export function routineDosingInventory(tank:Tank){
   });
 }
 
+export interface InventorySubcategoryOption{value:string;ar:string;en:string}
+
+const INVENTORY_SUBCATEGORIES:Record<InventoryCategory,InventorySubcategoryOption[]>={
+  feeding:[
+    {value:"dry_food",ar:"طعام جاف",en:"Dry food"},{value:"frozen_food",ar:"طعام مجمد",en:"Frozen food"},{value:"coral_food",ar:"غذاء مرجان",en:"Coral food"},{value:"seaweed_food",ar:"طحالب / نوري غذائي",en:"Seaweed / Nori food"},{value:"live_food",ar:"غذاء حي",en:"Live food"},{value:"other",ar:"أخرى",en:"Other"}
+  ],
+  fertilizer:[
+    {value:"complete",ar:"سماد متكامل",en:"Complete fertilizer"},{value:"nitrogen",ar:"نيتروجين",en:"Nitrogen"},{value:"phosphate",ar:"فوسفات",en:"Phosphate"},{value:"potassium",ar:"بوتاسيوم",en:"Potassium"},{value:"iron",ar:"حديد",en:"Iron"},{value:"micros",ar:"عناصر صغرى",en:"Micros"},{value:"root_tabs",ar:"Root Tabs",en:"Root tabs"},{value:"other",ar:"أخرى",en:"Other"}
+  ],
+  co2:[
+    {value:"gas_refill",ar:"تعبئة غاز CO₂",en:"CO₂ gas refill"},{value:"cylinder",ar:"أسطوانة CO₂",en:"CO₂ cylinder"},{value:"liquid_carbon",ar:"كربون سائل",en:"Liquid carbon"},{value:"other",ar:"أخرى",en:"Other"}
+  ],
+  dosing:[
+    {value:"alkalinity",ar:"KH / القلوية",en:"Alkalinity / KH"},{value:"calcium",ar:"كالسيوم",en:"Calcium"},{value:"magnesium",ar:"مغنزيوم",en:"Magnesium"},{value:"balanced_reef",ar:"متمم ريف متوازن",en:"Balanced reef"},{value:"commercial",ar:"منتج تجاري",en:"Commercial product"},{value:"other",ar:"أخرى",en:"Other"}
+  ],
+  supplement:[
+    {value:"trace_elements",ar:"عناصر نادرة",en:"Trace elements"},{value:"iodine",ar:"يود",en:"Iodine"},{value:"amino",ar:"أحماض أمينية",en:"Amino acids"},{value:"bacteria",ar:"بكتيريا",en:"Bacteria"},{value:"other",ar:"أخرى",en:"Other"}
+  ],
+  filter_media:[
+    {value:"activated_carbon",ar:"كربون نشط",en:"Activated carbon"},{value:"phosphate_media",ar:"مزيل فوسفات / GFO",en:"Phosphate media / GFO"},{value:"biological_media",ar:"ميديا بيولوجية",en:"Biological media"},{value:"mechanical_media",ar:"ميديا ميكانيكية",en:"Mechanical media"},{value:"zeolite",ar:"زيولايت",en:"Zeolite"},{value:"other",ar:"أخرى",en:"Other"}
+  ],
+  coral_treatment:[{value:"coral_dip",ar:"Coral Dip",en:"Coral Dip"},{value:"other",ar:"أخرى",en:"Other"}],
+  medication:[
+    {value:"copper",ar:"نحاس",en:"Copper"},{value:"antiparasitic",ar:"مضاد طفيليات",en:"Antiparasitic"},{value:"antibiotic",ar:"مضاد حيوي",en:"Antibiotic"},{value:"antifungal",ar:"مضاد فطري",en:"Antifungal"},{value:"aquatic_medication",ar:"دواء مائي عام",en:"General aquatic medication"},{value:"other",ar:"أخرى",en:"Other"}
+  ],
+  water_prep:[
+    {value:"marine_salt",ar:"ملح بحري",en:"Marine salt"},{value:"conditioner",ar:"مزيل كلور / Conditioner",en:"Conditioner"},{value:"freshwater_salt",ar:"ملح مياه عذبة",en:"Freshwater salt"},{value:"remineralizer",ar:"إعادة تمعدن",en:"Remineralizer"},{value:"other",ar:"أخرى",en:"Other"}
+  ],
+  equipment:[
+    {value:"spare",ar:"قطعة احتياطية",en:"Spare"},{value:"equipment_consumable",ar:"مستهلك جهاز",en:"Equipment consumable"},{value:"aquascape_consumable",ar:"مستهلك Aquascape",en:"Aquascape consumable"},{value:"other",ar:"أخرى",en:"Other"}
+  ],
+  testing:[
+    {value:"reagent",ar:"كاشف / Reagent",en:"Reagent"},{value:"test_kit",ar:"Test Kit",en:"Test kit"},{value:"calibration",ar:"محلول معايرة",en:"Calibration solution"},{value:"other",ar:"أخرى",en:"Other"}
+  ],
+  rodi:[
+    {value:"sediment_filter",ar:"فلتر رواسب",en:"Sediment filter"},{value:"carbon_filter",ar:"فلتر كربون",en:"Carbon filter"},{value:"di_resin",ar:"DI Resin",en:"DI resin"},{value:"membrane",ar:"غشاء RO",en:"RO membrane"},{value:"other",ar:"أخرى",en:"Other"}
+  ],
+  other:[{value:"other",ar:"أخرى",en:"Other"}]
+};
+
+export function inventorySubcategoryOptions(category:InventoryCategory){
+  return INVENTORY_SUBCATEGORIES[category]??INVENTORY_SUBCATEGORIES.other;
+}
+
+export function inventorySubcategoryLabel(category:InventoryCategory,value:string,lang:"ar"|"en"){
+  const item=inventorySubcategoryOptions(category).find(x=>x.value===value);
+  return item?(lang==="ar"?item.ar:item.en):value;
+}
+
 export function inventoryCategoryLabel(category:InventoryCategory,lang:"ar"|"en"){
   const ar:Record<InventoryCategory,string>={
     feeding:"تغذية",fertilizer:"أسمدة",co2:"CO₂",dosing:"جرعات كيميائية",supplement:"متممات",

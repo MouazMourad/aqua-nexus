@@ -10,6 +10,7 @@ import { tr,bi,categoryText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Modal } from "@/components/ui/Modal";
 import { uid,today,nowISO } from "@/lib/appUtils";
+import { PlantCarePanel } from "@/components/plant/PlantCarePanel";
 
 type EntryCategory=LivestockItem["category"]|"macroalgae";
 
@@ -65,6 +66,8 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
    <div className="table-wrap"><table><thead><tr><th>{tr(lang,"name")}</th><th>{tr(lang,"category")}</th><th>{tr(lang,"quantity")}</th><th>{lang==="ar"?"الصحة":"Health"}</th><th>{tr(lang,"load")}</th><th></th></tr></thead>
    <tbody>{tank.livestock.map(x=><tr key={x.id}><td>{lang==="ar"?x.name:(x.nameEn||x.name)}{x.sizeCm&&<small style={{display:"block"}}>{x.sizeCm} cm</small>}</td><td>{x.subtype==="macroalgae"?bi(lang,"ماكرو ألجي","Macroalgae"):categoryText(lang,x.category)}</td><td>{x.quantity}</td><td><span className={`status ${x.health!=="good"?"warn":""}`}>{x.health}</span></td><td>{((x.load??1)*x.quantity).toFixed(1)}</td><td><button className="btn" onClick={()=>startEdit(x)}>✎</button> <button className="btn danger" onClick={()=>remove(x.id)}>×</button></td></tr>)}</tbody></table></div>
   </div>
+
+  <PlantCarePanel tank={tank}/>
 
   <Modal open={!!editId} title={lang==="ar"?"تحديث حالة الكائن":"Update livestock"} onClose={()=>setEditId(null)}><div className="form-grid"><label className="field"><span>{tr(lang,"quantity")}</span><input type="number" min="1" value={editQty} onChange={e=>setEditQty(Number(e.target.value))}/></label><label className="field"><span>{lang==="ar"?"الصحة":"Health"}</span><select value={editHealth} onChange={e=>setEditHealth(e.target.value as LivestockItem["health"])}><option value="good">{lang==="ar"?"جيدة":"Good"}</option><option value="watch">{lang==="ar"?"مراقبة":"Watch"}</option><option value="treatment">{lang==="ar"?"علاج":"Treatment"}</option></select></label><label className="field"><span>{lang==="ar"?"الحجم التقريبي cm":"Estimated size cm"}</span><input type="number" min="0" step=".1" value={editSize||""} onChange={e=>setEditSize(Number(e.target.value))}/></label><label className="field full-field"><span>{tr(lang,"notes")}</span><textarea value={editNotes} onChange={e=>setEditNotes(e.target.value)}/></label></div><div className="modal-actions"><button className="btn" onClick={()=>setEditId(null)}>{tr(lang,"cancel")}</button><button className="btn primary" onClick={saveEdit}>{tr(lang,"save")}</button></div></Modal>
 

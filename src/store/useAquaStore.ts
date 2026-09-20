@@ -38,8 +38,15 @@ function recalcTank(tank: Tank): Tank {
 }
 
 function normalize(tank: Tank): Tank {
+  const createdAt=tank.createdAt ?? new Date().toISOString();
+  const cycling=tank.status==="new"||tank.status==="cycling";
+  const biologicalCycle=cycling
+    ? {...(tank.biologicalCycle??{startedAt:createdAt}),startedAt:tank.biologicalCycle?.startedAt??createdAt}
+    : tank.biologicalCycle;
   return recalcTank({
     ...tank,
+    createdAt,
+    biologicalCycle,
     equipment:(tank.equipment ?? []).map((e,i)=>{
       const visualKind=["lighting","waveMaker","overflow"].includes(e.kind);
       const migrateLegacy=visualKind && e.location==="external" && !e.displayPosition;
@@ -57,6 +64,7 @@ function normalize(tank: Tank): Tank {
     guidanceActions:tank.guidanceActions ?? [],
     healthSnapshots:tank.healthSnapshots ?? [],
     photos:tank.photos ?? [],
+    visionAssessments:tank.visionAssessments ?? [],
     feeding:tank.feeding ?? [],
     dosing:tank.dosing ?? [],
     doserChannels:tank.doserChannels ?? [],
@@ -66,8 +74,9 @@ function normalize(tank: Tank): Tank {
     expenses:tank.expenses ?? [],
     waterChanges:tank.waterChanges ?? [],
     rodi:tank.rodi ?? [],
-    acclimationSessions:tank.acclimationSessions ?? [],
-    createdAt:tank.createdAt ?? new Date().toISOString()
+    rodiServiceEvents:tank.rodiServiceEvents ?? [],
+    plantCare:tank.plantCare ?? [],
+    acclimationSessions:tank.acclimationSessions ?? []
   });
 }
 

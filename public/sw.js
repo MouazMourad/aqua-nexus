@@ -1,6 +1,16 @@
-const CACHE_NAME="aqua-nexus-pwa-v4";
+const CACHE_NAME="aqua-nexus-pwa-v5";
+const APP_SHELL=["/","/manifest.webmanifest"];
 
-self.addEventListener("install",()=>self.skipWaiting());
+self.addEventListener("install",event=>{
+  event.waitUntil((async()=>{
+    const cache=await caches.open(CACHE_NAME);
+    await Promise.all(APP_SHELL.map(async url=>{
+      try{await cache.add(url);}catch{}
+    }));
+    await self.skipWaiting();
+  })());
+});
+
 self.addEventListener("activate",event=>{
   event.waitUntil((async()=>{
     const keys=await caches.keys();
@@ -45,4 +55,52 @@ self.addEventListener("notificationclick",event=>{
     }
     if(self.clients.openWindow) await self.clients.openWindow(absolute);
   })());
+});
+
+self.addEventListener("fetch",event=>{
+  const request=event.request;
+  if(request.method!=="GET")return;
+  const url=new URL(request.url);
+  if(url.origin!==self.location.origin)return;
+  if(url.pathname.startsWith("/api/"))return;
+
+  if(request.mode==="navigate"){
+    event.respondWith((async()=>{
+      try{
+        const response=await fetch(request);
+        if(response&&response.ok){
+          const cache=await caches.open(CACHE_NAME);
+          cache.put("/",response.clone()).catch(()=>{});
+        }
+        return response;
+      }catch{
+        return (await caches.match(request))||(await caches.match("/"))||Response.error();
+      }
+    })());
+    return;
+  }
+
+  const staticAsset=url.pathname.startsWith("/_next/static/")
+    ||url.pathname.startsWith("/icons/")
+    ||url.pathname.endsWith(".webmanifest")
+    ||url.pathname.endsWith(".css")
+    ||url.pathname.endsWith(".js")
+    ||url.pathname.endsWith(".woff2");
+
+  if(staticAsset){
+    event.respondWith((async()=>{
+      const cached=await caches.match(request);
+      if(cached)return cached;
+      try{
+        const response=await fetch(request);
+        if(response&&response.ok){
+          const cache=await caches.open(CACHE_NAME);
+          cache.put(request,response.clone()).catch(()=>{});
+        }
+        return response;
+      }catch{
+        return Response.error();
+      }
+    })());
+  }
 });

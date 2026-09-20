@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import { demoMarineTank } from "@/data/demoTank";
+import { demoFreshwaterTank,demoMarineTank } from "@/data/demoTank";
 import { parseAquaQuestion,resolveAquaFollowup } from "@/domain/aquaAIIntent";
 import { buildAquaAIQueryPlan } from "@/domain/aquaAIQueryPlan";
 import { aquaAIAnswer } from "@/domain/aquaAIBrain";
@@ -18,9 +18,14 @@ import { deriveGuidanceActions } from "@/domain/impactEngine";
 import { deriveIntelligenceEvents } from "@/domain/eventIntelligence";
 import { coralTransferGate } from "@/domain/acclimationSafety";
 import { allowedAcclimationCategories,livestockCategoryFromAcclimation,normalizeAcclimationCategory } from "@/domain/acclimationCategories";
-import { correctiveDosingInventory,inventoryForConsumer,inventoryProfile,routineDosingInventory } from "@/domain/inventoryIntelligence";
+import { correctiveDosingInventory,inventoryForConsumer,inventoryProfile,inventorySubcategoryOptions,routineDosingInventory } from "@/domain/inventoryIntelligence";
 import { consumeInventory } from "@/domain/inventoryConsumption";
 import { fitChamberToSump,sumpChamberContents } from "@/domain/sumpOperations";
+import { validateBackupPayload,validateTankImportPayload } from "@/domain/backupValidation";
+import { visionDiseaseCandidates } from "@/domain/visionDifferential";
+import { buildVisionTriage } from "@/domain/visionIntelligence";
+import { sanitizeVisionQuestion,validateVisionDataUrl } from "@/domain/visionRequestSafety";
+import { biologicalCycleStatus,cycleRelevantMaintenanceTask,isCyclePageAllowed } from "@/domain/biologicalCycle";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -245,6 +250,148 @@ describe("Inventory data-integrity regression",()=>{
 });
 
 
+
+describe("AI Vision safety and differential regression",()=>{
+  it("accepts compact supported image data and rejects unsupported or oversized payloads",()=>{
+    expect(validateVisionDataUrl("data:image/jpeg;base64,AA==",1024).ok).toBe(true);
+    expect(validateVisionDataUrl("data:image/heic;base64,AA==",1024).ok).toBe(false);
+    const oversized="data:image/jpeg;base64,"+"A".repeat(5000);
+    expect(validateVisionDataUrl(oversized,100).ok).toBe(false);
+  });
+  it("sanitizes excessively long Vision questions",()=>{
+    expect(sanitizeVisionQuestion("x".repeat(5000),120).length).toBe(120);
+  });
+  it("escalates rapid breathing and tissue loss while keeping confidence bounded",()=>{
+    const fish=structuredClone(demoMarineTank);
+    fish.livestock=[{id:"fish-v",name:"Fish",category:"fish",quantity:1,health:"watch",load:1}];
+    const result=buildVisionTriage(fish,{livestockId:"fish-v",symptoms:["rapidBreathing"],metrics:{colorIndex:40,brightnessIndex:50,captureScore:80,clarityIndex:75}});
+    expect(result.level).toBe("urgent");
+    expect(result.confidenceScore).toBeLessThanOrEqual(88);
+    expect(result.nextEn.join(" ")).toMatch(/ammonia|surface agitation/i);
+  });
+  it("uses prior comparable captures as evidence without turning them into a diagnosis",()=>{
+    const coral=structuredClone(demoMarineTank);
+    coral.livestock=[{id:"coral-v",name:"Coral",category:"coral",quantity:1,health:"watch",load:1}];
+    const result=buildVisionTriage(coral,{livestockId:"coral-v",symptoms:["paleColor"],metrics:{colorIndex:35,brightnessIndex:54,captureScore:82,clarityIndex:72,blueDominancePercent:30},previousMetrics:{colorIndex:45,brightnessIndex:52,captureScore:80,clarityIndex:70,blueDominancePercent:29}});
+    expect(result.comparisonEn).toBeTruthy();
+    expect(result.summaryEn.toLowerCase()).not.toMatch(/confirmed diagnosis|definitive diagnosis/);
+  });
+  it("maps marine fish white spots to marine disease references only",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.livestock=[{id:"fish1",name:"Test fish",category:"fish",quantity:1,health:"watch",load:1}];
+    const ids=visionDiseaseCandidates(t,"fish1",["whiteSpots","rapidBreathing"]).map(x=>x.id);
+    expect(ids).toContain("m_ich");
+    expect(ids.some(x=>x.startsWith("f_"))).toBe(false);
+  });
+  it("maps coral tissue loss to coral references without claiming a diagnosis",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.livestock=[{id:"coral1",name:"Test coral",category:"coral",quantity:1,health:"watch",load:1}];
+    const candidates=visionDiseaseCandidates(t,"coral1",["tissueLoss"]);
+    expect(candidates.some(x=>x.id==="c_tissue"||x.id==="c_brownjelly"||x.id==="c_rtn")).toBe(true);
+    expect(candidates.every(x=>x.score>0)).toBe(true);
+  });
+});
+
+describe("Biological cycling gate",()=>{
+  it("does not treat elapsed time alone as cycle readiness",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.isTraining=false;t.status="cycling";t.createdAt=new Date(Date.now()-35*86400000).toISOString();
+    t.biologicalCycle={startedAt:t.createdAt};
+    t.chemistry=[];
+    const state=biologicalCycleStatus(t);
+    expect(state.active).toBe(true);
+    expect(state.day).toBeGreaterThanOrEqual(35);
+    expect(state.ready).toBe(false);
+  });
+  it("unlocks only after source evidence and two spaced clear marine readings",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.isTraining=false;t.status="cycling";
+    const now=Date.now();
+    t.createdAt=new Date(now-4*86400000).toISOString();
+    t.biologicalCycle={startedAt:t.createdAt,sourceAddedAt:new Date(now-3*86400000).toISOString(),method:"fishless"};
+    t.chemistry=[
+      {timestamp:new Date(now-1*3600000).toISOString(),usingDefaults:false,values:{NH3:0,NO3:8}},
+      {timestamp:new Date(now-14*3600000).toISOString(),usingDefaults:false,values:{NH3:0,NO3:6}},
+      {timestamp:new Date(now-30*3600000).toISOString(),usingDefaults:false,values:{NH3:1.0,NO3:0}}
+    ];
+    const state=biologicalCycleStatus(t);
+    expect(state.processingEvidence).toBe(true);
+    expect(state.twoConsecutiveClear).toBe(true);
+    expect(state.ready).toBe(true);
+  });
+  it("requires nitrite clearance for freshwater confirmation",()=>{
+    const t=structuredClone(demoFreshwaterTank);
+    t.isTraining=false;t.status="cycling";
+    const now=Date.now();
+    t.biologicalCycle={startedAt:new Date(now-3*86400000).toISOString(),sourceAddedAt:new Date(now-2*86400000).toISOString()};
+    t.chemistry=[
+      {timestamp:new Date(now-1*3600000).toISOString(),usingDefaults:false,values:{NH3:0,NO2:.10,NO3:15}},
+      {timestamp:new Date(now-14*3600000).toISOString(),usingDefaults:false,values:{NH3:0,NO2:0,NO3:12}},
+      {timestamp:new Date(now-30*3600000).toISOString(),usingDefaults:false,values:{NH3:.5,NO2:.3,NO3:2}}
+    ];
+    expect(biologicalCycleStatus(t).ready).toBe(false);
+  });
+  it("locks stocking and non-cycle workflow pages during cycling",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.isTraining=false;t.status="cycling";t.biologicalCycle={startedAt:new Date().toISOString()};
+    expect(stockingReadiness(t).state).toBe("not_now");
+    expect(isCyclePageAllowed("chemistry")).toBe(true);
+    expect(isCyclePageAllowed("emergency")).toBe(true);
+    expect(isCyclePageAllowed("livestock")).toBe(false);
+    expect(isCyclePageAllowed("feeding")).toBe(false);
+    expect(isCyclePageAllowed("dosing")).toBe(false);
+  });
+  it("keeps only cycle-related maintenance tasks in cycle-only mode",()=>{
+    expect(cycleRelevantMaintenanceTask({id:"c",title:"فحص كيمياء الدورة البيولوجية",cadence:"weekly",done:false,sourceDomain:"system",sourceId:"cycle:chemistry"})).toBe(true);
+    expect(cycleRelevantMaintenanceTask({id:"x",title:"Clean display glass",cadence:"weekly",done:false})).toBe(false);
+  });
+  it("keeps Local Best AI from recommending dosing while cycling",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.isTraining=false;t.status="cycling";t.biologicalCycle={startedAt:new Date().toISOString()};
+    const answer=aquaAIAnswer("قديش جرعة KH حط هلا؟",t,"dashboard");
+    expect(answer.titleEn).toMatch(/Biological cycle/i);
+    expect(answer.action?.page).not.toBe("dosing");
+  });
+});
+
+describe("AI Vision request safety",()=>{
+  it("accepts supported small image data URLs",()=>{
+    expect(validateVisionDataUrl("data:image/jpeg;base64,aGVsbG8=").ok).toBe(true);
+  });
+  it("rejects unsupported image types and malformed payloads",()=>{
+    expect(validateVisionDataUrl("data:image/svg+xml;base64,aGVsbG8=").ok).toBe(false);
+    expect(validateVisionDataUrl("data:image/png;base64,%%%").ok).toBe(false);
+  });
+  it("enforces the configured decoded image size limit",()=>{
+    const payload="A".repeat(1400);
+    expect(validateVisionDataUrl("data:image/png;base64,"+payload,100).ok).toBe(false);
+  });
+  it("caps external Vision questions before provider calls",()=>{
+    expect(sanitizeVisionQuestion("x".repeat(3000)).length).toBe(2400);
+  });
+});
+
+describe("Backup and taxonomy hardening",()=>{
+  it("accepts a structurally valid backup and preserves the selected tank",()=>{
+    const source=structuredClone(demoMarineTank);
+    const result=validateBackupPayload({language:"en",selectedTankId:source.id,tanks:[source]});
+    expect(result.ok).toBe(true);
+    if(result.ok)expect(result.data.selectedTankId).toBe(source.id);
+  });
+  it("rejects malformed tank data before replacing local state",()=>{
+    const bad={...structuredClone(demoMarineTank),systemVolumeLiters:-5};
+    expect(validateBackupPayload({language:"ar",selectedTankId:bad.id,tanks:[bad]}).ok).toBe(false);
+    expect(validateTankImportPayload({tanks:[bad]}).ok).toBe(false);
+  });
+  it("rejects duplicate tank ids in a backup",()=>{
+    const a=structuredClone(demoMarineTank),b=structuredClone(demoMarineTank);
+    expect(validateBackupPayload({language:"ar",selectedTankId:a.id,tanks:[a,b]}).ok).toBe(false);
+  });
+  it("offers standardized fertilizer and dosing subcategories",()=>{
+    expect(inventorySubcategoryOptions("fertilizer").map(x=>x.value)).toContain("potassium");
+    expect(inventorySubcategoryOptions("dosing").map(x=>x.value)).toContain("balanced_reef");
+  });
+});
 
 describe("Operations consumables regression",()=>{
   it("consumes multiple inventory requests atomically without going negative",()=>{

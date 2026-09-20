@@ -18,15 +18,21 @@ export default async () => {
     if(!record?.subscription||!Array.isArray(record?.tanks)) continue;
 
     const stale=record.tanks.filter((t:any)=>Number.isFinite(Number(t.lastVisit))&&now-Number(t.lastVisit)>=week);
+    const cycling=record.tanks.filter((t:any)=>t.cyclingActive===true);
     const unstable=record.tanks.filter((t:any)=>t.unstable===true||Number(t.overall)<80||Number(t.chemistry)<75||Number(t.maintenance)<70||t.trend==="declining"||t.bioload==="danger"||Number(t.equipmentWarnings)>0);
-    if(!stale.length&&!unstable.length) continue;
+    if(!stale.length&&!unstable.length&&!cycling.length) continue;
     if(record.lastNotifiedAt&&now-new Date(record.lastNotifiedAt).getTime()<day) continue;
 
     const lang=record.language==="en"?"en":"ar";
-    const all=[...new Map([...stale,...unstable].map((t:any)=>[t.id,t])).values()] as any[];
+    const all=[...new Map([...cycling,...stale,...unstable].map((t:any)=>[t.id,t])).values()] as any[];
     const names=all.map((x:any)=>x.name).join(lang==="ar"?"، ":", ");
     let body="";
-    if(stale.length&&unstable.length){
+    if(cycling.length){
+      const first=cycling[0];
+      body=lang==="ar"
+        ?`الدورة البيولوجية — اليوم ${first.cycleDay??1}: ${first.cycleReady?"شروط الجاهزية تحققت؛ افتح Aqua Nexus لإنهاء الدورة.":(first.cycleNextAr||"تابع فحوصات وخطوات الدورة.")}`
+        :`Biological cycle — day ${first.cycleDay??1}: ${first.cycleReady?"Readiness criteria are met; open Aqua Nexus to complete the cycle.":(first.cycleNextEn||"Continue cycle testing and follow-up.")}`;
+    }else if(stale.length&&unstable.length){
       body=lang==="ar"?`الحوض ${names} بحاجة متابعة: يوجد حوض غير مستقر و/أو مرّ أكثر من أسبوع بدون دخول.`:`${names} needs attention: one or more tanks are unstable and/or have not been checked for over a week.`;
     }else if(unstable.length){
       body=lang==="ar"?`تنبيه: الحوض ${names} وضعه غير مستقر ويحتاج مراجعة الآن.`:`Alert: ${names} is not stable and needs review now.`;

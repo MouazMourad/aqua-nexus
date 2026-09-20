@@ -8,6 +8,8 @@ import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { today,uid,nowISO } from "@/lib/appUtils";
 import { completeMaintenanceTask,maintenanceEffectiveState } from "@/domain/maintenanceSchedule";
+import { biologicalCycleStatus,cycleRelevantMaintenanceTask } from "@/domain/biologicalCycle";
+import { BiologicalCyclePanel } from "@/components/cycle/BiologicalCyclePanel";
 
 const cadences:MaintenanceTask["cadence"][]=["daily","weekly","monthly","quarterly","semiannual","annual"];
 
@@ -19,8 +21,10 @@ export function MaintenancePage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
  const [open,setOpen]=useState(false),[title,setTitle]=useState(""),[titleEn,setTitleEn]=useState(""),[cadence,setCadence]=useState<MaintenanceTask["cadence"]>("weekly"),[taskDetails,setTaskDetails]=useState<string|null>(null);
  const [departure,setDeparture]=useState(()=>addDateDays(today(),1)),[daysAway,setDaysAway]=useState(7),[caretaker,setCaretaker]=useState(""),[travelGenerated,setTravelGenerated]=useState(false);
- const hasChem=tank.maintenance.some(x=>/قياس النسب الكيميائية|Weekly chemistry/i.test(`${x.title} ${x.titleEn||""}`));
- const tasks=hasChem?tank.maintenance:[...tank.maintenance,{id:"virtual-chem",title:"قياس النسب الكيميائية الأسبوعي",titleEn:"Weekly chemistry measurement",cadence:"weekly" as const,done:false,nextDue:new Date(Date.now()+7*86400000).toISOString().slice(0,10)}];
+ const cycle=biologicalCycleStatus(tank);
+ const hasChem=tank.maintenance.some(x=>/قياس النسب الكيميائية|Weekly chemistry|الدورة البيولوجية|Biological cycle/i.test(`${x.title} ${x.titleEn||""}`));
+ const baseTasks=hasChem?tank.maintenance:[...tank.maintenance,{id:"virtual-chem",title:"قياس النسب الكيميائية الأسبوعي",titleEn:"Weekly chemistry measurement",cadence:"weekly" as const,done:false,nextDue:new Date(Date.now()+7*86400000).toISOString().slice(0,10)}];
+ const tasks=cycle.active?baseTasks.filter(cycleRelevantMaintenanceTask):baseTasks;
  const recurring=tasks.filter(x=>x.cadence!=="once");
  const completed=recurring.filter(x=>maintenanceEffectiveState(x).completed).length;
  const pending=recurring.length-completed;
@@ -58,9 +62,10 @@ export function MaintenancePage({tank}:{tank:Tank}) {
   }
   patch(tank.id,t=>({...t,maintenance:t.maintenance.map(x=>x.id===id?completeMaintenanceTask(x,today()):x)}));
  };
- const add=()=>{patch(tank.id,t=>({...t,maintenance:[...t.maintenance,{id:uid("task"),title:title||bi(lang,"مهمة جديدة","New Task"),titleEn:titleEn||title,cadence,done:false,nextDue:today(),manual:true}]}));setOpen(false)};
+ const add=()=>{if(cycle.active)return;patch(tank.id,t=>({...t,maintenance:[...t.maintenance,{id:uid("task"),title:title||bi(lang,"مهمة جديدة","New Task"),titleEn:titleEn||title,cadence,done:false,nextDue:today(),manual:true}]}));setOpen(false)};
 
  function generateTravelPlan(){
+  if(cycle.active)return;
   const span=Math.max(1,Math.min(60,Math.round(daysAway||1)));
   const who=caretaker.trim();
   const prefix="[TRAVEL]";
@@ -88,9 +93,12 @@ export function MaintenancePage({tank}:{tank:Tank}) {
  }
 
  return <section className="page-grid maintenance-page">
-  <PageHeader eyebrow="MAINTENANCE" title={tr(lang,"maintenance")} actions={<><button className="btn print-maintenance-btn" onClick={()=>window.print()}>🖨 {tr(lang,"printMaintenance")}</button><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(lang,"addTask")}</button></>}/>
+  <PageHeader eyebrow="MAINTENANCE" title={tr(lang,"maintenance")} actions={<><button className="btn print-maintenance-btn" onClick={()=>window.print()}>🖨 {tr(lang,"printMaintenance")}</button>{!cycle.active&&<button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(lang,"addTask")}</button>}</>}/>
 
-  {tank.maintenance.length===0&&<div className="inline-alert info full-span"><div><b>✓ {bi(lang,"مو لازم تبني جدول صيانة كامل من الصفر.","You do not need to build a full maintenance schedule from scratch.")}</b><p>{bi(lang,"Aqua Nexus بيضيف مهام تلقائياً من المعدات والأحداث المهمة. أضف مهمة يدوية فقط إذا عندك روتين خاص غير موجود، وابدأ بتنفيذ المهام المستحقة بدل محاولة تعبئة كلشي.","Aqua Nexus creates tasks automatically from equipment and important events. Add a manual task only for a routine that is not already covered, and focus first on due tasks rather than filling everything in.")}</p></div></div>}
+  {cycle.active&&<BiologicalCyclePanel tank={tank}/>}
+  {cycle.active&&<div className="inline-alert warn full-span"><b>🔒 {bi(lang,"Cycle-only mode","Cycle-only mode")}</b> {bi(lang,"كل مهام الصيانة غير المرتبطة بالدورة مخفية وموقوفة مؤقتاً، وبتعود تلقائياً بعد اكتمال الدورة.","All non-cycle maintenance tasks are temporarily hidden and paused. They return automatically after cycling is complete.")}</div>}
+
+  {!cycle.active&&tank.maintenance.length===0&&<div className="inline-alert info full-span"><div><b>✓ {bi(lang,"مو لازم تبني جدول صيانة كامل من الصفر.","You do not need to build a full maintenance schedule from scratch.")}</b><p>{bi(lang,"Aqua Nexus بيضيف مهام تلقائياً من المعدات والأحداث المهمة. أضف مهمة يدوية فقط إذا عندك روتين خاص غير موجود، وابدأ بتنفيذ المهام المستحقة بدل محاولة تعبئة كلشي.","Aqua Nexus creates tasks automatically from equipment and important events. Add a manual task only for a routine that is not already covered, and focus first on due tasks rather than filling everything in.")}</p></div></div>}
 
   {dueNow.length>0&&<div className="card panel full-span"><div className="module-head"><div><small className="eyebrow-mini">TODAY</small><h3>{bi(lang,"المطلوب منك الآن","What needs your attention now")}</h3><p className="note">{bi(lang,"بدل ما تفتش بين كل الجداول، هاي المهام المستحقة أو المتأخرة أولاً.","Instead of scanning every schedule, start with these due or overdue tasks.")}</p></div><span className="status warn">{dueNow.length}</span></div><div className="task-list">{dueNow.map(x=><div className="task-row" key={`due-${x.id}`}><span className="check-dot"></span><div><b>{(lang==="ar"?x.title:(x.titleEn||x.title)).replace("[TRAVEL] ","")}</b><small>{tr(lang,"due")}: {x.nextDue??today()}</small></div><button className="btn good" onClick={()=>done(x.id)}>✓</button></div>)}</div></div>}
 
@@ -99,12 +107,12 @@ export function MaintenancePage({tank}:{tank:Tank}) {
     <div className="print-meta"><span><b>{tr(lang,"name")}:</b> {tank.name}</span><span><b>{tr(lang,"systemVolume")}:</b> {tank.systemVolumeLiters} L</span><span><b>{tr(lang,"generatedOn")}:</b> {new Date().toLocaleDateString()}</span><span><b>{tr(lang,"maintenanceHealth")}:</b> {maintenanceHealth(tank)}%</span></div>
   </div>
 
-  <div className="card panel maintenance-health-card">
+  {!cycle.active&&<div className="card panel maintenance-health-card">
     <h3>{tr(lang,"maintenanceHealth")}</h3><b className="big-number">{maintenanceHealth(tank)}%</b>
     <div className="print-maint-summary"><span>{tr(lang,"totalTasks")}: <b>{recurring.length}</b></span><span>{tr(lang,"doneTasks")}: <b>{completed}</b></span><span>{tr(lang,"pendingTasks")}: <b>{pending}</b></span></div>
-  </div>
+  </div>}
 
-  <div className="card panel travel-mode-card">
+  {!cycle.active&&<div className="card panel travel-mode-card">
     <small className="eyebrow-mini">TRAVEL / ABSENCE MODE</small><h3>{bi(lang,"وضع السفر والغياب","Travel & absence mode")}</h3>
     <p className="note">{bi(lang,"Aqua Nexus يولّد خطة مبسطة للشخص يلي رح يراقب الحوض، مع مهام قبل السفر وأثناء الغياب وبعد الرجعة.","Aqua Nexus generates a simplified caretaker plan with tasks before, during and after your absence.")}</p>
     <div className="form-grid">
@@ -114,7 +122,7 @@ export function MaintenancePage({tank}:{tank:Tank}) {
     </div>
     <div className="travel-actions"><button className="btn primary" onClick={generateTravelPlan}>{bi(lang,"توليد خطة السفر","Generate travel plan")}</button>{travelGenerated&&<span className="status">✓ {bi(lang,"تمت إضافة الخطة للصيانة","Plan added to maintenance")}</span>}</div>
     <div className="inline-alert info">{bi(lang,"الخطة تتعمد تبسيط التعليمات للشخص المسؤول وتجنب تغييرات كبيرة بالجرعات أو المعدات خلال غيابك.","The plan deliberately keeps caretaker instructions simple and avoids major dosing/equipment changes while you are away.")}</div>
-  </div>
+  </div>}
 
   <div className="card panel full-span maintenance-plan-card">
    {cadences.map(c=><div className="maintenance-group" key={c}><h3>{tr(lang,c)}</h3><div className="task-list">{tasks.filter(x=>x.cadence===c).map(x=>{const effective=maintenanceEffectiveState(x);return <div className="task-row printable-task" key={x.id}><span className={`check-dot ${effective.completed?"done":""}`}>{effective.completed?"✓":""}</span><div><b>{(lang==="ar"?x.title:(x.titleEn||x.title)).replace("[TRAVEL] ","")}</b><small>{tr(lang,"due")}: {x.nextDue??"—"} {x.lastDone?` • ${tr(lang,"lastDone")}: ${x.lastDone}`:""} {x.autoGenerated?` • AUTO • ${x.sourceEquipmentName||""}`:""}</small></div><span className={`task-print-status ${effective.completed?"done":"pending"}`}>{effective.completed?tr(lang,"completed"):tr(lang,"pendingTasks")}</span><button className="btn no-print" onClick={()=>setTaskDetails(x.id)}>{bi(lang,"قائمة","Checklist")}</button><button className="btn good no-print" onClick={()=>done(x.id)}>✓</button></div>})}</div></div>)}
@@ -125,7 +133,7 @@ export function MaintenancePage({tank}:{tank:Tank}) {
    {(()=>{const task=tasks.find(x=>x.id===taskDetails);if(!task)return null;return <div><h3>{lang==="ar"?task.title:(task.titleEn||task.title)}</h3>{task.sourceEquipmentName&&<p className="note">{bi(lang,"الجهاز","Equipment")}: {task.sourceEquipmentName}</p>}<div className="task-list">{(task.checklist??[]).map((step,i)=>{const checked=(task.checklistDone??[]).includes(i);return <button type="button" key={i} className="task-row" onClick={()=>task.id!=="virtual-chem"&&patch(tank.id,t=>({...t,maintenance:t.maintenance.map(x=>x.id===task.id?{...x,checklistDone:checked?(x.checklistDone??[]).filter(n=>n!==i):[...(x.checklistDone??[]),i]}:x)}))}><span className={`check-dot ${checked?"done":""}`}>{checked?"✓":""}</span><b>{step}</b></button>})}</div><div className="modal-actions"><button className="btn good" onClick={()=>{done(task.id);setTaskDetails(null)}}>✓ {bi(lang,"إكمال الصيانة","Complete maintenance")}</button></div></div>})()}
   </Modal>
 
-  <Modal open={open} title={tr(lang,"addTask")} onClose={()=>setOpen(false)}>
+  <Modal open={open&&!cycle.active} title={tr(lang,"addTask")} onClose={()=>setOpen(false)}>
    <div className="form-grid"><label className="field"><span>العربية</span><input value={title} onChange={e=>setTitle(e.target.value)}/></label><label className="field"><span>English</span><input value={titleEn} onChange={e=>setTitleEn(e.target.value)}/></label><label className="field"><span>{tr(lang,"cadence")}</span><select value={cadence} onChange={e=>setCadence(e.target.value as MaintenanceTask["cadence"])}>{cadences.map(c=><option key={c} value={c}>{tr(lang,c)}</option>)}</select></label></div>
    <div className="modal-actions"><button className="btn" onClick={()=>setOpen(false)}>{tr(lang,"cancel")}</button><button className="btn primary" onClick={add}>{tr(lang,"save")}</button></div>
   </Modal>

@@ -6,6 +6,7 @@ import { systemAlerts } from "./alertEngine";
 import { smartInsights } from "./smartInsights";
 import { healthTimeline,tankForecast,tankStateView } from "./tankIntelligence";
 import { proactivePredictions,biologicalMemory } from "./tankLearning";
+import { isBiologicalCycleActive,isCyclePageAllowed } from "./biologicalCycle";
 
 export type IntelligenceDomain =
  "chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|
@@ -68,7 +69,8 @@ export function tankIntelligenceCore(tank:Tank):TankIntelligenceCore{
  const bio=bioload(tank);
  const guidanceActions:GuidanceAction[]=deriveGuidanceActions(tank);
  const rank={danger:0,warn:1,info:2};
- const openGuidance=guidanceActions.filter(g=>!["resolved","verified"].includes(g.status));
+ const cycling=isBiologicalCycleActive(tank);
+ const openGuidance=guidanceActions.filter(g=>!["resolved","verified"].includes(g.status)).filter(g=>!cycling||isCyclePageAllowed(g.page));
  const actionMap=new Map<string,IntelligenceAction>();
  for(const g of openGuidance){
   const domain=g.domain as IntelligenceDomain;
