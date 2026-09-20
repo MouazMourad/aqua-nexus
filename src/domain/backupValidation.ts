@@ -28,7 +28,7 @@ function validDimensions(value:unknown){
     && Number(value.length)>0&&Number(value.width)>0&&Number(value.height)>0;
 }
 function arraysAreArrays(tank:Record<string,unknown>){
-  const fields=["equipment","chemistry","maintenance","livestock","inventory","timeline","photos","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi"];
+  const fields=["equipment","chemistry","maintenance","livestock","inventory","timeline","photos","visionAssessments","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi","rodiServiceEvents","plantCare","acclimationSessions","emergencySessions","filterMedia","livestockExits"];
   return fields.every(key=>tank[key]===undefined||Array.isArray(tank[key]));
 }
 
