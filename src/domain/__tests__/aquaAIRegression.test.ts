@@ -16,6 +16,7 @@ import { tankStateView } from "@/domain/tankIntelligence";
 import { systemHealthTrend } from "@/domain/systemHealth";
 import { deriveGuidanceActions } from "@/domain/impactEngine";
 import { deriveIntelligenceEvents } from "@/domain/eventIntelligence";
+import { coralTransferGate } from "@/domain/acclimationSafety";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -207,3 +208,27 @@ describe("Aqua AI expert evaluation matrix",()=>{
   expect(a.factsAr?.length).toBeGreaterThan(0);expect(Array.isArray(a.inferencesAr)).toBe(true);
  });
 });
+
+describe("Acclimation coral dip safety",()=>{
+  const baseSession:any={
+    id:"acs-test",startedAt:new Date().toISOString(),status:"release",floatConfirmed:true,
+    coralDipEnabled:true,coralDipMinutes:10,coralDipRuns:[],coralDipSkippedItemIds:[],items:[],events:[]
+  };
+  const coral:any={id:"coral-1",name:"Test Coral",category:"coral",quantity:1,health:"good",dripMinutes:20,intervalMinutes:5,placement:"",status:"ready"};
+  it("blocks coral transfer until a dip is recorded and rinsed",()=>{
+    expect(coralTransferGate(baseSession,coral).allowed).toBe(false);
+    const running={...baseSession,coralDipRuns:[{id:"dip-1",batchId:"coral-1",itemIds:[coral.id],productName:"Dip",inventoryItemId:"inv-1",quantityUsed:10,unit:"mL",durationMinutes:10,status:"running",startedAt:new Date().toISOString(),endAt:Date.now()+600000}]};
+    expect(coralTransferGate(running,coral).allowed).toBe(false);
+    const rinseNeeded={...running,coralDipRuns:[{...running.coralDipRuns[0],status:"ready_to_rinse",endAt:null}]};
+    expect(coralTransferGate(rinseNeeded,coral).allowed).toBe(false);
+    const rinsed={...rinseNeeded,coralDipRuns:[{...rinseNeeded.coralDipRuns[0],status:"rinsed",rinsedAt:new Date().toISOString()}]};
+    expect(coralTransferGate(rinsed,coral).allowed).toBe(true);
+  });
+  it("allows an explicitly logged distress exception without pretending dip completed",()=>{
+    const skipped={...baseSession,coralDipSkippedItemIds:[coral.id]};
+    const gate=coralTransferGate(skipped,coral);
+    expect(gate.allowed).toBe(true);
+    expect(gate.reasonEn).toMatch(/explicitly skipped/i);
+  });
+});
+
