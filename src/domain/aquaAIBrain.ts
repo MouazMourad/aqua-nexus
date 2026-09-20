@@ -13,6 +13,7 @@ import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
 import { answerAquaQuery } from "./aquaAIQueryEngine";
 import { tankIntelligenceCore } from "./intelligenceCore";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
+import { biologicalCycleStatus,isCyclePageAllowed } from "./biologicalCycle";
 
 export type AquaAIConfidence="low"|"medium"|"high";
 export type AquaAIPage="dashboard"|"chemistry"|"maintenance"|"equipment"|"livestock"|"timeline"|"dosing"|"quarantine"|"emergency"|"rodi"|"journal"|"acclimation"|"inventory"|"feeding"|"waterchange"|"expenses"|"sump"|"diseases"|"alerts";
@@ -490,6 +491,25 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   const meta=metaAnswer(question);if(meta)return meta;
   const q=(question||"").trim().toLowerCase();
   const intent=parseAquaQuestion(question);
+  const cycle=biologicalCycleStatus(tank);
+  if(cycle.active){
+    const requestedPage=page as AquaAIPage;
+    const cycleChemistry=intent.params.some(p=>["NH3","NO2","NO3","pH","temperature","salinity"].includes(String(p)));
+    const cycleQuestion=/cycle|cycling|nitrogen|ammonia|nitrite|nitrate|دورة|امونيا|أمونيا|نتريت|نترات/.test(q);
+    if(!cycleChemistry&&!cycleQuestion&&!isCyclePageAllowed(requestedPage)){
+      return{
+        titleAr:`الدورة البيولوجية — اليوم ${cycle.day}`,titleEn:`Biological cycle — day ${cycle.day}`,
+        summaryAr:`هالعملية موقوفة مؤقتاً لأن الحوض ضمن الدورة البيولوجية. ${cycle.nextAr}`,
+        summaryEn:`This workflow is temporarily paused while the tank is cycling. ${cycle.nextEn}`,
+        detailsAr:[...cycle.blockersAr.slice(0,4),"الوقت وحده لا يكفي لاعتبار الحوض جاهزاً؛ لازم تثبت الجاهزية بالقياسات."],
+        detailsEn:[...cycle.blockersEn.slice(0,4),"Elapsed time alone does not make the tank ready; readiness must be proven by measured tests."],
+        evidenceAr:[`اليوم ${cycle.day} من الدورة`,`تقدم الدورة ${cycle.progress}%`],
+        evidenceEn:[`Cycle day ${cycle.day}`,`Cycle progress ${cycle.progress}%`],
+        confidence:"high",
+        action:{page:cycle.actionPage as AquaAIPage,ar:cycle.nextAr,en:cycle.nextEn}
+      };
+    }
+  }
 
   // High-specificity handlers stay explicit; every normal aquarium question
   // is planned generically by domain + operation, so one signal cannot hijack unrelated topics.
