@@ -16,6 +16,7 @@ import { maintenanceEffectiveState } from "./maintenanceSchedule";
 import { biologicalCycleStatus } from "./biologicalCycle";
 import { buildAquaAIQueryPlan } from "./aquaAIQueryPlan";
 import { answerBiologicalCycleQuestion } from "./biologicalCycleKnowledge";
+import { isAquariumScopedQuestion,offTopicAquaAnswer } from "./aquaAIScope";
 
 export type AquaAIConfidence="low"|"medium"|"high";
 export type AquaAIPage="dashboard"|"chemistry"|"maintenance"|"equipment"|"livestock"|"timeline"|"dosing"|"quarantine"|"emergency"|"rodi"|"journal"|"acclimation"|"inventory"|"feeding"|"waterchange"|"expenses"|"sump"|"diseases"|"alerts";
@@ -491,6 +492,7 @@ function metaAnswer(question:string):AquaAIAnswer|undefined{
 
 export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer{
   const meta=metaAnswer(question);if(meta)return meta;
+  if(!isAquariumScopedQuestion(question,tank))return offTopicAquaAnswer(question);
   const q=(question||"").trim().toLowerCase();
   const intent=parseAquaQuestion(question);
   const cycle=biologicalCycleStatus(tank);
