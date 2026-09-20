@@ -1,5 +1,7 @@
 import type { Language,Tank } from "./types";
 
+export const CURRENT_BACKUP_SCHEMA=10;
+
 export interface ValidBackupPayload{
   language:Language;
   selectedTankId:string;
@@ -46,6 +48,7 @@ export function validateTankShape(value:unknown,index=0):{ok:true;tank:Tank}|{ok
 
 export function validateBackupPayload(input:unknown):BackupValidationResult{
   if(!isObject(input))return{ok:false,error:"Backup root must be an object."};
+  if(typeof input.schemaVersion==="number"&&input.schemaVersion>CURRENT_BACKUP_SCHEMA)return{ok:false,error:`Backup schema ${input.schemaVersion} is newer than this Aqua Nexus build supports (${CURRENT_BACKUP_SCHEMA}). Update Aqua Nexus before restoring it.`};
   if(!Array.isArray(input.tanks))return{ok:false,error:"Backup must contain a tanks array."};
   if(input.tanks.length>MAX_TANKS)return{ok:false,error:`Backup contains more than ${MAX_TANKS} tanks.`};
   const ids=new Set<string>();
