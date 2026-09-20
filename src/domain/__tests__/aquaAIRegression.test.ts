@@ -692,12 +692,15 @@ describe("Full audit hardening regressions",()=>{
     t.rodiServiceEvents=[{id:"rs1",timestamp:"2026-09-20T10:00:00Z",component:"di"}];
     t.plantCare=[{id:"pc1",timestamp:"2026-09-20T11:00:00Z",kind:"fertilizer"}];
     t.doserChannels=[{id:"dc1",name:"Channel 1",material:"KH",capacityMl:1000,currentMl:700,consumption:10,period:"daily",color:"#fff"}];
+    (t as any).aiActionPlans=[{id:"plan-1",status:"active"}];
     const brain=buildTankBrainSnapshot(t);
     expect(brain.identity.plantedMode).toBe("highTech");
     expect(brain.identity.substrateType).toBe("nutrient");
     expect(brain.operations.rodiServiceEvents).toHaveLength(1);
     expect(brain.operations.plantCare).toHaveLength(1);
     expect(brain.equipment.doserChannels).toHaveLength(1);
+    expect(brain.intelligence.aiActionPlans).toHaveLength(1);
+    expect(brain.coverage.aiActionPlans).toBe(1);
   });
 
   it("turns plant care and RODI service into first-class intelligence events",()=>{
@@ -744,6 +747,17 @@ describe("Full audit hardening regressions",()=>{
 
 
 describe("Whole-tank intervention safety",()=>{
+  it("blocks a new livestock addition when intervention density is dangerous",()=>{
+    const now=new Date().toISOString(),t=structuredClone(demoMarineTank);
+    t.intelligenceEvents=[
+      {id:"stock-e1",timestamp:now,kind:"action",domain:"waterChange",verb:"water_changed",confidence:100,sourcePage:"waterchange",textAr:"تغيير ماء",textEn:"Water change"},
+      {id:"stock-e2",timestamp:now,kind:"action",domain:"sump",verb:"media_replaced",confidence:100,sourcePage:"sump",textAr:"ميديا",textEn:"Media"},
+      {id:"stock-e3",timestamp:now,kind:"action",domain:"equipment",verb:"installed",confidence:100,sourcePage:"equipment",textAr:"جهاز",textEn:"Equipment"}
+    ];
+    const readiness=stockingReadiness(t,{candidateKnown:false,candidateLabelAr:"نوع يدوي",candidateLabelEn:"manual species"});
+    expect(readiness.state).toBe("not_now");
+    expect(readiness.blockersEn.some(x=>/major interventions|rapid-change risk/i.test(x))).toBe(true);
+  });
   it("warns before stacking a second major intervention",()=>{
     const t=structuredClone(demoMarineTank);
     t.intelligenceEvents=[{id:"e1",timestamp:new Date().toISOString(),kind:"action",domain:"waterChange",verb:"water_changed",value:20,unit:"%",confidence:100,sourcePage:"waterchange",textAr:"تغيير ماء",textEn:"Water change"}];
