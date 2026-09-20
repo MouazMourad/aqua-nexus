@@ -39,7 +39,7 @@ export function PageRouter({page,tank,tanks,selectedTankId,onSelectTank,onNaviga
   case"chemistry":content=<ChemistryPage tank={tank}/>;break;
   case"maintenance":content=<MaintenancePage tank={tank}/>;break;
   case"inventory":content=<InventoryPage tank={tank}/>;break;
-  case"diseases":content=<DiseasesPage tank={tank}/>;break;
+  case"diseases":content=<DiseasesPage tank={tank} onVisualInsight={()=>onNavigate("journal")}/>;break;
   case"timeline":content=<TimelinePage tank={tank}/>;break;
   case"journal":content=<JournalPage tank={tank}/>;break;
   case"waterchange":content=<WaterChangePage tank={tank}/>;break;
