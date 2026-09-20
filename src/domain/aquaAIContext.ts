@@ -11,6 +11,8 @@ import { feedingIntelligence } from "./feedingIntelligence";
 import { rodiIntelligence } from "./rodiIntelligence";
 import { sumpIntelligence } from "./sumpIntelligence";
 import { tankIntelligenceCore } from "./intelligenceCore";
+import { biologicalCycleStatus } from "./biologicalCycle";
+import { biologicalCycleKnowledgeSnapshot } from "./biologicalCycleKnowledge";
 
 export function buildAquaAIContext(tank:Tank){
  const vision=((tank as any).visionAssessments??[]).slice(0,5);
@@ -20,6 +22,8 @@ export function buildAquaAIContext(tank:Tank){
   schemaVersion:2,
   generatedAt:new Date().toISOString(),
   tank:{id:tank.id,name:tank.name,type:tank.type,status:tank.status,ageMonths:tank.ageMonths,systemVolumeLiters:tank.systemVolumeLiters},
+  biologicalCycle:biologicalCycleStatus(tank),
+  biologicalCycleKnowledge:biologicalCycleKnowledgeSnapshot(tank),
   state:core.state,
   mood:tankMood(tank),
   forecast:core.forecast,
