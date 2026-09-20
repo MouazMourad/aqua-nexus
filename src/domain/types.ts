@@ -314,6 +314,62 @@ export interface JournalPhoto {
   dataUrl: string;
 }
 
+export interface VisionAssessmentRecord {
+  id: string;
+  timestamp: string;
+  photoId: string;
+  livestockId?: string;
+  symptoms: string[];
+  notes?: string;
+  metrics: {
+    colorIndex: number;
+    brightnessIndex: number;
+    captureScore: number;
+    contrastIndex?: number;
+    sharpnessIndex?: number;
+    clarityIndex?: number;
+    glarePercent?: number;
+    shadowPercent?: number;
+    palePixelPercent?: number;
+    greenDominancePercent?: number;
+    brightSpotPercent?: number;
+    redDominancePercent?: number;
+    blueDominancePercent?: number;
+    edgeDensity?: number;
+  };
+  triage: {
+    level: "monitor" | "attention" | "urgent";
+    confidence: "low" | "medium";
+    confidenceScore: number;
+    summaryAr: string;
+    summaryEn: string;
+    observationsAr: string[];
+    observationsEn: string[];
+    possibilitiesAr: string[];
+    possibilitiesEn: string[];
+    nextAr: string[];
+    nextEn: string[];
+    contextAr: string[];
+    contextEn: string[];
+    comparisonAr?: string;
+    comparisonEn?: string;
+    engine: string;
+  };
+  modelStatus: "local-best";
+  engine: string;
+  external?: {
+    status: "not_requested" | "unavailable" | "completed" | "error";
+    provider?: string;
+    model?: string;
+    text?: string;
+    error?: string;
+    analyzedAt?: string;
+  };
+  diseaseCandidateIds?: string[];
+  followUpTaskId?: string;
+  quarantineCaseId?: string;
+}
+
 export interface FeedingLog {
   id: string;
   timestamp: string;
@@ -584,6 +640,7 @@ export interface Tank {
   guidanceActions?: GuidanceAction[];
   healthSnapshots?: HealthSnapshot[];
   photos: JournalPhoto[];
+  visionAssessments?: VisionAssessmentRecord[];
   feeding: FeedingLog[];
   dosing: DosingLog[];
   doserChannels: DoserChannel[];
