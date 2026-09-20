@@ -3,8 +3,10 @@ import { expect,test,type Page } from "@playwright/test";
 async function openTrainingDashboard(page:Page){
   await page.goto("/");
   const training=page.locator(".training-entry-card").first();
+  const dashboard=page.locator(".progressive-dashboard");
+  await expect.poll(async()=>Boolean(await dashboard.isVisible().catch(()=>false)||await training.isVisible().catch(()=>false)),{timeout:15_000}).toBe(true);
   if(await training.isVisible().catch(()=>false))await training.click();
-  await expect(page.locator(".progressive-dashboard")).toBeVisible();
+  await expect(dashboard).toBeVisible({timeout:15_000});
 }
 
 async function pointerDrag(page:Page,downSelector:string,moveSelector:string,from:{x:number;y:number},to:{x:number;y:number},pointerId:number){
