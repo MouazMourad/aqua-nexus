@@ -15,9 +15,9 @@ export function FeedingPage({tank}:{tank:Tank}) {
  const todayKey=new Date().toDateString();
  const todayFeedings=tank.feeding.filter(x=>new Date(x.timestamp).toDateString()===todayKey).length;
  const latest=tank.feeding[0];
- const selectedInventory=tank.inventory.find(x=>x.id===inventoryItemId);
+ const selectedInventory=feedingStock.find(x=>x.id===inventoryItemId);
  const usedQty=Number(used);
- const canLog=Boolean(food.trim()&&selectedInventory&&Number.isFinite(usedQty)&&usedQty>0&&usedQty<=selectedInventory.quantity);
+ const canLog=Boolean(selectedInventory&&Number.isFinite(usedQty)&&usedQty>0&&usedQty<=selectedInventory.quantity);
  const livestockCount=tank.livestock.reduce((sum,x)=>sum+(Number(x.quantity)||0),0);
  const pressureLabel=plan.nutrientPressure==="high"
   ?bi(lang,"ضغط مغذيات مرتفع","High nutrient pressure")
@@ -30,8 +30,7 @@ export function FeedingPage({tank}:{tank:Tank}) {
    ?bi(lang,"كمل الروتين المعتاد لكن راقب الكمية واتجاه NO3/PO4.","Continue the normal routine, but watch the amount and the NO3/PO4 trend.")
    :bi(lang,"سجّل الوجبة الفعلية فقط؛ Aqua Nexus رح يربطها تلقائياً مع الحمل الحيوي والمغذيات.","Log only what was actually fed; Aqua Nexus will connect it automatically to livestock load and nutrients.");
  const add=()=>{
-  if(!food.trim())return;
-  const ts=nowISO(),q=Number(used),selected=tank.inventory.find(x=>x.id===inventoryItemId);
+  const ts=nowISO(),q=Number(used),selected=feedingStock.find(x=>x.id===inventoryItemId);
   if(!selected){window.alert(bi(lang,"اختر مادة الطعام من المخزون قبل تسجيل التغذية.","Select the food item from inventory before logging feeding."));return}
   if(!Number.isFinite(q)||q<=0){window.alert(bi(lang,"أدخل الكمية المستهلكة من المخزون.","Enter the quantity consumed from inventory."));return}
   if(q>selected.quantity){window.alert(bi(lang,"الكمية المستخدمة أكبر من المخزون المتوفر.","Used quantity exceeds available stock."));return}
@@ -39,10 +38,11 @@ export function FeedingPage({tank}:{tank:Tank}) {
    const inv=t.inventory.find(x=>x.id===inventoryItemId);
    if(!inv)return t;
    const consume=Math.min(q,inv.quantity),remainingStock=Math.max(0,inv.quantity-consume);
+   const foodName=lang==="ar"?inv.name:(inv.nameEn||inv.name);
    return {...t,
     inventory:t.inventory.map(x=>x.id===inventoryItemId?{...x,quantity:remainingStock}:x),
-    feeding:[{id:uid("feed"),timestamp:ts,food:food.trim(),amount,notes,inventoryItemId:inv.id,inventoryQuantityUsed:consume,inventoryUnit:inv.unit},...t.feeding],
-    timeline:[{id:uid("ev"),timestamp:ts,type:"feeding",textAr:`تم تسجيل تغذية: ${food.trim()} ${amount} • خُصم ${consume} ${inv.unit} من ${inv.name} • المتبقي ${remainingStock} ${inv.unit}`,textEn:`Feeding logged: ${food.trim()} ${amount} • deducted ${consume} ${inv.unit} from ${inv.nameEn||inv.name} • remaining ${remainingStock} ${inv.unit}`},...t.timeline]
+    feeding:[{id:uid("feed"),timestamp:ts,food:foodName,amount,notes,inventoryItemId:inv.id,inventoryQuantityUsed:consume,inventoryUnit:inv.unit},...t.feeding],
+    timeline:[{id:uid("ev"),timestamp:ts,type:"feeding",textAr:`تم تسجيل تغذية: ${inv.name} ${amount} • خُصم ${consume} ${inv.unit} من المخزون • المتبقي ${remainingStock} ${inv.unit}`,textEn:`Feeding logged: ${inv.nameEn||inv.name} ${amount} • deducted ${consume} ${inv.unit} from inventory • remaining ${remainingStock} ${inv.unit}`},...t.timeline]
    };
   });
   setFood("");setAmount("");setNotes("");setInventoryItemId("");setUsed("");
@@ -62,9 +62,9 @@ export function FeedingPage({tank}:{tank:Tank}) {
  <section className="card panel full-span">
   <div className="module-head"><div><small className="eyebrow-mini">{bi(lang,"تسجيل سريع","QUICK LOG")}</small><h3>{bi(lang,"سجّل شو صار فعلياً","Log what actually happened")}</h3><p className="note">{bi(lang,"كل تغذية تُخصم مباشرة من المخزون. اختر مادة الطعام وسجّل الكمية المستهلكة؛ الملاحظات فقط اختيارية.","Every feeding deducts directly from inventory. Select the food item and enter the consumed quantity; only notes are optional.")}</p></div><button className="btn" onClick={()=>setShowDetails(v=>!v)}>{showDetails?bi(lang,"إخفاء الملاحظات","Hide notes"):bi(lang,"ملاحظات","Notes")}</button></div>
   <div className="feeding-guided-grid">
-   <label className="field"><span>{tr(lang,"food")}</span><input autoFocus value={food} onChange={e=>setFood(e.target.value)} placeholder={bi(lang,"مثال: Mysis / Pellets","e.g. Mysis / Pellets")}/></label>
+   <label className="field"><span>{tr(lang,"food")}</span><input value={selectedInventory?(lang==="ar"?selectedInventory.name:(selectedInventory.nameEn||selectedInventory.name)):""} readOnly placeholder={bi(lang,"اختَر الطعام من المخزون","Select food from inventory")}/></label>
    <label className="field"><span>{tr(lang,"feedAmount")}</span><input value={amount} onChange={e=>setAmount(e.target.value)} placeholder={bi(lang,"مثال: مكعب واحد / رشة صغيرة","e.g. 1 cube / small pinch")}/></label>
-   <label className="field"><span>{bi(lang,"مادة الطعام من المخزون","Food item from inventory")}</span><select value={inventoryItemId} onChange={e=>{const id=e.target.value;setInventoryItemId(id);const inv=tank.inventory.find(x=>x.id===id);if(inv&&!food.trim())setFood(lang==="ar"?inv.name:(inv.nameEn||inv.name));}}><option value="">{bi(lang,"اختر من المخزون","Select from inventory")}</option>{feedingStock.map(x=><option key={x.id} value={x.id}>{lang==="ar"?x.name:(x.nameEn||x.name)} • {x.quantity} {x.unit}</option>)}</select>{selectedInventory&&<small>{bi(lang,`المتوفر: ${selectedInventory.quantity} ${selectedInventory.unit}`,`Available: ${selectedInventory.quantity} ${selectedInventory.unit}`)}</small>}</label>
+   <label className="field"><span>{bi(lang,"مادة الطعام من المخزون","Food item from inventory")}</span><select autoFocus value={inventoryItemId} onChange={e=>{const id=e.target.value;setInventoryItemId(id);const inv=feedingStock.find(x=>x.id===id);setFood(inv?(lang==="ar"?inv.name:(inv.nameEn||inv.name)):"");}}><option value="">{bi(lang,"اختر من المخزون","Select from inventory")}</option>{feedingStock.map(x=><option key={x.id} value={x.id}>{lang==="ar"?x.name:(x.nameEn||x.name)} • {x.quantity} {x.unit}</option>)}</select>{selectedInventory&&<small>{bi(lang,`المتوفر: ${selectedInventory.quantity} ${selectedInventory.unit}`,`Available: ${selectedInventory.quantity} ${selectedInventory.unit}`)}</small>}</label>
    <label className="field"><span>{bi(lang,"الكمية التي ستُخصم","Quantity to deduct")}</span><input type="number" min="0" step="any" value={used} onChange={e=>setUsed(e.target.value)} disabled={!selectedInventory} placeholder={selectedInventory?selectedInventory.unit:bi(lang,"اختر المادة أولاً","Select item first")}/></label>
   </div>
 
@@ -75,7 +75,7 @@ export function FeedingPage({tank}:{tank:Tank}) {
   </div>}
 
   <div className="feeding-primary-action">
-   <div><small>{bi(lang,"الإجراء الحالي","CURRENT ACTION")}</small><b>{!food.trim()?bi(lang,"اكتب نوع الطعام أولاً","Enter the food first"):!selectedInventory?bi(lang,"اختر مادة الطعام من المخزون","Select the food item from inventory"):!Number.isFinite(usedQty)||usedQty<=0?bi(lang,"أدخل الكمية المستهلكة","Enter the consumed quantity"):usedQty>selectedInventory.quantity?bi(lang,"الكمية أكبر من المخزون المتوفر","Quantity exceeds available inventory"):bi(lang,`سيُخصم ${usedQty} ${selectedInventory.unit} من المخزون عند الحفظ`,`${usedQty} ${selectedInventory.unit} will be deducted from inventory when saved`)}</b></div>
+   <div><small>{bi(lang,"الإجراء الحالي","CURRENT ACTION")}</small><b>{!selectedInventory?bi(lang,"اختر مادة الطعام من المخزون","Select the food item from inventory"):!Number.isFinite(usedQty)||usedQty<=0?bi(lang,"أدخل الكمية المستهلكة","Enter the consumed quantity"):usedQty>selectedInventory.quantity?bi(lang,"الكمية أكبر من المخزون المتوفر","Quantity exceeds available inventory"):bi(lang,`سيُخصم ${usedQty} ${selectedInventory.unit} من المخزون عند الحفظ`,`${usedQty} ${selectedInventory.unit} will be deducted from inventory when saved`)}</b></div>
    <button className="btn primary" onClick={add} disabled={!canLog}>{tr(lang,"addFeeding")}</button>
   </div>
  </section>
