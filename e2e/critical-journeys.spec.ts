@@ -70,6 +70,24 @@ test("sump chamber touch editor changes geometry without page failure",async({pa
   await plan.dispatchEvent("pointerup",{pointerId,pointerType:"touch",isPrimary:true,buttons:0,clientX:box.x+box.width/2+24,clientY:box.y+box.height/2+10,bubbles:true});
 });
 
+
+test("visual health intake analyzes an image locally and exposes safe AI second opinion",async({page})=>{
+  await openTrainingDashboard(page);
+  await page.locator('[data-aqua-page="journal"]').click();
+  const visual=page.locator(".card.panel").filter({hasText:/Local Best Visual Insight/}).first();
+  await expect(visual).toBeVisible();
+
+  const png=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6nXcAAAAASUVORK5CYII=","base64");
+  await visual.locator('input[type="file"]').first().setInputFiles({name:"vision-test.png",mimeType:"image/png",buffer:png});
+  await expect(visual).toContainText(/ماذا ألاحظ|WHAT I NOTICE/,{timeout:15_000});
+  await expect(visual).toContainText(/مستوى الثقة|CONFIDENCE LEVEL/);
+
+  const secondOpinion=visual.getByRole("button",{name:/AI Vision/}).first();
+  await expect(secondOpinion).toBeVisible();
+  await secondOpinion.click();
+  await expect(visual).toContainText(/مزود AI Vision|external AI Vision provider|رأي ثانٍ|second opinion/,{timeout:15_000});
+});
+
 test("setup defaults do not masquerade as stocking evidence",async({page})=>{
   await page.goto("/");
   await page.locator(".empty-tank-cta").click();
