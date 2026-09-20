@@ -171,13 +171,46 @@ export interface LivestockExitEvent {
   notes?:string;
 }
 
+export type InventoryCategory =
+  | "feeding"
+  | "fertilizer"
+  | "co2"
+  | "dosing"
+  | "supplement"
+  | "filter_media"
+  | "coral_treatment"
+  | "water_prep"
+  | "equipment"
+  | "testing"
+  | "rodi"
+  | "other";
+
+export type InventoryConsumer =
+  | "feeding"
+  | "fertilizer"
+  | "co2"
+  | "dosing"
+  | "acclimation"
+  | "waterChange"
+  | "sump"
+  | "equipment"
+  | "testing"
+  | "rodi";
+
 export interface InventoryItem {
   id: string;
   presetId?: string;
   name: string;
   nameEn?: string;
+  /** Legacy display category retained for backward compatibility. */
   category?: string;
   categoryEn?: string;
+  /** Canonical stock classification used by modules to show only relevant materials. */
+  inventoryCategory?: InventoryCategory;
+  inventorySubcategory?: string;
+  tankCompatibility?: "marine" | "freshwater" | "both";
+  consumedBy?: InventoryConsumer[];
+  stockBehavior?: "consumable" | "asset";
   quantity: number;
   unit: string;
   minimum: number;
