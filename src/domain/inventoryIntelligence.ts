@@ -46,6 +46,8 @@ function fallbackProfile(item:InventoryItem):InventoryProfile{
   const text=`${item.name} ${item.nameEn||""} ${item.category||""} ${item.categoryEn||""}`.toLowerCase();
   if(/coral\s*dip|reef\s*dip|مرجان.*ديب|ديب.*مرجان/.test(text))return{category:"coral_treatment",subcategory:"coral_dip",tankCompatibility:"marine",consumedBy:["acclimation"],stockBehavior:"consumable"};
   if(/all\s*for\s*reef/.test(text))return PRESET_PROFILES.allForReef;
+  if(/phosphate\s*(remover|removal)|po4\s*(remover|media)|gfo|فوسفات.*(مزيل|ميديا)/.test(text))return{category:"filter_media",subcategory:"phosphate_media",tankCompatibility:"marine",consumedBy:["sump"],stockBehavior:"consumable"};
+  if(/medication|medicine|treatment|دواء|علاج|cupramine|copper|prazipro|praziquantel|metronidazole|metroplex|kanaplex|formalin|antibiotic/.test(text))return{category:"medication",subcategory:"aquatic_medication",tankCompatibility:"both",consumedBy:["quarantine"],stockBehavior:"consumable"};
   if(/food|feeding|طعام|غذاء|mysis|pellet|nori/.test(text))return{category:"feeding",subcategory:"general_food",tankCompatibility:"both",consumedBy:["feeding"],stockBehavior:"consumable"};
   if(/fertili|سماد|nitrogen|potassium|phosphate|iron|micronutrient|root tab/.test(text))return{category:"fertilizer",subcategory:"general_fertilizer",tankCompatibility:"freshwater",consumedBy:["fertilizer"],stockBehavior:"consumable"};
   if(/\bco2\b|carbon dioxide/.test(text))return{category:"co2",subcategory:"co2",tankCompatibility:"freshwater",consumedBy:["co2"],stockBehavior:"consumable"};
@@ -78,15 +80,51 @@ export function inventoryForConsumer(tank:Tank,consumer:InventoryConsumer){
   });
 }
 
+function inferredDosingParameter(item:InventoryItem):"KH"|"Ca"|"Mg"|null{
+  if(item.dosingParameter)return item.dosingParameter;
+  const profile=inventoryProfile(item);
+  const text=`${profile.subcategory} ${item.name} ${item.nameEn||""}`.toLowerCase();
+  if(/alkalinity|\bkh\b|bicarbonate|carbonate|nahco3|na2co3|بيكربونات|كربونات/.test(text))return "KH";
+  if(/calcium|cacl2|كالسيوم/.test(text))return "Ca";
+  if(/magnesium|mgcl2|mgso4|epsom|مغنيسيوم|انكليزي/.test(text))return "Mg";
+  return null;
+}
+function inferredDosingCompound(item:InventoryItem):string|null{
+  if(item.dosingCompoundId)return item.dosingCompoundId;
+  const text=`${item.name} ${item.nameEn||""}`.toLowerCase();
+  if(/nahco3|sodium bicarbonate|بيكربونات الصوديوم/.test(text))return "nahco3";
+  if(/na2co3|sodium carbonate|كربونات الصوديوم/.test(text))return "na2co3";
+  if(/cacl2.*2h2o|calcium chloride dihydrate|كلوريد الكالسيوم ثنائي/.test(text))return "cacl2-2h2o";
+  if(/anhydrous calcium chloride|كلوريد الكالسيوم اللامائي/.test(text))return "cacl2";
+  if(/mgcl2|magnesium chloride|كلوريد المغنيسيوم/.test(text))return "mgcl2-6h2o";
+  if(/mgso4|magnesium sulfate|epsom|ملح انكليزي|ملح إنكليزي/.test(text))return "mgso4-7h2o";
+  return null;
+}
+export function correctiveDosingInventory(tank:Tank,param:"KH"|"Ca"|"Mg",form:"dry"|"stock"|"product",compoundId?:string){
+  return inventoryForConsumer(tank,"dosing").filter(item=>{
+    const profile=inventoryProfile(item);
+    if(profile.category!=="dosing"||profile.subcategory==="balanced_reef")return false;
+    if(inferredDosingParameter(item)!==param)return false;
+    if(form==="product")return true;
+    return Boolean(compoundId)&&inferredDosingCompound(item)===compoundId;
+  });
+}
+export function routineDosingInventory(tank:Tank){
+  return inventoryForConsumer(tank,"dosing").filter(item=>{
+    const profile=inventoryProfile(item);
+    return profile.category==="supplement"||profile.subcategory==="balanced_reef";
+  });
+}
+
 export function inventoryCategoryLabel(category:InventoryCategory,lang:"ar"|"en"){
   const ar:Record<InventoryCategory,string>={
     feeding:"تغذية",fertilizer:"أسمدة",co2:"CO₂",dosing:"جرعات كيميائية",supplement:"متممات",
-    filter_media:"ميديا فلترة",coral_treatment:"علاج المرجان",water_prep:"تحضير الماء",equipment:"تجهيزات",
+    filter_media:"ميديا فلترة",coral_treatment:"علاج المرجان",medication:"أدوية / علاج",water_prep:"تحضير الماء",equipment:"تجهيزات",
     testing:"فحوص",rodi:"RO/DI",other:"أخرى"
   };
   const en:Record<InventoryCategory,string>={
     feeding:"Feeding",fertilizer:"Fertilizer",co2:"CO₂",dosing:"Dosing",supplement:"Supplements",
-    filter_media:"Filter Media",coral_treatment:"Coral Treatment",water_prep:"Water Prep",equipment:"Equipment",
+    filter_media:"Filter Media",coral_treatment:"Coral Treatment",medication:"Medication / Treatment",water_prep:"Water Prep",equipment:"Equipment",
     testing:"Testing",rodi:"RO/DI",other:"Other"
   };
   return (lang==="ar"?ar:en)[category];
