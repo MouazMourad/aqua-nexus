@@ -3,6 +3,7 @@ import { bioload,chemistryHealthAssessment } from "./health";
 import { compatibilityCheck,type CompatibilityResult } from "./compatibility";
 import { equipmentAdequacy } from "./equipmentAdequacy";
 import { latestParameterSample,parameterFreshnessDays,requiredWeeklyChemistryKeys } from "./chemistryDataQuality";
+import { biologicalCycleStatus } from "./biologicalCycle";
 
 export type StockingReadinessState="ready"|"not_now"|"insufficient_evidence";
 
@@ -69,6 +70,11 @@ export function stockingReadiness(tank:Tank,options:StockingCandidateOptions={})
  }
 
  const blockersAr:string[]=[],blockersEn:string[]=[];
+ const cycle=biologicalCycleStatus(tank);
+ if(cycle.active){
+  blockersAr.push(`الحوض ضمن الدورة البيولوجية (اليوم ${cycle.day})؛ إضافة الكائنات مقفلة حتى اكتمال شروط الدورة.`);
+  blockersEn.push(`The tank is in biological cycling mode (day ${cycle.day}); livestock addition is locked until cycle criteria are complete.`);
+ }
  if(assessment.critical){
   blockersAr.push(`الكيمياء فيها عامل حرج خارج المجال الآمن: ${assessment.criticalKeys.join("، ")}.`);
   blockersEn.push(`Chemistry has a critical parameter outside its safe range: ${assessment.criticalKeys.join(", ")}.`);
