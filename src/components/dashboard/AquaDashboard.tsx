@@ -13,6 +13,7 @@ import { uid,nowISO } from "@/lib/appUtils";
 import { systemHealth } from "@/domain/systemHealth";
 import { biologicalCycleStatus,isCyclePageAllowed } from "@/domain/biologicalCycle";
 import { BiologicalCyclePanel } from "@/components/cycle/BiologicalCyclePanel";
+import { syncPushReminders } from "@/lib/pushNotifications";
 
 const equipOptions: {kind:EquipmentKind;ar:string;en:string}[] = [
  {kind:"lighting",ar:"إضاءة",en:"Lighting"},
@@ -41,6 +42,12 @@ export function AquaDashboard() {
  useEffect(()=>{
   if(cycle?.active&&!isCyclePageAllowed(page))setPage("dashboard");
  },[cycle?.active,page,tank?.id]);
+
+ useEffect(()=>{
+  if(typeof window==="undefined"||!("Notification" in window)||Notification.permission!=="granted")return;
+  const timer=window.setTimeout(()=>{void syncPushReminders(tanks,language,false).catch(()=>{})},1800);
+  return()=>window.clearTimeout(timer);
+ },[tanks,language]);
 
  useEffect(()=>{
   if(reminderChecked.current||!tank||typeof window==="undefined")return;
