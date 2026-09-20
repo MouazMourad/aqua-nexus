@@ -291,6 +291,23 @@ describe("AI Vision safety and differential regression",()=>{
   });
 });
 
+describe("AI Vision request safety",()=>{
+  it("accepts supported small image data URLs",()=>{
+    expect(validateVisionDataUrl("data:image/jpeg;base64,aGVsbG8=").ok).toBe(true);
+  });
+  it("rejects unsupported image types and malformed payloads",()=>{
+    expect(validateVisionDataUrl("data:image/svg+xml;base64,aGVsbG8=").ok).toBe(false);
+    expect(validateVisionDataUrl("data:image/png;base64,%%%").ok).toBe(false);
+  });
+  it("enforces the configured decoded image size limit",()=>{
+    const payload="A".repeat(1400);
+    expect(validateVisionDataUrl("data:image/png;base64,"+payload,100).ok).toBe(false);
+  });
+  it("caps external Vision questions before provider calls",()=>{
+    expect(sanitizeVisionQuestion("x".repeat(3000)).length).toBe(2400);
+  });
+});
+
 describe("Backup and taxonomy hardening",()=>{
   it("accepts a structurally valid backup and preserves the selected tank",()=>{
     const source=structuredClone(demoMarineTank);
