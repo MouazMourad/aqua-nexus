@@ -1,11 +1,13 @@
 "use client";
 import { useMemo,useState } from "react";
-import type { JournalPhoto,Tank } from "@/domain/types";
+import type { JournalPhoto,Tank,VisionAssessmentRecord } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { uid,nowISO } from "@/lib/appUtils";
 import { buildVisionTriage,captureConsistency,type VisionMetrics,type VisionSymptom } from "@/domain/visionIntelligence";
+import { visionDiseaseCandidates } from "@/domain/visionDifferential";
+import { askAquaVision } from "@/lib/aquaAIClient";
 
 type GrowthPhoto=JournalPhoto&{livestockId?:string;estimatedSizeCm?:number;colorIndex?:number;brightnessIndex?:number;captureScore?:number;clarityIndex?:number;greenDominancePercent?:number;palePixelPercent?:number};
 
@@ -63,11 +65,10 @@ function visualMetrics(img:HTMLImageElement):VisionMetrics{
 async function prepareImage(file:File):Promise<PreparedImage>{
  const original=await readFile(file),img=await loadImage(original),metrics=visualMetrics(img);
  const maxSide=1280,scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
- if(scale>=.999)return {dataUrl:original,metrics};
  const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
- const ctx=canvas.getContext("2d");if(!ctx)return {dataUrl:original,metrics};
+ const ctx=canvas.getContext("2d");if(!ctx)throw new Error("Image conversion failed");
  ctx.drawImage(img,0,0,canvas.width,canvas.height);
- return {dataUrl:canvas.toDataURL("image/jpeg",.86),metrics};
+ return {dataUrl:canvas.toDataURL("image/jpeg",.84),metrics};
 }
 
 const symptomLabels:Record<VisionSymptom,{ar:string;en:string}>={
@@ -77,9 +78,9 @@ const symptomLabels:Record<VisionSymptom,{ar:string;en:string}>={
 export function JournalPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
  const [caption,setCaption]=useState(""),[livestockId,setLivestockId]=useState(""),[sizeCm,setSizeCm]=useState(0);
- const [visionLivestockId,setVisionLivestockId]=useState(""),[visionSymptoms,setVisionSymptoms]=useState<VisionSymptom[]>([]),[visionNotes,setVisionNotes]=useState(""),[visionBusy,setVisionBusy]=useState(false),[visionError,setVisionError]=useState("");
+ const [visionLivestockId,setVisionLivestockId]=useState(""),[visionSymptoms,setVisionSymptoms]=useState<VisionSymptom[]>([]),[visionNotes,setVisionNotes]=useState(""),[visionBusy,setVisionBusy]=useState(false),[visionError,setVisionError]=useState(""),[deepVisionBusy,setDeepVisionBusy]=useState(false),[deepVisionError,setDeepVisionError]=useState("");
  const photos=tank.photos as GrowthPhoto[];
- const assessments:any[]=((tank as any).visionAssessments??[]);
+ const assessments:VisionAssessmentRecord[]=tank.visionAssessments??[];
  const trackedLivestock=tank.livestock.filter(x=>x.category==="coral"||x.category==="plant"||x.category==="other");
  const visionLivestock=tank.livestock;
 
@@ -107,29 +108,96 @@ export function JournalPage({tank}:{tank:Tank}) {
 
  function toggleSymptom(s:VisionSymptom){setVisionSymptoms(v=>v.includes(s)?v.filter(x=>x!==s):[...v,s]);}
  async function runVision(file?:File){
-  if(!file)return;setVisionBusy(true);setVisionError("");
+  if(!file)return;setVisionBusy(true);setVisionError("");setDeepVisionError("");
   try{
    const prepared=await prepareImage(file),ts=nowISO(),subject=tank.livestock.find(x=>x.id===visionLivestockId);
    const selectedSymptoms=visionSymptoms.length?visionSymptoms:["unknown" as VisionSymptom];
    const previous=assessments.find(x=>(x.livestockId||"")===(visionLivestockId||"")&&x.metrics);
    const triage=buildVisionTriage(tank,{livestockId:visionLivestockId||undefined,symptoms:selectedSymptoms,notes:visionNotes,metrics:prepared.metrics,previousMetrics:previous?.metrics,previousTimestamp:previous?.timestamp});
+   const candidates=visionDiseaseCandidates(tank,visionLivestockId||undefined,selectedSymptoms);
    const photoId=uid("ph"),assessmentId=uid("vision");
    const photo:any={id:photoId,timestamp:ts,caption:`Local Best Visual Insight${subject?` • ${subject.name}`:" • Whole Tank"}`,dataUrl:prepared.dataUrl,livestockId:visionLivestockId||undefined,...prepared.metrics};
-   const assessment={id:assessmentId,timestamp:ts,photoId,livestockId:visionLivestockId||undefined,symptoms:selectedSymptoms,notes:visionNotes,metrics:prepared.metrics,triage,modelStatus:"local-best",engine:triage.engine};
-   patch(tank.id,t=>({...t,photos:[photo,...t.photos],visionAssessments:[assessment,...((t as any).visionAssessments??[])],timeline:[{id:uid("ev"),timestamp:ts,type:"vision-assessment",textAr:`Local Best Visual Insight${subject?` لـ ${subject.name}`:" للحوض كامل"}: ${triage.summaryAr}`,textEn:`Local Best Visual Insight${subject?` for ${subject.nameEn||subject.name}`:" for the whole tank"}: ${triage.summaryEn}`},...t.timeline]} as any));
+   const assessment:VisionAssessmentRecord={id:assessmentId,timestamp:ts,photoId,livestockId:visionLivestockId||undefined,symptoms:selectedSymptoms,notes:visionNotes,metrics:prepared.metrics,triage,modelStatus:"local-best",engine:triage.engine,external:{status:"not_requested"},diseaseCandidateIds:candidates.map(x=>x.id)};
+   patch(tank.id,t=>({...t,photos:[photo,...t.photos],visionAssessments:[assessment,...(t.visionAssessments??[])],timeline:[{id:uid("ev"),timestamp:ts,type:"vision-assessment",textAr:`Local Best Visual Insight${subject?` لـ ${subject.name}`:" للحوض كامل"}: ${triage.summaryAr}`,textEn:`Local Best Visual Insight${subject?` for ${subject.nameEn||subject.name}`:" for the whole tank"}: ${triage.summaryEn}`},...t.timeline]}));
    setVisionSymptoms([]);setVisionNotes("");
   }catch{
    setVisionError(lang==="ar"?"ما قدرنا نحلل الصورة محلياً. جرّب صورة JPG/PNG/WEBP أو التقط صورة جديدة.":"Local image analysis failed. Try JPG/PNG/WEBP or capture a new photo.");
   }finally{setVisionBusy(false);}
  }
 
+ async function runDeepVision(assessment:VisionAssessmentRecord){
+  const photo=photos.find(x=>x.id===assessment.photoId),subject=tank.livestock.find(x=>x.id===assessment.livestockId);
+  if(!photo){setDeepVisionError(bi(lang,"الصورة المرتبطة بالتحليل غير موجودة.","The image linked to this assessment is missing."));return}
+  setDeepVisionBusy(true);setDeepVisionError("");
+  try{
+   const candidates=visionDiseaseCandidates(tank,assessment.livestockId,assessment.symptoms as VisionSymptom[]);
+   const symptomText=(assessment.symptoms as VisionSymptom[]).map(s=>lang==="ar"?symptomLabels[s]?.ar:symptomLabels[s]?.en).filter(Boolean).join(", ");
+   const localSummary=lang==="ar"?assessment.triage.summaryAr:assessment.triage.summaryEn;
+   const candidateText=candidates.map(x=>lang==="ar"?x.ar:x.en).join(", ");
+   const question=[
+    subject?`Subject: ${lang==="ar"?subject.name:(subject.nameEn||subject.name)} • category ${subject.category}`:"Scope: whole tank",
+    `Reported symptoms: ${symptomText||"none"}`,
+    assessment.notes?`User notes: ${assessment.notes}`:"",
+    `Local Aqua Nexus triage: ${localSummary}`,
+    candidateText?`Symptom-linked library references (not diagnoses): ${candidateText}`:""
+   ].filter(Boolean).join("\n");
+   const result=await askAquaVision({tank,imageDataUrl:photo.dataUrl,question,language:lang});
+   const ts=nowISO();
+   if(result.mode!=="external"||!result.answer?.text){
+    const message=result.answer?.messageAr&&lang==="ar"?result.answer.messageAr:result.answer?.messageEn||bi(lang,"ما في مزود AI Vision خارجي مربوط حالياً.","No external AI Vision provider is configured.");
+    patch(tank.id,t=>({...t,visionAssessments:(t.visionAssessments??[]).map(x=>x.id===assessment.id?{...x,external:{status:"unavailable",provider:result.provider,error:String(message),analyzedAt:ts}}:x)}));
+    setDeepVisionError(String(message));return;
+   }
+   patch(tank.id,t=>({...t,
+    visionAssessments:(t.visionAssessments??[]).map(x=>x.id===assessment.id?{...x,external:{status:"completed",provider:result.provider,model:result.model,text:String(result.answer.text),analyzedAt:ts}}:x),
+    timeline:[{id:uid("ev"),timestamp:ts,type:"vision-second-opinion",textAr:`تمت إضافة رأي AI Vision ثانٍ${subject?` لـ ${subject.name}`:" للحوض"} بدون اعتماد تشخيص نهائي تلقائي.`,textEn:`AI Vision second opinion added${subject?` for ${subject.nameEn||subject.name}`:" for the tank"} without auto-confirming a diagnosis.`},...t.timeline]
+   }));
+  }catch(error){
+   const message=error instanceof Error?error.message:String(error);
+   const ts=nowISO();
+   patch(tank.id,t=>({...t,visionAssessments:(t.visionAssessments??[]).map(x=>x.id===assessment.id?{...x,external:{status:"error",error:message,analyzedAt:ts}}:x)}));
+   setDeepVisionError(bi(lang,"فشل AI Vision الخارجي. التحليل المحلي محفوظ وما ضاع.","External AI Vision failed. The local assessment is still saved."));
+  }finally{setDeepVisionBusy(false);}
+ }
+
+ function markVisionWatch(assessment:VisionAssessmentRecord){
+  if(!assessment.livestockId)return;
+  const subject=tank.livestock.find(x=>x.id===assessment.livestockId);if(!subject)return;
+  const ts=nowISO();
+  patch(tank.id,t=>({...t,livestock:t.livestock.map(x=>x.id===subject.id?{...x,health:x.health==="treatment"?"treatment":"watch",lastObservedAt:ts}:x),timeline:[{id:uid("ev"),timestamp:ts,type:"vision-watch",textAr:`تم وضع ${subject.name} تحت المراقبة من نتيجة Visual Insight.`,textEn:`${subject.nameEn||subject.name} was marked for monitoring from Visual Insight.`},...t.timeline]}));
+ }
+
+ function createVisionFollowUp(assessment:VisionAssessmentRecord){
+  if(assessment.followUpTaskId)return;
+  const subject=tank.livestock.find(x=>x.id===assessment.livestockId),taskId=uid("task"),ts=nowISO();
+  const due=new Date(Date.now()+(assessment.triage.level==="urgent"?12:24)*3600000).toISOString().slice(0,10);
+  patch(tank.id,t=>({...t,
+   maintenance:[...t.maintenance,{id:taskId,title:`متابعة بصرية${subject?` — ${subject.name}`:" للحوض"}`,titleEn:`Visual follow-up${subject?` — ${subject.nameEn||subject.name}`:" for tank"}`,cadence:"once",done:false,nextDue:due,manual:true,sourceDomain:"journal",sourceId:`vision:${assessment.id}`}],
+   visionAssessments:(t.visionAssessments??[]).map(x=>x.id===assessment.id?{...x,followUpTaskId:taskId}:x),
+   timeline:[{id:uid("ev"),timestamp:ts,type:"vision-follow-up",textAr:"تم إنشاء مهمة متابعة بصرية من نتيجة الصورة.",textEn:"A visual follow-up task was created from the image assessment."},...t.timeline]
+  }));
+ }
+
+ function createVisionQuarantine(assessment:VisionAssessmentRecord){
+  if(!assessment.livestockId||assessment.quarantineCaseId)return;
+  const subject=tank.livestock.find(x=>x.id===assessment.livestockId);if(!subject)return;
+  const caseId=uid("q"),ts=nowISO(),symptoms=(assessment.symptoms as VisionSymptom[]).map(s=>lang==="ar"?symptomLabels[s]?.ar:symptomLabels[s]?.en).filter(Boolean).join(", ");
+  patch(tank.id,t=>({...t,
+   livestock:t.livestock.map(x=>x.id===subject.id?{...x,health:x.health==="treatment"?"treatment":"watch",lastObservedAt:ts}:x),
+   quarantine:[{id:caseId,livestockId:subject.id,organism:subject.name,reason:bi(lang,"متابعة حالة مشتبهة من Visual Insight بدون تشخيص دوائي تلقائي.","Visual Insight follow-up without automatic medication diagnosis."),symptoms,plan:bi(lang,"اعزل/راقب حسب الحاجة، ثبّت جودة الماء، راجع الفحوصات الحديثة واختر العلاج فقط بعد ترجيح السبب.","Quarantine/observe as appropriate, stabilize water quality, review current tests, and choose treatment only after the cause is reasonably supported."),start:ts.slice(0,10),status:"active"},...t.quarantine],
+   visionAssessments:(t.visionAssessments??[]).map(x=>x.id===assessment.id?{...x,quarantineCaseId:caseId}:x),
+   timeline:[{id:uid("ev"),timestamp:ts,type:"vision-quarantine",textAr:`تم إنشاء حالة متابعة/حجر مرتبطة بـ ${subject.name} من Visual Insight.`,textEn:`A linked quarantine/follow-up case was created for ${subject.nameEn||subject.name} from Visual Insight.`},...t.timeline]
+  }));
+ }
+
  const latest=assessments[0],latestObservations=latest?(lang==="ar"?latest.triage.observationsAr:latest.triage.observationsEn):[],latestPossibilities=latest?(lang==="ar"?latest.triage.possibilitiesAr:latest.triage.possibilitiesEn):[],latestNext=latest?(lang==="ar"?latest.triage.nextAr:latest.triage.nextEn):[];
+ const latestCandidates=latest?visionDiseaseCandidates(tank,latest.livestockId,latest.symptoms as VisionSymptom[]):[];
  const confidenceText=latest?`${latest.triage.confidence==="medium"?(lang==="ar"?"متوسطة":"Medium"):(lang==="ar"?"أولية":"Early")} • ${latest.triage.confidenceScore??"—"}/100`:"";
 
  return <section className="page-grid"><PageHeader eyebrow="PHOTO JOURNAL • LOCAL BEST AI • GROWTH" title={tr(lang,"journal")}/>
 
  <div className="card panel full-span">
-  <div className="module-head"><div><h3>{bi(lang,"Local Best Visual Insight","Local Best Visual Insight")}</h3><p className="note">{bi(lang,"التحليل يتم محلياً على جهازك: الصورة لا تُرسل لأي مزود AI خارجي. Aqua Nexus يستخرج مؤشرات بصرية، يقارنها بصور سابقة لنفس الحوض، ثم يربطها بالكيمياء والتاريخ والكائنات.","Analysis runs locally on your device: the image is not sent to any external AI provider. Aqua Nexus extracts visual signals, compares prior captures from this tank, then fuses them with chemistry, history and livestock context.")}</p></div><span className="scene-badge">LOCAL BEST AI</span></div>
+  <div className="module-head"><div><h3>{bi(lang,"Local Best Visual Insight","Local Best Visual Insight")}</h3><p className="note">{bi(lang,"الطبقة الأولى محلية على جهازك ولا ترسل الصورة للخارج. بعد ظهور النتيجة فيك تطلب AI Vision Second Opinion بشكل صريح؛ فقط عندها، وإذا في مزود خارجي مربوط، بتنرسل الصورة وسياق الحوض للمزود.","The first layer runs locally on your device and does not send the image externally. After the result appears, you can explicitly request an AI Vision second opinion; only then, and only if an external provider is configured, the image and tank context are sent to that provider.")}</p></div><span className="scene-badge">LOCAL BEST AI</span></div>
   <div className="form-grid"><label className="field"><span>{bi(lang,"نطاق الصورة","Image scope")}</span><select value={visionLivestockId} onChange={e=>setVisionLivestockId(e.target.value)}><option value="">{bi(lang,"الحوض كامل","Whole tank")}</option>{visionLivestock.map(x=><option key={x.id} value={x.id}>{lang==="ar"?x.name:(x.nameEn||x.name)}</option>)}</select></label><label className="field full-field"><span>{bi(lang,"ملاحظات السلوك/التطور","Behavior / progression notes")}</span><input value={visionNotes} onChange={e=>setVisionNotes(e.target.value)} placeholder={bi(lang,"من إمتى بلشت؟ في شهية؟ عم تنتشر؟","When did it start? appetite? spreading?")}/></label></div>
   <div className="vision-symptoms" style={{display:"flex",flexWrap:"wrap",gap:7,margin:"12px 0"}}>{(Object.keys(symptomLabels) as VisionSymptom[]).map(s=><button type="button" key={s} className={`btn ${visionSymptoms.includes(s)?"primary":""}`} onClick={()=>toggleSymptom(s)}>{lang==="ar"?symptomLabels[s].ar:symptomLabels[s].en}</button>)}</div>
   <label className="btn primary file-button">{visionBusy?bi(lang,"عم يتم التحليل محلياً...","Analyzing locally..."):bi(lang,"📷 حلل الصورة محلياً","📷 Analyze locally")}<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" disabled={visionBusy} onChange={e=>void runVision(e.target.files?.[0])}/></label>
@@ -141,7 +209,17 @@ export function JournalPage({tank}:{tank:Tank}) {
     <div><small><b>{bi(lang,"2 • ماذا قد يعني ذلك","2 • POSSIBLE MEANING")}</b></small><div style={{marginTop:4}}>{latestPossibilities.slice(0,3).join(" • ")}</div></div>
     <div><small><b>{bi(lang,"3 • ماذا تفحص الآن","3 • NEXT BEST CHECK")}</b></small><div style={{marginTop:4}}>{latestNext.slice(0,3).join(" • ")}</div></div>
     <div><small><b>{bi(lang,"4 • مستوى الثقة","4 • CONFIDENCE LEVEL")}</b></small><div style={{marginTop:4}}>{confidenceText} • Capture {latest.metrics.captureScore}/100 • Clarity {latest.metrics.clarityIndex??"—"}/100</div></div>
+    {latestCandidates.length>0&&<div><small><b>{bi(lang,"5 • مراجع محتملة من مكتبة الأمراض","5 • SYMPTOM-LINKED LIBRARY REFERENCES")}</b></small><div style={{display:"grid",gap:6,marginTop:6}}>{latestCandidates.map(x=><div key={x.id} className="aqua-ai-local-note"><b>{lang==="ar"?x.ar:x.en}{x.urgent?" ⚠️":""}</b><div>{lang==="ar"?x.symptomsAr:x.symptomsEn}</div></div>)}</div><div className="note">{bi(lang,"هاي مراجع مطابقة للأعراض وليست تشخيصات مؤكدة.","These are symptom-linked references, not confirmed diagnoses.")}</div></div>}
     {latest.triage.comparisonAr&&<div className="aqua-ai-local-note">{lang==="ar"?latest.triage.comparisonAr:latest.triage.comparisonEn}</div>}
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+     <button className="btn primary" disabled={deepVisionBusy} onClick={()=>void runDeepVision(latest)}>{deepVisionBusy?bi(lang,"عم يراجع AI Vision...","AI Vision reviewing..."):bi(lang,"✦ AI Vision رأي ثانٍ","✦ AI Vision second opinion")}</button>
+     {latest.livestockId&&<button className="btn" onClick={()=>markVisionWatch(latest)}>{bi(lang,"👁 وضع تحت المراقبة","👁 Mark as watch")}</button>}
+     <button className="btn" disabled={Boolean(latest.followUpTaskId)} onClick={()=>createVisionFollowUp(latest)}>{latest.followUpTaskId?bi(lang,"✓ متابعة منشأة","✓ Follow-up created"):bi(lang,"＋ متابعة 12–24 ساعة","＋ 12–24h follow-up")}</button>
+     {latest.livestockId&&<button className="btn" disabled={Boolean(latest.quarantineCaseId)} onClick={()=>createVisionQuarantine(latest)}>{latest.quarantineCaseId?bi(lang,"✓ حالة حجر منشأة","✓ Quarantine case created"):bi(lang,"＋ متابعة/حجر مرتبط","＋ Linked quarantine/follow-up")}</button>}
+    </div>
+    {deepVisionError&&<div className="inline-alert warn">{deepVisionError}</div>}
+    {latest.external?.status==="completed"&&latest.external.text&&<div className="aqua-ai-local-note" style={{display:"grid",gap:6}}><small><b>EXTERNAL AI VISION SECOND OPINION</b></small><div style={{whiteSpace:"pre-wrap"}}>{latest.external.text}</div><small>{latest.external.provider}{latest.external.model?` • ${latest.external.model}`:""} • {bi(lang,"رأي ثانٍ وليس تشخيصاً تلقائياً","second opinion, not an automatic diagnosis")}</small></div>}
+    {latest.external?.status==="unavailable"&&<div className="inline-alert info">{latest.external.error||bi(lang,"ما في مزود AI Vision خارجي مربوط حالياً.","No external AI Vision provider is configured.")}</div>}
    </div>
    <div className="summary-strip" style={{marginTop:10}}>
     <div className="summary"><small>{bi(lang,"الوضوح","Clarity")}</small><b>{latest.metrics.clarityIndex??"—"}</b></div>
