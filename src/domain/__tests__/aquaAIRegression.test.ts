@@ -26,6 +26,7 @@ import { visionDiseaseCandidates } from "@/domain/visionDifferential";
 import { buildVisionTriage } from "@/domain/visionIntelligence";
 import { sanitizeVisionQuestion,validateVisionDataUrl } from "@/domain/visionRequestSafety";
 import { biologicalCycleStatus,cycleRelevantMaintenanceTask,isCyclePageAllowed } from "@/domain/biologicalCycle";
+import { biologicalCycleKnowledgeSnapshot } from "@/domain/biologicalCycleKnowledge";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -351,6 +352,37 @@ describe("Biological cycling gate",()=>{
     const answer=aquaAIAnswer("قديش جرعة KH حط هلا؟",t,"dashboard");
     expect(answer.titleEn).toMatch(/Biological cycle/i);
     expect(answer.action?.page).not.toBe("dosing");
+  });
+  it("explains a stalled ammonia cycle from tank-specific evidence",()=>{
+    const t=structuredClone(demoFreshwaterTank);
+    const now=Date.now();
+    t.isTraining=false;t.status="cycling";
+    t.biologicalCycle={startedAt:new Date(now-10*86400000).toISOString(),sourceAddedAt:new Date(now-9*86400000).toISOString(),method:"fishless"};
+    t.chemistry=[
+      {timestamp:new Date(now-2*3600000).toISOString(),usingDefaults:false,values:{NH3:1.1,NO2:0,pH:6.3,temperature:25}},
+      {timestamp:new Date(now-30*3600000).toISOString(),usingDefaults:false,values:{NH3:1.12,NO2:0,pH:6.3,temperature:25}}
+    ];
+    const snapshot=biologicalCycleKnowledgeSnapshot(t);
+    expect(snapshot.issues.map(x=>x.id)).toContain("ammonia-stalled");
+    expect(snapshot.issues.map(x=>x.id)).toContain("low-ph");
+    const answer=aquaAIAnswer("ليش الأمونيا ما عم تنزل بالدورة؟",t,"chemistry");
+    expect(answer.titleAr).toMatch(/الأمونيا/);
+    expect(answer.detailsAr.join(" ")).toMatch(/pH|أكسج|اختبار/);
+    expect(answer.action?.page).toBe("chemistry");
+  });
+  it("knows that a normal water change does not reset the biofilter",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.isTraining=false;t.status="cycling";t.biologicalCycle={startedAt:new Date().toISOString(),sourceAddedAt:new Date().toISOString()};
+    const answer=aquaAIAnswer("غيرت مي، رجعت الدورة البيولوجية من الأول؟",t,"maintenance");
+    expect(answer.summaryAr).toMatch(/عادة|لا/);
+    expect(answer.detailsAr.join(" ")).toMatch(/الميديا|الكلور|الفلتر/);
+  });
+  it("treats bottled bacteria as acceleration, not proof of readiness",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.isTraining=false;t.status="cycling";t.biologicalCycle={startedAt:new Date().toISOString(),bacteriaSeededAt:new Date().toISOString()};
+    const answer=aquaAIAnswer("حطيت بكتيريا جاهزة، يعني الدورة خلصت؟",t,"maintenance");
+    expect(answer.summaryAr).toMatch(/ما بيعتبرو|ما.*إثبات|إثبات/);
+    expect(answer.detailsAr.join(" ")).toMatch(/أمونيا|القياس/);
   });
 });
 
