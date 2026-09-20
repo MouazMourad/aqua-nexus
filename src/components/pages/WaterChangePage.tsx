@@ -8,6 +8,7 @@ import { uid,nowISO } from "@/lib/appUtils";
 import { inventoryForConsumer,inventoryProfile } from "@/domain/inventoryIntelligence";
 import { consumeInventory,inventoryConsumptionMessage } from "@/domain/inventoryConsumption";
 import { waterChangeIntelligence } from "@/domain/waterChangeIntelligence";
+import { claimCriticalAction } from "@/lib/actionGuard";
 
 export function WaterChangePage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),[liters,setLiters]=useState(Math.round(tank.systemVolumeLiters*.15)),[sal,setSal]=useState(1.025),[temp,setTemp]=useState(25),[notes,setNotes]=useState(""),[saltItemId,setSaltItemId]=useState(""),[saltUsed,setSaltUsed]=useState(""),[conditionerItemId,setConditionerItemId]=useState(""),[conditionerUsed,setConditionerUsed]=useState(""),[freshSaltItemId,setFreshSaltItemId]=useState(""),[freshSaltUsed,setFreshSaltUsed]=useState(""),[rodiBatchId,setRodiBatchId]=useState("");
@@ -31,6 +32,7 @@ export function WaterChangePage({tank}:{tank:Tank}) {
   ].filter((x):x is {inventoryItemId:string;quantity:number;role:string}=>Boolean(x));
   const use=consumeInventory(tank.inventory,selected);
   if(!use.ok){window.alert(inventoryConsumptionMessage(use,lang));return}
+  if(!claimCriticalAction(`water-change:${tank.id}`))return;
   const marineSaltUse=use.uses.find(x=>x.role==="marine_salt"),ts=nowISO();
   patch(tank.id,t=>({...t,
    inventory:use.inventory,
