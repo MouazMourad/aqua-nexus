@@ -18,6 +18,7 @@ const PRESET_PROFILES:Record<string,InventoryProfile>={
   calcium:{category:"dosing",subcategory:"calcium",tankCompatibility:"marine",consumedBy:["dosing"],stockBehavior:"consumable"},
   magnesium:{category:"dosing",subcategory:"magnesium",tankCompatibility:"marine",consumedBy:["dosing"],stockBehavior:"consumable"},
   allForReef:{category:"dosing",subcategory:"balanced_reef",tankCompatibility:"marine",consumedBy:["dosing"],stockBehavior:"consumable"},
+  coralDip:{category:"coral_treatment",subcategory:"coral_dip",tankCompatibility:"marine",consumedBy:["acclimation"],stockBehavior:"consumable"},
   trace:{category:"supplement",subcategory:"trace_elements",tankCompatibility:"marine",consumedBy:["dosing"],stockBehavior:"consumable"},
   bacteria:{category:"supplement",subcategory:"bacteria",tankCompatibility:"both",consumedBy:["dosing"],stockBehavior:"consumable"},
   carbon:{category:"filter_media",subcategory:"activated_carbon",tankCompatibility:"both",consumedBy:["sump"],stockBehavior:"consumable"},
