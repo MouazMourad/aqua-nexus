@@ -3,6 +3,7 @@ import { aquaAIAnswer } from "@/domain/aquaAIBrain";
 import { aquaAISystemPrompt,buildTankAIContext } from "@/domain/aiContext";
 import { query } from "./db";
 import { ensureWorkspace } from "./workspace";
+import { isAquariumScopedQuestion,offTopicAquaAnswer } from "@/domain/aquaAIScope";
 
 export interface GatewayResult {
   mode:"local"|"external";
@@ -27,6 +28,11 @@ async function audit(workspace:string,tankId:string|undefined,mode:string,questi
 
 export async function runAquaChat(input:{workspace:string;tank:Tank;question:string;page?:string;language?:"ar"|"en"}) : Promise<GatewayResult>{
   const language=input.language||"ar";
+  if(!isAquariumScopedQuestion(input.question,input.tank)){
+    const answer=offTopicAquaAnswer(input.question);
+    await audit(input.workspace,input.tank.id,"chat",input.question,"local-scope-guard",undefined,answer);
+    return {mode:"local",provider:"Aqua Nexus scope guard",answer};
+  }
   const cfg=providerConfig();
   if(!cfg.configured){
     const answer=aquaAIAnswer(input.question,input.tank,input.page||"dashboard");
