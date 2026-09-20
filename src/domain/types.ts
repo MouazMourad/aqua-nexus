@@ -234,7 +234,7 @@ export interface InventoryItem {
 }
 
 export type IntelligenceEventKind = "fact"|"observation"|"action"|"omission"|"outcome";
-export type IntelligenceEventDomain = "chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|"waterChange"|"rodi"|"quarantine"|"emergency"|"acclimation"|"sump"|"journal"|"expense"|"system";
+export type IntelligenceEventDomain = "chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|"waterChange"|"rodi"|"plantCare"|"quarantine"|"emergency"|"acclimation"|"sump"|"journal"|"expense"|"system";
 export interface IntelligenceEvent {
   id:string;
   timestamp:string;
@@ -311,7 +311,11 @@ export interface JournalPhoto {
   id: string;
   timestamp: string;
   caption: string;
+  /** Small local preview kept with tank state for fast/offline rendering. */
   dataUrl: string;
+  /** Full-resolution compressed asset stored outside Zustand/localStorage. */
+  assetKey?: string;
+  fullResolutionStored?: boolean;
   livestockId?: string;
   estimatedSizeCm?: number;
   colorIndex?: number;
