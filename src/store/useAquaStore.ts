@@ -11,6 +11,7 @@ import { tankStateScore,tankStateView } from "@/domain/tankIntelligence";
 import { tankIntelligenceCore } from "@/domain/intelligenceCore";
 import { deriveIntelligenceEvents,mergeIntelligenceEvents,reconcileGuidanceActions } from "@/domain/eventIntelligence";
 import { deriveExtendedIntelligenceEvents } from "@/domain/extendedEventIntelligence";
+import { recordCloudDeleteTombstone } from "@/lib/cloudTombstones";
 
 interface AquaStore extends AquaState {
   setLanguage: (language: Language) => void;
@@ -173,6 +174,7 @@ export const useAquaStore = create<AquaStore>()(
       deleteTank:(tankId)=>set((state)=>{
         const target=state.tanks.find(t=>t.id===tankId);
         if(target?.isTraining)return state;
+        recordCloudDeleteTombstone(tankId);
         const tanks=state.tanks.filter(t=>t.id!==tankId);
         const real=tanks.filter(t=>!t.isTraining);
         return {
