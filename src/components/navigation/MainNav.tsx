@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect,useMemo,useRef,useState } from "react";
+import { createPortal } from "react-dom";
 import { tr } from "@/i18n";
 import type { Language,Tank } from "@/domain/types";
 import { GlobalHelpButton,PageHelpButton } from "@/components/help/HelpCenter";
@@ -210,7 +211,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
       <div className="all-modules-grid">{secondary.map((item,index)=>button(item,index,true))}</div>
     </div>}
 
-    {paletteOpen&&<div className="command-palette-backdrop" role="presentation" onMouseDown={e=>{if(e.currentTarget===e.target){setPaletteOpen(false);setQuery("")}}}>
+    {paletteOpen&&typeof document!=="undefined"&&createPortal(<div className="command-palette-backdrop" role="presentation" onMouseDown={e=>{if(e.currentTarget===e.target){setPaletteOpen(false);setQuery("")}}}>
       <section className="command-palette" role="dialog" aria-modal="true" aria-label={lang==="ar"?"بحث Aqua Nexus":"Aqua Nexus search"}>
         <div className="command-search"><span>⌕</span><input ref={searchRef} value={query} onChange={e=>setQuery(e.target.value)} placeholder={lang==="ar"?"ابحث: KH، Naso، Skimmer، صيانة، RO/DI…":"Search: KH, livestock, skimmer, maintenance, RO/DI…"} /><kbd>Esc</kbd></div>
         <div className="command-quick">
@@ -229,7 +230,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
           {!results.length&&<div className="command-empty">{lang==="ar"?"ما لقيت نتيجة. جرّب اسم كائن، جهاز، مهمة، بارامتر أو اسم صفحة.":"No match. Try a livestock name, device, task, parameter or module."}</div>}
         </div>
       </section>
-    </div>}
+    </div>,document.body)}
 
     <style jsx>{`
       .nav-help-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
