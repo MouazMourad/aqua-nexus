@@ -54,7 +54,7 @@ export function MaintenancePage({tank}:{tank:Tank}) {
     const ts=nowISO(),last=step>=totalSteps;
     patch(tank.id,t=>({...t,
       inventory:inv?t.inventory.map(x=>x.id===inv.id?{...x,quantity:Math.max(0,x.quantity-(perStep||0))}:x):t.inventory,
-      dosing:t.dosing.map(x=>x.id===doseId?{...x,stepIndex:step,status:last?"logged" as const:"in_progress" as const}:x),
+      dosing:t.dosing.map(x=>x.id===doseId?{...x,stepIndex:step,status:last?"logged" as const:"in_progress" as const,lastExecutedAt:ts,systemVolumeLiters:x.systemVolumeLiters??t.systemVolumeLiters}:x),
       maintenance:t.maintenance.map(x=>x.id===id?completeMaintenanceTask(x,today()):x),
       timeline:[{id:uid("ev"),timestamp:ts,type:"dosing-step",textAr:`تم تنفيذ الجرعة ${step}/${totalSteps}: ${perStep.toFixed(2)} ${dose.unit||""} من ${dose.material||dose.parameter}${inv?` • المتبقي بالمخزون ${Math.max(0,inv.quantity-perStep)} ${inv.unit}`:""}.`,textEn:`Executed dose step ${step}/${totalSteps}: ${perStep.toFixed(2)} ${dose.unit||""} of ${dose.material||dose.parameter}${inv?` • inventory remaining ${Math.max(0,inv.quantity-perStep)} ${inv.unit}`:""}.`},...t.timeline]
     }));
