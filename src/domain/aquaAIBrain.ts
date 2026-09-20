@@ -496,14 +496,15 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   if(cycle.active){
     const plan=buildAquaAIQueryPlan(intent);
     const cycleQuestion=/cycle|cycling|nitrogen|ammonia|nitrite|nitrate|دورة|امونيا|أمونيا|نتريت|نترات/.test(q);
+    const dosingQuestion=/جرعه|جرعة|جرعات|دوز|dose|dosing|supplement|مكمل/.test(q);
     const allowedDomains=new Set(["system","chemistry","equipment","maintenance","emergency","rodi","inventory","water","sump","journal"]);
-    const mustStayInCycle=cycleQuestion||plan.primary==="system"||!allowedDomains.has(plan.primary)||intent.mode==="canAdd"||intent.mode==="dose";
+    const mustStayInCycle=cycleQuestion||dosingQuestion||plan.primary==="system"||!allowedDomains.has(plan.primary)||intent.mode==="canAdd"||intent.mode==="dose";
     if(mustStayInCycle){
       const blocked=!cycleQuestion&&plan.primary!=="system"&&(!allowedDomains.has(plan.primary)||intent.mode==="canAdd"||intent.mode==="dose");
       return{
         titleAr:`الدورة البيولوجية — اليوم ${cycle.day}`,titleEn:`Biological cycle — day ${cycle.day}`,
-        summaryAr:blocked?`هالعملية موقوفة مؤقتاً لأن الحوض ضمن الدورة البيولوجية. ${cycle.nextAr}`:`${cycle.nextAr}`,
-        summaryEn:blocked?`This workflow is temporarily paused while the tank is cycling. ${cycle.nextEn}`:`${cycle.nextEn}`,
+        summaryAr:(blocked||dosingQuestion)?`هالعملية موقوفة مؤقتاً لأن الحوض ضمن الدورة البيولوجية. ${cycle.nextAr}`:`${cycle.nextAr}`,
+        summaryEn:(blocked||dosingQuestion)?`This workflow is temporarily paused while the tank is cycling. ${cycle.nextEn}`:`${cycle.nextEn}`,
         detailsAr:[...cycle.blockersAr.slice(0,4),"الوقت وحده لا يكفي لاعتبار الحوض جاهزاً؛ لازم تثبت الجاهزية بالقياسات."],
         detailsEn:[...cycle.blockersEn.slice(0,4),"Elapsed time alone does not make the tank ready; readiness must be proven by measured tests."],
         evidenceAr:[`اليوم ${cycle.day} من الدورة`,`تقدم الدورة ${cycle.progress}%`],
