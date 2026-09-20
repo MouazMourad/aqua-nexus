@@ -23,6 +23,7 @@ import { consumeInventory } from "@/domain/inventoryConsumption";
 import { fitChamberToSump,sumpChamberContents } from "@/domain/sumpOperations";
 import { validateBackupPayload,validateTankImportPayload } from "@/domain/backupValidation";
 import { visionDiseaseCandidates } from "@/domain/visionDifferential";
+import { buildVisionTriage } from "@/domain/visionIntelligence";
 import { sanitizeVisionQuestion,validateVisionDataUrl } from "@/domain/visionRequestSafety";
 
 const tank=structuredClone(demoMarineTank);
@@ -258,6 +259,21 @@ describe("AI Vision safety and differential regression",()=>{
   });
   it("sanitizes excessively long Vision questions",()=>{
     expect(sanitizeVisionQuestion("x".repeat(5000),120).length).toBe(120);
+  });
+  it("escalates rapid breathing and tissue loss while keeping confidence bounded",()=>{
+    const fish=structuredClone(demoMarineTank);
+    fish.livestock=[{id:"fish-v",name:"Fish",category:"fish",quantity:1,health:"watch",load:1}];
+    const result=buildVisionTriage(fish,{livestockId:"fish-v",symptoms:["rapidBreathing"],metrics:{colorIndex:40,brightnessIndex:50,captureScore:80,clarityIndex:75}});
+    expect(result.level).toBe("urgent");
+    expect(result.confidenceScore).toBeLessThanOrEqual(88);
+    expect(result.nextEn.join(" ")).toMatch(/ammonia|surface agitation/i);
+  });
+  it("uses prior comparable captures as evidence without turning them into a diagnosis",()=>{
+    const coral=structuredClone(demoMarineTank);
+    coral.livestock=[{id:"coral-v",name:"Coral",category:"coral",quantity:1,health:"watch",load:1}];
+    const result=buildVisionTriage(coral,{livestockId:"coral-v",symptoms:["paleColor"],metrics:{colorIndex:35,brightnessIndex:54,captureScore:82,clarityIndex:72,blueDominancePercent:30},previousMetrics:{colorIndex:45,brightnessIndex:52,captureScore:80,clarityIndex:70,blueDominancePercent:29}});
+    expect(result.comparisonEn).toBeTruthy();
+    expect(result.summaryEn.toLowerCase()).not.toMatch(/confirmed diagnosis|definitive diagnosis/);
   });
   it("maps marine fish white spots to marine disease references only",()=>{
     const t=structuredClone(demoMarineTank);
