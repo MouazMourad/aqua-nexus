@@ -418,6 +418,25 @@ export interface AcclimationEvent {
   textEn: string;
 }
 
+export type CoralDipRunStatus = "running" | "ready_to_rinse" | "rinsed" | "cancelled";
+
+export interface CoralDipRun {
+  id: string;
+  batchId: string;
+  itemIds: string[];
+  productName: string;
+  inventoryItemId: string;
+  quantityUsed: number;
+  unit: string;
+  durationMinutes: number;
+  status: CoralDipRunStatus;
+  startedAt: string;
+  remainingMs?: number;
+  endAt?: number | null;
+  completedAt?: string;
+  rinsedAt?: string;
+}
+
 export interface AcclimationSession {
   id: string;
   startedAt: string;
@@ -431,6 +450,14 @@ export interface AcclimationSession {
   existingNotes?: string;
   coralDipEnabled?: boolean;
   coralDipMinutes?: number;
+  /** Default inventory-backed Coral Dip preparation used when a coral batch starts. */
+  coralDipInventoryItemId?: string;
+  /** Quantity consumed from inventory for each freshly prepared dip bath. */
+  coralDipQuantityPerPrep?: number;
+  /** Each preparation is logged separately so inventory is consumed once per bath, not once per coral. */
+  coralDipRuns?: CoralDipRun[];
+  /** Explicit safety exception for distressed coral where the user intentionally skips dip. */
+  coralDipSkippedItemIds?: string[];
   floatConfirmed: boolean;
   floatStatus?: "waiting" | "running" | "paused" | "ready" | "done";
   floatStartedAt?: string;
