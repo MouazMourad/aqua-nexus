@@ -5,15 +5,11 @@ export function PWARegister() {
   useEffect(()=>{
     if(process.env.NODE_ENV!=="production"||!("serviceWorker" in navigator)) return;
 
-    let reloading=false;
-    const reloadOnControllerChange=()=>{
-      if(reloading)return;
-      reloading=true;
-      window.location.reload();
-    };
-
-    navigator.serviceWorker.addEventListener("controllerchange",reloadOnControllerChange);
-
+    // Never force-reload an active aquarium session when a new service worker
+    // takes control. Acclimation timers, forms and emergency workflows must not
+    // be interrupted by an infrastructure update. The new worker can activate
+    // immediately; the page will naturally load the newest shell on the next
+    // user-driven navigation/reload.
     let registration:ServiceWorkerRegistration|undefined;
     const checkForUpdate=()=>registration?.update().catch(()=>{});
 
@@ -27,7 +23,6 @@ export function PWARegister() {
     window.addEventListener("focus",checkForUpdate);
 
     return()=>{
-      navigator.serviceWorker.removeEventListener("controllerchange",reloadOnControllerChange);
       document.removeEventListener("visibilitychange",onVisible);
       window.removeEventListener("focus",checkForUpdate);
     };
