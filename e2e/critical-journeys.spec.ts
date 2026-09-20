@@ -60,7 +60,8 @@ test("equipment touch placement previews then commits on release",async({page})=
   await expect(pad).toBeVisible();
   const dot=pad.locator(".touch-device-dot");
   const before=await dot.getAttribute("style");
-  await pointerDrag(page,".touch-position-pad",".touch-position-pad",{x:.35,y:.45},{x:.78,y:.22},41);
+  const padSelector=".touch-position-pad:not(.front)";
+  await pointerDrag(page,padSelector,padSelector,{x:.35,y:.45},{x:.78,y:.22},41);
   await expect.poll(()=>dot.getAttribute("style"),{timeout:8_000}).not.toBe(before);
 });
 
