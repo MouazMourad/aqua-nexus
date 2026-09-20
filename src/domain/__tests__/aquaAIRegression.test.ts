@@ -230,5 +230,30 @@ describe("Acclimation coral dip safety",()=>{
     expect(gate.allowed).toBe(true);
     expect(gate.reasonEn).toMatch(/explicitly skipped/i);
   });
+  it("surfaces a finished dip as a central rinse action",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.acclimationSessions=[{...baseSession,items:[coral],coralDipRuns:[{id:"dip-rinse",batchId:"coral-1",itemIds:[coral.id],productName:"Dip",inventoryItemId:"inv-dip",quantityUsed:10,unit:"mL",durationMinutes:10,status:"ready_to_rinse",startedAt:new Date(Date.now()-600000).toISOString(),completedAt:new Date().toISOString()}]}];
+    const actions=deriveGuidanceActions(t);
+    expect(actions.some(x=>x.dedupeKey==="acclimation:coral-dip:dip-rinse:rinse"&&x.status==="ready")).toBe(true);
+  });
+  it("blocks the next dip preparation when linked inventory is insufficient",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.inventory=[{id:"inv-dip",name:"Coral Dip",quantity:5,unit:"mL",minimum:0}];
+    t.acclimationSessions=[{...baseSession,items:[coral],coralDipInventoryItemId:"inv-dip",coralDipQuantityPerPrep:10}];
+    const actions=deriveGuidanceActions(t);
+    expect(actions.some(x=>x.dedupeKey==="acclimation:coral-dip:stock:acs-test"&&x.status==="blocked")).toBe(true);
+  });
+  it("records dip start and rinse as acclimation intelligence events",()=>{
+    const before=structuredClone(demoMarineTank),running=structuredClone(demoMarineTank);
+    const run:any={id:"dip-event",batchId:"coral-1",itemIds:[coral.id],productName:"Dip",inventoryItemId:"inv-dip",quantityUsed:10,unit:"mL",durationMinutes:10,status:"running",startedAt:new Date().toISOString(),endAt:Date.now()+600000};
+    before.acclimationSessions=[{...baseSession,items:[coral],coralDipRuns:[]}];
+    running.acclimationSessions=[{...baseSession,items:[coral],coralDipRuns:[run]}];
+    const startEvents=deriveIntelligenceEvents(before,running);
+    expect(startEvents.some(x=>x.domain==="acclimation"&&x.verb==="coral_dip_started"&&x.entityId==="dip-event")).toBe(true);
+    const rinsed=structuredClone(running);
+    rinsed.acclimationSessions![0].coralDipRuns![0]={...run,status:"rinsed",endAt:null,rinsedAt:new Date().toISOString()};
+    const rinseEvents=deriveIntelligenceEvents(running,rinsed);
+    expect(rinseEvents.some(x=>x.domain==="acclimation"&&x.verb==="coral_dip_rinsed"&&x.entityId==="dip-event")).toBe(true);
+  });
 });
 
