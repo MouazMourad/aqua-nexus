@@ -34,6 +34,61 @@ function arraysAreArrays(tank:Record<string,unknown>){
   return fields.every(key=>tank[key]===undefined||Array.isArray(tank[key]));
 }
 
+function validTimestamp(value:unknown){
+  return typeof value==="string"&&value.length<=80&&Number.isFinite(new Date(value).getTime());
+}
+function duplicateId(items:unknown[]){
+  const seen=new Set<string>();
+  for(const item of items){
+    if(!isObject(item)||typeof item.id!=="string"||!item.id)continue;
+    if(seen.has(item.id))return item.id;
+    seen.add(item.id);
+  }
+  return null;
+}
+function nestedDataIssue(tank:Record<string,unknown>){
+  const arrays=["equipment","maintenance","livestock","inventory","timeline","photos","visionAssessments","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi","rodiServiceEvents","plantCare","acclimationSessions","emergencySessions","filterMedia","livestockExits"];
+  for(const field of arrays){
+    const items=(tank[field] as unknown[]|undefined)??[];
+    const dup=duplicateId(items);
+    if(dup)return `${field} contains duplicate id ${dup}`;
+  }
+
+  for(const [i,row] of (((tank.chemistry as unknown[])??[])).entries()){
+    if(!isObject(row)||!validTimestamp(row.timestamp)||!isObject(row.values))return `chemistry #${i+1} has an invalid timestamp or values object`;
+    for(const [key,value] of Object.entries(row.values)){
+      if(value!==null&&value!==undefined&&!finite(value))return `chemistry #${i+1} contains a non-finite value for ${key}`;
+    }
+  }
+  for(const [i,row] of (((tank.inventory as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validText(row.name,300)||!validText(row.unit,40)||!finite(row.quantity)||Number(row.quantity)<0)return `inventory #${i+1} is invalid or has negative stock`;
+    if(row.minimum!==undefined&&(!finite(row.minimum)||Number(row.minimum)<0))return `inventory #${i+1} has an invalid minimum`;
+  }
+  for(const [i,row] of (((tank.livestock as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validText(row.name,300)||!finite(row.quantity)||Number(row.quantity)<=0)return `livestock #${i+1} is invalid`;
+  }
+  for(const [i,row] of (((tank.dosing as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp))return `dosing #${i+1} is invalid`;
+    for(const key of ["amount","ml","perStep"]){
+      const value=row[key];
+      if(value!==undefined&&(!finite(value)||Number(value)<0))return `dosing #${i+1} has an invalid ${key}`;
+    }
+  }
+  for(const [i,row] of (((tank.waterChanges as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp)||!finite(row.liters)||Number(row.liters)<=0||!finite(row.percent)||Number(row.percent)<=0||Number(row.percent)>100)return `waterChanges #${i+1} is invalid`;
+  }
+  for(const [i,row] of (((tank.timeline as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp)||(!validText(row.textAr,4000)&&!validText(row.textEn,4000)))return `timeline #${i+1} is invalid`;
+  }
+  for(const [i,row] of (((tank.equipment as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validText(row.name,300)||!validText(row.kind,80))return `equipment #${i+1} is invalid`;
+  }
+  for(const [i,row] of (((tank.livestockExits as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp)||!validText(row.name,300)||!finite(row.quantity)||Number(row.quantity)<=0)return `livestockExits #${i+1} is invalid`;
+  }
+  return null;
+}
+
 export function validateTankShape(value:unknown,index=0):{ok:true;tank:Tank}|{ok:false;error:string}{
   if(!isObject(value))return{ok:false,error:`Tank #${index+1} is not an object.`};
   if(!validText(value.id,160))return{ok:false,error:`Tank #${index+1} has an invalid id.`};
@@ -43,6 +98,8 @@ export function validateTankShape(value:unknown,index=0):{ok:true;tank:Tank}|{ok
   if(!isObject(value.sump)||!isObject(value.sump.dimensions)||!validDimensions(value.sump.dimensions)||!Array.isArray(value.sump.chambers))return{ok:false,error:`Tank #${index+1} has invalid sump data.`};
   if(!finite(value.systemVolumeLiters)||Number(value.systemVolumeLiters)<=0)return{ok:false,error:`Tank #${index+1} has an invalid system volume.`};
   if(!arraysAreArrays(value))return{ok:false,error:`Tank #${index+1} contains an invalid collection field.`};
+  const nested=nestedDataIssue(value);
+  if(nested)return{ok:false,error:`Tank #${index+1}: ${nested}.`};
   return{ok:true,tank:value as unknown as Tank};
 }
 
