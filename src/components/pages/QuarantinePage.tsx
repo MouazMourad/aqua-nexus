@@ -5,6 +5,7 @@ import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { uid,today,nowISO } from "@/lib/appUtils";
+import { claimCriticalAction } from "@/lib/actionGuard";
 import { inventoryForConsumer } from "@/domain/inventoryIntelligence";
 
 function addHoursISO(hours:number){return new Date(Date.now()+Math.max(1,hours)*3600000).toISOString();}
@@ -25,6 +26,7 @@ export function QuarantinePage({tank}:{tank:Tank}) {
   const selectedMedication=medInventoryId?medicationStock.find(i=>i.id===medInventoryId):undefined;
   if(medInventoryId&&!selectedMedication){window.alert(bi(lang,"الدواء المحدد لم يعد متاحاً ضمن مخزون العلاج.","The selected medication is no longer available in treatment inventory."));return}
   if(selectedMedication&&selectedMedication.unit.toLowerCase()!=="ml"){window.alert(bi(lang,"حاسبة الحجر الحالية تعتمد mL. اختر دواء مخزون بوحدة mL أو اترك الربط فارغاً.","The current quarantine calculator uses mL. Select medication stock measured in mL or leave inventory unlinked."));return}
+  if(!claimCriticalAction(`quarantine-create:${tank.id}`))return;
   const nextDoseAt=treatment?ts:undefined;
   patch(tank.id,t=>({...t,
    livestock:subjectId?t.livestock.map(x=>x.id===subjectId?{...x,health:"treatment" as const,lastObservedAt:ts}:x):t.livestock,
@@ -43,6 +45,7 @@ export function QuarantinePage({tank}:{tank:Tank}) {
   const more=dosesGiven<total;
   const nextDoseAt=more?addHoursISO(q.intervalHours??24):undefined;
   const ts=nowISO();
+  if(!claimCriticalAction(`quarantine-dose:${tank.id}:${id}`))return;
   const inv=q.medicationInventoryItemId?medicationStock.find(i=>i.id===q.medicationInventoryItemId):undefined;
   const consume=q.medicationQuantityPerDose??dose;
   if(q.medicationInventoryItemId&&!inv){window.alert(bi(lang,"الدواء المرتبط بهذه الحالة غير موجود ضمن مخزون العلاج.","The medication linked to this case is missing from treatment inventory."));return}
@@ -56,6 +59,7 @@ export function QuarantinePage({tank}:{tank:Tank}) {
  }
 
  function close(id:string,resolved=true){
+  if(!claimCriticalAction(`quarantine-close:${tank.id}:${id}`))return;
   const q=tank.quarantine.find(x=>x.id===id);
   const ts=nowISO();
   patch(tank.id,t=>({...t,
