@@ -23,6 +23,35 @@ export function validateChemistryValues(tank:Tank,values:Record<string,number|nu
  return issues;
 }
 
+export function findNearDuplicateChemistryReading(tank:Tank,values:Record<string,number|null>,withinMinutes=10){
+ const keys=Object.keys(values).filter(k=>typeof values[k]==="number").sort();
+ if(!keys.length)return undefined;
+ const cutoff=Date.now()-Math.max(1,withinMinutes)*60000;
+ return tank.chemistry.find(reading=>{
+  if(reading.usingDefaults)return false;
+  const time=new Date(reading.timestamp).getTime();
+  if(!Number.isFinite(time)||time<cutoff)return false;
+  const priorKeys=Object.keys(reading.values??{}).filter(k=>typeof reading.values[k]==="number").sort();
+  if(priorKeys.length!==keys.length||priorKeys.some((k,i)=>k!==keys[i]))return false;
+  return keys.every(k=>{
+   const a=Number(values[k]),b=Number(reading.values[k]);
+   return Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=1e-9;
+  });
+ });
+}
+
+export function isExactChemistryDuplicate(existing:ChemistryReading[],candidate:ChemistryReading){
+ const at=new Date(candidate.timestamp).getTime();
+ if(!Number.isFinite(at))return false;
+ const keys=Object.keys(candidate.values??{}).filter(k=>typeof candidate.values[k]==="number").sort();
+ return existing.some(reading=>{
+  const bt=new Date(reading.timestamp).getTime();
+  if(!Number.isFinite(bt)||Math.abs(at-bt)>60000)return false;
+  const priorKeys=Object.keys(reading.values??{}).filter(k=>typeof reading.values[k]==="number").sort();
+  return priorKeys.length===keys.length&&priorKeys.every((k,i)=>k===keys[i])&&keys.every(k=>Number(reading.values[k])===Number(candidate.values[k]));
+ });
+}
+
 export function latestParameterSample(tank:Tank,key:string):ParameterSample|undefined{
  let best:ChemistryReading|undefined;
  for(const r of tank.chemistry){const v=r.values?.[key];if(typeof v!=="number"||!Number.isFinite(v))continue;if(!best||new Date(r.timestamp).getTime()>new Date(best.timestamp).getTime())best=r;}
