@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { uid,today,nowISO } from "@/lib/appUtils";
 import { claimCriticalAction } from "@/lib/actionGuard";
 import { inventoryForConsumer } from "@/domain/inventoryIntelligence";
+import { interventionGate } from "@/domain/interventionSafety";
 
 function addHoursISO(hours:number){return new Date(Date.now()+Math.max(1,hours)*3600000).toISOString();}
 function dateOnly(iso?:string){return iso?new Date(iso).toISOString().slice(0,10):today();}
@@ -45,6 +46,9 @@ export function QuarantinePage({tank}:{tank:Tank}) {
   const more=dosesGiven<total;
   const nextDoseAt=more?addHoursISO(q.intervalHours??24):undefined;
   const ts=nowISO();
+  const intervention=interventionGate(tank,"medication");
+  if(intervention.level==="warn"&&!window.confirm(lang==="ar"?intervention.ar+" هل جرعة العلاج مستحقة الآن حسب الخطة؟":intervention.en+" Is the treatment dose due now according to the plan?"))return;
+  if(intervention.level==="danger"&&!window.confirm(lang==="ar"?"⚠️ "+intervention.ar+" لا تكمل إلا إذا الجرعة العلاجية مطلوبة الآن فعلاً حسب الخطة/الملصق. متابعة؟":"⚠️ "+intervention.en+" Continue only if this treatment dose is genuinely due now under the plan/product label. Continue?"))return;
   if(!claimCriticalAction(`quarantine-dose:${tank.id}:${id}`))return;
   const inv=q.medicationInventoryItemId?medicationStock.find(i=>i.id===q.medicationInventoryItemId):undefined;
   const consume=q.medicationQuantityPerDose??dose;
