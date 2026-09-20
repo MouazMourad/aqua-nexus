@@ -52,12 +52,18 @@ function fallbackProfile(item:InventoryItem):InventoryProfile{
   if(/fertili|سماد|nitrogen|potassium|phosphate|iron|micronutrient|root tab/.test(text))return{category:"fertilizer",subcategory:"general_fertilizer",tankCompatibility:"freshwater",consumedBy:["fertilizer"],stockBehavior:"consumable"};
   if(/\bco2\b|carbon dioxide/.test(text))return{category:"co2",subcategory:"co2",tankCompatibility:"freshwater",consumedBy:["co2"],stockBehavior:"consumable"};
   if(/dip/.test(text))return{category:"coral_treatment",subcategory:"treatment",tankCompatibility:"marine",consumedBy:["acclimation"],stockBehavior:"consumable"};
-  if(/salt|ملح|conditioner|مزيل كلور/.test(text))return{category:"water_prep",subcategory:"water_prep",tankCompatibility:"both",consumedBy:["waterChange"],stockBehavior:"consumable"};
+  if(/conditioner|dechlor|مزيل كلور/.test(text))return{category:"water_prep",subcategory:"conditioner",tankCompatibility:"freshwater",consumedBy:["waterChange"],stockBehavior:"consumable"};
+  if(/marine\s*salt|reef\s*salt|ملح بحري/.test(text))return{category:"water_prep",subcategory:"marine_salt",tankCompatibility:"marine",consumedBy:["waterChange"],stockBehavior:"consumable"};
+  if(/aquarium\s*salt|freshwater\s*salt|ملح نهري/.test(text))return{category:"water_prep",subcategory:"freshwater_salt",tankCompatibility:"freshwater",consumedBy:["waterChange"],stockBehavior:"consumable"};
+  if(/sediment|رواسب/.test(text))return{category:"rodi",subcategory:"sediment_filter",tankCompatibility:"both",consumedBy:["rodi"],stockBehavior:"consumable"};
+  if(/di\s*resin|deion|راتنج.*di/.test(text))return{category:"rodi",subcategory:"di_resin",tankCompatibility:"both",consumedBy:["rodi"],stockBehavior:"consumable"};
+  if(/ro\s*carbon|carbon\s*block|كربون.*ro/.test(text))return{category:"rodi",subcategory:"carbon_filter",tankCompatibility:"both",consumedBy:["rodi"],stockBehavior:"consumable"};
+  if(/salt|ملح/.test(text))return{category:"water_prep",subcategory:"water_prep",tankCompatibility:"both",consumedBy:["waterChange"],stockBehavior:"consumable"};
   if(/carbon|gfo|phosphate media|filter floss|media|فلتر|فلترة|ميديا/.test(text))return{category:"filter_media",subcategory:"filter_media",tankCompatibility:"both",consumedBy:["sump"],stockBehavior:"consumable"};
   if(/kh|alkalinity|calcium|magnesium|buffer|جرعة|dosing/.test(text))return{category:"dosing",subcategory:"single_parameter",tankCompatibility:"marine",consumedBy:["dosing"],stockBehavior:"consumable"};
   if(/trace|iodine|amino|bacteria|supplement|متمم|عناصر|بكتيريا/.test(text))return{category:"supplement",subcategory:"supplement",tankCompatibility:"both",consumedBy:["dosing"],stockBehavior:"consumable"};
   if(/test|reagent|فحص|كاشف/.test(text))return{category:"testing",subcategory:"testing",tankCompatibility:"both",consumedBy:["testing"],stockBehavior:"consumable"};
-  if(/ro\/di|di resin|sediment/.test(text))return{category:"rodi",subcategory:"rodi",tankCompatibility:"both",consumedBy:["rodi"],stockBehavior:"consumable"};
+  if(/ro\/di/.test(text))return{category:"rodi",subcategory:"rodi",tankCompatibility:"both",consumedBy:["rodi"],stockBehavior:"consumable"};
   return{category:"other",subcategory:"other",tankCompatibility:"both",consumedBy:[],stockBehavior:"consumable"};
 }
 
