@@ -78,7 +78,7 @@ const symptomLabels:Record<VisionSymptom,{ar:string;en:string}>={
 export function JournalPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
  const [caption,setCaption]=useState(""),[livestockId,setLivestockId]=useState(""),[sizeCm,setSizeCm]=useState(0);
- const [visionLivestockId,setVisionLivestockId]=useState(""),[visionSymptoms,setVisionSymptoms]=useState<VisionSymptom[]>([]),[visionNotes,setVisionNotes]=useState(""),[visionBusy,setVisionBusy]=useState(false),[visionError,setVisionError]=useState(""),[deepVisionBusy,setDeepVisionBusy]=useState(false),[deepVisionError,setDeepVisionError]=useState("");
+ const [visionLivestockId,setVisionLivestockId]=useState(""),[visionSymptoms,setVisionSymptoms]=useState<VisionSymptom[]>([]),[visionNotes,setVisionNotes]=useState(""),[visionBusy,setVisionBusy]=useState(false),[visionError,setVisionError]=useState(""),[deepVisionBusyId,setDeepVisionBusyId]=useState<string|null>(null),[deepVisionError,setDeepVisionError]=useState("");
  const photos=tank.photos as GrowthPhoto[];
  const assessments:VisionAssessmentRecord[]=tank.visionAssessments??[];
  const trackedLivestock=tank.livestock.filter(x=>x.category==="coral"||x.category==="plant"||x.category==="other");
@@ -128,7 +128,7 @@ export function JournalPage({tank}:{tank:Tank}) {
  async function runDeepVision(assessment:VisionAssessmentRecord){
   const photo=photos.find(x=>x.id===assessment.photoId),subject=tank.livestock.find(x=>x.id===assessment.livestockId);
   if(!photo){setDeepVisionError(bi(lang,"الصورة المرتبطة بالتحليل غير موجودة.","The image linked to this assessment is missing."));return}
-  setDeepVisionBusy(true);setDeepVisionError("");
+  setDeepVisionBusyId(assessment.id);setDeepVisionError("");
   try{
    const candidates=visionDiseaseCandidates(tank,assessment.livestockId,assessment.symptoms as VisionSymptom[]);
    const symptomText=(assessment.symptoms as VisionSymptom[]).map(s=>lang==="ar"?symptomLabels[s]?.ar:symptomLabels[s]?.en).filter(Boolean).join(", ");
@@ -157,7 +157,7 @@ export function JournalPage({tank}:{tank:Tank}) {
    const ts=nowISO();
    patch(tank.id,t=>({...t,visionAssessments:(t.visionAssessments??[]).map(x=>x.id===assessment.id?{...x,external:{status:"error",error:message,analyzedAt:ts}}:x)}));
    setDeepVisionError(bi(lang,"فشل AI Vision الخارجي. التحليل المحلي محفوظ وما ضاع.","External AI Vision failed. The local assessment is still saved."));
-  }finally{setDeepVisionBusy(false);}
+  }finally{setDeepVisionBusyId(null);}
  }
 
  function markVisionWatch(assessment:VisionAssessmentRecord){
@@ -212,7 +212,7 @@ export function JournalPage({tank}:{tank:Tank}) {
     {latestCandidates.length>0&&<div><small><b>{bi(lang,"5 • مراجع محتملة من مكتبة الأمراض","5 • SYMPTOM-LINKED LIBRARY REFERENCES")}</b></small><div style={{display:"grid",gap:6,marginTop:6}}>{latestCandidates.map(x=><div key={x.id} className="aqua-ai-local-note"><b>{lang==="ar"?x.ar:x.en}{x.urgent?" ⚠️":""}</b><div>{lang==="ar"?x.symptomsAr:x.symptomsEn}</div></div>)}</div><div className="note">{bi(lang,"هاي مراجع مطابقة للأعراض وليست تشخيصات مؤكدة.","These are symptom-linked references, not confirmed diagnoses.")}</div></div>}
     {latest.triage.comparisonAr&&<div className="aqua-ai-local-note">{lang==="ar"?latest.triage.comparisonAr:latest.triage.comparisonEn}</div>}
     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-     <button className="btn primary" disabled={deepVisionBusy} onClick={()=>void runDeepVision(latest)}>{deepVisionBusy?bi(lang,"عم يراجع AI Vision...","AI Vision reviewing..."):bi(lang,"✦ AI Vision رأي ثانٍ","✦ AI Vision second opinion")}</button>
+     <button className="btn primary" disabled={deepVisionBusyId===latest.id} onClick={()=>void runDeepVision(latest)}>{deepVisionBusyId===latest.id?bi(lang,"عم يراجع AI Vision...","AI Vision reviewing..."):bi(lang,"✦ AI Vision رأي ثانٍ","✦ AI Vision second opinion")}</button>
      {latest.livestockId&&<button className="btn" onClick={()=>markVisionWatch(latest)}>{bi(lang,"👁 وضع تحت المراقبة","👁 Mark as watch")}</button>}
      <button className="btn" disabled={Boolean(latest.followUpTaskId)} onClick={()=>createVisionFollowUp(latest)}>{latest.followUpTaskId?bi(lang,"✓ متابعة منشأة","✓ Follow-up created"):bi(lang,"＋ متابعة 12–24 ساعة","＋ 12–24h follow-up")}</button>
      {latest.livestockId&&<button className="btn" disabled={Boolean(latest.quarantineCaseId)} onClick={()=>createVisionQuarantine(latest)}>{latest.quarantineCaseId?bi(lang,"✓ حالة حجر منشأة","✓ Quarantine case created"):bi(lang,"＋ متابعة/حجر مرتبط","＋ Linked quarantine/follow-up")}</button>}
@@ -236,6 +236,25 @@ export function JournalPage({tank}:{tank:Tank}) {
  <div className="card panel full-span"><div className="module-head"><div><h3>{bi(lang,"Frag / Growth Tracker","Frag / Growth Tracker")}</h3><p className="note">{bi(lang,"ثبّت الزاوية والإضاءة والمسافة قدر الإمكان حتى تكون المقارنة الزمنية أصدق.","Keep angle, lighting and distance as consistent as possible for better time-series comparison.")}</p></div></div><div className="journal-add" style={{flexWrap:"wrap"}}><label className="field grow"><span>{tr(lang,"photoCaption")}</span><input value={caption} onChange={e=>setCaption(e.target.value)}/></label><label className="field"><span>{bi(lang,"الكائن المتابع","Tracked organism")}</span><select value={livestockId} onChange={e=>setLivestockId(e.target.value)}><option value="">—</option>{trackedLivestock.map(x=><option key={x.id} value={x.id}>{lang==="ar"?x.name:(x.nameEn||x.name)}</option>)}</select></label><label className="field"><span>{bi(lang,"الحجم التقديري cm","Estimated size cm")}</span><input type="number" min="0" step=".1" value={sizeCm||""} onChange={e=>setSizeCm(Number(e.target.value))}/></label><label className="btn primary file-button">{tr(lang,"addPhoto")}<input type="file" accept="image/*" capture="environment" onChange={e=>void add(e.target.files?.[0])}/></label></div><div className="inline-alert info" style={{marginTop:12}}>{bi(lang,"صور النمو تنضغط محلياً لتقليل التخزين. النمو يعتمد على الحجم المدخل، بينما اللون والوضوح مؤشرات مقارنة من الصورة وليست segmentation أو قياساً مخبرياً.","Growth photos are compressed locally to reduce storage. Growth uses entered size, while color/clarity are comparative image signals, not segmentation or laboratory measurements.")}</div></div>
 
  {livestockId&&<div className="card panel full-span"><div className="module-head"><h3>{bi(lang,"سجل التطور الزمني","Growth Timeline")}</h3><span className="scene-badge">{growth?.count??0} {bi(lang,"صور","photos")}</span></div>{growth&&growth.count>=2?<><div className="summary-strip"><div className="summary"><small>{bi(lang,"النمو منذ أول صورة","Growth since first photo")}</small><b>{growth.growthPct===null?"—":`${growth.growthPct>=0?"+":""}${growth.growthPct.toFixed(1)}%`}</b></div><div className="summary"><small>{bi(lang,"معدل تقريبي / 30 يوم","Approx / 30d")}</small><b>{growth.monthlyGrowthPct===null?"—":`${growth.monthlyGrowthPct>=0?"+":""}${growth.monthlyGrowthPct.toFixed(1)}%`}</b></div><div className="summary"><small>{bi(lang,"تغير مؤشر اللون","Color-index change")}</small><b>{growth.colorDelta===null?"—":`${growth.colorDelta>=0?"+":""}${growth.colorDelta}`}</b></div><div className="summary"><small>{bi(lang,"اتساق التصوير","Capture consistency")}</small><b>{growth.consistency?.score??"—"}%</b></div></div>{growth.consistency&&<div className="inline-alert info" style={{marginTop:10}}>{lang==="ar"?growth.consistency.noteAr:growth.consistency.noteEn}</div>}</>:<div className="inline-alert info">{bi(lang,"أضف صورتين أو أكثر لنفس الكائن حتى يظهر اتجاه النمو وتغير اللون.","Add at least two photos of the same organism to show growth and color trend.")}</div>}</div>}
+
+ {assessments.length>0&&<div className="card panel full-span">
+  <div className="module-head"><div><h3>{bi(lang,"سجل Visual Insight","Visual Insight history")}</h3><p className="note">{bi(lang,"كل تحليل محفوظ مع الصورة والكائن والنتيجة والإجراءات المرتبطة حتى تقدر تراجع تطور الحالة.","Every assessment stays linked to its photo, organism, result and follow-up actions so you can review progression.")}</p></div><span className="scene-badge">{assessments.length}</span></div>
+  <div className="history-list">{assessments.slice(0,12).map(a=>{const subject=tank.livestock.find(x=>x.id===a.livestockId),photo=photos.find(x=>x.id===a.photoId);return <div className="history-row" key={a.id} style={{alignItems:"flex-start",gap:12}}>
+   {photo&&<img src={photo.dataUrl} alt={photo.caption||"Visual assessment"} style={{width:72,height:72,objectFit:"cover",borderRadius:10,flex:"0 0 auto"}}/>}
+   <div style={{display:"grid",gap:5,flex:1,minWidth:0}}>
+    <b>{subject?(lang==="ar"?subject.name:(subject.nameEn||subject.name)):bi(lang,"الحوض كامل","Whole tank")} • {a.triage.level==="urgent"?bi(lang,"عاجل","Urgent"):a.triage.level==="attention"?bi(lang,"متابعة","Attention"):bi(lang,"مراقبة","Monitor")}</b>
+    <small>{new Date(a.timestamp).toLocaleString()} • {bi(lang,"ثقة","Confidence")} {a.triage.confidenceScore}/100 • Capture {a.metrics.captureScore}/100</small>
+    <span>{lang==="ar"?a.triage.summaryAr:a.triage.summaryEn}</span>
+    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+     <button className="btn" disabled={deepVisionBusyId===a.id} onClick={()=>void runDeepVision(a)}>{deepVisionBusyId===a.id?bi(lang,"عم يراجع...","Reviewing..."):a.external?.status==="completed"?bi(lang,"إعادة الرأي الثاني","Repeat second opinion"):bi(lang,"AI Vision رأي ثانٍ","AI Vision second opinion")}</button>
+     {a.livestockId&&<button className="btn" onClick={()=>markVisionWatch(a)}>{bi(lang,"مراقبة","Watch")}</button>}
+     <button className="btn" disabled={Boolean(a.followUpTaskId)} onClick={()=>createVisionFollowUp(a)}>{a.followUpTaskId?bi(lang,"✓ متابعة","✓ Follow-up"):bi(lang,"＋ متابعة","＋ Follow-up")}</button>
+     {a.livestockId&&<button className="btn" disabled={Boolean(a.quarantineCaseId)} onClick={()=>createVisionQuarantine(a)}>{a.quarantineCaseId?bi(lang,"✓ حجر/متابعة","✓ Quarantine"):bi(lang,"＋ حجر/متابعة","＋ Quarantine")}</button>}
+    </div>
+    {a.external?.status==="completed"&&a.external.text&&<div className="aqua-ai-local-note" style={{whiteSpace:"pre-wrap"}}>{a.external.text}</div>}
+   </div>
+  </div>})}</div>
+ </div>}
 
  <div className="photo-grid full-span">{photos.map(p=>{const subject=tank.livestock.find(x=>x.id===p.livestockId);return <article className="photo-card" key={p.id}><img src={p.dataUrl} alt={p.caption}/><div><b>{p.caption||subject&&(lang==="ar"?subject.name:(subject.nameEn||subject.name))||tr(lang,"journal")}</b><small>{new Date(p.timestamp).toLocaleString()}</small>{subject&&<small>{lang==="ar"?subject.name:(subject.nameEn||subject.name)}{p.estimatedSizeCm?` • ${p.estimatedSizeCm} cm`:""}</small>}<small>{typeof p.colorIndex==="number"?`${bi(lang,"مؤشر اللون","Color index")}: ${p.colorIndex}/100`:""}{typeof p.brightnessIndex==="number"?` • ${bi(lang,"الإضاءة","brightness")}: ${p.brightnessIndex}/100`:""}{typeof p.captureScore==="number"?` • Capture ${p.captureScore}/100`:""}</small></div></article>})}</div>
  </section>;
