@@ -17,6 +17,7 @@ import { systemHealthTrend } from "@/domain/systemHealth";
 import { deriveGuidanceActions } from "@/domain/impactEngine";
 import { deriveIntelligenceEvents } from "@/domain/eventIntelligence";
 import { coralTransferGate } from "@/domain/acclimationSafety";
+import { allowedAcclimationCategories,livestockCategoryFromAcclimation,normalizeAcclimationCategory } from "@/domain/acclimationCategories";
 import { correctiveDosingInventory,inventoryForConsumer,inventoryProfile,routineDosingInventory } from "@/domain/inventoryIntelligence";
 
 const tank=structuredClone(demoMarineTank);
@@ -238,6 +239,26 @@ describe("Inventory data-integrity regression",()=>{
   it("classifies phosphate remover as filter media rather than fertilizer",()=>{
     const profile=inventoryProfile({id:"po4",name:"Phosphate Remover",quantity:100,unit:"g",minimum:10});
     expect(profile.category).toBe("filter_media");
+  });
+});
+
+
+describe("Tank-aware acclimation categories",()=>{
+  it("never exposes freshwater plants as a marine acclimation category",()=>{
+    expect(allowedAcclimationCategories("marine")).toEqual(["fish","invert","coral","macroalgae"]);
+    expect(allowedAcclimationCategories("freshwater")).toEqual(["fish","invert","plant"]);
+  });
+  it("maps known marine library plants to macroalgae but rejects arbitrary marine plants",()=>{
+    expect(normalizeAcclimationCategory("marine","plant","plant")).toBe("macroalgae");
+    expect(normalizeAcclimationCategory("marine","plant","")).toBeNull();
+    expect(normalizeAcclimationCategory("marine","macroalgae","")).toBe("macroalgae");
+  });
+  it("rejects coral and macroalgae in freshwater acclimation",()=>{
+    expect(normalizeAcclimationCategory("freshwater","coral","coral")).toBeNull();
+    expect(normalizeAcclimationCategory("freshwater","macroalgae","")).toBeNull();
+  });
+  it("preserves macroalgae identity after transfer to livestock",()=>{
+    expect(livestockCategoryFromAcclimation("macroalgae")).toEqual({category:"plant",subtype:"macroalgae"});
   });
 });
 
