@@ -534,6 +534,16 @@ export interface PlantCareLog {
   notes?: string;
 }
 
+export interface BiologicalCycleState {
+  startedAt: string;
+  sourceAddedAt?: string;
+  bacteriaSeededAt?: string;
+  method?: "fishless" | "seeded_media" | "bottled_bacteria" | "other";
+  completedAt?: string;
+  completionReadingTimestamps?: string[];
+  notes?: string;
+}
+
 export interface AcclimationItem {
   id: string;
   libraryId?: string;
@@ -668,6 +678,7 @@ export interface Tank {
   rodi: RODILog[];
   rodiServiceEvents?: RODIServiceEvent[];
   plantCare?: PlantCareLog[];
+  biologicalCycle?: BiologicalCycleState;
   acclimationSessions?: AcclimationSession[];
   createdAt: string;
 }
