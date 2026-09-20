@@ -36,7 +36,7 @@ export function MaintenancePage({tank}:{tank:Tank}) {
   if(task?.sourceDomain==="dosing"&&task.sourceId?.startsWith("dose-step:")){
     const parts=task.sourceId.split(":"),doseId=parts[1],step=Number(parts[2]);
     const dose=tank.dosing.find(x=>x.id===doseId);
-    if(!dose||!totalSteps||!perStep||!Number.isFinite(step)){window.alert(bi(lang,"تعذر ربط مهمة الجرعة بخطة الجرعات. افتح صفحة الجرعات وراجع الخطة.","This dose task is no longer linked correctly. Open Dosing and review the plan."));return}
+    if(!dose||!dose.steps||!dose.perStep||!Number.isFinite(step)){window.alert(bi(lang,"تعذر ربط مهمة الجرعة بخطة الجرعات. افتح صفحة الجرعات وراجع الخطة.","This dose task is no longer linked correctly. Open Dosing and review the plan."));return}
     const totalSteps=dose.steps,perStep=dose.perStep;
     const expected=(dose.stepIndex??0)+1;
     if(step!==expected){window.alert(bi(lang,`يجب تنفيذ الجرعات بالترتيب. الخطوة التالية المطلوبة هي ${expected}.`,`Dose steps must be executed in order. The next required step is ${expected}.`));return}
