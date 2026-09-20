@@ -49,3 +49,34 @@ export function validatePercent(value:number,field="percent"){
   if(!finite(value)||value<0||value>100)return{ok:false,issue:{field,level:"danger" as const,ar:"النسبة يجب أن تكون بين 0 و100.",en:"Percentage must be between 0 and 100."}};
   return{ok:true as const};
 }
+
+
+export function validateTankSetupEntry(input:{
+  length:number;width:number;height:number;displacementPercent:number;ageMonths:number;
+  sumpEnabled:boolean;sumpLength:number;sumpWidth:number;sumpHeight:number;sumpFillPercent:number;
+}){
+  const issues:InputSanityIssue[]=[];
+  const add=(x:InputSanityIssue|undefined)=>{if(x)issues.push(x)};
+  add(range("length",input.length,1,2000,"طول الحوض","Tank length"));
+  add(range("width",input.width,1,1000,"عرض الحوض","Tank width"));
+  add(range("height",input.height,1,1000,"ارتفاع الحوض","Tank height"));
+  add(range("displacementPercent",input.displacementPercent,0,90,"نسبة الإزاحة","Displacement percent"));
+  add(range("ageMonths",input.ageMonths,0,1200,"عمر الحوض","Tank age"));
+  if(input.sumpEnabled){
+    add(range("sumpLength",input.sumpLength,1,2000,"طول السامب","Sump length"));
+    add(range("sumpWidth",input.sumpWidth,1,1000,"عرض السامب","Sump width"));
+    add(range("sumpHeight",input.sumpHeight,1,1000,"ارتفاع السامب","Sump height"));
+    add(range("sumpFillPercent",input.sumpFillPercent,1,100,"نسبة تعبئة السامب","Sump fill percent"));
+  }
+  return{ok:!issues.some(x=>x.level==="danger"),issues};
+}
+
+export function sanitizeSumpDimension(value:number,fallback:number,max=2000){
+  return finite(value)?Math.max(1,Math.min(max,value)):Math.max(1,fallback);
+}
+export function sanitizeSumpFill(value:number,fallback:number){
+  return finite(value)?Math.max(1,Math.min(100,value)):Math.max(1,Math.min(100,fallback));
+}
+export function sanitizeNonNegative(value:number,fallback=0,max=1_000_000){
+  return finite(value)?Math.max(0,Math.min(max,value)):Math.max(0,fallback);
+}
