@@ -25,7 +25,14 @@ export function DosingPage({tank}:{tank:Tank}) {
  const routineItem=routineStock.find(x=>x.id===routineItemId);
  useEffect(()=>{if(inventoryItemId&&!correctiveStock.some(x=>x.id===inventoryItemId))setInventoryItemId("");},[inventoryItemId,correctiveStock]);
  const current=sample?.value,readingAgeHours=sample?Math.max(0,(Date.now()-new Date(sample.timestamp).getTime())/3600000):99999,currentIssue=current===undefined?undefined:validateChemistryValue(tank,param,current),dataIssue=guide.dataIssues.find(x=>x.key===param),targetCheck=useMemo(()=>validateDosingTarget(tank,param,target),[tank,param,target]);
- const dosingReady=current!==undefined&&readingAgeHours<=48&&sample?.confidence!=="low"&&!currentIssue&&!dataIssue&&!targetCheck.blocked;
+ const latestCorrectiveExecution=useMemo(()=>tank.dosing
+  .filter(x=>x.parameter===param&&x.calculatorMode!=="routine"&&x.status!=="planned")
+  .map(x=>({log:x,at:new Date(x.lastExecutedAt||x.timestamp).getTime()}))
+  .filter(x=>Number.isFinite(x.at))
+  .sort((a,b)=>b.at-a.at)[0],[tank.dosing,param]);
+ const sampleTime=sample?new Date(sample.timestamp).getTime():0;
+ const needsPostDoseRetest=Boolean(sample&&latestCorrectiveExecution&&latestCorrectiveExecution.at>=sampleTime);
+ const dosingReady=current!==undefined&&readingAgeHours<=48&&sample?.confidence!=="low"&&!currentIssue&&!dataIssue&&!needsPostDoseRetest&&!targetCheck.blocked;
  const calc=useMemo(()=>calculateDose({parameter:param,current:current??Number.NaN,target,volumeLiters:tank.systemVolumeLiters,form,presetId:chosen?.id,purityPercent:purity,stockGramsPerLiter,productRaisePerMlPer100L:productRaise}),[param,current,target,tank.systemVolumeLiters,form,chosen?.id,purity,stockGramsPerLiter,productRaise]);
  function setCount(n:number){patch(tank.id,t=>{const channels=[...t.doserChannels];while(channels.length<n)channels.push({id:uid("dc"),name:`Channel ${channels.length+1}`,material:"",capacityMl:1000,currentMl:1000,consumption:0,period:"daily",color:colors[channels.length%colors.length]});return {...t,doserChannels:channels.slice(0,n)};});}
  function updateChannel(id:string,p:Partial<DoserChannel>){patch(tank.id,t=>({...t,doserChannels:t.doserChannels.map(x=>x.id===id?{...x,...p}:x)}))}
@@ -46,7 +53,7 @@ export function DosingPage({tank}:{tank:Tank}) {
    const linked=t.inventory.find(x=>x.id===inventoryItemId);
    const consume=linked&&calc.steps===1?calc.amount:0;
    const channels=calc.steps===1&&calc.unit==="mL"?t.doserChannels.map(ch=>ch.material.trim().toLowerCase()===material.trim().toLowerCase()?{...ch,currentMl:Math.max(0,ch.currentMl-calc.amount)}:ch):t.doserChannels;
-   const dose:DosingLog={id:doseId,timestamp:ts,parameter:param,current,target,ml:calc.unit==="mL"?calc.amount:0,amount:calc.amount,unit:calc.unit,material,calculatorMode:form,steps:calc.steps,perStep:calc.perStep,stepIndex:calc.steps>1?0:1,status:calc.steps>1?"planned":"logged",sourceReadingTimestamp:sample?.timestamp,inventoryItemId:linked?.id,verifyAfter:new Date(Date.now()+24*3600000).toISOString()};
+   const dose:DosingLog={id:doseId,timestamp:ts,parameter:param,current,target,ml:calc.unit==="mL"?calc.amount:0,amount:calc.amount,unit:calc.unit,material,calculatorMode:form,steps:calc.steps,perStep:calc.perStep,stepIndex:calc.steps>1?0:1,status:calc.steps>1?"planned":"logged",sourceReadingTimestamp:sample?.timestamp,systemVolumeLiters:t.systemVolumeLiters,lastExecutedAt:calc.steps===1?ts:undefined,inventoryItemId:linked?.id,verifyAfter:new Date(Date.now()+24*3600000).toISOString()};
    const amountText=`${calc.amount.toFixed(calc.unit==="g"?2:1)} ${calc.unit}`,perStepText=`${calc.perStep.toFixed(calc.unit==="g"?2:1)} ${calc.unit}`;
    const stepTasks=calc.steps>1?Array.from({length:calc.steps},(_,i)=>({id:uid("task"),title:`جرعة ${param} ${i+1}/${calc.steps}: ${perStepText}`,titleEn:`${param} dose ${i+1}/${calc.steps}: ${perStepText}`,cadence:"once" as const,done:false,nextDue:datePlusDays(i),manual:true,sourceDomain:"dosing" as const,sourceId:`dose-step:${doseId}:${i+1}`})):[];
    const retestTasks=Array.from({length:calc.steps},(_,i)=>({id:uid("task"),title:`إعادة قياس ${param} بعد الجرعة ${i+1}/${calc.steps}`,titleEn:`Retest ${param} after dose ${i+1}/${calc.steps}`,cadence:"once" as const,done:false,nextDue:datePlusDays(i+1),manual:true,sourceDomain:"dosing" as const,sourceId:`dose-retest:${doseId}:${i+1}`}));
@@ -67,7 +74,7 @@ export function DosingPage({tank}:{tank:Tank}) {
   const profile=inventoryProfile(item),ts=nowISO(),material=lang==="ar"?item.name:(item.nameEn||item.name);
   patch(tank.id,t=>({...t,
    inventory:t.inventory.map(x=>x.id===item.id?{...x,quantity:Math.max(0,x.quantity-q)}:x),
-   dosing:[{id:uid("dose"),timestamp:ts,parameter:profile.subcategory==="balanced_reef"?"Balanced Reef":"Supplement",ml:item.unit.toLowerCase()==="ml"?q:0,amount:q,unit:item.unit,material,inventoryItemId:item.id,calculatorMode:"routine",steps:1,perStep:q,stepIndex:1,status:"logged"},...t.dosing],
+   dosing:[{id:uid("dose"),timestamp:ts,parameter:profile.subcategory==="balanced_reef"?"Balanced Reef":"Supplement",ml:item.unit.toLowerCase()==="ml"?q:0,amount:q,unit:item.unit,material,inventoryItemId:item.id,calculatorMode:"routine",steps:1,perStep:q,stepIndex:1,status:"logged",systemVolumeLiters:t.systemVolumeLiters,lastExecutedAt:ts},...t.dosing],
    timeline:[{id:uid("ev"),timestamp:ts,type:"dosing",textAr:`تم تسجيل جرعة روتينية من ${item.name}: ${q} ${item.unit} • المتبقي ${Math.max(0,item.quantity-q)} ${item.unit}.`,textEn:`Routine dose logged for ${item.nameEn||item.name}: ${q} ${item.unit} • remaining ${Math.max(0,item.quantity-q)} ${item.unit}.`},...t.timeline]
   }));
   setRoutineAmount("");
@@ -81,6 +88,8 @@ export function DosingPage({tank}:{tank:Tank}) {
    ?(lang==="ar"?"ثقة القراءة منخفضة. أعد القياس قبل الجرعة.":"Reading confidence is low. Retest before dosing.")
    :currentIssue?(lang==="ar"?currentIssue.ar:currentIssue.en)
    :dataIssue?(lang==="ar"?dataIssue.reasonAr:dataIssue.reasonEn)
+   :needsPostDoseRetest
+    ?(lang==="ar"?`تم تنفيذ جرعة ${param} بعد آخر قراءة مسجلة. أعد قياس ${param} قبل أي تصحيح جديد؛ ما رح يعتمد Aqua Nexus على نفس القراءة مرتين.`:`A ${param} dose was executed after the latest recorded reading. Retest ${param} before any new correction; Aqua Nexus will not reuse the same reading twice.`)
    :readingAgeHours>48
     ?(lang==="ar"?`قراءة ${param} أقدم من 48 ساعة. أعد القياس قبل أي جرعة.`:`${param} reading is older than 48 hours. Retest before dosing.`)
     :targetCheck.blocked?(lang==="ar"?targetCheck.ar:targetCheck.en)
