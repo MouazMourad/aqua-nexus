@@ -3,6 +3,7 @@ import { chemistryGuidance } from "./chemistryGuidance";
 import { systemHealth } from "./systemHealth";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
 import { biologicalCycleAlert,biologicalCycleStatus } from "./biologicalCycle";
+import { interventionDensityAlert } from "./interventionSafety";
 
 export type SystemAlertLevel="info"|"warn"|"danger";
 
@@ -82,6 +83,9 @@ export function systemAlerts(tank:Tank):SystemAlert[]{
 
   const activeAcc=(tank.acclimationSessions??[]).find(x=>x.status!=="completed");
   if(activeAcc)pushUnique(out,{id:`acc-${activeAcc.id}`,level:"info",domain:"acclimation",ar:"هناك جلسة إقلمة نشطة حالياً.",en:"An acclimation session is currently active.",actionPage:"acclimation"});
+
+  const density=interventionDensityAlert(tank);
+  if(density)pushUnique(out,{id:"intervention-density",level:density.level,domain:"system",ar:density.ar,en:density.en,actionPage:"dashboard"});
 
   if(system.score<60)pushUnique(out,{id:"system-critical",level:"danger",domain:"system",ar:`صحة النظام الكلية ${system.score}% وتحتاج تدخل منظم حسب أعلى التنبيهات.`,en:`Overall system health is ${system.score}% and needs structured action based on the highest-priority alerts.`});
   else if(system.score<80)pushUnique(out,{id:"system-watch",level:"warn",domain:"system",ar:`صحة النظام الكلية ${system.score}% وتحتاج متابعة.`,en:`Overall system health is ${system.score}% and needs attention.`});
