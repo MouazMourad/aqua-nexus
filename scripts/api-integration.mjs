@@ -55,10 +55,17 @@ try{
     throw new Error("Lighting import route did not fail closed without a configured AI provider "+JSON.stringify(lightingVision.body));
   }
 
+  const equipmentVision=await json("/api/ai/equipment-import",{method:"POST",headers,body:JSON.stringify({
+    tank:tank("Equipment Vision CI"),sourceKind:"image",vendor:"generic",fileName:"equipment.png",fileType:"image/png",imageDataUrl:tinyPng,language:"en"
+  })});
+  if(equipmentVision.r.status!==503||!String(equipmentVision.body?.error||"").toLowerCase().includes("provider")){
+    throw new Error("Equipment import route did not fail closed without a configured AI provider "+JSON.stringify(equipmentVision.body));
+  }
+
   x=await json("/api/tanks/ci-tank?expectedVersion=2",{method:"DELETE",headers});
   if(!x.r.ok||x.body.deleted!==true)throw new Error("Versioned delete failed "+JSON.stringify(x.body));
 
-  console.log("Backend integration: health, migrations, workspace isolation, optimistic versioning and lighting-import guard OK");
+  console.log("Backend integration: health, migrations, workspace isolation, optimistic versioning and lighting/equipment import guards OK");
 }finally{
   if(server.exitCode===null){
     server.kill("SIGTERM");
