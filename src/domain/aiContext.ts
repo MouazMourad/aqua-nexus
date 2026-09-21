@@ -17,6 +17,7 @@ import { systemAlerts } from "./alertEngine";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
 import { biologicalCycleStatus } from "./biologicalCycle";
 import { biologicalCycleKnowledgeSnapshot } from "./biologicalCycleKnowledge";
+import { equipmentImportIntelligence } from "./equipmentImport";
 
 export interface TankAIContext {
   schema:"aqua-nexus-ai-context/v1";
@@ -31,7 +32,7 @@ export interface TankAIContext {
   learning:{maturity:ReturnType<typeof tankLearningMaturity>;baselines:ReturnType<typeof tankBaselines>;signals:ReturnType<typeof learnedTankSignals>;predictions:ReturnType<typeof proactivePredictions>;repeatedPatterns:ReturnType<typeof repeatedResponsePatterns>;memory:ReturnType<typeof biologicalMemory>;eventLinks:ReturnType<typeof eventChemistryLinks>};
   nutrients:ReturnType<typeof analyzeNutrients>;
   maintenance:{due:Array<{id:string;title:string;titleEn?:string;nextDue?:string}>;total:number};
-  equipment:{warnings:Array<{id:string;name:string;kind:string;status:string}>;energy:{dailyKwh:number;monthlyKwh:number;monthlyCost:number;configured:number;currency:string};media:ReturnType<typeof mediaPredictions>};
+  equipment:{warnings:Array<{id:string;name:string;kind:string;status:string}>;energy:{dailyKwh:number;monthlyKwh:number;monthlyCost:number;configured:number;currency:string};media:ReturnType<typeof mediaPredictions>;deviceData:ReturnType<typeof equipmentImportIntelligence>};
   livestock:{total:number;watch:number;treatment:number};
   care:{activeQuarantine:number;activeEmergency:number;recentFeedings:number;recentWaterChanges:number;recentDoses:number};
   recentEvents:Array<{timestamp:string;type:string;textAr:string;textEn:string}>;
@@ -42,6 +43,7 @@ const DAY=86400000;
 export function buildTankAIContext(tank:Tank):TankAIContext{
   const today=new Date().toISOString().slice(0,10),now=Date.now();
   const state=tankStateView(tank),forecast=tankForecast(tank),mood=tankMood(tank),energy=tankEnergy(tank);
+  const deviceData=equipmentImportIntelligence(tank);
   const system=systemHealth(tank),cycle=biologicalCycleStatus(tank),cycleKnowledge=biologicalCycleKnowledgeSnapshot(tank);
   const due=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).due).slice(0,12).map(x=>({id:x.id,title:x.title,titleEn:x.titleEn,nextDue:x.nextDue}));
   const within=(timestamp:string,days:number)=>{const t=new Date(timestamp).getTime();return Number.isFinite(t)&&now-t<=days*DAY;};
@@ -59,7 +61,7 @@ export function buildTankAIContext(tank:Tank):TankAIContext{
     learning:{maturity:tankLearningMaturity(tank),baselines:tankBaselines(tank),signals:learnedTankSignals(tank),predictions:proactivePredictions(tank),repeatedPatterns:repeatedResponsePatterns(tank),memory:biologicalMemory(tank),eventLinks:eventChemistryLinks(tank)},
     nutrients:analyzeNutrients(tank),
     maintenance:{due,total:tank.maintenance.length},
-    equipment:{warnings:tank.equipment.filter(x=>x.status==="warning"||x.status==="service").map(x=>({id:x.id,name:x.name,kind:x.kind,status:x.status})),energy:{dailyKwh:energy.dailyKwh,monthlyKwh:energy.monthlyKwh,monthlyCost:energy.monthlyCost,configured:energy.configured,currency:tank.energySettings?.currency||""},media:mediaPredictions(tank)},
+    equipment:{warnings:tank.equipment.filter(x=>x.status==="warning"||x.status==="service").map(x=>({id:x.id,name:x.name,kind:x.kind,status:x.status})),energy:{dailyKwh:energy.dailyKwh,monthlyKwh:energy.monthlyKwh,monthlyCost:energy.monthlyCost,configured:energy.configured,currency:tank.energySettings?.currency||""},media:mediaPredictions(tank),deviceData},
     livestock:{total:tank.livestock.reduce((s,x)=>s+x.quantity,0),watch:tank.livestock.filter(x=>x.health==="watch").length,treatment:tank.livestock.filter(x=>x.health==="treatment").length},
     care:{activeQuarantine:tank.quarantine.filter(x=>x.status==="active").length,activeEmergency:(tank.emergencySessions??[]).filter(x=>x.status==="active").length,recentFeedings:tank.feeding.filter(x=>within(x.timestamp,7)).length,recentWaterChanges:tank.waterChanges.filter(x=>within(x.timestamp,30)).length,recentDoses:tank.dosing.filter(x=>within(x.timestamp,7)).length},
     recentEvents:tank.timeline.slice(0,20).map(x=>({timestamp:x.timestamp,type:x.type,textAr:x.textAr,textEn:x.textEn})),
