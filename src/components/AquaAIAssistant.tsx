@@ -20,7 +20,7 @@ function FishMascot({state}:{state:"normal"|"alert"|"critical"}){
 type InsightView={id:string;labelAr:string;labelEn:string;promptAr:string;promptEn:string};
 
 export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;onNavigate?:(page:AppPage)=>void}){
- const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
+ const lang=useAquaStore(s=>s.language),experience=useAquaStore(s=>s.aquariumExperience),patch=useAquaStore(s=>s.patchTank);
  const [open,setOpen]=useState(false),[selected,setSelected]=useState<string|null>(null),[question,setQuestion]=useState(""),[askedQuestion,setAskedQuestion]=useState(""),[resolvedQuestion,setResolvedQuestion]=useState(""),[conversationContext,setConversationContext]=useState(""),[conversationHistory,setConversationHistory]=useState<AquaConversationTurn[]>([]),[stage,setStage]=useState(0),[scopeBlocked,setScopeBlocked]=useState(false),[greeting,setGreeting]=useState(false),[planNote,setPlanNote]=useState("");
  const [deepAI,setDeepAI]=useState<{status:"idle"|"loading"|"external"|"local"|"error";text?:string;provider?:string;model?:string}>({status:"idle"});
  const deepRequestRef=useRef(0);
