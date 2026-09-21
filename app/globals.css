@@ -2234,3 +2234,56 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .input-like{min-height:39px;display:flex;align-items:center;padding:7px 9px;border:1px solid rgba(101,202,225,.16);border-radius:9px;background:rgba(1,16,24,.72)}
 @media(max-width:850px){.lighting-map-pair,.lighting-brain-grid{grid-template-columns:1fr}.lighting-channel-row{grid-template-columns:auto 1fr 1fr}.lighting-channel-row .field.mini{grid-column:2/4}}
 @media(max-width:650px){.lighting-controls{grid-template-columns:1fr}.lighting-channel-row{grid-template-columns:1fr 1fr}.lighting-channel-row .checkbox-row{grid-column:1/-1}.lighting-channel-row .field.mini{grid-column:auto}.lighting-heat-cell span{font-size:7px}}
+
+
+/* Lighting Intelligence v2 — mobile-safe and interactive */
+.lighting-page,.lighting-page>*{min-width:0;max-width:100%}
+.lighting-page .card,.lighting-page .panel,.lighting-page .full-span{min-width:0;max-width:100%}
+.lighting-page .module-head{min-width:0;align-items:flex-start;flex-wrap:wrap}
+.lighting-page .module-head>div{min-width:0;max-width:100%}
+.lighting-page .module-head h3,.lighting-page .module-head p,.lighting-page .inline-alert,.lighting-page .note{overflow-wrap:anywhere}
+.lighting-page-actions,.lighting-head-badges,.lighting-demo-toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.lighting-demo-toolbar{margin:2px 0 10px}
+.lighting-demo-clock{margin-inline-start:auto;min-width:68px;text-align:center;font-size:16px;font-weight:800;letter-spacing:.06em;padding:7px 10px;border:1px solid var(--light-border);border-radius:10px;background:rgba(3,20,30,.72)}
+.lighting-page input[type="range"]{display:block;width:100%;max-width:100%;min-width:0}
+.lighting-time-field{grid-column:1/-1}
+.lighting-page .summary-strip{grid-template-columns:repeat(5,minmax(0,1fr));min-width:0}
+.lighting-page .summary{min-width:0}
+.lighting-page .summary b{overflow-wrap:anywhere}
+.lighting-placement-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:9px}
+.lighting-placement-card{display:grid;gap:7px;padding:12px;border:1px solid var(--light-border);border-radius:14px;background:rgba(255,255,255,.018)}
+.lighting-placement-card>div{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.lighting-placement-card span{font-size:8px;padding:4px 7px;border-radius:999px;background:rgba(82,193,230,.1);color:#bdeef8}
+.lighting-placement-card strong{font-size:16px}.lighting-placement-card p{margin:0;color:var(--muted);font-size:9px;line-height:1.55}
+.lighting-placement-card.zone-top{border-color:rgba(255,184,94,.28)}.lighting-placement-card.zone-mid{border-color:rgba(88,207,232,.24)}.lighting-placement-card.zone-bottom,.lighting-placement-card.zone-shade{border-color:rgba(132,149,255,.22)}
+.lighting-import-panel .history-row{min-width:0}.lighting-import-panel .history-row>div{min-width:0}.lighting-import-panel .history-row b,.lighting-import-panel .history-row small{overflow-wrap:anywhere}
+.lighting-required-field{border:1px solid rgba(255,184,94,.2);padding:8px;border-radius:11px;background:rgba(255,184,94,.035)}
+.lighting-required-field>span::before{content:"●";font-size:6px;color:#ffbe69;margin-inline-end:5px}
+.lighting-points-wrap{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}
+.lighting-points-table{width:max-content;min-width:680px}
+.lighting-channel-editor,.lighting-fixtures,.lighting-brain-grid,.lighting-map-pair{min-width:0}
+.lighting-3d-wrap{width:100%;max-width:100%}
+
+@media(max-width:720px){
+ .lighting-page{grid-template-columns:minmax(0,1fr)!important;gap:10px;overflow-x:hidden}
+ .lighting-page .page-header{align-items:flex-start;flex-direction:column}
+ .lighting-page-actions{width:100%}.lighting-page-actions .btn{flex:1 1 120px}
+ .lighting-page .summary-strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+ .lighting-page .summary{padding:10px;border-radius:13px}
+ .lighting-page .summary small{font-size:8px}.lighting-page .summary b{font-size:16px}
+ .lighting-controls{grid-template-columns:minmax(0,1fr)!important;gap:9px}
+ .lighting-time-field{grid-column:auto}
+ .lighting-demo-toolbar{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+ .lighting-demo-toolbar .btn:first-child{grid-column:1/-1}
+ .lighting-demo-clock{margin:0;grid-column:1/-1;width:100%;box-sizing:border-box}
+ .lighting-map-pair,.lighting-brain-grid{grid-template-columns:minmax(0,1fr)!important}
+ .lighting-placement-grid{grid-template-columns:minmax(0,1fr)}
+ .lighting-channel-row{grid-template-columns:minmax(0,1fr)!important;align-items:stretch}
+ .lighting-channel-row>*{min-width:0;width:100%}
+ .lighting-channel-row .checkbox-row,.lighting-channel-row .field.mini{grid-column:auto!important}
+ .lighting-fixture-card .form-grid,.lighting-import-panel .form-grid{grid-template-columns:minmax(0,1fr)!important}
+ .lighting-heat-grid{min-width:0}
+ .lighting-heat-cell span{font-size:6px}
+ .lighting-page .history-row{grid-template-columns:minmax(0,1fr) auto;min-width:0}
+ .lighting-page .history-row small{display:block;max-width:100%;word-break:break-word}
+}
