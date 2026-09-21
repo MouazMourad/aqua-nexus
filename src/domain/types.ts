@@ -542,6 +542,40 @@ export interface PlantCareLog {
   notes?: string;
 }
 
+
+export interface TankVacationPeriod {
+  id:string;
+  startedAt:string;
+  plannedEndAt?:string;
+  endedAt?:string;
+  notes?:string;
+}
+
+export interface TankRelocationEvent {
+  id:string;
+  startedAt:string;
+  completedAt?:string;
+  status:"planned"|"in_progress"|"completed";
+  from?:string;
+  to?:string;
+  notes?:string;
+}
+
+export interface TankRestartEvent {
+  id:string;
+  timestamp:string;
+  reason?:string;
+  notes?:string;
+}
+
+export interface TankLifecycleState {
+  vacations?:TankVacationPeriod[];
+  relocations?:TankRelocationEvent[];
+  restarts?:TankRestartEvent[];
+  archivedAt?:string;
+  archiveReason?:string;
+}
+
 export interface BiologicalCycleState {
   startedAt: string;
   sourceAddedAt?: string;
@@ -687,6 +721,7 @@ export interface Tank {
   rodiServiceEvents?: RODIServiceEvent[];
   plantCare?: PlantCareLog[];
   biologicalCycle?: BiologicalCycleState;
+  lifecycle?: TankLifecycleState;
   acclimationSessions?: AcclimationSession[];
   createdAt: string;
 }
