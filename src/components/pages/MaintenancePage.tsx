@@ -11,6 +11,7 @@ import { completeMaintenanceTask,maintenanceEffectiveState } from "@/domain/main
 import { biologicalCycleStatus,cycleRelevantMaintenanceTask } from "@/domain/biologicalCycle";
 import { BiologicalCyclePanel } from "@/components/cycle/BiologicalCyclePanel";
 import { validateAbsencePlan } from "@/domain/inputSanity";
+import { buildVacationTaskDrafts } from "@/domain/vacationPlan";
 
 const cadences:MaintenanceTask["cadence"][]=["daily","weekly","monthly","quarterly","semiannual","annual"];
 
@@ -77,28 +78,17 @@ export function MaintenancePage({tank}:{tank:Tank}) {
   if(cycle.active)return;
   const sanity=validateAbsencePlan({daysAway});
   if(!sanity.ok){window.alert(lang==="ar"?sanity.issues[0]?.ar:sanity.issues[0]?.en);return}
-  const span=Math.round(daysAway);
-  const who=caretaker.trim();
-  const prefix="[TRAVEL]";
-  const preDate=addDateDays(departure,-1);
-  const generated:MaintenanceTask[]=[];
-  const addTask=(ar:string,en:string,due:string)=>generated.push({id:uid("travel"),title:`${prefix} ${ar}`,titleEn:`${prefix} ${en}`,cadence:"once",done:false,nextDue:due,manual:true});
-  addTask("فحص كيمياء كامل وتسجيل القيم الأساسية قبل السفر","Run a full chemistry test and save baseline values before travel",preDate);
-  addTask("فحص مضخة الرجوع والسخان والويف ميكر والـATO والتأكد من عدم وجود إنذارات","Inspect return pump, heater, wave makers and ATO; confirm there are no warnings",preDate);
-  addTask("تعبئة خزان ATO وخزانات الدوزر وتجهيز حصص الطعام بدون زيادة","Refill ATO/doser reservoirs and prepare pre-portioned food without overfeeding",preDate);
-  if(tank.type==="marine")addTask("تأكد من الملوحة وثبات حرارة ماء التعويض وعدم ترك خلطات غير موثقة","Confirm salinity and top-off setup; do not leave undocumented mixes",preDate);
-  const interval=span<=14?1:2;
-  for(let d=0;d<span;d+=interval){
-    const due=addDateDays(departure,d);
-    const day=d+1;
-    addTask(`سفر يوم ${day}: نظرة بصرية على الكائنات + الحرارة + مستوى الماء + عمل المضخات${who?` — المسؤول: ${who}`:""}`,`Travel day ${day}: visual livestock check + temperature + water level + pump operation${who?` — caretaker: ${who}`:""}`,due);
-    if(d%7===6||day===span)addTask(`سفر يوم ${day}: مراجعة التنبيهات وعدم تعديل الجرعات أو المعدات بدون سبب واضح`,`Travel day ${day}: review alerts; avoid changing dosing or equipment without a clear reason`,due);
-  }
-  if(span>=7)addTask("فحص كيمياء مختصر أثناء الغياب إذا كان الشخص المسؤول قادر عليه","Run a limited chemistry check during absence if the caretaker can do it safely",addDateDays(departure,Math.min(7,span-1)));
-  addTask("بعد العودة: فحص كيمياء كامل ومقارنة الحالة مع خط الأساس قبل السفر","After return: run a full chemistry test and compare with the pre-travel baseline",addDateDays(departure,span));
+  const span=Math.round(daysAway),who=caretaker.trim(),ts=nowISO();
+  const drafts=buildVacationTaskDrafts({departure,daysAway:span,caretaker:who,tankType:tank.type});
+  const generated:MaintenanceTask[]=drafts.map(x=>({...x,id:uid("travel")}));
   patch(tank.id,t=>{
-    const keep=t.maintenance.filter(x=>!x.title.startsWith(prefix)&&!(x.titleEn||"").startsWith(prefix));
-    return {...t,maintenance:[...generated,...keep],timeline:[{id:uid("ev"),timestamp:nowISO(),type:"travel",textAr:`تم إنشاء خطة غياب لمدة ${span} يوم تبدأ ${departure}${who?` والمسؤول ${who}`:""}.`,textEn:`A ${span}-day travel plan was generated starting ${departure}${who?` with ${who} as caretaker`:""}.`},...t.timeline]};
+    const keep=t.maintenance.filter(x=>!x.title.startsWith("[TRAVEL]")&&!(x.titleEn||"").startsWith("[TRAVEL]"));
+    const activeVacation=[...(t.lifecycle?.vacations??[])].reverse().find(x=>!x.endedAt);
+    const plannedEndAt=addDateDays(departure,span);
+    const vacations=activeVacation
+      ?(t.lifecycle?.vacations??[]).map(x=>x.id===activeVacation.id?{...x,plannedEndAt,notes:who?`Caretaker: ${who}`:x.notes}:x)
+      :[...(t.lifecycle?.vacations??[]),{id:uid("vac"),startedAt:ts,plannedEndAt,notes:who?`Caretaker: ${who}`:undefined}];
+    return {...t,maintenance:[...generated,...keep],lifecycle:{...(t.lifecycle??{}),vacations},timeline:[{id:uid("ev"),timestamp:ts,type:"travel",textAr:`تم إنشاء خطة غياب لمدة ${span} يوم تبدأ ${departure}${who?` والمسؤول ${who}`:""} وربطها بوضع السفر.`,textEn:`A ${span}-day travel plan was generated starting ${departure}${who?` with ${who} as caretaker`:""} and linked to vacation mode.`},...t.timeline]};
   });
   setTravelGenerated(true);window.setTimeout(()=>setTravelGenerated(false),2600);
  }
