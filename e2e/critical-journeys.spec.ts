@@ -352,3 +352,32 @@ test("corrupt dirty fallback never overrides a valid IndexedDB state",async({pag
   expect(dirty).toBeNull();
 });
 
+test("document locale and accessibility smoke stay valid in Arabic and English",async({page})=>{
+  await openTrainingDashboard(page);
+  await expect(page.locator("html")).toHaveAttribute("lang","ar");
+  await expect(page.locator("html")).toHaveAttribute("dir","rtl");
+
+  const issues=await page.evaluate(()=>{
+    const problems:string[]=[];
+    const ids=[...document.querySelectorAll("[id]")].map(x=>x.id).filter(Boolean);
+    const seen=new Set<string>();
+    for(const id of ids){if(seen.has(id))problems.push("duplicate-id:"+id);seen.add(id)}
+    for(const button of document.querySelectorAll("button")){
+      const el=button as HTMLButtonElement;
+      if(el.offsetParent===null)continue;
+      const name=(el.getAttribute("aria-label")||el.getAttribute("title")||el.textContent||"").trim();
+      if(!name)problems.push("unnamed-button");
+    }
+    for(const image of document.querySelectorAll("img")){
+      if(!image.hasAttribute("alt"))problems.push("image-without-alt");
+    }
+    return problems;
+  });
+  expect(issues).toEqual([]);
+
+  const english=page.getByRole("button",{name:"EN"}).first();
+  await english.click();
+  await expect(page.locator("html")).toHaveAttribute("lang","en");
+  await expect(page.locator("html")).toHaveAttribute("dir","ltr");
+});
+
