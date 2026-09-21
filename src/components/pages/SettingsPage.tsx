@@ -6,25 +6,49 @@ import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { downloadText,today,uid,nowISO } from "@/lib/appUtils";
 import { syncPushReminders } from "@/lib/pushNotifications";
-import { CURRENT_BACKUP_SCHEMA,validateBackupPayload } from "@/domain/backupValidation";
-import { externalizeAllTankPhotos,hydrateTankPhotosForBackup } from "@/lib/photoStorage";
+import { validateBackupPayload } from "@/domain/backupValidation";
+import { externalizeAllTankPhotos } from "@/lib/photoStorage";
 import { activeRelocation,activeVacation,isTankArchived } from "@/domain/tankLifecycle";
 import { sanitizeBounded,validateEnergySettings } from "@/domain/inputSanity";
 import { buildVacationTaskDrafts,vacationDays } from "@/domain/vacationPlan";
-import { clearTankHistoryArchive,hydrateAllTankHistoryArchives } from "@/lib/historyArchiveStorage";
+import { clearTankHistoryArchive } from "@/lib/historyArchiveStorage";
+import { buildCompleteRecoveryBackup } from "@/lib/recoveryBackup";
+import { readDataSafetyStatus,subscribeDataSafety,type DataSafetyStatus } from "@/lib/dataSafetyStatus";
+import { deviceBackupEnabled,setDeviceBackupEnabled as persistDeviceBackup,subscribeDeviceBackupSetting } from "@/lib/deviceBackupSettings";
+import { clearLongTermHistory,longTermHistoryStats } from "@/lib/longTermHistory";
 
 export function SettingsPage({tank}:{tank:Tank}) {
  const state=useAquaStore(),patch=useAquaStore(s=>s.patchTank),del=useAquaStore(s=>s.deleteTank),replace=useAquaStore(s=>s.replaceData),[name,setName]=useState(tank.name),file=useRef<HTMLInputElement>(null),lang=state.language;
  const [notificationState,setNotificationState]=useState<"unknown"|"enabled"|"disabled"|"unsupported"|"busy">("unknown");
  const [notificationNote,setNotificationNote]=useState("");
  const [backupNote,setBackupNote]=useState<{kind:"good"|"danger";text:string}|null>(null);
+ const [dataSafety,setDataSafety]=useState<DataSafetyStatus>({persistence:"ok"});
+ const [deviceBackup,setDeviceBackup]=useState(false);
+ const [archiveCount,setArchiveCount]=useState(0);
  const [vacationEnd,setVacationEnd]=useState(""),[vacationNotes,setVacationNotes]=useState("");
  const [moveFrom,setMoveFrom]=useState(""),[moveTo,setMoveTo]=useState(""),[moveNotes,setMoveNotes]=useState("");
  const [restartReason,setRestartReason]=useState(""),[archiveReason,setArchiveReason]=useState("");
  const vacation=activeVacation(tank),relocation=activeRelocation(tank),archived=isTankArchived(tank);
  const profile=tank.ecosystemProfile??"auto";
  const energy=tank.energySettings??{pricePerKwh:0,currency:"USD"};
- const exportBackup=async()=>{const tanks=await hydrateAllTankHistoryArchives(await hydrateTankPhotosForBackup(state.tanks));downloadText(`Aqua_Nexus_Backup_${today()}.json`,JSON.stringify({app:"Aqua Nexus",schemaVersion:CURRENT_BACKUP_SCHEMA,exportedAt:new Date().toISOString(),language:state.language,aquariumExperience:state.aquariumExperience,selectedTankId:state.selectedTankId,tanks},null,2));};
+ const exportBackup=async()=>{
+  setBackupNote(null);
+  try{
+   const backup=await buildCompleteRecoveryBackup({tanks:state.tanks,language:state.language,aquariumExperience:state.aquariumExperience,selectedTankId:state.selectedTankId});
+   downloadText(`Aqua_Nexus_Backup_${today()}.json`,JSON.stringify(backup,null,2));
+   setBackupNote({kind:"good",text:lang==="ar"?`نسخة الاستعادة مكتملة: ${backup.tanks.length} حوض و ${backup.recovery.photoAssets} صورة، مع كل التاريخ المؤرشف.`:`Complete recovery backup created: ${backup.tanks.length} tank(s), ${backup.recovery.photoAssets} photo(s), including archived history.`});
+  }catch(e){
+   setBackupNote({kind:"danger",text:(lang==="ar"?"لم يتم إنشاء Backup ناقص. السبب: ":"Incomplete backup was blocked. Reason: ")+(e instanceof Error?e.message:String(e))});
+  }
+ };
+
+ useEffect(()=>{
+  setDataSafety(readDataSafetyStatus());
+  setDeviceBackup(deviceBackupEnabled());
+  void longTermHistoryStats(tank.id).then(x=>setArchiveCount(x.total)).catch(()=>setArchiveCount(0));
+  const offSafety=subscribeDataSafety(setDataSafety),offBackup=subscribeDeviceBackupSetting(setDeviceBackup);
+  return()=>{offSafety();offBackup()};
+ },[tank.id]);
 
  useEffect(()=>{
   if(typeof window==="undefined")return;
@@ -43,7 +67,7 @@ export function SettingsPage({tank}:{tank:Tank}) {
     const validated=validateBackupPayload(parsed);
     if(!validated.ok){setBackupNote({kind:"danger",text:(lang==="ar"?"النسخة الاحتياطية غير صالحة: ":"Invalid backup: ")+validated.error});return}
     const tanks=await externalizeAllTankPhotos(validated.data.tanks);
-    for(const imported of tanks)await clearTankHistoryArchive(imported.id);
+    for(const imported of tanks){await clearTankHistoryArchive(imported.id);await clearLongTermHistory(imported.id);}
     replace({...validated.data,tanks});
     setBackupNote({kind:"good",text:lang==="ar"?`تم التحقق من النسخة واستيراد ${tanks.length} حوض بأمان، مع نقل الصور الكبيرة إلى مخزن الوسائط المحلي.`:`Backup validated and ${tanks.length} tank(s) imported safely; large images were moved to local media storage.`});
    }catch{
@@ -178,6 +202,15 @@ export function SettingsPage({tank}:{tank:Tank}) {
   {notificationState!=="unsupported"&&<button className="btn primary" style={{marginTop:10}} onClick={enableNotifications} disabled={notificationState==="busy"||notificationsEnabled}>{notificationState==="busy"?(lang==="ar"?"جاري التفعيل...":"Enabling..."):notificationsEnabled?(lang==="ar"?"التنبيهات مفعّلة":"Notifications enabled"):(lang==="ar"?"تفعيل التنبيهات":"Enable notifications")}</button>}
  </div>
 
- <div className="card panel"><h3>{tr(lang,"dataSync")}</h3><p className="note">{tr(lang,"localStorageNote")}</p><div className="inline-alert info">{bi(lang,"النسخة الحالية Local-first. ملف JSON هو نسخة الاستعادة الكاملة؛ Cloud account/sync يبقى مرحلة SaaS منفصلة ولا يتم ادعاء وجوده قبل بنائه فعلياً.","The current build is local-first. JSON is the full recovery backup; cloud account/sync remains a separate SaaS phase and is not presented as active until actually implemented.")}</div><button className="btn" onClick={()=>void exportBackup()}>{tr(lang,"export")} JSON</button> <button className="btn" onClick={()=>file.current?.click()}>{tr(lang,"import")}</button><input ref={file} type="file" accept=".json,application/json" hidden onChange={e=>{importFile(e.target.files?.[0]);e.currentTarget.value=""}}/>{backupNote&&<div className={`inline-alert ${backupNote.kind}`} style={{marginTop:10}}>{backupNote.text}</div>}<hr/><button className="btn danger" onClick={()=>{if(confirm(tr(lang,"confirmDeleteTank")))del(tank.id)}}>{tr(lang,"deleteTank")}</button></div>
+ <div className="card panel full-span"><div className="module-head"><div><small className="eyebrow-mini">DATA SAFETY</small><h3>{bi(lang,"سلامة البيانات والاستعادة","Data safety & recovery")}</h3></div><span className={`status ${dataSafety.persistence==="failed"?"danger":dataSafety.persistence==="degraded"?"warn":"good"}`}>{dataSafety.persistence.toUpperCase()}</span></div>
+  <div className="summary-strip"><div className="summary"><small>{bi(lang,"الحفظ المحلي","Local persistence")}</small><b>{dataSafety.persistence==="ok"?"✓":dataSafety.persistence==="degraded"?"⚠":"✕"}</b></div><div className="summary"><small>{bi(lang,"سجلات مؤرشفة طويلة الأمد","Long-term archived records")}</small><b>{archiveCount}</b></div><div className="summary"><small>{bi(lang,"Device Backup","Device Backup")}</small><b>{deviceBackup?bi(lang,"مفعّل","ON"):bi(lang,"مغلق","OFF")}</b></div></div>
+  {dataSafety.lastFailure&&<div className={`inline-alert ${dataSafety.persistence==="failed"?"danger":"warn"}`}>{dataSafety.lastFailure}</div>}
+  <div className="inline-alert info">{bi(lang,"Aqua Nexus يعمل Local-first. لا يتم رفع بيانات الحوض إلى الـbackend إلا إذا فعّلت Device Backup بنفسك. هذا ليس حساباً سحابياً ولا مزامنة متعددة الأجهزة.","Aqua Nexus is local-first. Tank data is not sent to the backend unless you explicitly enable Device Backup. This is not a cloud account or multi-device sync.")}</div>
+  <label className="checkbox-row"><input type="checkbox" checked={deviceBackup} onChange={e=>{persistDeviceBackup(e.target.checked);setDeviceBackup(e.target.checked)}}/><span>{bi(lang,"تفعيل Device Backup التجريبي لهذا المتصفح","Enable experimental Device Backup for this browser")}</span></label>
+  <div className="actions"><button className="btn primary" onClick={()=>void exportBackup()}>{bi(lang,"إنشاء Full Recovery Backup","Create Full Recovery Backup")} JSON</button><button className="btn" onClick={()=>file.current?.click()}>{tr(lang,"import")}</button></div>
+  <input ref={file} type="file" accept=".json,application/json" hidden onChange={e=>{importFile(e.target.files?.[0]);e.currentTarget.value=""}}/>
+  {backupNote&&<div className={`inline-alert ${backupNote.kind}`} style={{marginTop:10}}>{backupNote.text}</div>}
+  <hr/><button className="btn danger" onClick={()=>{if(confirm(tr(lang,"confirmDeleteTank")))del(tank.id)}}>{tr(lang,"deleteTank")}</button>
+ </div>
  <style jsx>{`\n  .experience-choice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.experience-choice{border:1px solid rgba(86,181,205,.18);background:rgba(255,255,255,.025);color:inherit;border-radius:14px;padding:12px;text-align:inherit;display:grid;gap:5px}.experience-choice b{font-size:13px}.experience-choice span{font-size:10px;line-height:1.55;opacity:.7}.experience-choice.active{border-color:rgba(82,218,173,.5);background:rgba(43,151,118,.12);box-shadow:0 0 0 1px rgba(82,218,173,.08)}@media(max-width:680px){.experience-choice-grid{grid-template-columns:1fr}}\n `}</style>\n </section>;
 }
