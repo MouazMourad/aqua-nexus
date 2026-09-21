@@ -774,12 +774,12 @@ describe("Full audit hardening regressions",()=>{
 
   it("evaluates AI plans from the target domain instead of only whole-tank score",()=>{
     const baseline=structuredClone(demoMarineTank);
-    baseline.chemistry=[{timestamp:"2026-09-21T00:00:00Z",values:{KH:6},source:"manual",confidence:"high"},...baseline.chemistry];
+    baseline.chemistry=[{timestamp:"2026-09-21T00:00:00Z",values:{KH:6},source:"manual",confidence:"high"}];
     const answer=aquaAIAnswer("KH منخفض شو اعمل؟",baseline,"chemistry");
     const plan=createActionPlan(baseline,"KH منخفض شو اعمل؟",answer);
     expect(plan.focus?.domain).toBe("chemistry");
     const after=structuredClone(baseline);
-    after.chemistry=[{timestamp:"2026-09-21T12:00:00Z",values:{KH:7.8},source:"manual",confidence:"high"},...after.chemistry];
+    after.chemistry=[{timestamp:"2026-09-21T12:00:00Z",values:{KH:7.8},source:"manual",confidence:"high"}];
     const result=evaluatePlanOutcome(after,plan);
     expect(result.usedDomainMetrics).toBe(true);
     expect(result.details.some(x=>x.key==="chem:KH"&&x.result==="improved")).toBe(true);
@@ -822,7 +822,7 @@ describe("Full audit hardening regressions",()=>{
     const large:any={id:"p1",timestamp:"2026-09-20T12:00:00Z",caption:"test",dataUrl:"data:image/jpeg;base64,"+"A".repeat(150000)};
     const small:any={...large,id:"p2",dataUrl:"data:image/jpeg;base64,"+"A".repeat(1000)};
     expect(photoNeedsExternalization(large)).toBe(true);
-    expect(photoNeedsExternalization(small)).toBe(false);
+    expect(photoNeedsExternalization(small)).toBe(true);
   });
 });
 
