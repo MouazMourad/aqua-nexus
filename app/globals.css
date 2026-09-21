@@ -2299,3 +2299,39 @@ button:disabled{opacity:.45;cursor:not-allowed}
  .lighting-import-review-body .summary-strip{grid-template-columns:repeat(3,minmax(0,1fr))}
  .lighting-import-preview img{max-height:260px}
 }
+
+.lighting-depth-layout{display:grid;grid-template-columns:70px minmax(0,1fr);gap:10px;align-items:stretch;margin-top:12px}
+.lighting-depth-ruler{display:grid;grid-template-rows:auto 1fr 1fr auto;align-items:start;justify-items:end;padding:4px 0;color:var(--muted);font-size:8px}
+.lighting-depth-ruler span:nth-child(2),.lighting-depth-ruler span:nth-child(3){align-self:center}
+.lighting-depth-tank{display:grid;grid-template-rows:35fr 33fr 32fr;min-height:620px;border:2px solid rgba(82,201,232,.28);border-radius:18px;overflow:hidden;background:linear-gradient(180deg,rgba(62,184,255,.12),rgba(8,54,78,.18) 35%,rgba(4,28,42,.42) 68%,rgba(1,15,24,.72));box-shadow:inset 0 0 45px rgba(42,153,207,.08)}
+.lighting-depth-zone{position:relative;display:grid;align-content:start;gap:9px;padding:14px;border-bottom:1px solid rgba(255,255,255,.08);min-width:0}
+.lighting-depth-zone:last-child{border-bottom:0}
+.lighting-depth-zone.depth-top{background:linear-gradient(180deg,rgba(89,192,255,.09),rgba(89,192,255,.025))}
+.lighting-depth-zone.depth-mid{background:linear-gradient(180deg,rgba(61,131,220,.045),rgba(17,69,108,.025))}
+.lighting-depth-zone.depth-bottom{background:linear-gradient(180deg,rgba(13,44,69,.02),rgba(0,8,14,.12))}
+.lighting-depth-zone-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.lighting-depth-zone-head>div{display:grid;gap:2px}.lighting-depth-zone-head b{font-size:12px}.lighting-depth-zone-head small{font-size:8px;color:var(--muted)}
+.lighting-depth-zone-head>span{font-size:11px;letter-spacing:1px;opacity:.8}
+.lighting-depth-suitable{margin:0;font-size:9px;line-height:1.55;color:#c6e8ef;overflow-wrap:anywhere}
+.lighting-shade-pocket{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 9px;border:1px dashed rgba(128,133,255,.28);border-radius:10px;background:rgba(44,38,95,.1)}
+.lighting-shade-pocket b{font-size:8px;letter-spacing:.07em;color:#c8c7ff}.lighting-shade-pocket small{font-size:8px;color:var(--muted)}
+.lighting-depth-residents{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;min-width:0}
+.lighting-depth-resident{display:grid;gap:8px;padding:10px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(2,18,28,.78);min-width:0}
+.lighting-depth-resident.within{border-color:rgba(77,214,151,.24)}.lighting-depth-resident.outside{border-color:rgba(255,155,92,.32)}.lighting-depth-resident.suggested{border-color:rgba(100,187,235,.22)}
+.lighting-depth-resident-title{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.lighting-depth-resident-title>div{display:grid;gap:2px;min-width:0}
+.lighting-depth-resident-title b{font-size:10px;overflow-wrap:anywhere}.lighting-depth-resident-title small{font-size:7.5px;color:var(--muted)}
+.lighting-depth-resident-title>span{font-size:7px;padding:4px 6px;border-radius:999px;background:rgba(255,255,255,.06);white-space:nowrap}
+.lighting-depth-resident-metrics{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,.8fr);gap:7px;align-items:end}
+.lighting-depth-resident-metrics>div{display:grid;gap:3px}.lighting-depth-resident-metrics small{font-size:7.5px;color:var(--muted)}.lighting-depth-resident-metrics b{font-size:9px}
+.lighting-depth-input{display:flex;align-items:center;gap:5px}.lighting-depth-input input{min-width:0;width:100%;height:34px;border:1px solid rgba(101,202,225,.16);border-radius:8px;background:rgba(1,16,24,.72);color:inherit;padding:5px 7px}.lighting-depth-input b{font-size:8px;opacity:.6}
+.lighting-depth-resident p{margin:0;font-size:8px;line-height:1.5;color:var(--muted)}
+.lighting-depth-empty{padding:10px;border:1px dashed rgba(255,255,255,.08);border-radius:10px;color:var(--muted);font-size:8px}
+@media(max-width:720px){
+ .lighting-depth-layout{grid-template-columns:48px minmax(0,1fr);gap:6px}
+ .lighting-depth-tank{min-height:760px}
+ .lighting-depth-zone{padding:10px}
+ .lighting-depth-residents{grid-template-columns:minmax(0,1fr)}
+ .lighting-depth-resident-metrics{grid-template-columns:1fr 1fr}
+ .lighting-depth-resident-metrics .field{grid-column:1/-1}
+ .lighting-depth-zone-head b{font-size:10px}
+}
