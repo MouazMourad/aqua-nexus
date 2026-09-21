@@ -36,6 +36,7 @@ export interface TankIntelligenceCore{
  state:ReturnType<typeof tankStateView>;
  chemistry:ReturnType<typeof chemistryHealthAssessment>;
  maintenance:number;
+ lighting:ReturnType<typeof lightingIntelligence>;
  bioload:ReturnType<typeof bioload>;
  alerts:ReturnType<typeof systemAlerts>;
  insights:ReturnType<typeof smartInsights>;
