@@ -50,6 +50,11 @@ export async function readTankHistoryArchive(tankId:string){
   try{return await readRaw(tankId)}catch{return null}
 }
 
+export async function readTankHistoryArchiveStrict(tankId:string){
+  if(!available())return null;
+  return await readRaw(tankId);
+}
+
 export async function archiveOldTankHistory(tank:Tank,beforeISO:string){
   if(!available())return {ok:false as const,reason:"indexeddb-unavailable" as const,tank,archivedTimeline:0,archivedEvents:0};
   const cutoff=new Date(beforeISO).getTime();
@@ -81,6 +86,16 @@ export async function archiveOldTankHistory(tank:Tank,beforeISO:string){
 
 export async function hydrateTankHistoryArchive(tank:Tank):Promise<Tank>{
   const archive=await readTankHistoryArchive(tank.id);
+  if(!archive)return tank;
+  return{
+    ...tank,
+    timeline:mergeById(tank.timeline,archive.timeline),
+    intelligenceEvents:mergeById(tank.intelligenceEvents??[],archive.intelligenceEvents)
+  };
+}
+
+export async function hydrateTankHistoryArchiveStrict(tank:Tank):Promise<Tank>{
+  const archive=await readTankHistoryArchiveStrict(tank.id);
   if(!archive)return tank;
   return{
     ...tank,
