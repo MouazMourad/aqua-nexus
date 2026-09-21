@@ -13,6 +13,7 @@ import { PushReminderSync } from "@/components/PushReminderSync";
 import { CloudSyncBridge } from "@/components/CloudSyncBridge";
 import { DashboardCommandCollapse } from "@/components/dashboard/DashboardCommandCollapse";
 import { PhotoStorageBridge } from "@/components/PhotoStorageBridge";
+import { DocumentLocaleSync } from "@/components/DocumentLocaleSync";
 
 export const metadata: Metadata = {
   title: "Aqua Nexus 3D",
@@ -31,7 +32,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ar" dir="rtl">
-      <body><PWARegister/><PushReminderSync/><CloudSyncBridge/><PhotoStorageBridge/><DashboardCommandCollapse/>{children}</body>
+      <body><DocumentLocaleSync/><PWARegister/><PushReminderSync/><CloudSyncBridge/><PhotoStorageBridge/><DashboardCommandCollapse/>{children}</body>
     </html>
   );
 }
