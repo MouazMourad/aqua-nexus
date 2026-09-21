@@ -190,7 +190,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
       <PageHelpButton page={active}/>
       <GlobalHelpButton lang={lang}/>
       <button type="button" className="nav-quick-trigger" onClick={()=>openPalette()} aria-label={lang==="ar"?"إجراءات سريعة":"Quick actions"}>＋ <span>{lang==="ar"?"تسجيل سريع":"Quick log"}</span></button>
-      <button type="button" className="nav-search-trigger" onClick={()=>openPalette()} aria-label={lang==="ar"?"بحث بالأوامر والوحدات":"Search commands, tank data and modules"}>⌕ <span>{lang==="ar"?"بحث":"Search"}</span><kbd>⌘K</kbd></button>
+      <button type="button" className="nav-search-trigger nav-advanced-trigger" onClick={()=>openPalette()} aria-label={lang==="ar"?"متقدم":"Advanced"}>◇ <span>{lang==="ar"?"متقدم":"Advanced"}</span></button>
     </div>
 
     <div className="dock-shell nav-primary-shell">
@@ -212,7 +212,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
     </div>}
 
     {paletteOpen&&typeof document!=="undefined"&&createPortal(<div className="command-palette-backdrop" role="presentation" onMouseDown={e=>{if(e.currentTarget===e.target){setPaletteOpen(false);setQuery("")}}}>
-      <section className="command-palette" role="dialog" aria-modal="true" aria-label={lang==="ar"?"بحث Aqua Nexus":"Aqua Nexus search"}>
+      <section className="command-palette" role="dialog" aria-modal="true" aria-label={lang==="ar"?"أدوات Aqua Nexus المتقدمة":"Aqua Nexus advanced tools"}>
         <div className="command-search"><span>⌕</span><input ref={searchRef} value={query} onChange={e=>setQuery(e.target.value)} placeholder={lang==="ar"?"ابحث: KH، Naso، Skimmer، صيانة، RO/DI…":"Search: KH, livestock, skimmer, maintenance, RO/DI…"} /><kbd>Esc</kbd></div>
         <div className="command-quick">
           <small>{lang==="ar"?"تسجيل سريع من أي صفحة":"QUICK ACTIONS"}</small>
@@ -236,7 +236,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
       .nav-help-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
       .nav-search-trigger,.nav-quick-trigger{min-height:34px;border:1px solid rgba(92,205,230,.22);border-radius:11px;background:rgba(8,38,52,.72);color:#c9edf4;padding:6px 9px;display:flex;align-items:center;gap:6px;font-size:10px}
       .nav-quick-trigger{margin-inline-start:auto;border-color:rgba(92,230,180,.2);background:rgba(22,75,62,.42)}
-      .nav-search-trigger kbd,.command-search kbd{font:inherit;font-size:8px;padding:2px 5px;border:1px solid rgba(255,255,255,.13);border-radius:6px;opacity:.7}
+      .command-search kbd{font:inherit;font-size:8px;padding:2px 5px;border:1px solid rgba(255,255,255,.13);border-radius:6px;opacity:.7}.nav-advanced-trigger{border-color:rgba(159,139,255,.25);background:linear-gradient(145deg,rgba(91,73,170,.36),rgba(8,38,52,.72))}
       .primary-modules-nav{min-width:0!important;justify-content:flex-start!important;padding:3px 0}
       .primary-modules-nav .nav-item{min-width:78px;flex:0 0 auto}
       .nav-more{border-inline-start:1px solid rgba(255,255,255,.08)!important}
@@ -248,7 +248,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
       .command-search{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;padding:13px;border-bottom:1px solid rgba(255,255,255,.08)}.command-search>span{font-size:22px}.command-search input{border:0;background:transparent;color:#effcff;font-size:16px;outline:0;min-width:0}
       .command-quick{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.07);display:grid;gap:7px}.command-quick>small{font-size:8px;letter-spacing:.08em;opacity:.55;font-weight:850}.command-quick>div{display:flex;gap:6px;flex-wrap:wrap}.command-quick button{border:1px solid rgba(100,224,185,.15);border-radius:9px;background:rgba(72,195,156,.055);color:inherit;padding:7px 9px;font-size:9px;display:flex;gap:5px;align-items:center}.command-quick button:disabled{opacity:.35}
       .command-results{padding:7px;overflow:auto;max-height:calc(80dvh - 126px);display:grid;gap:3px}.command-results>button{border:0;background:transparent;color:inherit;display:grid;grid-template-columns:36px 1fr auto;gap:9px;align-items:center;text-align:inherit;padding:9px;border-radius:11px}.command-results>button:hover,.command-results>button:focus-visible{background:rgba(72,199,227,.1);outline:1px solid rgba(72,199,227,.2)}.command-results>button:disabled{opacity:.38}.command-results>button>span{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:color-mix(in srgb,var(--command-color) 16%,transparent);color:var(--command-color);font-size:17px}.command-results>button>div{display:grid;gap:2px}.command-results b{font-size:12px}.command-results small{font-size:8px;opacity:.55}.command-results em{font-style:normal;opacity:.35}.command-empty{padding:22px;text-align:center;opacity:.65}
-      @media(max-width:760px){.nav-search-trigger span,.nav-search-trigger kbd,.nav-quick-trigger span{display:none}.nav-search-trigger,.nav-quick-trigger{margin-inline-start:0;width:36px;justify-content:center;padding:0}.primary-modules-nav .nav-item{min-width:72px}.all-modules-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.command-palette-backdrop{padding-top:max(12px,env(safe-area-inset-top))}.command-palette{max-height:90dvh}.command-results{max-height:calc(90dvh - 138px)}}
+      @media(max-width:760px){.nav-search-trigger span,.nav-quick-trigger span{display:none}.nav-search-trigger,.nav-quick-trigger{margin-inline-start:0;width:36px;justify-content:center;padding:0}.primary-modules-nav .nav-item{min-width:72px}.all-modules-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.command-palette-backdrop{padding-top:max(12px,env(safe-area-inset-top))}.command-palette{max-height:90dvh}.command-results{max-height:calc(90dvh - 138px)}}
       @media(max-width:430px){.all-modules-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.command-quick>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.command-quick button{justify-content:center}}
     `}</style>
   </div>;
