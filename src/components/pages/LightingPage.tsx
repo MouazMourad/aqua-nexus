@@ -205,9 +205,17 @@ export function LightingPage({tank,onEquipment}:{tank:Tank;onEquipment:()=>void}
   const ts=nowISO();
   patch(tank.id,t=>({...t,equipment:t.equipment.map(x=>x.id===id?{...x,...partial}:x),timeline:[{id:uid("ev"),timestamp:ts,type:"lighting-fixture-model",textAr:"تم تحديث نموذج وحدة إنارة لتحسين تقدير التوزيع الضوئي.",textEn:"A lighting fixture model was updated to improve light-distribution estimation."},...t.timeline]}));
  }
- function updateLivestockLightingDepth(id:string,value:number|undefined){
-  const ts=nowISO(),depth=value===undefined?undefined:clamp(value,0,tank.display.height);
-  patch(tank.id,t=>({...t,livestock:t.livestock.map(x=>x.id===id?{...x,lightingDepthCm:depth}:x),timeline:[{id:uid("ev"),timestamp:ts,type:"lighting-livestock-depth",textAr:depth===undefined?"تم حذف عمق التموضع الضوئي للكائن.":"تم ضبط عمق الكائن على "+Math.round(depth)+" سم تحت سطح الماء.",textEn:depth===undefined?"Photosynthetic livestock depth was cleared.":"Livestock depth set to "+Math.round(depth)+" cm below the water surface."},...t.timeline]}));
+ function updateLivestockLightingPlacement(id:string,partial:{lightingDepthCm?:number;lightingXPct?:number;lightingZPct?:number;lightingExposure?:"open"|"partialShade"|"shade"},clearKey?:"lightingDepthCm"|"lightingXPct"|"lightingZPct"){
+  const ts=nowISO();
+  patch(tank.id,t=>({...t,livestock:t.livestock.map(x=>{
+    if(x.id!==id)return x;
+    const next={...x,...partial};
+    if(clearKey)delete (next as any)[clearKey];
+    if(typeof next.lightingDepthCm==="number")next.lightingDepthCm=clamp(next.lightingDepthCm,0,t.display.height);
+    if(typeof next.lightingXPct==="number")next.lightingXPct=clamp(next.lightingXPct,0,100);
+    if(typeof next.lightingZPct==="number")next.lightingZPct=clamp(next.lightingZPct,0,100);
+    return next;
+  }),timeline:[{id:uid("ev"),timestamp:ts,type:"lighting-livestock-placement",textAr:"تم تحديث موقع الكائن الضوئي (X/Z/العمق/التعرض) وربطه بحساب PAR.",textEn:"Photosynthetic livestock placement (X/Z/depth/exposure) was updated and linked to PAR calculation."},...t.timeline]}));
  }
  async function analyzeLightingImportWithAI(args:{file:File;sourceKind:"image"|"text";imageDataUrl?:string;textContent?:string}){
   const response=await fetch("/api/ai/lighting-import",{
@@ -373,11 +381,20 @@ export function LightingPage({tank,onEquipment}:{tank:Tank;onEquipment:()=>void}
        {zone==="bottom"&&<div className="lighting-shade-pocket"><b>{bi(lang,"منطقة ظل","SHADE POCKET")}</b><small>{tank.type==="marine"?bi(lang,"Soft منخفض الإضاءة أو مرحلة acclimation؛ الظل ليس عمقاً ثابتاً.","Low-light soft coral or acclimation; shade is not a fixed depth."):bi(lang,"Anubias • Java Fern • Buce • Moss تحت hardscape أو بعيداً عن الذروة.","Anubias • Java Fern • Buce • Moss under hardscape or away from the peak.")}</small></div>}
        <div className="lighting-depth-residents">
         {residents.length?residents.map(x=><article className={"lighting-depth-resident "+(x.placementStatus==="outside"?"outside":x.placementStatus==="within"?"within":"suggested")} key={x.livestockId}>
-         <div className="lighting-depth-resident-title"><div><b>{x.name}</b><small>{x.category==="coral"?bi(lang,"مرجان","CORAL"):bi(lang,"نبات","PLANT")} • {x.parMin}–{x.parMax} PAR</small></div><span>{x.actualDepthCm===undefined?bi(lang,"مقترح","SUGGESTED"):x.placementStatus==="within"?bi(lang,"مناسب","OK"):bi(lang,"راجع الموقع","CHECK")}</span></div>
-         <div className="lighting-depth-resident-metrics">
-          <label className="field mini"><span>{bi(lang,"بعده عن سطح الماء","Depth below surface")}</span><div className="lighting-depth-input"><input type="number" min="0" max={tank.display.height} step="1" value={x.actualDepthCm??""} placeholder={Math.round((x.recommendedDepthMinCm+x.recommendedDepthMaxCm)/2).toString()} onChange={e=>updateLivestockLightingDepth(x.livestockId,e.target.value===""?undefined:Number(e.target.value))}/><b>cm</b></div></label>
-          <div><small>{bi(lang,"العمق المقترح","Suggested depth")}</small><b>{Math.round(x.recommendedDepthMinCm)}–{Math.round(x.recommendedDepthMaxCm)} cm</b></div>
-          <div><small>{bi(lang,"PAR عند موقعه","PAR at position")}</small><b>{typeof x.estimatedPeakParAtActualDepth==="number"?"≈ "+Math.round(x.estimatedPeakParAtActualDepth):"—"}</b></div>
+         <div className="lighting-depth-resident-title"><div><b>{x.name}</b><small>{x.category==="coral"?bi(lang,"مرجان","CORAL"):bi(lang,"نبات","PLANT")} • {x.parMin}–{x.parMax} PAR</small></div><span>{x.placementStatus==="unset"?bi(lang,"حدد الموقع","SET POSITION"):x.placementStatus==="within"?bi(lang,"مناسب","OK"):bi(lang,"راجع الموقع","CHECK")}</span></div>
+         <div className="lighting-position-row">
+          <div className="lighting-position-mini" aria-label={bi(lang,"موقع الكائن من الأعلى","Livestock top-view position")}>
+           <span className="lighting-position-front">{bi(lang,"أمام","FRONT")}</span>
+           {x.actualXPct!==undefined&&x.actualZPct!==undefined?<i style={{left:x.actualXPct+"%",top:x.actualZPct+"%"}} title={"X "+Math.round(x.actualXPct)+"% • Z "+Math.round(x.actualZPct)+"%"}/>:<em>{bi(lang,"حدد X و Z","SET X / Z")}</em>}
+          </div>
+          <div className="lighting-depth-resident-metrics">
+           <label className="field mini"><span>{bi(lang,"بعده عن سطح الماء","Depth below surface")}</span><div className="lighting-depth-input"><input aria-label={"Depth "+x.name} type="number" min="0" max={tank.display.height} step="1" defaultValue={x.actualDepthCm??""} placeholder={Math.round((x.recommendedDepthMinCm+x.recommendedDepthMaxCm)/2).toString()} onBlur={e=>e.target.value===""?updateLivestockLightingPlacement(x.livestockId,{},"lightingDepthCm"):updateLivestockLightingPlacement(x.livestockId,{lightingDepthCm:Number(e.target.value)})}/><b>cm</b></div></label>
+           <label className="field mini"><span>X % {bi(lang,"يسار ← يمين","left → right")}</span><input aria-label={"X "+x.name} type="number" min="0" max="100" step="1" defaultValue={x.actualXPct??""} placeholder="50" onBlur={e=>e.target.value===""?updateLivestockLightingPlacement(x.livestockId,{},"lightingXPct"):updateLivestockLightingPlacement(x.livestockId,{lightingXPct:Number(e.target.value)})}/></label>
+           <label className="field mini"><span>Z % {bi(lang,"أمام ← خلف","front → back")}</span><input aria-label={"Z "+x.name} type="number" min="0" max="100" step="1" defaultValue={x.actualZPct??""} placeholder="50" onBlur={e=>e.target.value===""?updateLivestockLightingPlacement(x.livestockId,{},"lightingZPct"):updateLivestockLightingPlacement(x.livestockId,{lightingZPct:Number(e.target.value)})}/></label>
+           <label className="field mini"><span>{bi(lang,"التعرض للضوء","Light exposure")}</span><select aria-label={"Exposure "+x.name} value={x.exposure} onChange={e=>updateLivestockLightingPlacement(x.livestockId,{lightingExposure:e.target.value as "open"|"partialShade"|"shade"})}><option value="open">{bi(lang,"مفتوح","Open light")}</option><option value="partialShade">{bi(lang,"ظل جزئي","Partial shade")}</option><option value="shade">{bi(lang,"ظل","Shade")}</option></select></label>
+           <div><small>{bi(lang,"العمق المقترح","Suggested depth")}</small><b>{Math.round(x.recommendedDepthMinCm)}–{Math.round(x.recommendedDepthMaxCm)} cm</b></div>
+           <div><small>{bi(lang,"PAR عند موقعه","PAR at position")}</small><b>{typeof x.estimatedPeakParAtActualDepth==="number"?"≈ "+Math.round(x.estimatedPeakParAtActualDepth):"—"}</b></div>
+          </div>
          </div>
          <p>{lang==="ar"?x.ar:x.en}</p>
         </article>):<div className="lighting-depth-empty">{bi(lang,"ما في كائن مسجل بهذا المستوى حالياً.","No registered livestock at this level yet.")}</div>}
