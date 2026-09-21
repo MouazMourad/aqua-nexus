@@ -1,10 +1,10 @@
-# Aqua Nexus 3D — v0.2.0 RC
+# Aqua Nexus 3D — v0.3.0 RC
 
-Aqua Nexus is a local-first aquarium management platform for marine and freshwater systems. It combines tank setup, chemistry, livestock, acclimation, maintenance, equipment, sump, dosing, feeding, water changes, RO/DI, quarantine, emergencies, inventory, reports, long-term history and deterministic aquarium intelligence.
+Aqua Nexus is a local-first aquarium management platform for marine and freshwater systems. It combines tank setup, chemistry, livestock, acclimation, maintenance, equipment, Lighting Intelligence, sump, dosing, feeding, water changes, RO/DI, quarantine, emergencies, inventory, reports, long-term history and deterministic aquarium intelligence.
 
 ## Current release posture
 
-**v0.2.0-rc.1** is a Release Candidate for controlled testing.
+**v0.3.0-rc.1** is a Release Candidate for controlled testing.
 
 The product is intentionally **local-first**. Full JSON Recovery Backup is the authoritative portable recovery artifact. Experimental Device Backup exists only when the user explicitly enables it from Settings; it is not an account system and not multi-device sync.
 
@@ -15,6 +15,15 @@ The product is intentionally **local-first**. Full JSON Recovery Backup is the a
 - High-risk overrides require a written reason and are logged.
 - Meaningful Tank fields are covered by compile-time and runtime event contracts.
 - Numeric entry is validated at save boundaries, not only through HTML controls.
+
+## Lighting Intelligence
+
+- Lighting hardware remains sourced from the real Equipment registry; the lighting page adds schedule, spectrum and optical modelling without duplicating fixtures.
+- Multi-channel schedules are normalized into a vendor-neutral LightingProgram.
+- Top, front and interactive 3D light-field views use the same deterministic estimator consumed by Tank Brain and Local Best AI.
+- PAR is explicitly labelled estimated until calibrated with measured points from the user's aquarium.
+- Program changes are versioned so Tank Brain can relate lighting changes to later chemistry/livestock observations without claiming causation.
+- Vendor file and screenshot import is intentionally deferred to the unified import layer.
 
 ## Data safety
 
