@@ -1093,6 +1093,16 @@ describe("Lighting Intelligence regression",()=>{
     const plant=lightingPlacementRecommendations(freshwater).find(x=>x.livestockId==="plant-low");
     expect(plant?.zone).toBe("shade");
     expect(plant?.parMax).toBeLessThanOrEqual(60);
+
+    marine.livestock.push({id:"coral-depth",name:"Acropora Depth",category:"coral",quantity:1,health:"good",lightingDepthCm:marine.display.height*.2} as any);
+    const placed=lightingPlacementRecommendations(marine).find(x=>x.livestockId==="coral-depth");
+    expect(placed?.placementStatus).toBe("within");
+    expect(placed?.actualZone).toBe("top");
+    expect(placed?.estimatedPeakParAtActualDepth).toBeGreaterThan(0);
+
+    freshwater.livestock.push({id:"plant-carpet",name:"Monte Carlo Carpet",category:"plant",quantity:1,health:"good"} as any);
+    const carpet=lightingPlacementRecommendations(freshwater).find(x=>x.livestockId==="plant-carpet");
+    expect(carpet?.zone).toBe("bottom");
   });
   it("uses fixture wattage when no measured reference PAR exists",()=>{
     const t=litTank();
@@ -1108,10 +1118,16 @@ describe("Lighting Intelligence regression",()=>{
     expect(isCyclePageAllowed("lighting")).toBe(true);
     expect(TANK_EVENT_COVERAGE.lighting).toBe("evented");
   });
+  it("rejects impossible photosynthetic depth in recovery backups",()=>{
+    const t=litTank() as any;
+    t.livestock.push({id:"bad-depth",name:"Coral",category:"coral",quantity:1,health:"good",lightingDepthCm:t.display.height+5});
+    const result=validateBackupPayload({app:"Aqua Nexus",schemaVersion:14,language:"ar",selectedTankId:t.id,tanks:[t]});
+    expect(result.ok).toBe(false);
+  });
   it("rejects corrupt lighting values in recovery backups",()=>{
     const t=litTank() as any;
     t.lighting.activeProgram.points[0].values[t.lighting.activeProgram.channels[0].id]=999;
-    const result=validateBackupPayload({app:"Aqua Nexus",schemaVersion:11,language:"ar",selectedTankId:t.id,tanks:[t]});
+    const result=validateBackupPayload({app:"Aqua Nexus",schemaVersion:14,language:"ar",selectedTankId:t.id,tanks:[t]});
     expect(result.ok).toBe(false);
   });
 });
