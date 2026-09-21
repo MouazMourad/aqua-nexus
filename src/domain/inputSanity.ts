@@ -151,3 +151,32 @@ export function validateEnergySettings(input:{pricePerKwh:number;currency:string
 export function sanitizeBounded(value:number,min:number,max:number,fallback=min){
   return finite(value)?Math.max(min,Math.min(max,value)):fallback;
 }
+
+
+export function validateTreatmentSetup(input:{volumeLiters:number;labelDoseMlPer100L:number;intervalHours:number;totalDoses:number}){
+  const issues:InputSanityIssue[]=[]; const add=(x:InputSanityIssue|undefined)=>{if(x)issues.push(x)};
+  add(range("volumeLiters",input.volumeLiters,.1,1_000_000,"حجم حوض الحجر","Quarantine volume"));
+  add(range("labelDoseMlPer100L",input.labelDoseMlPer100L,.000001,10_000,"جرعة الملصق","Label dose"));
+  add(range("intervalHours",input.intervalHours,.25,720,"الفاصل بين الجرعات","Dose interval"));
+  add(range("totalDoses",input.totalDoses,1,100,"عدد الجرعات","Planned doses"));
+  const scaled=input.labelDoseMlPer100L*(input.volumeLiters/100);
+  if(Number.isFinite(scaled)&&scaled>input.volumeLiters)issues.push({field:"labelDoseMlPer100L",level:"danger",ar:"الجرعة المحسوبة أكبر من حجم حوض الحجر نفسه. هذا غالباً خطأ إدخال أو وحدة قياس.",en:"The calculated medication volume exceeds the quarantine volume itself. This is likely an entry/unit error."});
+  return{ok:!issues.some(x=>x.level==="danger"),issues};
+}
+
+export function validateAcclimationItemEntry(input:{quantity:number;dripMinutes:number;intervalMinutes:number}){
+  const issues:InputSanityIssue[]=[]; const add=(x:InputSanityIssue|undefined)=>{if(x)issues.push(x)};
+  add(range("quantity",input.quantity,1,10_000,"عدد الكائنات","Organism quantity"));
+  add(range("dripMinutes",input.dripMinutes,0,360,"مدة الإقلمة","Acclimation duration"));
+  add(range("intervalMinutes",input.intervalMinutes,0,180,"فاصل التنزيل","Release interval"));
+  return{ok:!issues.some(x=>x.level==="danger"),issues};
+}
+
+export function validateAcclimationWater(input:{salinity?:number;temperature?:number;dipMinutes?:number;dipQuantity?:number}){
+  const issues:InputSanityIssue[]=[]; const add=(x:InputSanityIssue|undefined)=>{if(x)issues.push(x)};
+  if(input.salinity!==undefined)add(range("salinity",input.salinity,.99,1.06,"الملوحة","Salinity"));
+  if(input.temperature!==undefined)add(range("temperature",input.temperature,0,45,"الحرارة","Temperature"));
+  if(input.dipMinutes!==undefined)add(range("dipMinutes",input.dipMinutes,.1,120,"مدة Coral Dip","Coral Dip duration"));
+  if(input.dipQuantity!==undefined)add(range("dipQuantity",input.dipQuantity,.000001,1_000_000,"كمية Coral Dip","Coral Dip quantity"));
+  return{ok:!issues.some(x=>x.level==="danger"),issues};
+}
