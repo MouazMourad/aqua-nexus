@@ -39,7 +39,11 @@ export function buildTankBrainSnapshot(tank:Tank){
       items:tank.equipment,
       energySettings:tank.energySettings,
       doserChannels:tank.doserChannels,
-      filterMedia:tank.filterMedia??[]
+      filterMedia:tank.filterMedia??[],
+      imports:tail(tank.externalImports,20),
+      telemetry:tail(tank.deviceTelemetry,120),
+      topOff:tail(tank.topOff,120),
+      deviceAlerts:tail(tank.deviceAlerts,80)
     },
     chemistry:{count:tank.chemistry.length,recent:tail(tank.chemistry,40)},
     maintenance:{count:tank.maintenance.length,items:tail(tank.maintenance,120)},
@@ -82,6 +86,10 @@ export function buildTankBrainSnapshot(tank:Tank){
       maintenance:tank.maintenance.length,
       livestock:tank.livestock.length,
       equipment:tank.equipment.length,
+      externalImports:tank.externalImports?.length??0,
+      deviceTelemetry:tank.deviceTelemetry?.length??0,
+      topOff:tank.topOff?.length??0,
+      deviceAlerts:tank.deviceAlerts?.length??0,
       inventory:tank.inventory.length,
       timeline:tank.timeline.length,
       intelligenceEvents:tank.intelligenceEvents?.length??0,
