@@ -127,6 +127,18 @@ export function SettingsPage({tank}:{tank:Tank}) {
  return <section className="page-grid"><PageHeader eyebrow="SETTINGS" title={tr(lang,"settings")}/>
  <div className="card panel"><label className="field"><span>{tr(lang,"language")}</span><select value={lang} onChange={e=>state.setLanguage(e.target.value as any)}><option value="ar">{tr(lang,"arabic")}</option><option value="en">{tr(lang,"english")}</option></select></label><label className="field"><span>{tr(lang,"name")}</span><input value={name} onChange={e=>setName(e.target.value)}/></label><button className="btn primary" onClick={()=>patch(tank.id,{name})}>{tr(lang,"save")}</button><div className="inline-alert good">{tr(lang,"actualTranslationNote")}</div></div>
 
+ <div className="card panel full-span aquarium-experience-card">
+  <div className="module-head"><div><small className="eyebrow-mini">AQUARIUM EXPERIENCE</small><h3>{bi(lang,"خبرتك في الأحواض","Your aquarium experience")}</h3><p className="note">{bi(lang,"هذا الإعداد يغيّر عمق المعلومات والتحكم في الأحواض فقط. طريقة استخدام Aqua Nexus تبقى بسيطة وواضحة للجميع، وما في أي ميزة تختفي نهائياً.","This changes aquarium depth and control only. Aqua Nexus stays simple to use for everyone, and no feature becomes permanently inaccessible.")}</p></div><span className="scene-badge">{state.aquariumExperience==="beginner"?bi(lang,"مبتدئ","Beginner"):state.aquariumExperience==="intermediate"?bi(lang,"متوسط","Intermediate"):bi(lang,"متقدم","Advanced")}</span></div>
+  <div className="experience-choice-grid">
+   {[
+    {id:"beginner",ar:"مبتدئ",en:"Beginner",arText:"قرار واضح، معنى الأرقام، وتحذيرات وخطوة تالية. التفاصيل المتقدمة تبقى بزر متقدم.",enText:"Clear decisions, what numbers mean, warnings and next action. Advanced detail stays one tap away."},
+    {id:"intermediate",ar:"متوسط",en:"Intermediate",arText:"يظهر اتجاهات أكثر، أسباب محتملة، وربط بين الكيمياء والصيانة والمعدات.",enText:"Shows more trends, possible causes and links across chemistry, maintenance and equipment."},
+    {id:"advanced",ar:"متقدم",en:"Advanced",arText:"يفتح عمق أكبر افتراضياً: Baselines، Correlations، أدلة القرار، وحسابات وتحكم أدق.",enText:"Opens deeper aquarium detail by default: baselines, correlations, evidence and finer controls."}
+   ].map(x=><button type="button" key={x.id} className={`experience-choice ${state.aquariumExperience===x.id?"active":""}`} onClick={()=>state.setAquariumExperience(x.id as any)}><b>{lang==="ar"?x.ar:x.en}</b><span>{lang==="ar"?x.arText:x.enText}</span></button>)}
+  </div>
+  <div className="inline-alert info" style={{marginTop:10}}>{bi(lang,"مهم: «مبتدئ/متوسط/متقدم» يعني خبرة في تربية الأحياء المائية، وليس خبرة بالكمبيوتر أو الواجهات.","Important: Beginner / Intermediate / Advanced refers to aquarium-keeping experience, not computer or UI skill.")}</div>
+ </div>
+
  <div className="card panel">
   <h3>{bi(lang,"بروفايل الحوض والحسابات","Tank profile & calculations")}</h3>
   <p className="note">{bi(lang,"البروفايل يؤثر على أهداف الكيمياء ومتطلبات الإنارة/الحركة وتقييم التجهيزات. Auto يستنتج من الكائنات.","The profile affects chemistry targets, lighting/flow requirements and equipment adequacy. Auto infers from livestock.")}</p>
@@ -154,5 +166,5 @@ export function SettingsPage({tank}:{tank:Tank}) {
  </div>
 
  <div className="card panel"><h3>{tr(lang,"dataSync")}</h3><p className="note">{tr(lang,"localStorageNote")}</p><div className="inline-alert info">{bi(lang,"النسخة الحالية Local-first. ملف JSON هو نسخة الاستعادة الكاملة؛ Cloud account/sync يبقى مرحلة SaaS منفصلة ولا يتم ادعاء وجوده قبل بنائه فعلياً.","The current build is local-first. JSON is the full recovery backup; cloud account/sync remains a separate SaaS phase and is not presented as active until actually implemented.")}</div><button className="btn" onClick={()=>void exportBackup()}>{tr(lang,"export")} JSON</button> <button className="btn" onClick={()=>file.current?.click()}>{tr(lang,"import")}</button><input ref={file} type="file" accept=".json,application/json" hidden onChange={e=>{importFile(e.target.files?.[0]);e.currentTarget.value=""}}/>{backupNote&&<div className={`inline-alert ${backupNote.kind}`} style={{marginTop:10}}>{backupNote.text}</div>}<hr/><button className="btn danger" onClick={()=>{if(confirm(tr(lang,"confirmDeleteTank")))del(tank.id)}}>{tr(lang,"deleteTank")}</button></div>
- </section>;
+ <style jsx>{`\n  .experience-choice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.experience-choice{border:1px solid rgba(86,181,205,.18);background:rgba(255,255,255,.025);color:inherit;border-radius:14px;padding:12px;text-align:inherit;display:grid;gap:5px}.experience-choice b{font-size:13px}.experience-choice span{font-size:10px;line-height:1.55;opacity:.7}.experience-choice.active{border-color:rgba(82,218,173,.5);background:rgba(43,151,118,.12);box-shadow:0 0 0 1px rgba(82,218,173,.08)}@media(max-width:680px){.experience-choice-grid{grid-template-columns:1fr}}\n `}</style>\n </section>;
 }
