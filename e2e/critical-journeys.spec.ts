@@ -442,3 +442,52 @@ test("Lighting Intelligence edits, visualizes and calibrates the tank light mode
   await expect(calibration).toContainText("180 PAR");
 });
 
+test("Lighting mobile layout stays inside the viewport and the 10x demo follows time",async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await openTrainingDashboard(page);
+  await goToPage(page,"lighting");
+  await expect(page.locator(".lighting-page")).toBeVisible();
+  const overflow=await page.evaluate(()=>{
+    const el=document.querySelector(".lighting-page") as HTMLElement|null;
+    return {
+      page:(el?.scrollWidth??0)-(el?.clientWidth??0),
+      document:document.documentElement.scrollWidth-window.innerWidth
+    };
+  });
+  expect(overflow.page).toBeLessThanOrEqual(2);
+  expect(overflow.document).toBeLessThanOrEqual(2);
+
+  const clock=page.locator(".lighting-demo-clock");
+  const before=(await clock.textContent())?.trim();
+  await page.getByRole("button",{name:/ديمو اليوم 10×|Day demo 10×/}).click();
+  await page.waitForTimeout(1200);
+  const after=(await clock.textContent())?.trim();
+  expect(after).not.toBe(before);
+  await page.getByRole("button",{name:/إيقاف الديمو|Pause demo/}).click();
+});
+
+test("Lighting import records vendor file and date and parses a generic CSV for review",async({page})=>{
+  await openTrainingDashboard(page);
+  await goToPage(page,"lighting");
+  const file=page.locator('input[type="file"]').first();
+  await file.setInputFiles({
+    name:"lighting-demo.csv",
+    mimeType:"text/csv",
+    buffer:Buffer.from("Time,Blue,White\n09:00,0,0\n12:00,60,20\n18:00,0,0\n")
+  });
+  await expect(page.locator(".lighting-import-panel")).toContainText("lighting-demo.csv");
+  await expect(page.locator(".lighting-import-panel")).toContainText(/2 ch|قناة|parsed/i);
+  await expect(page.getByRole("button",{name:/حفظ البرنامج|Save program/}).first()).toBeEnabled();
+});
+
+test("dashboard exposes live lighting intensity and opens Lighting Intelligence",async({page})=>{
+  await openTrainingDashboard(page);
+  const card=page.locator('[data-dashboard-module="lighting"]');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText(/الإنارة|Lighting/);
+  await card.locator(".pd-module-button").click();
+  await expect(card).toContainText(/PAR|الإنارة الآن|Lighting now/);
+  await card.getByRole("button",{name:/فتح صفحة الإنارة|Open Lighting Intelligence/}).click();
+  await expect(page.locator(".lighting-page")).toBeVisible();
+});
+
