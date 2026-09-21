@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { tr } from "@/i18n";
 import type { Language,Tank } from "@/domain/types";
 import { GlobalHelpButton,PageHelpButton } from "@/components/help/HelpCenter";
+import { markFeatureLearned } from "@/lib/featureDiscovery";
 
 export type AppPage =
   | "dashboard" | "tanks" | "equipment" | "lighting" | "sump" | "livestock" | "acclimation" | "library"
@@ -150,6 +151,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
     setAllOpen(false);setPaletteOpen(false);setQuery("");onChange(page);
   };
   const openPalette=(preset="")=>{
+    markFeatureLearned("global-search");
     setQuery(preset);setPaletteOpen(true);setAllOpen(false);
     window.setTimeout(()=>searchRef.current?.focus(),0);
   };
