@@ -233,7 +233,8 @@ export function lightingPlacementRecommendations(tank:Tank):LightingPlacementRec
       row={zone:"mid",min:40,max:100,kindAr:"نبات متوسط الإضاءة",kindEn:"moderate-light plant"};
       if(/anubias|java fern|microsorum|buce|bucephalandra|moss|انوبيا|جافا|بوس|موس/.test(n))row={zone:"shade",min:20,max:55,kindAr:"نبات ظل/منخفض الإضاءة",kindEn:"shade/low-light plant"};
       else if(/cryptocoryne|crypt|كريبت/.test(n))row={zone:"bottom",min:30,max:75,kindAr:"Crypt منخفض إلى متوسط",kindEn:"low-to-moderate Crypt"};
-      else if(/monte carlo|glossostigma|hemianthus|hc cuba|rotala|ludwigia|alternanthera|carpet|مونتي|روتالا|لودويجيا/.test(n))row={zone:"top",min:80,max:180,kindAr:"نبات قوي/كاربت يحتاج إضاءة أعلى",kindEn:"higher-light stem/carpet plant"};
+      else if(/monte carlo|glossostigma|hemianthus|hc cuba|carpet|مونتي/.test(n))row={zone:"bottom",min:80,max:180,kindAr:"كاربت عالي الإضاءة على السابستريت",kindEn:"high-light carpet on the substrate"};
+      else if(/rotala|ludwigia|alternanthera|روتالا|لودويجيا/.test(n))row={zone:"mid",min:80,max:180,kindAr:"نبات ساقي عالي الإضاءة؛ قيّم الضوء عند الكانوبي",kindEn:"high-light stem plant; evaluate light at the canopy"};
     }
     if(!row)continue;
     const depth=zoneDepth(row.zone);
