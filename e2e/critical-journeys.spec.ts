@@ -460,6 +460,17 @@ test("Lighting mobile layout stays inside the viewport and the 10x demo follows 
   expect(overflow.page).toBeLessThanOrEqual(2);
   expect(overflow.document).toBeLessThanOrEqual(2);
 
+  const field=page.locator(".lighting-3d-wrap");
+  const timeSlider=page.getByLabel("Lighting simulation time");
+  await timeSlider.fill("0");
+  const nightIntensity=Number(await field.getAttribute("data-light-intensity"));
+  const nightColor=await field.getAttribute("data-light-color");
+  await timeSlider.fill("900");
+  const dayIntensity=Number(await field.getAttribute("data-light-intensity"));
+  const dayColor=await field.getAttribute("data-light-color");
+  expect(dayIntensity).toBeGreaterThan(nightIntensity);
+  expect(dayColor).not.toBe(nightColor);
+
   const clock=page.locator(".lighting-demo-clock");
   const before=(await clock.textContent())?.trim();
   await page.getByRole("button",{name:/ديمو اليوم 10×|Day demo 10×/}).click();
@@ -467,6 +478,21 @@ test("Lighting mobile layout stays inside the viewport and the 10x demo follows 
   const after=(await clock.textContent())?.trim();
   expect(after).not.toBe(before);
   await page.getByRole("button",{name:/إيقاف الديمو|Pause demo/}).click();
+});
+
+test("Lighting depth map shows actual livestock depth and keeps it editable",async({page})=>{
+  await openTrainingDashboard(page);
+  await goToPage(page,"lighting");
+  const diagram=page.locator(".lighting-depth-tank");
+  await expect(diagram).toBeVisible();
+  await expect(diagram).toContainText(/مرجان تورش|Torch Coral/);
+  await expect(diagram).toContainText(/32/);
+  const resident=diagram.locator(".lighting-depth-resident").filter({hasText:/مرجان تورش|Torch Coral/}).first();
+  const depth=resident.locator('input[type="number"]');
+  await expect(depth).toHaveValue("32");
+  await depth.fill("36");
+  await expect(depth).toHaveValue("36");
+  await expect(resident).toContainText(/PAR|cm/);
 });
 
 test("Lighting import records vendor file and date and parses a generic CSV for review",async({page})=>{
