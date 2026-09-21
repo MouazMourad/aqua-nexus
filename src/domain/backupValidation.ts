@@ -1,7 +1,7 @@
 import type { AquariumExperienceLevel,Language,Tank } from "./types";
 import { validateChemistryValues } from "./chemistryDataQuality";
 
-export const CURRENT_BACKUP_SCHEMA=15;
+export const CURRENT_BACKUP_SCHEMA=16;
 
 export interface ValidBackupPayload{
   language:Language;
@@ -33,7 +33,7 @@ function validDimensions(value:unknown){
     && Number(value.length)>0&&Number(value.width)>0&&Number(value.height)>0;
 }
 function arraysAreArrays(tank:Record<string,unknown>){
-  const fields=["equipment","chemistry","maintenance","livestock","inventory","timeline","intelligenceEvents","guidanceActions","healthSnapshots","photos","visionAssessments","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi","rodiServiceEvents","plantCare","acclimationSessions","emergencySessions","filterMedia","livestockExits","aiActionPlans"];
+  const fields=["equipment","externalImports","deviceTelemetry","topOff","chemistry","maintenance","livestock","inventory","timeline","intelligenceEvents","guidanceActions","healthSnapshots","photos","visionAssessments","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi","rodiServiceEvents","plantCare","acclimationSessions","emergencySessions","filterMedia","livestockExits","aiActionPlans"];
   return fields.every(key=>tank[key]===undefined||(Array.isArray(tank[key])&&(tank[key] as unknown[]).length<=MAX_ROWS_PER_COLLECTION));
 }
 
@@ -50,7 +50,7 @@ function duplicateId(items:unknown[]){
   return null;
 }
 function nestedDataIssue(tank:Record<string,unknown>){
-  const arrays=["equipment","maintenance","livestock","inventory","timeline","photos","visionAssessments","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi","rodiServiceEvents","plantCare","acclimationSessions","emergencySessions","filterMedia","livestockExits"];
+  const arrays=["equipment","externalImports","deviceTelemetry","topOff","maintenance","livestock","inventory","timeline","photos","visionAssessments","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi","rodiServiceEvents","plantCare","acclimationSessions","emergencySessions","filterMedia","livestockExits"];
   for(const field of arrays){
     const items=(tank[field] as unknown[]|undefined)??[];
     const dup=duplicateId(items);
@@ -94,6 +94,22 @@ function nestedDataIssue(tank:Record<string,unknown>){
     }
     if(row.mountingHeightCm!==undefined&&Number(row.mountingHeightCm)>150)return `equipment #${i+1} has mountingHeightCm above 150`;
     if(row.parAtTargetDepth!==undefined&&Number(row.parAtTargetDepth)>5000)return `equipment #${i+1} has implausible parAtTargetDepth`;
+  }
+
+  for(const [i,row] of (((tank.externalImports as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.importedAt)||!validText(row.vendor,80)||!validText(row.sourceName,500)||!validText(row.sourceType,40)||!validText(row.fingerprint,160)||!finite(row.confidence)||Number(row.confidence)<0||Number(row.confidence)>100)return `externalImports #${i+1} is invalid`;
+    if(!["structured-file","ai-text","ai-image"].includes(String(row.analysisMode)))return `externalImports #${i+1} has invalid analysisMode`;
+    if(!["reviewed","applied","partial","failed"].includes(String(row.status)))return `externalImports #${i+1} has invalid status`;
+    if(!isObject(row.counts))return `externalImports #${i+1} counts are invalid`;
+    for(const key of ["equipment","chemistry","dosing","topOff","telemetry","alerts"]){const value=row.counts[key];if(!finite(value)||Number(value)<0||Number(value)>1000000)return `externalImports #${i+1} has invalid count ${key}`;}
+    if(row.warnings!==undefined&&(!Array.isArray(row.warnings)||row.warnings.length>100||row.warnings.some(x=>typeof x!=="string"||x.length>2000)))return `externalImports #${i+1} warnings are invalid`;
+  }
+  for(const [i,row] of (((tank.deviceTelemetry as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp)||!validText(row.metric,160)||!finite(row.value))return `deviceTelemetry #${i+1} is invalid`;
+    if(row.unit!==undefined&&typeof row.unit!=="string")return `deviceTelemetry #${i+1} has invalid unit`;
+  }
+  for(const [i,row] of (((tank.topOff as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp)||!finite(row.liters)||Number(row.liters)<0||Number(row.liters)>100000)return `topOff #${i+1} is invalid`;
   }
 
   for(const [i,row] of (((tank.rodi as unknown[])??[])).entries()){
