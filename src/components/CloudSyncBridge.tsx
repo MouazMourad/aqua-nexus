@@ -7,9 +7,10 @@ import { clearCloudDeleteTombstone,cloudDeleteTombstones } from "@/lib/cloudTomb
 import type { Tank } from "@/domain/types";
 import { downloadText } from "@/lib/appUtils";
 import { CURRENT_BACKUP_SCHEMA } from "@/domain/backupValidation";
-import { clearTankHistoryArchive,hydrateTankHistoryArchive } from "@/lib/historyArchiveStorage";
+import { clearTankHistoryArchive,hydrateTankHistoryArchiveStrict } from "@/lib/historyArchiveStorage";
 import { hydrateTankPhotosForBackup } from "@/lib/photoStorage";
 import { deviceBackupEnabled,subscribeDeviceBackupSetting } from "@/lib/deviceBackupSettings";
+import { hydrateLongTermHistoryStrict } from "@/lib/longTermHistory";
 
 function stableValue(value:unknown):unknown{
   if(Array.isArray(value))return value.map(stableValue);
@@ -39,7 +40,7 @@ export function CloudSyncBridge(){
   useEffect(()=>{
     setOptedIn(deviceBackupEnabled());
     return subscribeDeviceBackupSetting(setOptedIn);
-  },[optedIn]);
+  },[]);
 
   useEffect(()=>{
     let cancelled=false;
@@ -73,7 +74,7 @@ export function CloudSyncBridge(){
             baseline.set(local.id,"");
             continue;
           }
-          const cloudSig=signature(cloud),fullLocal=await hydrateTankHistoryArchive(local);
+          const cloudSig=signature(cloud),fullLocal=await hydrateLongTermHistoryStrict(await hydrateTankHistoryArchiveStrict(local));
           baseline.set(local.id,localSig);
           if(cloudSig!==signature(fullLocal))conflicts.add(local.id);
         }
@@ -95,7 +96,7 @@ export function CloudSyncBridge(){
     // Bootstrap exactly once from the local state present at application load.
     // Subsequent tank changes are handled by the versioned sync effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[]);
+  },[optedIn]);
 
   const runBackup=useCallback(async()=>{
     if(!enabled||!initializedRef.current)return;
@@ -117,7 +118,8 @@ export function CloudSyncBridge(){
     try{
       for(const tank of changed){
         const expected=versionsRef.current[tank.id];
-        const result=await backupTank(tank,expected);
+        const fullTank=await hydrateLongTermHistoryStrict(await hydrateTankHistoryArchiveStrict(tank));
+        const result=await backupTank(fullTank,expected);
         if(result.conflict){
           conflictsRef.current.add(tank.id);
           setSyncState("error");
