@@ -33,10 +33,12 @@ export function DashboardFeatureBubble(){
   const lang=useAquaStore(s=>s.language);
   const [index,setIndex]=useState(0);
   const [cycle,setCycle]=useState(0);
+  const [visible,setVisible]=useState(true);
   useEffect(()=>{
     const timer=window.setInterval(()=>{
       setIndex(i=>(i+1)%FEATURE_TIPS.length);
       setCycle(c=>c+1);
+      setVisible(true);
     },BUBBLE_CYCLE_MS);
     return()=>window.clearInterval(timer);
   },[]);
@@ -49,8 +51,10 @@ export function DashboardFeatureBubble(){
   };
   const label=names[tip.page]?.[lang==="ar"?"ar":"en"]??tip.page;
 
-  return <div className="feature-bubble-lane" aria-hidden="true">
-    <div className="feature-bubble" key={cycle}>
+  if(!visible)return null;
+
+  return <div className="feature-bubble-lane">
+    <div className="feature-bubble" key={cycle} role="button" tabIndex={0} aria-label={lang==="ar"?"إخفاء التلميح":"Dismiss tip"} onClick={()=>setVisible(false)} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setVisible(false);}}}>
       <div className="feature-bubble-body">
         <span className="feature-bubble-icon">{tip.icon}</span>
         <span>
@@ -62,7 +66,7 @@ export function DashboardFeatureBubble(){
     </div>
     <style jsx>{`
       .feature-bubble-lane{position:fixed;inset:0;z-index:2600;pointer-events:none;overflow:hidden}
-      .feature-bubble{position:absolute;inset-inline-end:clamp(12px,4vw,58px);bottom:-190px;width:min(360px,calc(100vw - 28px));pointer-events:none;animation:aquaBubbleRise ${BUBBLE_RISE_MS}ms linear forwards;filter:drop-shadow(0 14px 28px rgba(0,0,0,.28))}
+      .feature-bubble{position:absolute;inset-inline-end:clamp(12px,4vw,58px);bottom:-190px;width:min(360px,calc(100vw - 28px));pointer-events:auto;cursor:pointer;animation:aquaBubbleRise ${BUBBLE_RISE_MS}ms linear forwards;filter:drop-shadow(0 14px 28px rgba(0,0,0,.28))}
       .feature-bubble:before,.feature-bubble:after{content:"";position:absolute;border-radius:50%;border:1px solid rgba(149,235,255,.28);background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.22),rgba(91,212,239,.06) 48%,rgba(22,105,137,.035) 72%,transparent 73%);pointer-events:none}
       .feature-bubble:before{width:36px;height:36px;inset-inline-start:-18px;top:-24px}.feature-bubble:after{width:18px;height:18px;inset-inline-end:18px;bottom:-19px}
       .feature-bubble-body{width:100%;border:1px solid rgba(134,228,248,.28);border-radius:32px 32px 32px 18px;background:linear-gradient(135deg,rgba(17,75,98,.66),rgba(5,31,46,.54));backdrop-filter:blur(13px);-webkit-backdrop-filter:blur(13px);color:inherit;padding:13px 15px;display:grid;grid-template-columns:38px 1fr;gap:9px;text-align:inherit;box-shadow:inset 0 1px 0 rgba(255,255,255,.09)}
