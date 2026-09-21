@@ -14,6 +14,7 @@ import { createDefaultConsumables,equipmentLife,equipmentReliability,syncEquipme
 import { sanitizeBounded,sanitizeNonNegative,validateEnergySettings,validateEquipmentEntry } from "@/domain/inputSanity";
 import { EquipmentAddModal } from "@/components/equipment/EquipmentAddModal";
 import { EquipmentImportWorkspace } from "@/components/equipment/EquipmentImportWorkspace";
+import { equipmentImportIntelligence } from "@/domain/equipmentImport";
 
 export function EquipmentPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
@@ -29,6 +30,7 @@ export function EquipmentPage({tank}:{tank:Tank}) {
  const energy=useMemo(()=>tankEnergy(tank),[tank.equipment,tank.energySettings?.pricePerKwh]);
  const adequacy=useMemo(()=>equipmentAdequacy(tank),[tank]);
  const reliability=useMemo(()=>equipmentReliability(tank),[tank]);
+ const importedData=useMemo(()=>equipmentImportIntelligence(tank),[tank]);
  useEffect(()=>{if(open)setLocation(suggestedLocation(kind,tank.sump.chambers))},[kind,open,tank.sump.chambers]);
  useEffect(()=>{const synced=syncEquipmentSystem(tank);if(JSON.stringify(synced.equipment)!==JSON.stringify(tank.equipment)||JSON.stringify(synced.maintenance)!==JSON.stringify(tank.maintenance))patch(tank.id,t=>({...t,...synced}));},[tank.id,tank.equipment.length]);
 
@@ -76,10 +78,27 @@ export function EquipmentPage({tank}:{tank:Tank}) {
   if(!check.ok)return t;
   return {...t,energySettings:next};
  });}
+ function acknowledgeDeviceAlert(id:string){
+  const ts=new Date().toISOString();
+  patch(tank.id,t=>({...t,deviceAlerts:(t.deviceAlerts??[]).map(x=>x.id===id?{...x,acknowledgedAt:ts}:x),timeline:[{id:uid("ev"),timestamp:ts,type:"device-alert-acknowledged",textAr:"تمت مراجعة تنبيه جهاز مستورد.",textEn:"Imported device alert was acknowledged."},...t.timeline]}));
+ }
  function logFailure(id:string){const note=failureNote.trim()||bi(lang,"عطل مسجل بدون ملاحظات","Failure logged without notes");patch(tank.id,t=>({...t,equipment:t.equipment.map(x=>x.id===id?{...x,status:"warning" as const,failures:[...(x.failures??[]),{id:uid("fail"),timestamp:new Date().toISOString(),note}],postActionCheckAt:new Date(Date.now()+24*3600000).toISOString()}:x),timeline:[{id:uid("ev"),timestamp:new Date().toISOString(),type:"equipment-failure",textAr:`تم تسجيل عطل على ${t.equipment.find(x=>x.id===id)?.name||"جهاز"}: ${note}`,textEn:`Equipment failure logged: ${note}`},...t.timeline]}));setFailureNote("");}
 
  return <section className="page-grid">
   <PageHeader eyebrow="EQUIPMENT" title={tr(lang,"equipment")} actions={<div className="equipment-page-actions"><button className="btn" onClick={()=>setImportOpen(v=>!v)}>⇧ {bi(lang,"استيراد","Import")}</button><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(lang,"addEquipment")}</button></div>}/>\n  {importOpen&&<EquipmentImportWorkspace tank={tank} onClose={()=>setImportOpen(false)}/>}
+  {(tank.externalImports?.length||tank.deviceTelemetry?.length||tank.topOff?.length||tank.deviceAlerts?.length)&&<section className="card panel full-span">
+   <div className="module-head"><div><small className="eyebrow-mini">IMPORTED DEVICE DATA • TANK BRAIN</small><h3>{bi(lang,"بيانات الأجهزة الداخلة على عقل الحوض","Imported device data feeding Tank Brain")}</h3><p className="note">{bi(lang,"بعد اعتماد الاستيراد، الكيمياء والجرعات والتعويض والتليمِتري والتنبيهات تصير بيانات الحوض نفسها، مع حفظ المصدر والثقة.","After review, chemistry, dosing, top-off, telemetry and alerts become canonical tank data with provenance and confidence preserved.")}</p></div><span className={"status "+(importedData.dangerAlerts?"danger":importedData.unacknowledgedAlerts?"warn":"good")}>{importedData.unacknowledgedAlerts} ALERTS</span></div>
+   <div className="summary-strip">
+    <div className="summary"><small>{bi(lang,"آخر مصدر","Latest source")}</small><b>{importedData.latestImport?.vendor??"—"}</b></div>
+    <div className="summary"><small>{bi(lang,"ثقة الاستيراد","Import confidence")}</small><b>{importedData.latestImport?Math.round(importedData.latestImport.confidence)+"%":"—"}</b></div>
+    <div className="summary"><small>Telemetry 24h</small><b>{importedData.recentTelemetry}</b></div>
+    <div className="summary"><small>{bi(lang,"تعويض ماء 7 أيام","Top-off 7d")}</small><b>{importedData.recentTopOffLiters?importedData.recentTopOffLiters.toFixed(1)+" L":"—"}</b></div>
+    <div className="summary"><small>{bi(lang,"كيمياء من جهاز 7 أيام","Device chemistry 7d")}</small><b>{importedData.recentImportedChemistry}</b></div>
+   </div>
+   {importedData.issues.map(x=><div className={"inline-alert "+x.level} key={x.id}>{lang==="ar"?x.ar:x.en}</div>)}
+   {(tank.deviceAlerts??[]).filter(x=>!x.acknowledgedAt).slice(0,8).map(x=><div className="history-row device-alert-row" key={x.id}><div><b>{x.sourceDevice||x.sourceSystem||bi(lang,"جهاز","Device")} • {x.level.toUpperCase()}</b><small>{new Date(x.timestamp).toLocaleString()} • {x.message}</small></div><button className="btn" onClick={()=>acknowledgeDeviceAlert(x.id)}>✓ {bi(lang,"تمت المراجعة","Acknowledge")}</button></div>)}
+  </section>}
+
   {tank.equipment.length===0&&<div className="inline-alert info full-span"><div><b>⚙ {bi(lang,"ابدأ بالمعدات الموجودة فعلياً عندك، مو بالمواصفات المثالية.","Start with the equipment you actually have, not an ideal setup.")}</b><p>{bi(lang,"ضيف الأجهزة الأساسية أولاً. الاسم والنوع والموقع كافيين كبداية؛ Flow وRated Volume وPAR والطاقة معلومات إضافية بتحسن دقة التقييم لما تعرفها.","Add the main devices first. Name, type and location are enough to begin; flow, rated volume, PAR and power are optional details that improve the assessment when you know them.")}</p><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(lang,"addEquipment")}</button></div></div>}
   <section className="card panel full-span">
    <div className="module-head"><div><small className="eyebrow-mini">SYSTEM EQUIPMENT HEALTH</small><h3>{bi(lang,"كفاية تجهيزات الحوض","Aquarium Equipment Adequacy")}</h3><p className="note">{lang==="ar"?adequacy.basisAr:adequacy.basisEn}</p></div><span className={`status ${adequacy.level==="danger"?"danger":adequacy.level==="warn"?"warn":""}`}>{adequacy.score}%</span></div>
