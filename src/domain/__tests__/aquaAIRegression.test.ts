@@ -46,6 +46,7 @@ import { domainOutcomeLearning } from "@/domain/outcomeLearning";
 import { historyPage } from "@/domain/historyPagination";
 import { buildVacationTaskDrafts,vacationDays } from "@/domain/vacationPlan";
 import { defaultLightingProgram,estimatedParAt,lightingCalibrationFactor,lightingGrid,lightingIntelligence,lightingPlacementRecommendations,lightingSchedule } from "@/domain/lightingIntelligence";
+import { lightingCandidateToProgram,normalizeLightingImportCandidate } from "@/domain/lightingImport";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -1020,6 +1021,35 @@ describe("Final hardening contracts",()=>{
 });
 
 describe("Lighting Intelligence regression",()=>{
+  it("normalizes a vision lighting import into the same editable program model",()=>{
+    const raw={
+      confidence:82,vendorDetected:"Maxspect",programName:"AB+ Screenshot",
+      fixture:{brand:"Maxspect",model:"L165",powerWatts:65},
+      channels:[
+        {key:"uv",name:"UV",spectrum:"uv"},
+        {key:"blue",name:"Royal Blue",spectrum:"royalBlue"}
+      ],
+      points:[
+        {minute:540,values:{uv:0,blue:0}},
+        {minute:900,values:{uv:35,blue:70}},
+        {minute:1320,values:{uv:0,blue:0}}
+      ],
+      warnings:["One graph point was visually approximated"],evidence:["Visible channel labels and time axis"]
+    };
+    const normalized=normalizeLightingImportCandidate(raw,"image");
+    expect(normalized.ok).toBe(true);
+    if(!normalized.ok)return;
+    const program=lightingCandidateToProgram(normalized.candidate,"Imported");
+    expect(program.channels).toHaveLength(2);
+    expect(program.points).toHaveLength(3);
+    expect(program.points[1].values[program.channels[1].id]).toBe(70);
+    expect(normalized.candidate.confidence).toBe(82);
+  });
+  it("rejects unusable AI lighting extraction instead of inventing a schedule",()=>{
+    const normalized=normalizeLightingImportCandidate({confidence:20,channels:[{key:"blue",name:"Blue"}],points:[{minute:600,values:{blue:50}}]},"image");
+    expect(normalized.ok).toBe(false);
+  });
+
   function litTank(){
     const t=structuredClone(demoMarineTank);
     const fixture=t.equipment.find(x=>x.kind==="lighting")??{id:"light-test",name:"Test Light",kind:"lighting" as const,location:"display" as const,status:"on" as const};
