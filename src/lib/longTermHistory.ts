@@ -135,7 +135,7 @@ export async function readHistoricalPage<T=unknown>(tankId:string,domain:Histori
 export async function readAllHistoricalDomain<T=unknown>(tankId:string,domain:HistoricalDomain){
   const out:Array<HistoricalRecord&{payload:T}>=[]; let cursor:null|{timestampMs:number;id:string}=null;
   do{
-    const page=await readHistoricalPage<T>(tankId,domain,{limit:500,cursor});
+    const page:HistoricalPage<T>=await readHistoricalPage<T>(tankId,domain,{limit:500,cursor});
     out.push(...page.rows);cursor=page.nextCursor;
   }while(cursor);
   return out;
