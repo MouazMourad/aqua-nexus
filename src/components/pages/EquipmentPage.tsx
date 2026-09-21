@@ -12,8 +12,7 @@ import { deviceEnergy,equipmentProfile,tankEnergy } from "@/domain/equipmentInte
 import { equipmentAdequacy } from "@/domain/equipmentAdequacy";
 import { createDefaultConsumables,equipmentLife,equipmentReliability,syncEquipmentSystem } from "@/domain/equipmentLifecycle";
 import { sanitizeBounded,sanitizeNonNegative,validateEnergySettings,validateEquipmentEntry } from "@/domain/inputSanity";
-
-const kinds:EquipmentKind[]=["lighting","waveMaker","overflow","skimmer","returnPump","filterSock","rollerFilter","reactor","heater","doser","uv","ozone","ato","refugiumLight","turfScrubber","probe","co2","other"];
+import { EquipmentAddModal } from "@/components/equipment/EquipmentAddModal";
 
 export function EquipmentPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
@@ -120,20 +119,7 @@ export function EquipmentPage({tank}:{tank:Tank}) {
 
   <div className="equipment-grid full-span">{tank.equipment.map(x=>{const due=daysFrom(x.lastServiceAt,x.serviceIntervalDays??90),en=deviceEnergy(x,price),life=equipmentLife(x);return <button type="button" className="equipment-card clickable" key={x.id} onClick={()=>setDetails(x.id)}><div className="equipment-card-head"><span className="eq-big-icon">⚙</span><span className="status">{x.status}</span></div><h3>{x.name}</h3><small>{x.brand} {x.model}</small><div className="equipment-meta"><span><b>{tr(lang,"location")}</b>{x.location}</span><span><b>{tr(lang,"due")}</b>{due}</span><span><b>{bi(lang,"العمر","Life")}</b>{life.usedPercent}% • {life.status}</span><span><b>{bi(lang,"الأهمية","Criticality")}</b>{x.criticality??"—"}</span>{en.monthlyKwh>0&&<span><b>⚡</b>{en.monthlyKwh.toFixed(1)} kWh/mo</span>}</div></button>})}</div>
 
-  <Modal open={open} title={tr(lang,"addEquipment")} onClose={()=>setOpen(false)}>
-   <div className="form-grid">
-    <label className="field"><span>{tr(lang,"name")}</span><input value={name} onChange={e=>setName(e.target.value)}/></label>
-    <label className="field"><span>{tr(lang,"type")}</span><select value={kind} onChange={e=>setKind(e.target.value as EquipmentKind)}>{kinds.map(k=><option key={k}>{k}</option>)}</select></label>
-    <label className="field"><span>{tr(lang,"location")}</span><select value={location} onChange={e=>setLocation(e.target.value)}><option value="display">{bi(lang,"الحوض الرئيسي","Display Tank")}</option><option value="external">{bi(lang,"خارجي","External")}</option>{tank.sump.chambers.map(c=><option key={c.id} value={`sump:${c.id}`}>{lang==="ar"?c.name:(c.nameEn||c.name)}</option>)}</select></label>
-    <label className="field"><span>{tr(lang,"brandLabel")}</span><input value={brand} onChange={e=>setBrand(e.target.value)}/></label>
-    <label className="field"><span>{tr(lang,"model")}</span><input value={model} onChange={e=>setModel(e.target.value)}/></label>
-    <label className="field"><span>{tr(lang,"serviceInterval")}</span><input type="number" value={days} onChange={e=>setDays(Number(e.target.value))}/></label>
-    <label className="field"><span>{bi(lang,"القدرة W","Power W")}</span><input type="number" min="0" value={power||""} onChange={e=>setPower(Number(e.target.value))}/></label>
-    <label className="field"><span>{bi(lang,"ساعات التشغيل / يوم","Hours / day")}</span><input type="number" min="0" max="24" step=".1" value={hours||""} onChange={e=>setHours(Number(e.target.value))}/></label><label className="field"><span>{bi(lang,"التدفق L/h","Flow L/h")}</span><input type="number" min="0" value={flowLph||""} onChange={e=>setFlowLph(Number(e.target.value))}/></label><label className="field"><span>{bi(lang,"الحجم المصنف L","Rated volume L")}</span><input type="number" min="0" value={ratedVolume||""} onChange={e=>setRatedVolume(Number(e.target.value))}/></label>{kind==="lighting"&&<><label className="field"><span>PAR {bi(lang,"عند عمق الكائنات","at livestock depth")}</span><input type="number" min="0" value={par||""} onChange={e=>setPar(Number(e.target.value))}/></label><label className="field"><span>{bi(lang,"تغطية الطول cm","Coverage length cm")}</span><input type="number" min="0" value={coverageLength||""} onChange={e=>setCoverageLength(Number(e.target.value))}/></label><label className="field"><span>{bi(lang,"تغطية العرض cm","Coverage width cm")}</span><input type="number" min="0" value={coverageWidth||""} onChange={e=>setCoverageWidth(Number(e.target.value))}/></label></>}
-   </div>
-   <div className="inline-alert info">{bi(lang,"الموقع المقترح يتغير تلقائياً حسب نوع الجهاز. أدخل Flow L/h للمضخات وRated Volume للأجهزة المصنفة بالحجم؛ Aqua Nexus يستخدمها لمقارنة التجهيزات بحجم الحوض والحمل الحيوي ضمن الصحة العامة.","The suggested location changes by device type. Enter Flow L/h for pumps and Rated Volume for volume-rated equipment; Aqua Nexus uses these to compare equipment against tank size and bioload in overall health.")}</div>
-   <div className="modal-actions"><button className="btn" onClick={()=>setOpen(false)}>{tr(lang,"cancel")}</button><button className="btn primary" onClick={add}>{tr(lang,"save")}</button></div>
-  </Modal>
+  <EquipmentAddModal open={open} lang={lang} tank={tank} name={name} kind={kind} location={location} brand={brand} model={model} days={days} power={power} hours={hours} ratedVolume={ratedVolume} flowLph={flowLph} par={par} coverageLength={coverageLength} coverageWidth={coverageWidth} onClose={()=>setOpen(false)} onSave={add} setName={setName} setKind={setKind} setLocation={setLocation} setBrand={setBrand} setModel={setModel} setDays={setDays} setPower={setPower} setHours={setHours} setRatedVolume={setRatedVolume} setFlowLph={setFlowLph} setPar={setPar} setCoverageLength={setCoverageLength} setCoverageWidth={setCoverageWidth}/>
 
   <Modal open={!!e} title={e?.name??tr(lang,"equipment")} onClose={()=>setDetails(null)}>
    {e&&profile&&<>
