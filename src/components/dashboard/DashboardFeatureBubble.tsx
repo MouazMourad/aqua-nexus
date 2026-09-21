@@ -3,8 +3,10 @@
 import { useEffect,useState } from "react";
 import type { AppPage } from "@/components/navigation/MainNav";
 import { useAquaStore } from "@/store/useAquaStore";
+import { readFeatureDiscovery,subscribeFeatureDiscovery,type FeatureDiscoveryState } from "@/lib/featureDiscovery";
 
 type FeatureTip={
+  id:string;
   page:AppPage;
   icon:string;
   ar:string;
@@ -15,18 +17,18 @@ const BUBBLE_RISE_MS=45000;
 const BUBBLE_CYCLE_MS=80000;
 
 const FEATURE_TIPS:FeatureTip[]=[
-  {page:"equipment",icon:"⇧",ar:"ارفع صورة أو ملف جهاز؛ راجع القيم ثم Aqua Nexus يوزّعها تلقائياً.",en:"Upload a device screenshot or export, review the values, then Aqua Nexus routes them automatically."},
-  {page:"lighting",icon:"☀",ar:"شغّل محاكاة الإنارة ×10 وشوف لون وسطوع الحوض 3D يتغير.",en:"Run the 10× lighting demo and watch the 3D tank change color and brightness."},
-  {page:"lighting",icon:"↕",ar:"خريطة العمق تقترح مكان المرجان أو النبات حسب الضوء والمسافة عن السطح.",en:"The depth map suggests coral or plant placement from light and distance below the surface."},
-  {page:"chemistry",icon:"⚗",ar:"استورد سجل الكيمياء CSV/TXT بدل إدخال القراءات القديمة يدوياً.",en:"Import old chemistry history from CSV/TXT instead of entering readings manually."},
-  {page:"dashboard",icon:"✦",ar:"Tank Brain يربط بيانات الحوض كلها ليحدد الحالة والخطر والخطوة التالية.",en:"Tank Brain connects the whole aquarium to identify state, risk and the next action."},
-  {page:"acclimation",icon:"⇄",ar:"الإقلمة تدير عدادات منفصلة ومتوازية للسمك والمرجان واللافقاريات والنبات.",en:"Acclimation runs separate parallel timers for fish, corals, inverts and plants."},
-  {page:"equipment",icon:"⚙",ar:"حدد مكان الجهاز باللمس وتابع عمره وأعطاله والطاقة والاحتياط.",en:"Place equipment by touch and track lifecycle, failures, energy and backup readiness."},
-  {page:"alerts",icon:"△",ar:"مركز التنبيهات يجمع مشاكل الحوض كلها بمكان واحد.",en:"The Alerts center brings aquarium problems together in one place."},
-  {page:"journal",icon:"▧",ar:"Visual Tank Insight يربط الصورة بالكائن وسجل الحوض.",en:"Visual Tank Insight links a photo to the livestock item and tank history."},
-  {page:"dashboard",icon:"⌕",ar:"البحث الشامل يوصلك لكائن أو جهاز أو KH أو مهمة بسرعة.",en:"Global search jumps quickly to livestock, equipment, KH or a task."},
-  {page:"dashboard",icon:"⚙",ar:"رتّب صناديق الداشبورد وأخفِ ما لا تحتاجه.",en:"Reorder Dashboard cards and hide what you do not need."},
-  {page:"sump",icon:"▤",ar:"مخطط السامب مبني على أبعاد الحجر الحقيقية ومحتوياتها.",en:"The sump layout uses the real chamber dimensions and contents."}
+  {id:"smart-import",page:"equipment",icon:"⇧",ar:"ارفع صورة أو ملف جهاز؛ راجع القيم ثم Aqua Nexus يوزّعها تلقائياً.",en:"Upload a device screenshot or export, review the values, then Aqua Nexus routes them automatically."},
+  {id:"lighting-demo",page:"lighting",icon:"☀",ar:"شغّل محاكاة الإنارة ×10 وشوف لون وسطوع الحوض 3D يتغير.",en:"Run the 10× lighting demo and watch the 3D tank change color and brightness."},
+  {id:"lighting-placement",page:"lighting",icon:"↕",ar:"خريطة العمق تقترح مكان المرجان أو النبات حسب الضوء والمسافة عن السطح.",en:"The depth map suggests coral or plant placement from light and distance below the surface."},
+  {id:"chemistry-import",page:"chemistry",icon:"⚗",ar:"استورد سجل الكيمياء CSV/TXT بدل إدخال القراءات القديمة يدوياً.",en:"Import old chemistry history from CSV/TXT instead of entering readings manually."},
+  {id:"tank-brain",page:"dashboard",icon:"✦",ar:"Tank Brain يربط بيانات الحوض كلها ليحدد الحالة والخطر والخطوة التالية.",en:"Tank Brain connects the whole aquarium to identify state, risk and the next action."},
+  {id:"acclimation",page:"acclimation",icon:"⇄",ar:"الإقلمة تدير عدادات منفصلة ومتوازية للسمك والمرجان واللافقاريات والنبات.",en:"Acclimation runs separate parallel timers for fish, corals, inverts and plants."},
+  {id:"equipment-management",page:"equipment",icon:"⚙",ar:"حدد مكان الجهاز باللمس وتابع عمره وأعطاله والطاقة والاحتياط.",en:"Place equipment by touch and track lifecycle, failures, energy and backup readiness."},
+  {id:"alerts-center",page:"alerts",icon:"△",ar:"مركز التنبيهات يجمع مشاكل الحوض كلها بمكان واحد.",en:"The Alerts center brings aquarium problems together in one place."},
+  {id:"visual-insight",page:"journal",icon:"▧",ar:"Visual Tank Insight يربط الصورة بالكائن وسجل الحوض.",en:"Visual Tank Insight links a photo to the livestock item and tank history."},
+  {id:"global-search",page:"dashboard",icon:"⌕",ar:"البحث الشامل يوصلك لكائن أو جهاز أو KH أو مهمة بسرعة.",en:"Global search jumps quickly to livestock, equipment, KH or a task."},
+  {id:"dashboard-customize",page:"dashboard",icon:"⚙",ar:"رتّب صناديق الداشبورد وأخفِ ما لا تحتاجه.",en:"Reorder Dashboard cards and hide what you do not need."},
+  {id:"sump-model",page:"sump",icon:"▤",ar:"مخطط السامب مبني على أبعاد الحجر الحقيقية ومحتوياتها.",en:"The sump layout uses the real chamber dimensions and contents."}
 ];
 
 export function DashboardFeatureBubble(){
@@ -34,24 +36,37 @@ export function DashboardFeatureBubble(){
   const [index,setIndex]=useState(0);
   const [cycle,setCycle]=useState(0);
   const [visible,setVisible]=useState(true);
+  const [discovery,setDiscovery]=useState<FeatureDiscoveryState>({mode:"smart",learned:[]});
+
+  useEffect(()=>{
+    setDiscovery(readFeatureDiscovery());
+    return subscribeFeatureDiscovery(next=>{
+      setDiscovery(next);
+      setIndex(0);
+      setVisible(true);
+    });
+  },[]);
+
+  const available=discovery.mode==="off"?[]:FEATURE_TIPS.filter(x=>!discovery.learned.includes(x.id));
+
   useEffect(()=>{
     const timer=window.setInterval(()=>{
-      setIndex(i=>(i+1)%FEATURE_TIPS.length);
+      setIndex(i=>available.length?(i+1)%available.length:0);
       setCycle(c=>c+1);
       setVisible(true);
     },BUBBLE_CYCLE_MS);
     return()=>window.clearInterval(timer);
-  },[]);
+  },[available.length]);
 
-  const tip=FEATURE_TIPS[index];
+  const tip=available.length?available[index%available.length]:null;
+  if(!visible||!tip)return null;
+
   const names:Partial<Record<AppPage,{ar:string;en:string}>>={
     dashboard:{ar:"لوحة القيادة",en:"Dashboard"},equipment:{ar:"التجهيزات",en:"Equipment"},lighting:{ar:"الإنارة",en:"Lighting"},
     chemistry:{ar:"الكيمياء",en:"Chemistry"},acclimation:{ar:"الإقلمة",en:"Acclimation"},alerts:{ar:"التنبيهات",en:"Alerts"},
     journal:{ar:"الصور والسجل",en:"Journal"},sump:{ar:"السامب",en:"Sump"}
   };
   const label=names[tip.page]?.[lang==="ar"?"ar":"en"]??tip.page;
-
-  if(!visible)return null;
 
   return <div className="feature-bubble-lane">
     <div className="feature-bubble" key={cycle} role="button" tabIndex={0} aria-label={lang==="ar"?"إخفاء التلميح":"Dismiss tip"} onClick={()=>setVisible(false)} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setVisible(false);}}}>
