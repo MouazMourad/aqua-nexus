@@ -319,5 +319,107 @@ export function deriveExtendedIntelligenceEvents(before:Tank,after:Tank):Intelli
     }
   }
 
+
+  // Coverage contract: meaningful Tank edits that are not naturally append-only
+  // still become explicit memory events instead of silently changing the snapshot.
+  const coreChanged:string[]=[];
+  if(before.name!==after.name)coreChanged.push("name");
+  if(before.ageMonths!==after.ageMonths)coreChanged.push("ageMonths");
+  if(!same(before.display,after.display))coreChanged.push("display");
+  if(coreChanged.length)push({
+    timestamp:now(),kind:"fact",domain:"system",verb:"tank_identity_changed",entityType:"tank",entityId:after.id,confidence:100,
+    sourceId:bucketSource(`${after.id}:identity`),sourcePage:"tanks",
+    textAr:`تغيرت بيانات أساسية للحوض: ${coreChanged.join("، ")}`,
+    textEn:`Core tank details changed: ${coreChanged.join(", ")}`,
+    metadata:{changed:coreChanged.join(","),name:after.name,ageMonths:after.ageMonths??null,display:JSON.stringify(after.display)}
+  });
+
+  for(const old of before.maintenance)if(!after.maintenance.some(x=>x.id===old.id))push({
+    timestamp:now(),kind:"action",domain:"maintenance",verb:"task_removed",entityType:"task",entityId:old.id,confidence:100,
+    sourceId:`${old.id}:removed:${Date.now()}`,sourcePage:"maintenance",
+    textAr:`تمت إزالة مهمة الصيانة ${old.title}`,textEn:`Maintenance task removed: ${old.titleEn||old.title}`
+  });
+  for(const old of before.inventory)if(!after.inventory.some(x=>x.id===old.id))push({
+    timestamp:now(),kind:"action",domain:"inventory",verb:"item_removed",entityType:"stock",entityId:old.id,confidence:100,
+    sourceId:`${old.id}:removed:${Date.now()}`,sourcePage:"inventory",
+    textAr:`تمت إزالة مادة المخزون ${old.name}`,textEn:`Inventory item removed: ${old.nameEn||old.name}`
+  });
+
+  const beforeExpenses=new Map(before.expenses.map(x=>[x.id,x]));
+  for(const row of after.expenses){
+    const old=beforeExpenses.get(row.id); if(!old)continue;
+    const changed=changedKeys(old,row,["description","amount","currency","date","category"]);
+    if(changed.length)push({
+      timestamp:now(),kind:"fact",domain:"expense",verb:"expense_changed",entityType:"expense",entityId:row.id,confidence:100,
+      sourceId:bucketSource(`${row.id}:expense`),sourcePage:"expenses",
+      textAr:`تم تعديل سجل مصروف: ${changed.join("، ")}`,textEn:`Expense record changed: ${changed.join(", ")}`,
+      metadata:{changed:changed.join(","),snapshot:snapshot(row,changed)}
+    });
+  }
+  for(const old of before.expenses)if(!after.expenses.some(x=>x.id===old.id))push({
+    timestamp:now(),kind:"action",domain:"expense",verb:"expense_removed",entityType:"expense",entityId:old.id,confidence:100,
+    sourceId:`${old.id}:removed:${Date.now()}`,sourcePage:"expenses",
+    textAr:`تم حذف سجل المصروف ${old.description}`,textEn:`Expense record removed: ${old.description}`
+  });
+
+  for(const old of before.photos)if(!after.photos.some(x=>x.id===old.id))push({
+    timestamp:now(),kind:"action",domain:"journal",verb:"photo_removed",entityType:"photo",entityId:old.id,confidence:100,
+    sourceId:`${old.id}:removed:${Date.now()}`,sourcePage:"journal",
+    textAr:"تمت إزالة صورة/ملاحظة من السجل",textEn:"A journal photo/observation was removed"
+  });
+
+  for(const old of before.quarantine)if(!after.quarantine.some(x=>x.id===old.id))push({
+    timestamp:now(),kind:"action",domain:"quarantine",verb:"case_removed",entityType:"case",entityId:old.id,confidence:100,
+    sourceId:`${old.id}:removed:${Date.now()}`,sourcePage:"quarantine",
+    textAr:`تمت إزالة حالة الحجر/العلاج لـ ${old.organism}`,textEn:`Quarantine/treatment case removed for ${old.organism}`
+  });
+
+  const beforePlans=new Map((((before.aiActionPlans??[]) as any[])).map(x=>[String(x.id),x]));
+  for(const plan of ((after.aiActionPlans??[]) as any[])){
+    const old=beforePlans.get(String(plan.id));
+    if(!old)push({
+      timestamp:String(plan.createdAt||now()),kind:"action",domain:"system",verb:"ai_plan_created",entityType:"aiActionPlan",entityId:String(plan.id),confidence:100,
+      sourceId:`${String(plan.id)}:created`,sourcePage:"dashboard",
+      textAr:`تم إنشاء خطة متابعة Local Best AI: ${String(plan.titleAr||plan.titleEn||"")}`,
+      textEn:`Local Best AI follow-up plan created: ${String(plan.titleEn||plan.titleAr||"")}`,
+      metadata:{focus:(plan.focus as any)?.domain??null,reviewAfterHours:plan.reviewAfterHours??null}
+    });
+    else{
+      const oldDone=Array.isArray((old as any).steps)?(old as any).steps.filter((x:any)=>x.done).length:0;
+      const newDone=Array.isArray(plan.steps)?plan.steps.filter((x:any)=>x.done).length:0;
+      if((old as any).status!==plan.status||oldDone!==newDone||String((old as any).outcome||"")!==String(plan.outcome||""))push({
+        timestamp:String(plan.completedAt||now()),kind:plan.status==="completed"?"outcome":"observation",domain:"system",verb:plan.status==="completed"?"ai_plan_outcome":"ai_plan_progress",
+        entityType:"aiActionPlan",entityId:String(plan.id),value:plan.outcome??newDone,confidence:100,
+        sourceId:bucketSource(`${String(plan.id)}:progress`),sourcePage:"dashboard",
+        textAr:plan.status==="completed"?`تم تقييم خطة Local Best AI: ${String(plan.outcome||"stable")}`:`تقدم تنفيذ خطة Local Best AI: ${newDone}/${Array.isArray(plan.steps)?plan.steps.length:0}`,
+        textEn:plan.status==="completed"?`Local Best AI plan outcome: ${String(plan.outcome||"stable")}`:`Local Best AI plan progress: ${newDone}/${Array.isArray(plan.steps)?plan.steps.length:0}`,
+        metadata:{outcome:plan.outcome??null,done:newDone,total:Array.isArray(plan.steps)?plan.steps.length:0,focus:(plan.focus as any)?.domain??null}
+      });
+    }
+  }
+
+  // Lifecycle edits after creation are meaningful too (planned return, notes,
+  // destination or plan changes), not only start/end transitions.
+  for(const row of after.lifecycle?.vacations??[]){
+    const old=beforeVacations.get(row.id); if(!old)continue;
+    const changed=changedKeys(old,row,["plannedEndAt","notes"]);
+    if(changed.length)push({
+      timestamp:now(),kind:"fact",domain:"system",verb:"vacation_changed",entityType:"vacation",entityId:row.id,confidence:100,
+      sourceId:bucketSource(`${row.id}:vacation`),sourcePage:"settings",
+      textAr:"تم تحديث خطة السفر/الغياب",textEn:"Vacation/away plan updated",
+      metadata:{changed:changed.join(","),plannedEndAt:row.plannedEndAt??null,notes:row.notes??null}
+    });
+  }
+  for(const row of after.lifecycle?.relocations??[]){
+    const old=beforeMoves.get(row.id); if(!old)continue;
+    const changed=changedKeys(old,row,["from","to","notes"]);
+    if(changed.length)push({
+      timestamp:now(),kind:"fact",domain:"system",verb:"relocation_changed",entityType:"relocation",entityId:row.id,confidence:100,
+      sourceId:bucketSource(`${row.id}:relocation`),sourcePage:"settings",
+      textAr:"تم تحديث تفاصيل نقل الحوض",textEn:"Tank relocation details updated",
+      metadata:{changed:changed.join(","),from:row.from??null,to:row.to??null,notes:row.notes??null}
+    });
+  }
+
   return out;
 }
