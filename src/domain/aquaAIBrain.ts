@@ -481,13 +481,15 @@ function lightingAnswer(tank:Tank):AquaAIAnswer{
  const light=lightingIntelligence(tank),schedule=light.schedule;
  const firstIssue=light.issues[0];
  const calibrated=light.calibrationPoints>0;
+ const latestImport=light.latestImport;
  const detailsAr=[
   `وحدات الإنارة الفعالة: ${light.fixtures}.`,
   light.program?`البرنامج: ${light.program.name} • الفترة ${(schedule.photoperiodMinutes/60).toFixed(1)} ساعة • Peak ${Math.round(schedule.peakPercent)}% عند ${formatLightMinute(schedule.peakMinute)}.`:"برنامج الإنارة غير محفوظ بعد.",
   light.program?`PAR المقدر في وسط الحوض عند عمق ${Math.round(light.depthPct)}%: حوالي ${Math.round(light.centerPeak)}.`:"ما في تقدير PAR موثوق بدون برنامج إنارة.",
   calibrated?`النموذج معاير بـ ${light.calibrationPoints} نقطة PAR فعلية ومعامل ×${light.calibrationFactor.toFixed(2)}.`:"الخريطة حالياً Estimated؛ أضف قياسات PAR حقيقية لرفع الثقة.",
   ...light.issues.slice(0,3).map(x=>x.ar),
-  ...(light.chemistrySignals.length?["إشارات كيميائية قريبة: "+light.chemistrySignals.join(" • ")+" — ارتباط زمني محتمل وليس إثبات سببية."]:[])
+  ...(light.chemistrySignals.length?["إشارات كيميائية قريبة: "+light.chemistrySignals.join(" • ")+" — ارتباط زمني محتمل وليس إثبات سببية."]:[]),
+  ...(latestImport?[`آخر مصدر استيراد: ${latestImport.fileName} • ${latestImport.analysisMode??latestImport.status}${typeof latestImport.confidence==="number"?" • ثقة "+Math.round(latestImport.confidence)+"%":""}.`]:[])
  ];
  const detailsEn=[
   `Active lighting fixtures: ${light.fixtures}.`,
@@ -495,15 +497,16 @@ function lightingAnswer(tank:Tank):AquaAIAnswer{
   light.program?`Estimated center PAR at ${Math.round(light.depthPct)}% depth: about ${Math.round(light.centerPeak)}.`:"A reliable PAR estimate needs a saved lighting program.",
   calibrated?`The model is calibrated with ${light.calibrationPoints} measured PAR point(s), factor ×${light.calibrationFactor.toFixed(2)}.`:"The map is currently estimated; add measured PAR points to improve confidence.",
   ...light.issues.slice(0,3).map(x=>x.en),
-  ...(light.chemistrySignals.length?["Nearby chemistry signals: "+light.chemistrySignals.join(" • ")+" — possible temporal association, not proof of causation."]:[])
+  ...(light.chemistrySignals.length?["Nearby chemistry signals: "+light.chemistrySignals.join(" • ")+" — possible temporal association, not proof of causation."]:[]),
+  ...(latestImport?[`Latest import source: ${latestImport.fileName} • ${latestImport.analysisMode??latestImport.status}${typeof latestImport.confidence==="number"?" • "+Math.round(latestImport.confidence)+"% confidence":""}.`]:[])
  ];
  return{
   titleAr:"تحليل إنارة الحوض",titleEn:"Tank lighting analysis",
   summaryAr:firstIssue?(firstIssue.ar+" "+(calibrated?"الخريطة معايرة بقياسات فعلية.":"اعتبر قيم PAR تقديرية حتى تتم المعايرة.")):"الإنارة الحالية لا تظهر مشكلة رئيسية من البيانات المسجلة، مع بقاء PAR تقديرياً حتى تتم المعايرة.",
   summaryEn:firstIssue?(firstIssue.en+" "+(calibrated?"The map is calibrated with measured PAR.":"Treat PAR as estimated until calibrated.")):"Current lighting data shows no major issue; PAR remains estimated until calibrated.",
   detailsAr,detailsEn,
-  evidenceAr:[`${light.fixtures} وحدات إنارة`,`${light.calibrationPoints} نقاط PAR`,`ثقة النموذج ${light.confidence}%`,`جرعة نسبية ${schedule.relativeDoseHours.toFixed(1)} h-eq`],
-  evidenceEn:[`${light.fixtures} lighting fixtures`,`${light.calibrationPoints} PAR points`,`${light.confidence}% model confidence`,`${schedule.relativeDoseHours.toFixed(1)} h-eq relative dose`],
+  evidenceAr:[`${light.fixtures} وحدات إنارة`,`${light.calibrationPoints} نقاط PAR`,`ثقة النموذج ${light.confidence}%`,`جرعة نسبية ${schedule.relativeDoseHours.toFixed(1)} h-eq`,...(latestImport?[`استيراد ${latestImport.analysisMode??latestImport.status}${typeof latestImport.confidence==="number"?" "+Math.round(latestImport.confidence)+"%":""}`]:[])],
+  evidenceEn:[`${light.fixtures} lighting fixtures`,`${light.calibrationPoints} PAR points`,`${light.confidence}% model confidence`,`${schedule.relativeDoseHours.toFixed(1)} h-eq relative dose`,...(latestImport?[`Import ${latestImport.analysisMode??latestImport.status}${typeof latestImport.confidence==="number"?" "+Math.round(latestImport.confidence)+"%":""}`]:[])],
   missingEvidenceAr:calibrated?[]:["قياسات PAR فعلية موزعة على الحوض","سجل حجم تعويض الماء/ATO إذا بدنا قياس أثر التبخر"],
   missingEvidenceEn:calibrated?[]:["Measured PAR points across the tank","Measured top-off/ATO volume history to quantify evaporation response"],
   confidence:light.confidence>=80?"high":light.confidence>=45?"medium":"low",
