@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { createJSONStorage,persist } from "zustand/middleware";
-import type { AquaState, ChemistryReading, Equipment, HealthSnapshot, Language, Tank } from "@/domain/types";
+import type { AquaState, AquariumExperienceLevel, ChemistryReading, Equipment, HealthSnapshot, Language, Tank } from "@/domain/types";
 import { demoMarineTank, demoFreshwaterTank } from "@/data/demoTank";
 import { liters, round1 } from "@/lib/units";
 import { defaultDisplayPosition } from "@/lib/displayLayout";
@@ -16,6 +16,7 @@ import { aquaStateStorage } from "@/lib/aquaStateStorage";
 
 interface AquaStore extends AquaState {
   setLanguage: (language: Language) => void;
+  setAquariumExperience: (level:AquariumExperienceLevel) => void;
   selectTank: (tankId: string) => void;
   addTank: (tank: Tank) => void;
   deleteTank: (tankId: string) => void;
@@ -162,10 +163,12 @@ export const useAquaStore = create<AquaStore>()(
   persist(
     (set) => ({
       language:"ar",
+      aquariumExperience:"beginner",
       selectedTankId:demoMarineTank.id,
       tanks:canonicalTrainingTanks(),
 
       setLanguage:(language)=>set({language}),
+      setAquariumExperience:(aquariumExperience)=>set({aquariumExperience}),
       selectTank:(selectedTankId)=>set({selectedTankId}),
 
       addTank:(tank)=>set((state)=>({
@@ -260,14 +263,14 @@ export const useAquaStore = create<AquaStore>()(
         const tanks=withCanonicalTraining(Array.isArray(p.tanks)?p.tanks:[]);
         const requested=tanks.find(t=>t.id===p.selectedTankId);
         const firstReal=tanks.find(t=>!t.isTraining);
-        return {...p,tanks,selectedTankId:requested?.id??firstReal?.id??demoMarineTank.id};
+        return {...p,aquariumExperience:["beginner","intermediate","advanced"].includes(p.aquariumExperience)?p.aquariumExperience:"beginner",tanks,selectedTankId:requested?.id??firstReal?.id??demoMarineTank.id};
       },
       merge:(persisted:any,current)=>{
         const p=persisted??{};
         const tanks=withCanonicalTraining(p.tanks??current.tanks);
         const requested=tanks.find(t=>t.id===p.selectedTankId);
         const firstReal=tanks.find(t=>!t.isTraining);
-        return {...current,...p,tanks,selectedTankId:requested?.id??firstReal?.id??demoMarineTank.id};
+        return {...current,...p,aquariumExperience:["beginner","intermediate","advanced"].includes(p.aquariumExperience)?p.aquariumExperience:"beginner",tanks,selectedTankId:requested?.id??firstReal?.id??demoMarineTank.id};
       }
     }
   )
