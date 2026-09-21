@@ -13,6 +13,7 @@ import { sumpIntelligence } from "@/domain/sumpIntelligence";
 import { stockingReadiness } from "@/domain/stockingReadiness";
 import { auditTankCompatibility } from "@/domain/compatibility";
 import { tankStateView } from "@/domain/tankIntelligence";
+import { tankIntelligenceCore } from "@/domain/intelligenceCore";
 import { systemHealthTrend } from "@/domain/systemHealth";
 import { deriveGuidanceActions } from "@/domain/impactEngine";
 import { deriveIntelligenceEvents,mergeIntelligenceEvents } from "@/domain/eventIntelligence";
@@ -1094,15 +1095,41 @@ describe("Lighting Intelligence regression",()=>{
     expect(plant?.zone).toBe("shade");
     expect(plant?.parMax).toBeLessThanOrEqual(60);
 
-    marine.livestock.push({id:"coral-depth",name:"Acropora Depth",category:"coral",quantity:1,health:"good",lightingDepthCm:marine.display.height*.2} as any);
+    marine.livestock.push({id:"coral-depth",name:"Acropora Depth",category:"coral",quantity:1,health:"good",lightingDepthCm:marine.display.height*.2,lightingXPct:50,lightingZPct:50,lightingExposure:"open"} as any);
     const placed=lightingPlacementRecommendations(marine).find(x=>x.livestockId==="coral-depth");
     expect(placed?.placementStatus).toBe("within");
     expect(placed?.actualZone).toBe("top");
     expect(placed?.estimatedPeakParAtActualDepth).toBeGreaterThan(0);
+    expect(placed?.actualXPct).toBe(50);
+    expect(placed?.actualZPct).toBe(50);
 
     freshwater.livestock.push({id:"plant-carpet",name:"Monte Carlo Carpet",category:"plant",quantity:1,health:"good"} as any);
     const carpet=lightingPlacementRecommendations(freshwater).find(x=>x.livestockId==="plant-carpet");
     expect(carpet?.zone).toBe("bottom");
+  });
+  it("applies X/Z position and local hardscape shade to per-livestock PAR",()=>{
+    const t=litTank();
+    t.livestock.push({id:"shade-open",name:"Torch Open",category:"coral",quantity:1,health:"good",lightingDepthCm:30,lightingXPct:50,lightingZPct:50,lightingExposure:"open"} as any);
+    t.livestock.push({id:"shade-covered",name:"Torch Shade",category:"coral",quantity:1,health:"good",lightingDepthCm:30,lightingXPct:50,lightingZPct:50,lightingExposure:"shade"} as any);
+    const rows=lightingPlacementRecommendations(t);
+    const open=rows.find(x=>x.livestockId==="shade-open")!;
+    const shade=rows.find(x=>x.livestockId==="shade-covered")!;
+    expect(open.estimatedPeakParAtActualDepth).toBeGreaterThan(0);
+    expect(shade.estimatedPeakParAtActualDepth).toBeLessThan((open.estimatedPeakParAtActualDepth??0)*.6);
+    expect(shade.exposureFactor).toBe(.45);
+  });
+  it("feeds real livestock light placement into Tank Brain and Local Best AI",()=>{
+    const t=litTank();
+    t.livestock.push({id:"brain-coral",name:"Torch Brain Link",category:"coral",quantity:1,health:"good",lightingDepthCm:t.display.height*.95,lightingXPct:4,lightingZPct:4,lightingExposure:"shade"} as any);
+    const light=lightingIntelligence(t);
+    expect(light.issues.some(x=>x.id==="photosynthetic-placement")).toBe(true);
+    const core=tankIntelligenceCore(t);
+    expect(core.lighting.placementRecommendations.some(x=>x.livestockId==="brain-coral")).toBe(true);
+    expect(core.nextActions.some(x=>x.domain==="lighting")).toBe(true);
+    const answer=aquaAIAnswer("وين Torch Brain Link وقديش واصله ضو؟",t,"lighting");
+    const joined=answer.detailsAr.join(" ");
+    expect(joined).toContain("Torch Brain Link");
+    expect(joined).toMatch(/X|PAR|ظل/);
   });
   it("uses fixture wattage when no measured reference PAR exists",()=>{
     const t=litTank();
@@ -1121,7 +1148,13 @@ describe("Lighting Intelligence regression",()=>{
   it("rejects impossible photosynthetic depth in recovery backups",()=>{
     const t=litTank() as any;
     t.livestock.push({id:"bad-depth",name:"Coral",category:"coral",quantity:1,health:"good",lightingDepthCm:t.display.height+5});
-    const result=validateBackupPayload({app:"Aqua Nexus",schemaVersion:14,language:"ar",selectedTankId:t.id,tanks:[t]});
+    const result=validateBackupPayload({app:"Aqua Nexus",schemaVersion:15,language:"ar",selectedTankId:t.id,tanks:[t]});
+    expect(result.ok).toBe(false);
+  });
+  it("rejects invalid livestock X/Z or exposure in recovery backups",()=>{
+    const t=litTank() as any;
+    t.livestock.push({id:"bad-xyz",name:"Coral",category:"coral",quantity:1,health:"good",lightingDepthCm:20,lightingXPct:120,lightingZPct:50,lightingExposure:"hidden"});
+    const result=validateBackupPayload({app:"Aqua Nexus",schemaVersion:15,language:"ar",selectedTankId:t.id,tanks:[t]});
     expect(result.ok).toBe(false);
   });
   it("rejects corrupt lighting values in recovery backups",()=>{
