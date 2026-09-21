@@ -206,7 +206,7 @@ export function normalizeEquipmentImportCandidate(raw:unknown,sourceKind:Equipme
       unit:x?.unit?String(x.unit).slice(0,60):undefined,deviceName:x?.deviceName?String(x.deviceName).slice(0,300):undefined,
       destination:canonical&&plausibleChemistry(canonical,value)?"chemistry":"telemetry"
     };
-  }).filter(x=>Number.isFinite(x.value));
+  }).filter((x:EquipmentImportMeasurementCandidate)=>Number.isFinite(x.value));
 
   const doses:EquipmentImportDoseCandidate[]=dosesRaw.slice(0,100000).map((x:any,i:number)=>{
     const timestamp=safeTimestamp(x?.timestamp??x?.time??x?.date),parameter=String(x?.parameter??x?.material??x?.name??"dose").slice(0,160);
@@ -215,7 +215,7 @@ export function normalizeEquipmentImportCandidate(raw:unknown,sourceKind:Equipme
     return{key:"dose-"+i+"-"+keyHash(sourceRecordId),sourceRecordId,enabled:x?.enabled!==false,timestamp,parameter,ml,
       amount:finite(x?.amount)??undefined,unit:x?.unit?String(x.unit).slice(0,60):undefined,material:x?.material?String(x.material).slice(0,200):undefined,
       deviceName:x?.deviceName?String(x.deviceName).slice(0,300):undefined};
-  }).filter(x=>x.ml>=0);
+  }).filter((x:EquipmentImportDoseCandidate)=>x.ml>=0);
 
   const topOff:EquipmentImportTopOffCandidate[]=topRaw.slice(0,100000).map((x:any,i:number)=>{
     const timestamp=safeTimestamp(x?.timestamp??x?.time??x?.date),liters=Math.max(0,finite(x?.liters??x?.volumeLiters??x?.value)??0);
