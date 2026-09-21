@@ -17,7 +17,10 @@ function pool(){
       max:Number(process.env.DATABASE_POOL_MAX||10),
       idleTimeoutMillis:30000,
       connectionTimeoutMillis:8000,
-      ssl:process.env.DATABASE_SSL==="require"?{rejectUnauthorized:false}:undefined
+      ssl:process.env.DATABASE_SSL==="require"?{
+        rejectUnauthorized:process.env.DATABASE_SSL_INSECURE!=="1",
+        ...(process.env.DATABASE_SSL_CA?{ca:process.env.DATABASE_SSL_CA.replace(/\\n/g,"\n")}:{})
+      }:undefined
     });
   }
   return globalForAqua.aquaPgPool;
@@ -89,6 +92,13 @@ CREATE TABLE IF NOT EXISTS aqua_job_runs (
   details jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS aqua_rate_limits (
+  bucket_key text PRIMARY KEY,
+  count integer NOT NULL DEFAULT 0,
+  reset_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS aqua_rate_limits_reset_idx ON aqua_rate_limits(reset_at);
 `;
 
 export async function ensureBackendSchema(){
