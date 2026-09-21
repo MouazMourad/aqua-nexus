@@ -85,6 +85,12 @@ function nestedDataIssue(tank:Record<string,unknown>){
   }
   for(const [i,row] of (((tank.equipment as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validText(row.name,300)||!validText(row.kind,80))return `equipment #${i+1} is invalid`;
+    for(const key of ["parAtTargetDepth","mountingHeightCm","parReferenceDepthCm","coverageLengthCm","coverageWidthCm"]){
+      const value=row[key];
+      if(value!==undefined&&(!finite(value)||Number(value)<0))return `equipment #${i+1} has invalid ${key}`;
+    }
+    if(row.mountingHeightCm!==undefined&&Number(row.mountingHeightCm)>150)return `equipment #${i+1} has mountingHeightCm above 150`;
+    if(row.parAtTargetDepth!==undefined&&Number(row.parAtTargetDepth)>5000)return `equipment #${i+1} has implausible parAtTargetDepth`;
   }
 
   for(const [i,row] of (((tank.rodi as unknown[])??[])).entries()){
