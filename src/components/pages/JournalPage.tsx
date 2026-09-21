@@ -92,6 +92,7 @@ export function JournalPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
  const [caption,setCaption]=useState(""),[livestockId,setLivestockId]=useState(""),[sizeCm,setSizeCm]=useState(0);
  const [visionLivestockId,setVisionLivestockId]=useState(""),[visionSymptoms,setVisionSymptoms]=useState<VisionSymptom[]>([]),[visionNotes,setVisionNotes]=useState(""),[visionBusy,setVisionBusy]=useState(false),[visionError,setVisionError]=useState(""),[deepVisionBusyId,setDeepVisionBusyId]=useState<string|null>(null),[deepVisionError,setDeepVisionError]=useState("");
+ const [photoLimit,setPhotoLimit]=useState(60);
  const photos=tank.photos as GrowthPhoto[];
  const assessments:VisionAssessmentRecord[]=tank.visionAssessments??[];
  const trackedLivestock=tank.livestock.filter(x=>x.category==="coral"||x.category==="plant"||x.category==="other");
@@ -281,6 +282,6 @@ export function JournalPage({tank}:{tank:Tank}) {
   </div>})}</div>
  </div>}
 
- <div className="photo-grid full-span">{photos.map(p=>{const subject=tank.livestock.find(x=>x.id===p.livestockId);return <article className="photo-card" key={p.id}><StoredPhotoImage photo={p} alt={p.caption||tr(lang,"journal")}/><div><b>{p.caption||subject&&(lang==="ar"?subject.name:(subject.nameEn||subject.name))||tr(lang,"journal")}</b><small>{new Date(p.timestamp).toLocaleString()}</small>{subject&&<small>{lang==="ar"?subject.name:(subject.nameEn||subject.name)}{p.estimatedSizeCm?` • ${p.estimatedSizeCm} cm`:""}</small>}<small>{typeof p.colorIndex==="number"?`${bi(lang,"مؤشر اللون","Color index")}: ${p.colorIndex}/100`:""}{typeof p.brightnessIndex==="number"?` • ${bi(lang,"الإضاءة","brightness")}: ${p.brightnessIndex}/100`:""}{typeof p.captureScore==="number"?` • Capture ${p.captureScore}/100`:""}</small></div></article>})}</div>
+ <div className="photo-grid full-span">{photos.slice(0,photoLimit).map(p=>{const subject=tank.livestock.find(x=>x.id===p.livestockId);return <article className="photo-card" key={p.id}><StoredPhotoImage photo={p} alt={p.caption||tr(lang,"journal")}/><div><b>{p.caption||subject&&(lang==="ar"?subject.name:(subject.nameEn||subject.name))||tr(lang,"journal")}</b><small>{new Date(p.timestamp).toLocaleString()}</small>{subject&&<small>{lang==="ar"?subject.name:(subject.nameEn||subject.name)}{p.estimatedSizeCm?` • ${p.estimatedSizeCm} cm`:""}</small>}<small>{typeof p.colorIndex==="number"?`${bi(lang,"مؤشر اللون","Color index")}: ${p.colorIndex}/100`:""}{typeof p.brightnessIndex==="number"?` • ${bi(lang,"الإضاءة","brightness")}: ${p.brightnessIndex}/100`:""}{typeof p.captureScore==="number"?` • Capture ${p.captureScore}/100`:""}</small></div></article>})}</div>{photoLimit<photos.length&&<div className="full-span" style={{display:"flex",justifyContent:"center"}}><button className="btn" onClick={()=>setPhotoLimit(n=>n+60)}>{bi(lang,`عرض 60 صورة أقدم — باقي ${photos.length-photoLimit}`,`Show 60 older photos — ${photos.length-photoLimit} remaining`)}</button></div>}
  </section>;
 }
