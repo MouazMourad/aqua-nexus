@@ -180,3 +180,25 @@ export function validateAcclimationWater(input:{salinity?:number;temperature?:nu
   if(input.dipQuantity!==undefined)add(range("dipQuantity",input.dipQuantity,.000001,1_000_000,"كمية Coral Dip","Coral Dip quantity"));
   return{ok:!issues.some(x=>x.level==="danger"),issues};
 }
+
+export function validateLivestockEntry(input:{quantity:number;sizeCm?:number}){
+  const issues:InputSanityIssue[]=[]; const add=(x:InputSanityIssue|undefined)=>{if(x)issues.push(x)};
+  add(range("quantity",input.quantity,1,10_000,"عدد الكائنات","Livestock quantity"));
+  if(input.sizeCm!==undefined)add(range("sizeCm",input.sizeCm,0,1000,"الحجم التقريبي","Estimated size"));
+  return{ok:!issues.some(x=>x.level==="danger"),issues};
+}
+
+export function validateGrowthMeasurement(input:{sizeCm?:number}){
+  const issues:InputSanityIssue[]=[];
+  if(input.sizeCm!==undefined){
+    const issue=range("sizeCm",input.sizeCm,0,1000,"الحجم التقديري","Estimated size");
+    if(issue)issues.push(issue);
+  }
+  return{ok:!issues.some(x=>x.level==="danger"),issues};
+}
+
+export function validateAbsencePlan(input:{daysAway:number}){
+  const issue=range("daysAway",input.daysAway,1,365,"مدة الغياب بالأيام","Days away");
+  return{ok:!issue,issues:issue?[issue]:[]};
+}
+
