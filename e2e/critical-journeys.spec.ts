@@ -158,7 +158,7 @@ test("new wizard tank enters biological cycling and locks non-cycle workflows",a
 
 
 test("progressive navigation keeps every module reachable and supports keyboard search",async({page})=>{
-  await expect(page.getByRole("button",{name:/متقدم|Advanced/})).toBeVisible();
+  await expect(page.getByRole("button",{name:/بحث في Aqua Nexus|Search Aqua Nexus/})).toBeVisible();
   await openTrainingDashboard(page);
   await expect(page.locator('[data-aqua-page="chemistry"]')).toBeVisible();
   await expect(page.locator('[data-aqua-page="diseases"]')).toHaveCount(0);
@@ -167,7 +167,7 @@ test("progressive navigation keeps every module reachable and supports keyboard 
   await page.getByRole("button",{name:"Close"}).click();
 
   await page.keyboard.press("Control+K");
-  const dialog=page.getByRole("dialog",{name:/أدوات Aqua Nexus المتقدمة|Aqua Nexus advanced tools/});
+  const dialog=page.getByRole("dialog",{name:/بحث وأدوات Aqua Nexus|Aqua Nexus search and tools/});
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('[data-quick-action="chemistry"]')).toBeVisible();
   await dialog.locator("input").fill("lighting");
@@ -177,7 +177,7 @@ test("progressive navigation keeps every module reachable and supports keyboard 
   await expect(page.locator(".page-grid")).toContainText(/RO\/DI/);
 
   await page.getByRole("button",{name:/إجراءات سريعة|Quick actions/}).click();
-  const quick=page.getByRole("dialog",{name:/أدوات Aqua Nexus المتقدمة|Aqua Nexus advanced tools/});
+  const quick=page.getByRole("dialog",{name:/بحث وأدوات Aqua Nexus|Aqua Nexus search and tools/});
   await quick.locator('[data-quick-action="chemistry"]').click();
   await expect(page.locator(".page-grid")).toContainText(/شو وضع الكيمياء فعلياً|What is actually happening with chemistry/);
 });
