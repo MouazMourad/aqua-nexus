@@ -92,6 +92,124 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const exceptionCandidates=useMemo(()=>[...(active?.items??[])].filter(i=>!i.emergency&&!["added","deferred"].includes(i.status)),[active?.items]);
  const step=active?.wizardStep??1;
  const acclimationGuide=useMemo(()=>buildAcclimationGuide(active,lang),[active,lang]);
+ function ev(ar:string,en:string){return{id:uid("ace"),timestamp:nowISO(),textAr:ar,textEn:en}}
+ function unlockAudio(){
+  if(typeof window==="undefined")return;
+  const AudioCtor=window.AudioContext||(window as any).webkitAudioContext;
+  if(!AudioCtor)return;
+  if(!audioCtxRef.current)audioCtxRef.current=new AudioCtor();
+  if(audioCtxRef.current.state==="suspended")audioCtxRef.current.resume().catch(()=>{});
+ }
+ function soundFamily(lane:string){
+  if(lane==="fish")return "fish";
+  if(lane==="coral")return "coral";
+  if(lane==="plant"||lane==="macroalgae")return "plant";
+  if(lane==="emergency")return "emergency";
+  if(lane==="global")return "global";
+  return "invert";
+ }
+ function playTimerSound(lane:string){
+  unlockAudio();
+  const ctx=audioCtxRef.current;if(!ctx)return;
+  const family=soundFamily(lane);
+  const patterns:any={
+   fish:[[880,0,.11],[1120,.16,.11],[880,.32,.13]],
+   invert:[[520,0,.09],[390,.13,.09],[520,.26,.12]],
+   coral:[[660,0,.16],[660,.22,.16],[820,.46,.18]],
+   plant:[[440,0,.13],[554,.18,.13],[659,.36,.18]],
+   emergency:[[980,0,.12],[620,.16,.12],[980,.32,.12],[620,.48,.16]],
+   global:[[740,0,.14],[920,.20,.14],[1120,.40,.20]]
+  };
+  const gain=ctx.createGain();gain.connect(ctx.destination);gain.gain.setValueAtTime(.0001,ctx.currentTime);
+  for(const [freq,delay,dur] of patterns[family]){
+   const osc=ctx.createOscillator();osc.type=family==="invert"?"square":family==="coral"?"sine":"triangle";osc.frequency.value=freq;osc.connect(gain);
+   const t=ctx.currentTime+delay;gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(.12,t+.015);gain.gain.exponentialRampToValueAtTime(.0001,t+dur);osc.start(t);osc.stop(t+dur+.02);
+  }
+ }
+ function pushTimerAlert(lane:string,batch?:number,emergencyName?:string){
+  const name=emergencyName||(lane==="emergency"?bi(lang,"المسار الاستثنائي","Exception track"):releaseLaneLabel(lang,lane));
+  const message=emergencyName
+   ?bi(lang,`انتهى عداد الإقلمة الاستثنائية لـ ${emergencyName} — جاهز للفحص النهائي.`,`Rapid exception timer finished for ${emergencyName} — ready for final check.`)
+   :bi(lang,`انتهى عداد ${name}${batch?` — الدفعة ${batch}`:""} وأصبحت جاهزة للفحص.`,`${name}${batch?` — Batch ${batch}`:""} timer finished and is ready for inspection.`);
+  setTimerAlerts(prev=>[{id:uid("alert"),lane,batch,message},...prev].slice(0,5));
+  playTimerSound(lane);
+  try{if("vibrate" in navigator)(navigator as any).vibrate(lane==="emergency"?[220,90,220,90,300]:[160,80,160]);}catch{}
+  void showCriticalAquariumNotification("Aqua Nexus",message,`acclimation-${active?.id||"session"}-${lane}-${batch??emergencyName??"timer"}`);
+ }
+ function laneRuntime(lane:any){
+  const unfinished=lane.entries.filter((e:any)=>!["added","deferred"].includes(e.item.status));
+  if(!unfinished.length)return{completed:true,currentBatch:lane.totalBatches,batchEntries:[],items:[],started:false,timer:0,status:"done"};
+  const currentBatch=Math.min(...unfinished.map((e:any)=>e.batch));
+  const batchEntries=lane.entries.filter((e:any)=>e.batch===currentBatch);
+  const items=batchEntries.map((e:any)=>e.item).filter((i:AcclimationItem)=>!["added","deferred"].includes(i.status));
+  const started=items.some((i:AcclimationItem)=>Boolean(i.startedAt)||["acclimating","paused","ready"].includes(i.status));
+  const timer=items.length?Math.max(...items.map((i:AcclimationItem)=>started?remaining(i,now):itemDuration(i))):0;
+  const status=items.some((i:AcclimationItem)=>i.status==="acclimating")?"running":items.some((i:AcclimationItem)=>i.status==="paused")?"paused":items.length&&items.every((i:AcclimationItem)=>i.status==="ready")?"ready":"waiting";
+  return{completed:false,currentBatch,batchEntries,items,started,timer,status};
+ }
+ function batchRuntime(batch:any){
+  const allItems=batch.entries.map((e:any)=>e.item).filter((i:AcclimationItem)=>!i.emergency);
+  const remainingItems=allItems.filter((i:AcclimationItem)=>!["added","deferred"].includes(i.status));
+  const allAdded=allItems.length>0&&allItems.every((i:AcclimationItem)=>i.status==="added");
+  const complete=remainingItems.length===0;
+  const started=Boolean(active?.dripStartedAt);
+  const timer=remainingItems.length?Math.max(...remainingItems.map((i:AcclimationItem)=>started?remaining(i,now):batch.plannedMinutes*60000)):0;
+  const status=allAdded?"done":remainingItems.some((i:AcclimationItem)=>i.status==="acclimating")?"running":remainingItems.some((i:AcclimationItem)=>i.status==="paused")?"paused":remainingItems.length&&remainingItems.every((i:AcclimationItem)=>i.status==="ready")?"ready":"waiting";
+  return{allItems,remainingItems,allAdded,complete,started,timer,status};
+ }
+ function exceptionBoxRuntime(){
+  const allItems=exceptionAllItems;
+  const remainingItems=exceptionPendingItems;
+  const allAdded=allItems.length>0&&allItems.every((i:AcclimationItem)=>i.status==="added");
+  const started=allItems.some((i:AcclimationItem)=>Boolean(i.startedAt));
+  const timer=remainingItems.length?Math.max(...remainingItems.map((i:AcclimationItem)=>remaining(i,now))):0;
+  const status=allAdded?"done":remainingItems.some((i:AcclimationItem)=>i.status==="emergency")?"running":remainingItems.some((i:AcclimationItem)=>i.status==="paused")?"paused":remainingItems.length&&remainingItems.every((i:AcclimationItem)=>i.status==="ready")?"ready":"waiting";
+  return{allItems,remainingItems,allAdded,started,timer,status};
+ }
+ function bucketAction(action:"start"|"pause"|"resume"|"done"){
+  if(!active)return;
+  let s={...active},r=s.bucketRemainingMs??5*60000;
+  if(s.bucketStatus==="running"&&s.bucketEndAt)r=Math.max(0,s.bucketEndAt-Date.now());
+  if(action==="start")s={...s,bucketStatus:"running",bucketStartedAt:nowISO(),bucketRemainingMs:r,bucketEndAt:Date.now()+r,events:[ev("بدأ عداد نقل كل الكائنات إلى الأوعية لمدة 5 دقائق.","Started the 5-minute transfer-to-containers timer for the whole shipment."),...s.events]};
+  if(action==="pause")s={...s,bucketStatus:"paused",bucketRemainingMs:r,bucketEndAt:null};
+  if(action==="resume")s={...s,bucketStatus:"running",bucketEndAt:Date.now()+r,bucketRemainingMs:r};
+  if(action==="done")s={...s,bucketStatus:"done",bucketRemainingMs:0,bucketEndAt:null,events:[ev("تم تأكيد نقل كل الكائنات إلى الأوعية. جاهز لبدء التنقيط العام.","Confirmed all livestock moved to containers. Ready to start global drip acclimation."),...s.events]};
+  saveSession(s);
+ }
+ function startAllDripBatches(){
+  if(!active||!active.floatConfirmed||active.bucketStatus!=="done")return;
+  unlockAudio();
+  const started=Date.now();
+  const durationByItem=new Map<string,number>();
+  releaseBatches.forEach(batch=>batch.entries.forEach((entry:any)=>durationByItem.set(entry.item.id,batch.plannedMinutes*60000)));
+  saveSession({...active,status:"drip",dripStartedAt:nowISO(),items:active.items.map(item=>{
+   if(item.emergency||["added","deferred"].includes(item.status))return item;
+   const duration=durationByItem.get(item.id)??itemDuration(item);
+   return{...item,status:"acclimating" as const,startedAt:nowISO(),remainingMs:duration,endAt:started+duration};
+  }),events:[ev("بدأ التنقيط لجميع الدفعات بالتوازي، وكل دفعة تعمل بعداد مستقل.","Parallel drip acclimation started for all batches; every batch now has an independent timer."),...active.events]});
+ }
+ function startLaneBatch(laneKey:string,batch:number){
+  if(!active||!active.floatConfirmed)return;
+  const lane=releaseLanes.find(x=>x.key===laneKey);if(!lane)return;
+  const ids=new Set(lane.entries.filter(x=>x.batch===batch&&x.item.status==="waiting").map(x=>x.item.id));
+  if(!ids.size)return;
+  unlockAudio();
+  const start=Date.now();
+  saveSession({...active,items:active.items.map(x=>ids.has(x.id)?{...x,status:"acclimating" as const,startedAt:nowISO(),remainingMs:x.remainingMs??itemDuration(x),endAt:start+(x.remainingMs??itemDuration(x))}:x),events:[ev(`بدأت الدفعة ${batch} من مسار ${releaseLaneLabel("ar",laneKey)}.`,`Started Batch ${batch} of the ${releaseLaneLabel("en",laneKey)} lane.`),...active.events]});
+ }
+ function saveSession(s:AcclimationSession,withLog=true){patch(tank.id,t=>({...t,acclimationSessions:[s,...(t.acclimationSessions??[]).filter(x=>x.id!==s.id)]}));}
+ async function newSession(){if(currentSession){window.alert(bi(lang,"في جلسة إقلمة شغالة حالياً. كمّلها أو عالج العناصر المؤجلة قبل بدء شحنة جديدة.","An acclimation session is already active. Finish it or resolve deferred items before starting another shipment."));return;}const intervention=interventionGate(tank,"livestockAddition");let overrideReason="";if(intervention.level==="danger"){const reason=await requestOverride({title:lang==="ar"?"بدء إقلمة أثناء حالة عالية الخطورة":"Start acclimation during a high-risk tank state",message:(lang==="ar"?intervention.ar:intervention.en)+" "+bi(lang,"إذا الشحنة وصلت فعلياً، أكمل الإقلمة فقط وتجنب أي تدخل كبير إضافي.","If the shipment has arrived, proceed with acclimation only and avoid other major interventions."),requireReason:true});if(!reason)return;overrideReason=reason;}else if(intervention.level==="warn"&&!window.confirm(lang==="ar"?intervention.ar+" إذا الشحنة وصلت فعلياً، كمل الإقلمة فقط وتجنب أي تدخل كبير إضافي. بدء الجلسة؟":intervention.en+" If the shipment has arrived, proceed with acclimation only and avoid other major interventions. Start session?"))return;const ts=nowISO();const s:AcclimationSession={id:uid("acs"),startedAt:ts,status:"setup",wizardStep:1,categories:[],tankSalinity:tank.type==="marine"?1.025:undefined,bagSalinity:tank.type==="marine"?1.020:undefined,temperature:25,existingNotes:"",coralDipEnabled:false,coralDipMinutes:10,coralDipQuantityPerPrep:0,coralDipRuns:[],coralDipSkippedItemIds:[],floatConfirmed:false,floatStatus:"waiting",floatRemainingMs:15*60000,bucketStatus:"waiting",bucketRemainingMs:5*60000,preflight:{},items:[],events:[...(overrideReason?[ev(`تجاوز تحذير بدء الإقلمة. السبب: ${overrideReason}`,`Acclimation-start warning overridden. Reason: ${overrideReason}`)]:[]),ev("بدأت جلسة أقلمة جديدة.","New acclimation session started.")]};saveSession(s);if(overrideReason)patch(tank.id,t=>({...t,timeline:[{id:uid("ev"),timestamp:ts,type:"safety-override",textAr:`تم تجاوز تحذير بدء الإقلمة. السبب: ${overrideReason}`,textEn:`Acclimation-start warning overridden. Reason: ${overrideReason}`},...t.timeline]}));}
+ function sessionPatch(p:Partial<AcclimationSession>){if(!active)return;saveSession({...active,...p});}
+ function setStep(n:number){sessionPatch({wizardStep:n})}
+ function toggleCat(c:Cat){if(!active)return;const cats=active.categories??[];sessionPatch({categories:cats.includes(c)?cats.filter(x=>x!==c):[...cats,c]});}
+
+ function speciesApply(id:string){setSelected(id);const x:any=choices.find(y=>y.id===id);if(!x)return;setCustom(lang==="ar"?x.ar:x.en);setPlacement(x.care||x.placement||"");setDrip(category==="invert"?45:category==="fish"?20:20);setIntervalMin(category==="coral"?5:category==="plant"||category==="macroalgae"?0:15);setTemperament((x.temperament||"peaceful") as any);setSensitivity((x.sensitivity||"normal") as any);}
+ function readPhoto(file?:File){if(!file){setImageData("");return}const r=new FileReader();r.onload=()=>setImageData(String(r.result||""));r.readAsDataURL(file)}
+ function addItem(){if(!active||(!selected&&!custom.trim()))return;const check=validateAcclimationItemEntry({quantity:qty,dripMinutes:drip,intervalMinutes:interval});const danger=check.issues.find(x=>x.level==="danger");if(danger){window.alert(lang==="ar"?danger.ar:danger.en);return;}const x:any=choices.find(y=>y.id===selected);const ar=x?.ar||custom.trim(),en=x?.en||custom.trim();const item:AcclimationItem={id:uid("aci"),libraryId:x?.id,name:ar,nameEn:en,category,quantity:Math.round(qty),dripMinutes:drip,intervalMinutes:interval,placement:placement||x?.care||"",notes,temperament,sensitivity,subtype:category==="macroalgae"?"macroalgae":subtype,health,status:"waiting",remainingMs:drip*60000,imageDataUrl:imageData||undefined};saveSession({...active,items:[...active.items,item],events:[ev(`تمت إضافة ${ar} إلى الشحنة.`,`Added ${en} to the shipment.`),...active.events]});setSelected("");setCustom("");setQty(1);setNotes("");setPlacement("");setImageData("");}
+ function removeItem(id:string){if(!active)return;saveSession({...active,items:active.items.filter(x=>x.id!==id)});}
+ function moveItem(id:string,dir:number){if(!active)return;const a=[...active.items],i=a.findIndex(x=>x.id===id),j=i+dir;if(i<0||j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];saveSession({...active,items:a});}
+ function autoOrder(){if(!active)return;saveSession({...active,items:[...active.items].sort((a,b)=>score(a)-score(b)),events:[ev("تم تطبيق ترتيب التنزيل المقترح.","Suggested release order applied."),...active.events]});}
+
  const preflight=useMemo(()=>{const base=lang==="ar"?["سطل/وعاء نظيف ومخصص لكل مجموعة","خرطوم تنقيط مع محبس تحكم","شبكة / وعاء نقل منفصل","Refractometer أو جهاز قياس الملوحة","ميزان حرارة","مناشف ومكان عمل جاف","اختبار صوت التنبيهات","أبقِ Aqua Nexus مفتوحاً أثناء العدادات الحرجة؛ التطبيق يحاول إبقاء الشاشة مستيقظة عند دعم الجهاز"]:["Clean dedicated container(s)","Airline / drip line + valve","Net / specimen container","Refractometer or salinity meter","Thermometer","Towels + dry working area","Timer/sound volume checked","Keep Aqua Nexus open during critical timers; the app requests screen wake-lock when supported"];if(active?.items.some(i=>i.category==="coral")&&active.coralDipEnabled)base.push(lang==="ar"?"ماء Coral Dip وماء شطف منفصل جاهزان":"Coral dip + separate rinse water prepared");if(active?.items.some(i=>i.category==="plant"))base.push(lang==="ar"?"وعاء فحص/شطف النباتات جاهز":"Plant rinse/inspection container");
  if(active?.items.some(i=>i.category==="macroalgae"||i.subtype==="macroalgae"))base.push(lang==="ar"?"وعاء فحص/شطف الماكرو ألجي جاهز":"Macroalgae rinse/inspection container");return base},[active?.items,active?.coralDipEnabled,lang]);
  function toggleCheck(i:number){if(!active)return;sessionPatch({preflight:{...(active.preflight??{}),[i]:!(active.preflight??{})[i]}})}
