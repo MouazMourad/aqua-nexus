@@ -59,6 +59,7 @@ function localRemove(name:string){
   if(typeof window==="undefined")return;
   try{localStorage.removeItem(name)}catch{}
 }
+function fallbackDirtyKey(name:string){return `${name}:fallback-dirty`;}
 
 /**
  * Local-first durable Zustand storage.
@@ -72,6 +73,21 @@ function localRemove(name:string){
 export const aquaStateStorage:StateStorage={
   async getItem(name){
     if(!hasIndexedDb())return localGet(name);
+    // If an IndexedDB write failed previously, the localStorage fallback is the
+    // newest committed copy. Prefer it until it has been verified back into IDB.
+    const dirty=localGet(fallbackDirtyKey(name));
+    if(dirty==="1"){
+      const fallback=localGet(name);
+      if(fallback!==null){
+        try{
+          await writeIdb(name,fallback);
+          const verified=await readIdb(name);
+          if(verified===fallback){localRemove(fallbackDirtyKey(name));localRemove(name);}
+        }catch{}
+        return fallback;
+      }
+      localRemove(fallbackDirtyKey(name));
+    }
     try{
       const stored=await readIdb(name);
       if(stored!==null)return stored;
@@ -91,15 +107,19 @@ export const aquaStateStorage:StateStorage={
     if(!hasIndexedDb()){localSet(name,value);return;}
     try{
       await writeIdb(name,value);
-      // A successful IndexedDB write makes the primary localStorage copy
-      // unnecessary and prevents quota pressure from returning.
+      const verified=await readIdb(name);
+      if(verified!==value)throw new Error("IndexedDB verification failed");
+      // A successful verified IndexedDB write makes the fallback unnecessary.
       localRemove(name);
+      localRemove(fallbackDirtyKey(name));
     }catch{
       localSet(name,value);
+      localSet(fallbackDirtyKey(name),"1");
     }
   },
   async removeItem(name){
     localRemove(name);
+    localRemove(fallbackDirtyKey(name));
     if(!hasIndexedDb())return;
     try{await removeIdb(name)}catch{}
   }
