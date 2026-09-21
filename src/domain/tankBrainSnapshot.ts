@@ -1,6 +1,12 @@
 import type { JournalPhoto,Tank } from "./types";
 
 function tail<T>(rows:T[]|undefined,limit:number){return (rows??[]).slice(0,limit);}
+function acclimationForBrain(session:any){
+  return {...session,items:(session.items??[]).map((item:any)=>{
+    const {imageDataUrl,...rest}=item;
+    return {...rest,hasImage:Boolean(imageDataUrl)};
+  })};
+}
 function photoMeta(photo:JournalPhoto){
   const {dataUrl,...meta}=photo;
   return {...meta,hasStoredPreview:Boolean(photo.previewKey)||Boolean(dataUrl),embeddedPreviewBytes:dataUrl?.length??0};
@@ -56,8 +62,8 @@ export function buildTankBrainSnapshot(tank:Tank){
     biologicalCycle:tank.biologicalCycle??null,
     lifecycle:tank.lifecycle??null,
     acclimation:{
-      active:activeAcclimation,
-      recentCompleted:recentAcclimation,
+      active:activeAcclimation.map(acclimationForBrain),
+      recentCompleted:recentAcclimation.map(acclimationForBrain),
       totalSessions:(tank.acclimationSessions??[]).length
     },
     intelligence:{
