@@ -40,6 +40,7 @@ import { validateDoserChannelEntry,validateEquipmentEntry,validateExpenseEntry,v
 import { photoNeedsExternalization } from "@/lib/photoStorage";
 import { interventionDensityAlert,interventionGate } from "@/domain/interventionSafety";
 import { createActionPlan,evaluatePlanOutcome } from "@/domain/actionPlanEngine";
+import { activeRelocation,activeVacation,archivedPageAllowed,isTankArchived } from "@/domain/tankLifecycle";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -793,6 +794,42 @@ describe("Full audit hardening regressions",()=>{
   });
 });
 
+
+
+describe("Tank lifecycle completion",()=>{
+  it("puts vacation, relocation and archive state into Tank Brain and events",()=>{
+    const before=structuredClone(demoMarineTank),after=structuredClone(demoMarineTank),now=new Date().toISOString();
+    after.lifecycle={
+      vacations:[{id:"vac-1",startedAt:now,plannedEndAt:"2026-10-01"}],
+      relocations:[{id:"move-1",startedAt:now,status:"in_progress",from:"Old room",to:"New room"}],
+      restarts:[{id:"restart-1",timestamp:now,reason:"full rebuild"}],
+      archivedAt:now,archiveReason:"retired"
+    };
+    const brain=buildTankBrainSnapshot(after);
+    const events=deriveExtendedIntelligenceEvents(before,after);
+    expect(brain.lifecycle?.archivedAt).toBe(now);
+    expect(events.some(x=>x.verb==="vacation_started")).toBe(true);
+    expect(events.some(x=>x.verb==="relocation_started")).toBe(true);
+    expect(events.some(x=>x.verb==="major_restart")).toBe(true);
+    expect(events.some(x=>x.verb==="tank_archived")).toBe(true);
+  });
+  it("locks operational work for archived tanks but leaves recovery/reporting available",()=>{
+    const t=structuredClone(demoMarineTank);t.lifecycle={archivedAt:new Date().toISOString()};
+    expect(isTankArchived(t)).toBe(true);
+    expect(archivedPageAllowed("dosing")).toBe(false);
+    expect(archivedPageAllowed("reports")).toBe(true);
+    expect(archivedPageAllowed("settings")).toBe(true);
+    expect(interventionGate(t,"correctiveDosing").blocked).toBe(true);
+  });
+  it("treats relocation as a real safety state",()=>{
+    const t=structuredClone(demoMarineTank),now=new Date().toISOString();
+    t.lifecycle={vacations:[{id:"vac",startedAt:now}],relocations:[{id:"move",startedAt:now,status:"in_progress"}]};
+    expect(activeVacation(t)?.id).toBe("vac");
+    expect(activeRelocation(t)?.id).toBe("move");
+    expect(interventionGate(t,"livestockAddition").blocked).toBe(true);
+    expect(interventionGate(t,"correctiveDosing").level).toBe("danger");
+  });
+});
 
 describe("Whole-tank intervention safety",()=>{
   it("blocks a new livestock addition when intervention density is dangerous",()=>{
