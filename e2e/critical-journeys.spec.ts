@@ -576,3 +576,64 @@ test("Lighting screenshot import uses Vision analysis, fills editable values and
   await expect(review).toContainText(/One value was visually approximated/);
 });
 
+test("Equipment CSV import is editable, routes data to Tank Brain and supports alert acknowledgement",async({page})=>{
+  await openTrainingDashboard(page);
+  await goToPage(page,"equipment");
+  await page.getByRole("button",{name:/استيراد|Import/}).first().click();
+  const workspace=page.locator(".equipment-import-workspace");
+  await expect(workspace).toBeVisible();
+  await workspace.getByLabel(/الشركة|Vendor/).selectOption("neptune-apex");
+  const csv=[
+    "timestamp,device,kind,brand,model,power_watts,metric,value,unit,topoff_liters,alert,severity",
+    "2026-09-21T10:00:00Z,Apex Imported Probe,probe,Neptune,PM2,6,pH,8.15,,5.0,Probe warning,warning"
+  ].join("\n");
+  await page.getByTestId("equipment-import-input").setInputFiles({name:"apex-device-export.csv",mimeType:"text/csv",buffer:Buffer.from(csv)});
+  await expect(workspace).toContainText(/REVIEW BEFORE APPLY|apex-device-export.csv/);
+  const measurement=workspace.locator(".equipment-import-row.measurement").first();
+  const value=measurement.locator('input[type="number"]');
+  await expect(value).toHaveValue("8.15");
+  await value.fill("8.22");
+  await expect(value).toHaveValue("8.22");
+  await workspace.getByRole("button",{name:/اعتماد الاستيراد|Apply import/}).click();
+  await expect(page.locator(".card.panel").filter({hasText:/IMPORTED DEVICE DATA/})).toBeVisible();
+  await expect(page.locator(".equipment-grid")).toContainText("Apex Imported Probe");
+  const importedCard=page.locator(".card.panel").filter({hasText:/IMPORTED DEVICE DATA/});
+  await expect(importedCard).toContainText(/5\.0 L|5 L/);
+  await expect(importedCard).toContainText(/Probe warning/);
+  await importedCard.getByRole("button",{name:/تمت المراجعة|Acknowledge/}).click();
+  await expect(importedCard).not.toContainText(/Probe warning/);
+});
+
+test("Equipment screenshot import uses Vision analysis and applies edited device values",async({page})=>{
+  await page.addInitScript((mockCandidate)=>{
+    const original=window.fetch.bind(window);
+    window.fetch=async(input:RequestInfo|URL,init?:RequestInit)=>{
+      const url=typeof input==="string"?input:input instanceof Request?input.url:String(input);
+      if(url.includes("/api/ai/equipment-import")){
+        return new Response(JSON.stringify({ok:true,mode:"external",provider:"test-vision",model:"test",answer:{candidate:mockCandidate}}),{status:200,headers:{"content-type":"application/json"}});
+      }
+      return original(input,init);
+    };
+  },{
+    sourceKind:"image",confidence:91,vendorDetected:"HYDROS",
+    devices:[{sourceRecordId:"hydros-x4",name:"HYDROS Control X4",kind:"probe",brand:"HYDROS",model:"Control X4",status:"on",powerWatts:12}],
+    measurements:[{sourceRecordId:"temp-x4",timestamp:"2026-09-21T11:00:00Z",parameter:"temperature",value:25.6,unit:"C",deviceName:"HYDROS Control X4"}],
+    doses:[],topOff:[],alerts:[],warnings:["Device location was not visible"],evidence:["Visible device name and temperature tile"]
+  });
+  await openTrainingDashboard(page);
+  await goToPage(page,"equipment");
+  await page.getByRole("button",{name:/استيراد|Import/}).first().click();
+  const workspace=page.locator(".equipment-import-workspace");
+  await workspace.getByLabel(/الشركة|Vendor/).selectOption("hydros");
+  const png=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2r0sAAAAASUVORK5CYII=","base64");
+  await page.getByTestId("equipment-import-input").setInputFiles({name:"hydros-dashboard.png",mimeType:"image/png",buffer:png});
+  await expect(workspace).toContainText("91%",{timeout:25000});
+  await expect(workspace).toContainText(/Device location was not visible/);
+  const deviceName=workspace.getByLabel("Device name 0");
+  await expect(deviceName).toHaveValue("HYDROS Control X4");
+  await deviceName.fill("HYDROS Control X4 Edited");
+  await workspace.getByRole("button",{name:/اعتماد الاستيراد|Apply import/}).click();
+  await expect(page.locator(".equipment-grid")).toContainText("HYDROS Control X4 Edited");
+  await expect(page.locator(".card.panel").filter({hasText:/IMPORTED DEVICE DATA/})).toContainText(/HYDROS|91%/);
+});
+
