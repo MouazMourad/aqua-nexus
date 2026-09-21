@@ -9,6 +9,7 @@ import { aquaAIAnswer,type AquaAIAnswer,type AquaAIPage } from "@/domain/aquaAIB
 import { parseAquaQuestion,resolveAquaFollowup,type AquaConversationTurn } from "@/domain/aquaAIIntent";
 import { tankMood } from "@/domain/tankLearning";
 import { learnedTankSignals } from "@/domain/tankPatterns";
+import { domainOutcomeLearning } from "@/domain/outcomeLearning";
 import { createActionPlan,evaluatePlanOutcome,type AquaActionPlan } from "@/domain/actionPlanEngine";
 import { uid,nowISO } from "@/lib/appUtils";
 import { askAquaAI } from "@/lib/aquaAIClient";
@@ -28,7 +29,7 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
  const health=core.health,trend=systemHealthTrend(tank),alerts=core.alerts,mood=tankMood(tank);
  const hasDanger=alerts.some(x=>x.level==="danger"),hasWarning=alerts.some(x=>x.level==="warn");
  const state:"normal"|"alert"|"critical"=(health.score<60||hasDanger)?"critical":(health.score<80||trend==="declining"||hasWarning)?"alert":"normal";
- const learned=useMemo(()=>learnedTankSignals(tank),[tank]);
+ const learned=useMemo(()=>[...domainOutcomeLearning(tank),...learnedTankSignals(tank)].slice(0,8),[tank]);
  const plans:AquaActionPlan[]=((tank as any).aiActionPlans??[]),currentPlan=plans.find(x=>x.status==="active");
  const views:InsightView[]=[
   {id:"state",labelAr:"حالة الحوض الآن",labelEn:"Tank state now",promptAr:"حلل حالة الحوض الآن",promptEn:"Analyze the tank state now"},
