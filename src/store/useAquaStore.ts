@@ -22,7 +22,7 @@ interface AquaStore extends AquaState {
   deleteTank: (tankId: string) => void;
   patchTank: (tankId: string, updater: Partial<Tank> | ((tank: Tank) => Tank)) => void;
   addChemistryReading: (tankId: string, reading: ChemistryReading) => void;
-  replaceData: (data: Pick<AquaState, "language"|"selectedTankId"|"tanks">) => void;
+  replaceData: (data: Pick<AquaState, "language"|"aquariumExperience"|"selectedTankId"|"tanks">) => void;
   replaceTankSnapshot: (tankId:string, tank:Tank) => void;
   resetDemo: () => void;
   resetTrainingTank: (tankId: string) => void;
@@ -226,6 +226,7 @@ export const useAquaStore = create<AquaStore>()(
         return {
           ...state,
           language:data.language,
+          aquariumExperience:data.aquariumExperience,
           selectedTankId:requested?.id ?? firstReal?.id ?? demoMarineTank.id,
           tanks
         };
