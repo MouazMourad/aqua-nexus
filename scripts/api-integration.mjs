@@ -3,7 +3,7 @@ import {spawn} from "node:child_process";
 const port=3101,base=`http://127.0.0.1:${port}`,device="ci-device-aqua-nexus-1234567890";
 const headers={"content-type":"application/json","x-aqua-device-id":device};
 
-const server=spawn(process.platform==="win32"?"npm.cmd":"npm",["run","start","--","-p",String(port)],{
+const server=spawn(process.execPath,["node_modules/next/dist/bin/next","start","-p",String(port)],{
   stdio:["ignore","pipe","pipe"],env:{...process.env,PORT:String(port)}
 });
 let logs="";
@@ -52,5 +52,12 @@ try{
 
   console.log("Backend integration: health, migrations, workspace isolation and optimistic versioning OK");
 }finally{
-  server.kill("SIGTERM");
+  if(server.exitCode===null){
+    server.kill("SIGTERM");
+    await Promise.race([
+      new Promise(resolve=>server.once("exit",resolve)),
+      new Promise(resolve=>setTimeout(resolve,3000))
+    ]);
+    if(server.exitCode===null)server.kill("SIGKILL");
+  }
 }
