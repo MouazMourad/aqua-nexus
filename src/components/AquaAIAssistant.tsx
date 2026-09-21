@@ -97,8 +97,9 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
  function toggleStep(planId:string,stepId:string){patch(tank.id,t=>({...t,aiActionPlans:((t as any).aiActionPlans??[]).map((p:AquaActionPlan)=>p.id!==planId?p:{...p,steps:p.steps.map(s=>s.id!==stepId?s:{...s,done:!s.done,completedAt:!s.done?nowISO():undefined})})} as any));}
  function reviewPlan(plan:AquaActionPlan){
   const result=evaluatePlanOutcome(tank,plan),ts=nowISO();
-  patch(tank.id,t=>({...t,aiActionPlans:((t as any).aiActionPlans??[]).map((p:AquaActionPlan)=>p.id!==plan.id?p:{...p,status:"completed",completedAt:ts,outcomeScore:result.current,outcome:result.outcome}),timeline:[{id:uid("ev"),timestamp:ts,type:"ai-action-outcome",textAr:`تم تقييم خطة Local Best AI: الحالة ${result.outcome==="improved"?"تحسنت":result.outcome==="worse"?"تراجعت":"بقيت مستقرة"} (${plan.baselineScore}% → ${result.current}%).`,textEn:`Local Best AI plan reviewed: tank ${result.outcome} (${plan.baselineScore}% → ${result.current}%).`},...t.timeline]} as any));
-  setPlanNote(lang==="ar"?`تم إغلاق الخطة وتسجيل النتيجة: ${plan.baselineScore}% → ${result.current}%.`:`Plan closed and outcome recorded: ${plan.baselineScore}% → ${result.current}%.`);
+  const stateAr=result.outcome==="improved"?"تحسنت":result.outcome==="worse"?"تراجعت":"بقيت مستقرة";
+  patch(tank.id,t=>({...t,aiActionPlans:((t as any).aiActionPlans??[]).map((p:AquaActionPlan)=>p.id!==plan.id?p:{...p,status:"completed",completedAt:ts,outcomeScore:result.current,outcome:result.outcome,outcomeDetails:result.details,outcomeSummaryAr:result.summaryAr,outcomeSummaryEn:result.summaryEn}),timeline:[{id:uid("ev"),timestamp:ts,type:"ai-action-outcome",textAr:`تم تقييم خطة Local Best AI: ${stateAr}. ${result.summaryAr}`,textEn:`Local Best AI plan reviewed: ${result.outcome}. ${result.summaryEn}`},...t.timeline]} as any));
+  setPlanNote(lang==="ar"?`تم إغلاق الخطة: ${stateAr}. ${result.summaryAr}`:`Plan closed: ${result.outcome}. ${result.summaryEn}`);
  }
 
  const statusText=lang==="ar"?`${mood.symbol} ${mood.ar}`:`${mood.symbol} ${mood.en}`;
