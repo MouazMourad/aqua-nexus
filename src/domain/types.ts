@@ -737,9 +737,12 @@ export interface LightingImportRecord {
   fileName:string;
   fileType:string;
   fileSize:number;
-  status:"parsed"|"metadata-only"|"unsupported";
+  status:"parsed"|"analyzed"|"metadata-only"|"unsupported";
+  analysisMode?:"structured-file"|"ai-text"|"ai-image";
+  confidence?:number;
   detectedChannels?:number;
   detectedPoints?:number;
+  warnings?:string[];
   notes?:string;
 }
 
