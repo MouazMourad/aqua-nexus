@@ -193,6 +193,10 @@ export interface LightingPlacementRecommendation{
   recommendedDepthMinCm:number;
   recommendedDepthMaxCm:number;
   actualDepthCm?:number;
+  actualXPct?:number;
+  actualZPct?:number;
+  exposure:"open"|"partialShade"|"shade";
+  exposureFactor:number;
   actualZone?:"top"|"mid"|"bottom";
   placementStatus:"unset"|"within"|"outside";
   estimatedPeakParAtActualDepth?:number;
@@ -239,12 +243,20 @@ export function lightingPlacementRecommendations(tank:Tank):LightingPlacementRec
     if(!row)continue;
     const depth=zoneDepth(row.zone);
     const actual=typeof item.lightingDepthCm==="number"&&Number.isFinite(item.lightingDepthCm)?clamp(item.lightingDepthCm,0,height):undefined;
-    const status:LightingPlacementRecommendation["placementStatus"]=actual===undefined?"unset":(actual>=depth.min&&actual<=depth.max?"within":"outside");
-    const peakPar=actual!==undefined&&program?estimatedParAt(tank,50,50,actual/height*100,peakMinute):undefined;
+    const actualXPct=typeof item.lightingXPct==="number"&&Number.isFinite(item.lightingXPct)?clamp(item.lightingXPct,0,100):undefined;
+    const actualZPct=typeof item.lightingZPct==="number"&&Number.isFinite(item.lightingZPct)?clamp(item.lightingZPct,0,100):undefined;
+    const exposure=item.lightingExposure??"open";
+    const exposureFactor=exposure==="shade"?.45:exposure==="partialShade"?.72:1;
+    const positionComplete=actual!==undefined&&actualXPct!==undefined&&actualZPct!==undefined;
+    const rawPeakPar=positionComplete&&program?estimatedParAt(tank,actualXPct,actualZPct,actual/height*100,peakMinute):undefined;
+    const peakPar=rawPeakPar===undefined?undefined:rawPeakPar*exposureFactor;
+    const depthWithin=actual!==undefined&&actual>=depth.min&&actual<=depth.max;
+    const parWithin=peakPar!==undefined&&peakPar>=row.min*.8&&peakPar<=row.max*1.2;
+    const status:LightingPlacementRecommendation["placementStatus"]=positionComplete?(depthWithin&&parWithin?"within":"outside"):"unset";
     rows.push({
       livestockId:item.id,name:item.name,category:item.category as "coral"|"plant",zone:row.zone,parMin:row.min,parMax:row.max,
-      recommendedDepthMinCm:depth.min,recommendedDepthMaxCm:depth.max,actualDepthCm:actual,actualZone:actual===undefined?undefined:actualZone(actual),
-      placementStatus:status,estimatedPeakParAtActualDepth:peakPar,
+      recommendedDepthMinCm:depth.min,recommendedDepthMaxCm:depth.max,actualDepthCm:actual,actualXPct,actualZPct,exposure,exposureFactor,
+      actualZone:actual===undefined?undefined:actualZone(actual),placementStatus:status,estimatedPeakParAtActualDepth:peakPar,
       ar:`${row.kindAr}: نطاق بداية ${row.min}–${row.max} PAR، وعمق مقترح ${Math.round(depth.min)}–${Math.round(depth.max)} سم تحت سطح الماء.`,
       en:`${row.kindEn}: starting range ${row.min}–${row.max} PAR, suggested depth ${Math.round(depth.min)}–${Math.round(depth.max)} cm below the surface.`
     });
@@ -307,8 +319,8 @@ export function lightingIntelligence(tank:Tank){
   if(placementUnset.length)issues.push({
     id:"photosynthetic-depth-unset",
     level:"info",
-    ar:"عمق "+placementUnset.length+" مرجان/نبات غير مسجل بعد؛ المخطط يعرض موقعاً مقترحاً فقط.",
-    en:placementUnset.length+" coral/plant depth(s) are not recorded yet; the diagram is showing suggested placement only."
+    ar:"موقع "+placementUnset.length+" مرجان/نبات غير مكتمل بعد (X/Z/العمق)؛ المخطط يعرض موقعاً مقترحاً فقط.",
+    en:placementUnset.length+" coral/plant position(s) are incomplete (X/Z/depth); the diagram is showing suggested placement only."
   });
   const calibration=tank.lighting?.calibrationPoints??[];
   const latestImport=tank.lighting?.imports?.[0];
