@@ -1,6 +1,6 @@
 "use client";
 import { useEffect,useMemo,useRef,useState } from "react";
-import type { Equipment,LightingChannel,LightingProgram,Tank } from "@/domain/types";
+import type { Equipment,LightingChannel,LightingImportRecord,LightingProgram,Tank } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DecisionGuidance } from "@/components/ui/DecisionGuidance";
@@ -201,7 +201,8 @@ export function LightingPage({tank,onEquipment}:{tank:Tank;onEquipment:()=>void}
   let text="";try{text=await file.text()}catch{setImportNote(bi(lang,"تعذر قراءة الملف.","Could not read the file."));return}
   const parsed=parseLightingFile(text,file.name,importCompany),ts=nowISO();
   const source=IMPORT_COMPANIES.find(x=>x.id===importCompany);
-  patch(tank.id,t=>({...t,lighting:{...(t.lighting??{}),imports:[{id:uid("light-import-log"),importedAt:ts,sourceCompany:importCompany,fileName:file.name,fileType:file.type||file.name.split(".").pop()||"unknown",fileSize:file.size,status:parsed?"parsed":"unsupported",detectedChannels:parsed?.channels.length,detectedPoints:parsed?.points.length},...(t.lighting?.imports??[])].slice(0,50)},timeline:[{id:uid("ev"),timestamp:ts,type:"lighting-import",textAr:`تم تسجيل استيراد إنارة من ${source?.ar??importCompany}: ${file.name}${parsed?" وتم تفسير البرنامج للمراجعة.":" لكن تنسيق الملف لم يُفسر تلقائياً."}`,textEn:`Lighting import recorded from ${source?.en??importCompany}: ${file.name}${parsed?" and the schedule was parsed for review.":" but the format could not be mapped automatically."}`},...t.timeline]}));
+  const importRecord:LightingImportRecord={id:uid("light-import-log"),importedAt:ts,sourceCompany:importCompany,fileName:file.name,fileType:file.type||file.name.split(".").pop()||"unknown",fileSize:file.size,status:parsed?"parsed":"unsupported",detectedChannels:parsed?.channels.length,detectedPoints:parsed?.points.length};
+  patch(tank.id,t=>({...t,lighting:{...(t.lighting??{}),imports:[importRecord,...(t.lighting?.imports??[])].slice(0,50)},timeline:[{id:uid("ev"),timestamp:ts,type:"lighting-import",textAr:`تم تسجيل استيراد إنارة من ${source?.ar??importCompany}: ${file.name}${parsed?" وتم تفسير البرنامج للمراجعة.":" لكن تنسيق الملف لم يُفسر تلقائياً."}`,textEn:`Lighting import recorded from ${source?.en??importCompany}: ${file.name}${parsed?" and the schedule was parsed for review.":" but the format could not be mapped automatically."}`},...t.timeline]}));
   if(parsed){
    setDraft(parsed);
    setViewMinute(new Date().getHours()*60+new Date().getMinutes());
