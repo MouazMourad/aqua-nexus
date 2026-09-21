@@ -70,6 +70,19 @@ export interface TopOffLog {
   notes?:string;
 }
 
+export interface ExternalDeviceAlert {
+  id:string;
+  timestamp:string;
+  level:"info"|"warn"|"danger";
+  message:string;
+  equipmentId?:string;
+  sourceDevice?:string;
+  sourceSystem?:string;
+  sourceImportId?:string;
+  sourceRecordId?:string;
+  acknowledgedAt?:string;
+}
+
 export interface EquipmentFailureEvent {
   id:string;
   timestamp:string;
@@ -851,6 +864,7 @@ export interface Tank {
   externalImports?: ExternalImportRecord[];
   deviceTelemetry?: DeviceTelemetryLog[];
   topOff?: TopOffLog[];
+  deviceAlerts?: ExternalDeviceAlert[];
   energySettings?: EnergySettings;
   lighting?: TankLightingState;
   chemistry: ChemistryReading[];
