@@ -15,7 +15,7 @@ import { auditTankCompatibility } from "@/domain/compatibility";
 import { tankStateView } from "@/domain/tankIntelligence";
 import { systemHealthTrend } from "@/domain/systemHealth";
 import { deriveGuidanceActions } from "@/domain/impactEngine";
-import { deriveIntelligenceEvents } from "@/domain/eventIntelligence";
+import { deriveIntelligenceEvents,mergeIntelligenceEvents } from "@/domain/eventIntelligence";
 import { coralTransferGate } from "@/domain/acclimationSafety";
 import { allowedAcclimationCategories,livestockCategoryFromAcclimation,normalizeAcclimationCategory } from "@/domain/acclimationCategories";
 import { correctiveDosingInventory,inventoryForConsumer,inventoryProfile,inventorySubcategoryOptions,routineDosingInventory } from "@/domain/inventoryIntelligence";
@@ -36,9 +36,10 @@ import { repeatedResponsePatterns,tankLearningMaturity } from "@/domain/tankPatt
 import { claimCriticalAction,releaseCriticalAction } from "@/lib/actionGuard";
 import { deriveExtendedIntelligenceEvents } from "@/domain/extendedEventIntelligence";
 import { buildTankBrainSnapshot } from "@/domain/tankBrainSnapshot";
-import { validateRodiEntry } from "@/domain/inputSanity";
+import { validateDoserChannelEntry,validateEquipmentEntry,validateExpenseEntry,validateInventoryEntry,validateRodiEntry,validateWaterChangeEntry } from "@/domain/inputSanity";
 import { photoNeedsExternalization } from "@/lib/photoStorage";
 import { interventionDensityAlert,interventionGate } from "@/domain/interventionSafety";
+import { createActionPlan,evaluatePlanOutcome } from "@/domain/actionPlanEngine";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -735,6 +736,53 @@ describe("Full audit hardening regressions",()=>{
     expect(validateRodiEntry({tdsIn:150,tdsOut:3,liters:20,wasteLiters:60,productionMinutes:60,sourcePressurePsi:60}).ok).toBe(true);
     expect(validateRodiEntry({tdsIn:150,tdsOut:9000,liters:20,wasteLiters:60,productionMinutes:60,sourcePressurePsi:60}).ok).toBe(false);
     expect(validateRodiEntry({tdsIn:150,tdsOut:200,liters:20,wasteLiters:60,productionMinutes:60,sourcePressurePsi:60}).ok).toBe(false);
+  });
+
+
+  it("records field-level equipment, livestock and sump configuration changes",()=>{
+    const before=structuredClone(demoMarineTank),after=structuredClone(demoMarineTank);
+    after.equipment[0]={...after.equipment[0],powerWatts:(after.equipment[0].powerWatts??20)+5,backupPlan:"spare pump ready"};
+    after.livestock[0]={...after.livestock[0],notes:"feeding response improved",sizeCm:12};
+    after.sump={...after.sump,operatingFillPercent:Math.max(1,after.sump.operatingFillPercent-3)};
+    const events=deriveExtendedIntelligenceEvents(before,after);
+    expect(events.some(x=>x.domain==="equipment"&&x.verb==="configuration_changed")).toBe(true);
+    expect(events.some(x=>x.domain==="livestock"&&x.verb==="observation_updated")).toBe(true);
+    expect(events.some(x=>x.domain==="sump"&&x.verb==="configuration_changed")).toBe(true);
+  });
+
+  it("replaces coalesced event snapshots instead of silently dropping later edits",()=>{
+    const oldEvent:any={id:"evt-equipment-configuration_changed-eq1:123",timestamp:"2026-09-21T01:00:00Z",kind:"fact",domain:"equipment",verb:"configuration_changed",entityId:"eq1",textAr:"قديم",textEn:"old"};
+    const newEvent:any={...oldEvent,timestamp:"2026-09-21T01:00:20Z",textAr:"جديد",textEn:"new"};
+    const merged=mergeIntelligenceEvents([oldEvent],[newEvent]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].textEn).toBe("new");
+  });
+
+  it("applies sanity checks across operational numeric domains",()=>{
+    expect(validateEquipmentEntry({serviceIntervalDays:90,powerWatts:50,hoursPerDay:24,ratedVolumeLiters:500,flowLph:5000,parAtTargetDepth:250,coverageLengthCm:120,coverageWidthCm:60}).ok).toBe(true);
+    expect(validateEquipmentEntry({serviceIntervalDays:0,powerWatts:-1,hoursPerDay:30,ratedVolumeLiters:500,flowLph:5000,parAtTargetDepth:250,coverageLengthCm:120,coverageWidthCm:60}).ok).toBe(false);
+    expect(validateInventoryEntry({quantity:50,minimum:10,unit:"mL",name:"Supplement"}).ok).toBe(true);
+    expect(validateInventoryEntry({quantity:-2,minimum:0,unit:"mL",name:"Supplement"}).ok).toBe(false);
+    expect(validateExpenseEntry({amount:12,description:"Salt",currency:"USD"}).ok).toBe(true);
+    expect(validateExpenseEntry({amount:-1,description:"Salt",currency:"USD"}).ok).toBe(false);
+    expect(validateWaterChangeEntry({liters:50,systemVolumeLiters:500,salinity:1.025,temperature:25}).ok).toBe(true);
+    expect(validateWaterChangeEntry({liters:600,systemVolumeLiters:500,salinity:1.025,temperature:25}).ok).toBe(false);
+    expect(validateDoserChannelEntry({capacityMl:1000,currentMl:500,consumption:10}).ok).toBe(true);
+    expect(validateDoserChannelEntry({capacityMl:500,currentMl:900,consumption:10}).ok).toBe(false);
+  });
+
+  it("evaluates AI plans from the target domain instead of only whole-tank score",()=>{
+    const baseline=structuredClone(demoMarineTank);
+    baseline.chemistry=[{timestamp:"2026-09-21T00:00:00Z",values:{KH:6},source:"manual",confidence:"high"},...baseline.chemistry];
+    const answer=aquaAIAnswer("KH منخفض شو اعمل؟",baseline,"chemistry");
+    const plan=createActionPlan(baseline,"KH منخفض شو اعمل؟",answer);
+    expect(plan.focus?.domain).toBe("chemistry");
+    const after=structuredClone(baseline);
+    after.chemistry=[{timestamp:"2026-09-21T12:00:00Z",values:{KH:7.8},source:"manual",confidence:"high"},...after.chemistry];
+    const result=evaluatePlanOutcome(after,plan);
+    expect(result.usedDomainMetrics).toBe(true);
+    expect(result.details.some(x=>x.key==="chem:KH"&&x.result==="improved")).toBe(true);
+    expect(result.outcome).toBe("improved");
   });
 
   it("moves large photo payloads out of persisted tank state",()=>{
