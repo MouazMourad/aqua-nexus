@@ -47,6 +47,7 @@ jobs:
           psql "$DATABASE_URL" -f db/migrations/001_backend.sql
           psql "$DATABASE_URL" -f db/migrations/002_push_state.sql
           psql "$DATABASE_URL" -f db/migrations/003_vercel_push_reminders.sql
+          psql "$DATABASE_URL" -f db/migrations/004_rate_limits.sql
       - name: Build
         run: npm run build
       - name: Backend integration
