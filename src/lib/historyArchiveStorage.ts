@@ -51,7 +51,7 @@ export async function readTankHistoryArchive(tankId:string){
 }
 
 export async function readTankHistoryArchiveStrict(tankId:string){
-  if(!available())return null;
+  if(!available())throw new Error("IndexedDB unavailable while verifying legacy history archive");
   return await readRaw(tankId);
 }
 
