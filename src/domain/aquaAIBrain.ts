@@ -539,7 +539,8 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   if(!isAquariumScopedQuestion(question,tank))return offTopicAquaAnswer(question);
   const q=(question||"").trim().toLowerCase();
   const lightingQ=normText(question);
-  if(/انار|ضوء|(?:^|\s)ضو(?:\s|$)|الضو|lighting|light|photoperiod|spectrum|par\b|uv\b|royal blue/.test(lightingQ))return lightingAnswer(tank);
+  const lightingTokens=["انار","اضاء","ضوء","ضو","lighting","light","photoperiod","spectrum","par","uv","royal blue"];
+  if(lightingTokens.some(token=>lightingQ.includes(token)))return lightingAnswer(tank);
   const intent=parseAquaQuestion(question);
   const cycle=biologicalCycleStatus(tank);
   const explicitCycleQuestion=/cycle|cycling|nitrogen cycle|دورة بيولوج|الدورة البيولوج|دورة النيتروجين/.test(q);
