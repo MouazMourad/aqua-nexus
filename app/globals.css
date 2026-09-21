@@ -2287,3 +2287,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
  .lighting-page .history-row{grid-template-columns:minmax(0,1fr) auto;min-width:0}
  .lighting-page .history-row small{display:block;max-width:100%;word-break:break-word}
 }
+
+.lighting-import-review{display:grid;grid-template-columns:minmax(180px,.8fr) minmax(0,1.4fr);gap:12px;margin:12px 0;padding:10px;border:1px solid rgba(91,205,231,.16);border-radius:14px;background:rgba(2,15,23,.55)}
+.lighting-import-preview{min-width:0;border-radius:12px;overflow:hidden;background:#02090d;border:1px solid rgba(255,255,255,.06)}
+.lighting-import-preview img{display:block;width:100%;height:auto;max-height:360px;object-fit:contain}
+.lighting-import-review-body{display:grid;align-content:start;gap:9px;min-width:0}
+.lighting-import-review-body .summary-strip{grid-template-columns:repeat(3,minmax(0,1fr))}
+.lighting-import-warnings{display:grid;gap:6px}
+@media(max-width:720px){
+ .lighting-import-review{grid-template-columns:minmax(0,1fr)}
+ .lighting-import-review-body .summary-strip{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .lighting-import-preview img{max-height:260px}
+}
