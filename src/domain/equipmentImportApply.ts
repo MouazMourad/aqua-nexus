@@ -3,6 +3,7 @@ import type {
 } from "./types";
 import { autoMatchImportedDevice,type EquipmentImportCandidate } from "./equipmentImport";
 import { createDefaultConsumables } from "./equipmentLifecycle";
+import { validateChemistryValues } from "./chemistryDataQuality";
 
 export interface EquipmentImportApplyMeta{
   importId:string;
@@ -27,6 +28,7 @@ export interface EquipmentImportApplication{
   importRecord:ExternalImportRecord;
   overflow:EquipmentImportArchiveOverflow;
   skippedDuplicates:number;
+  blockedIssues:Array<{ar:string;en:string}>;
 }
 
 const HOT_LIMIT={chemistry:2500,dosing:2500,deviceTelemetry:5000,topOff:5000,deviceAlerts:2000};
@@ -68,6 +70,7 @@ function deviceIdForName(equipment:Equipment[],name:string|undefined){
 export function prepareEquipmentImportApplication(tank:Tank,candidate:EquipmentImportCandidate,meta:EquipmentImportApplyMeta):EquipmentImportApplication{
   const vendor=meta.vendor;
   let skippedDuplicates=0;
+  const blockedIssues:Array<{ar:string;en:string}>=[];
   let equipment=[...tank.equipment];
 
   for(const row of candidate.devices.filter(x=>x.enabled)){
@@ -135,6 +138,11 @@ export function prepareEquipmentImportApplication(tank:Tank,candidate:EquipmentI
   for(const [timestamp,rows] of chemistryGroups){
     const values:Record<string,number|null>={};
     rows.forEach(row=>{values[row.parameter]=row.value});
+    const validation=validateChemistryValues(tank,values);
+    if(validation.length){
+      blockedIssues.push(...validation.map(x=>({ar:"قراءة مستوردة محجوبة: "+x.ar,en:"Blocked imported reading: "+x.en})));
+      continue;
+    }
     const sourceRecordId=stableId("chem",vendor,timestamp,...rows.map(x=>String(x.sourceRecordId??x.parameter)+":"+x.value).sort());
     if(chemistryExistingKeys.has(sourceRecordId)){skippedDuplicates++;continue}
     chemistryImported.push({
@@ -221,7 +229,7 @@ export function prepareEquipmentImportApplication(tank:Tank,candidate:EquipmentI
   };
 
   return{
-    tank:next,importRecord,skippedDuplicates,
+    tank:next,importRecord,skippedDuplicates,blockedIssues,
     overflow:{
       chemistry:chemSplit.overflow,dosing:doseSplit.overflow,deviceTelemetry:telemetrySplit.overflow,
       topOff:topSplit.overflow,deviceAlerts:alertSplit.overflow
