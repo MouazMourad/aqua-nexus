@@ -60,6 +60,13 @@ function localRemove(name:string){
   try{localStorage.removeItem(name)}catch{}
 }
 function fallbackDirtyKey(name:string){return `${name}:fallback-dirty`;}
+function validPersistedValue(value:string|null){
+  if(value===null)return false;
+  try{
+    const parsed=JSON.parse(value);
+    return Boolean(parsed&&typeof parsed==="object"&&parsed.state&&typeof parsed.state==="object");
+  }catch{return false}
+}
 
 /**
  * Local-first durable Zustand storage.
@@ -72,35 +79,42 @@ function fallbackDirtyKey(name:string){return `${name}:fallback-dirty`;}
  */
 export const aquaStateStorage:StateStorage={
   async getItem(name){
-    if(!hasIndexedDb())return localGet(name);
+    if(!hasIndexedDb()){
+      const local=localGet(name);
+      return validPersistedValue(local)?local:null;
+    }
     // If an IndexedDB write failed previously, the localStorage fallback is the
     // newest committed copy. Prefer it until it has been verified back into IDB.
     const dirty=localGet(fallbackDirtyKey(name));
     if(dirty==="1"){
       const fallback=localGet(name);
-      if(fallback!==null){
+      if(validPersistedValue(fallback)){
         try{
-          await writeIdb(name,fallback);
+          await writeIdb(name,fallback!);
           const verified=await readIdb(name);
           if(verified===fallback){localRemove(fallbackDirtyKey(name));localRemove(name);}
         }catch{}
         return fallback;
       }
+      // A corrupt fallback must never override a valid durable copy. Preserve
+      // the raw local value for forensic/manual recovery, but stop treating it
+      // as authoritative so the next read can safely use IndexedDB.
       localRemove(fallbackDirtyKey(name));
     }
     try{
       const stored=await readIdb(name);
       if(stored!==null)return stored;
       const legacy=localGet(name);
-      if(legacy!==null){
-        await writeIdb(name,legacy);
+      if(validPersistedValue(legacy)){
+        await writeIdb(name,legacy!);
         const verified=await readIdb(name);
         if(verified===legacy)localRemove(name);
         return legacy;
       }
       return null;
     }catch{
-      return localGet(name);
+      const local=localGet(name);
+      return validPersistedValue(local)?local:null;
     }
   },
   async setItem(name,value){

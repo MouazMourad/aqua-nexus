@@ -1,4 +1,5 @@
 import type { IntelligenceEvent,Tank } from "./types";
+import { eventedTankFields } from "./eventCoverage";
 
 const now=()=>new Date().toISOString();
 const makeId=(domain:string,verb:string,source:string)=>`evt-${domain}-${verb}-${source}`;
@@ -420,6 +421,20 @@ export function deriveExtendedIntelligenceEvents(before:Tank,after:Tank):Intelli
       metadata:{changed:changed.join(","),from:row.from??null,to:row.to??null,notes:row.notes??null}
     });
   }
+
+
+  // Runtime coverage guarantee. Specialized events above carry the domain detail;
+  // this checkpoint guarantees that every top-level field declared "evented"
+  // leaves an immutable audit trace even if a future editor forgets a specialized
+  // event branch. Derived/immutable/recovery-exempt fields are intentionally absent.
+  const coverageChanged=eventedTankFields.filter(field=>!same(before[field],after[field]));
+  if(coverageChanged.length)push({
+    timestamp:now(),kind:"fact",domain:"system",verb:"coverage_checkpoint",entityType:"tank",entityId:after.id,confidence:100,
+    sourceId:bucketSource(`${after.id}:coverage`),sourcePage:"system",
+    textAr:`تم توثيق تغيير حقول الحوض: ${coverageChanged.join("، ")}`,
+    textEn:`Tank field changes were audit-captured: ${coverageChanged.join(", ")}`,
+    metadata:{changedFields:coverageChanged.join(","),fieldCount:coverageChanged.length}
+  });
 
   return out;
 }

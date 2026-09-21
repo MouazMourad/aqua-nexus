@@ -931,6 +931,18 @@ describe("Final hardening contracts",()=>{
     expect(eventedTankFields).toContain("lifecycle");
   });
 
+
+  it("runtime coverage checkpoint catches evented-field changes even without relying on a specialized event",()=>{
+    const before=structuredClone(demoMarineTank) as any,after=structuredClone(demoMarineTank) as any;
+    after.visionAssessments=[{id:"vision-contract",timestamp:new Date().toISOString(),photoId:"photo-x",symptoms:[],metrics:{colorIndex:50,brightnessIndex:50,captureScore:50},triage:{level:"monitor",confidence:"low",summaryAr:"اختبار",summaryEn:"test",engine:"local-best"},modelStatus:"local-best",engine:"local-best",external:{status:"not_requested"},diseaseCandidateIds:[]}];
+    after.feeding=[{id:"feed-contract",timestamp:new Date().toISOString(),food:"Test",amount:"small",notes:"contract"},...before.feeding];
+    const events=deriveExtendedIntelligenceEvents(before,after);
+    const checkpoint=events.find(x=>x.verb==="coverage_checkpoint");
+    expect(checkpoint).toBeTruthy();
+    expect(String(checkpoint?.metadata?.changedFields)).toContain("visionAssessments");
+    expect(String(checkpoint?.metadata?.changedFields)).toContain("feeding");
+  });
+
   it("records core edits, removals and AI-plan progress as explicit memory",()=>{
     const before=structuredClone(demoMarineTank) as any,after=structuredClone(demoMarineTank) as any;
     after.name="Renamed Reef";

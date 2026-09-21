@@ -293,3 +293,62 @@ test("high-risk decision pages expose a consistent What Why Next Safety pattern"
   }
 });
 
+test("real IndexedDB write failure falls back to localStorage and repairs on reload",async({page})=>{
+  await openTrainingDashboard(page);
+  await page.waitForTimeout(500);
+  await page.evaluate(()=>{
+    const w=window as any;
+    w.__aquaOrigIdbPut=IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put=function(){throw new DOMException("forced quota failure","QuotaExceededError") as any};
+  });
+  await goToPage(page,"expenses");
+  const panel=page.locator(".card.panel").first();
+  await panel.locator("input").nth(0).fill("Forced IDB Failure Probe");
+  await panel.locator('input[type="number"]').fill("9.87");
+  await panel.getByRole("button",{name:/إضافة مصروف|Add expense/}).click();
+  await expect(page.locator(".history-list")).toContainText("Forced IDB Failure Probe");
+  await page.waitForTimeout(500);
+  const fallback=await page.evaluate(()=>{
+    const key="aqua-nexus-3d-v1";
+    const w=window as any;
+    if(w.__aquaOrigIdbPut)IDBObjectStore.prototype.put=w.__aquaOrigIdbPut;
+    return{raw:localStorage.getItem(key),dirty:localStorage.getItem(key+":fallback-dirty")};
+  });
+  expect(fallback.raw).toContain("Forced IDB Failure Probe");
+  expect(fallback.dirty).toBe("1");
+
+  await page.reload();
+  await openTrainingDashboard(page);
+  await goToPage(page,"expenses");
+  await expect(page.locator(".history-list")).toContainText("Forced IDB Failure Probe");
+  await page.waitForTimeout(700);
+  const repaired=await page.evaluate(()=>{
+    const key="aqua-nexus-3d-v1";
+    return{raw:localStorage.getItem(key),dirty:localStorage.getItem(key+":fallback-dirty")};
+  });
+  expect(repaired.dirty).toBeNull();
+  expect(repaired.raw).toBeNull();
+});
+
+test("corrupt dirty fallback never overrides a valid IndexedDB state",async({page})=>{
+  await openTrainingDashboard(page);
+  await page.waitForTimeout(600);
+  const hasDurableState=await page.evaluate(async()=>{
+    const key="aqua-nexus-3d-v1";
+    const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open("aqua-nexus-state-v1",1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+    return await new Promise<boolean>((resolve,reject)=>{const tx=db.transaction("zustand","readonly"),r=tx.objectStore("zustand").get(key);r.onsuccess=()=>resolve(typeof r.result==="string"&&r.result.length>10);r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close()});
+  });
+  expect(hasDurableState).toBe(true);
+  await page.evaluate(()=>{
+    const key="aqua-nexus-3d-v1";
+    localStorage.setItem(key,'{"state":');
+    localStorage.setItem(key+":fallback-dirty","1");
+  });
+  await page.reload();
+  await openTrainingDashboard(page);
+  await expect(page.locator(".progressive-dashboard")).toBeVisible();
+  await page.waitForTimeout(600);
+  const dirty=await page.evaluate(()=>localStorage.getItem("aqua-nexus-3d-v1:fallback-dirty"));
+  expect(dirty).toBeNull();
+});
+
