@@ -14,7 +14,7 @@ const RAW_AQUARIUM_KEYWORDS=[
   "حوض","أحواض","اكواريوم","Aqua Nexus","سمك","أسماك","مرجان","روبيان","جمبري","حلزون",
   "نبات مائي","بحري","نهري","ريف","reef","aquarium","tank","fish","coral","shrimp","snail",
   "marine","freshwater","livestock","sump","فلتر","فلترة","مضخة","سكيمر","سخان","heater","wave",
-  "overflow","return pump","filter","skimmer","rodi","ato","إضاءة","اضاءة","إنارة","انارة","ضوء","ضو","الضو","lighting","light","PAR","photoperiod","spectrum","ملوحة","salinity",
+  "overflow","return pump","filter","skimmer","rodi","ato","إضاءة","اضاءة","إنارة","انارة","ضوء","ضو","الضو","lighting","light","PAR","equipment","device","controller","telemetry","apex","reefbeat","hydros","ghl","seneye","معدات","جهاز","اجهزة","أجهزة","ATO","تعويض ماء","photoperiod","spectrum","ملوحة","salinity",
   "KH","alkalinity","calcium","كالسيوم","magnesium","مغنيسيوم","NO3","nitrate","نترات","PO4",
   "phosphate","فوسفات","NH3","NH4","ammonia","أمونيا","NO2","nitrite","نتريت","pH","TDS","GH",
   "كيمياء","كيميا","جرعة","جرعات","دوز","dosing","تغذية","feeding","أقلمة","acclimation","حجر صحي",
