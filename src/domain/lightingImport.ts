@@ -87,7 +87,7 @@ export function normalizeLightingImportCandidate(raw:unknown,sourceKind:Lighting
       values[ch.key]=clamp(Number.isFinite(Number(direct))?Number(direct):0,0,100);
     }
     return{minute,values};
-  }).sort((a,b)=>a.minute-b.minute);
+  }).sort((a:LightingImportCandidatePoint,b:LightingImportCandidatePoint)=>a.minute-b.minute);
 
   if(new Set(points.map(x=>x.minute)).size<2)return{ok:false,error:"Lighting import needs at least two distinct times"};
   const confidence=clamp(Number(obj.confidence??70),0,100);
