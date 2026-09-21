@@ -1,7 +1,7 @@
 import type { AquariumExperienceLevel,Language,Tank } from "./types";
 import { validateChemistryValues } from "./chemistryDataQuality";
 
-export const CURRENT_BACKUP_SCHEMA=14;
+export const CURRENT_BACKUP_SCHEMA=15;
 
 export interface ValidBackupPayload{
   language:Language;
@@ -70,6 +70,8 @@ function nestedDataIssue(tank:Record<string,unknown>){
   for(const [i,row] of (((tank.livestock as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validText(row.name,300)||!finite(row.quantity)||Number(row.quantity)<=0)return `livestock #${i+1} is invalid`;
     if(row.lightingDepthCm!==undefined&&(!finite(row.lightingDepthCm)||Number(row.lightingDepthCm)<0||Number(row.lightingDepthCm)>Number((tank.display as Record<string,unknown>).height)))return `livestock #${i+1} has invalid lightingDepthCm`;
+    for(const key of ["lightingXPct","lightingZPct"]){const value=row[key];if(value!==undefined&&(!finite(value)||Number(value)<0||Number(value)>100))return `livestock #${i+1} has invalid ${key}`;}
+    if(row.lightingExposure!==undefined&&!["open","partialShade","shade"].includes(String(row.lightingExposure)))return `livestock #${i+1} has invalid lightingExposure`;
   }
   for(const [i,row] of (((tank.dosing as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp))return `dosing #${i+1} is invalid`;
