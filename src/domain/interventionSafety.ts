@@ -1,4 +1,5 @@
 import type { IntelligenceEvent,Tank } from "./types";
+import { activeRelocation,isTankArchived } from "./tankLifecycle";
 
 export type InterventionKind=
   |"correctiveDosing"|"waterChange"|"medication"|"filterMedia"
@@ -52,6 +53,17 @@ export function recentMajorInterventions(tank:Tank,hours=12){
 
 export function interventionGate(tank:Tank,next:InterventionKind,hours=12):InterventionGate{
   const recent=recentMajorInterventions(tank,hours).filter(x=>x.kind!==next || next==="waterChange" || next==="correctiveDosing");
+  if(isTankArchived(tank))return{
+    level:"danger",blocked:true,recent,distinctKinds:new Set(recent.map(x=>x.kind)).size,
+    ar:"الحوض مؤرشف والعمليات التشغيلية مقفلة. أعد الحوض من الأرشيف قبل تسجيل تدخل جديد.",
+    en:"This tank is archived and operational workflows are locked. Restore it before logging a new intervention."
+  };
+  const relocation=activeRelocation(tank);
+  if(relocation)return{
+    level:"danger",blocked:next==="livestockAddition",recent,distinctKinds:new Set(recent.map(x=>x.kind)).size,
+    ar:"نقل الحوض قيد التنفيذ. لا تضف كائنات جديدة، وتجنب أي تدخل كبير غير ضروري حتى يستقر النظام بعد النقل.",
+    en:"Tank relocation is in progress. Do not add new livestock and avoid unnecessary major interventions until the system stabilizes after the move."
+  };
   const distinct=new Set(recent.map(x=>x.kind));
   const emergency=(tank.emergencySessions??[]).some(x=>x.status==="active");
   if(emergency){
