@@ -7,7 +7,7 @@ import type { Language,Tank } from "@/domain/types";
 import { GlobalHelpButton,PageHelpButton } from "@/components/help/HelpCenter";
 
 export type AppPage =
-  | "dashboard" | "tanks" | "equipment" | "sump" | "livestock" | "acclimation" | "library"
+  | "dashboard" | "tanks" | "equipment" | "lighting" | "sump" | "livestock" | "acclimation" | "library"
   | "chemistry" | "maintenance" | "inventory" | "diseases" | "timeline"
   | "journal" | "waterchange" | "feeding" | "dosing" | "quarantine"
   | "emergency" | "rodi" | "expenses" | "alerts" | "reports" | "settings";
@@ -28,6 +28,7 @@ const items:NavItem[]=[
   {key:"dashboard",label:"dashboard",icon:"⌂",color:"#55e8ff",group:"core"},
   {key:"tanks",label:"tanks",icon:"▣",color:"#55b8ff",group:"system"},
   {key:"equipment",label:"equipment",icon:"⚙",color:"#8b8cff",group:"core"},
+  {key:"lighting",label:"lighting",icon:"☀",color:"#7bb8ff",group:"core"},
   {key:"sump",label:"sump",icon:"▤",color:"#3ed2c0",group:"system"},
   {key:"livestock",label:"livestock",icon:"◉",color:"#ffb44d",group:"core"},
   {key:"acclimation",label:"acclimation",icon:"⇄",color:"#ff7fc5",group:"core"},
@@ -50,7 +51,7 @@ const items:NavItem[]=[
   {key:"settings",label:"settings",icon:"⚙",color:"#c0d5df",group:"system"}
 ];
 
-const PRIMARY:AppPage[]=["dashboard","chemistry","livestock","maintenance","equipment","acclimation","alerts"];
+const PRIMARY:AppPage[]=["dashboard","chemistry","livestock","maintenance","equipment","lighting","acclimation","alerts"];
 const PAGE_SET=new Set<AppPage>(items.map(x=>x.key));
 const PAGE_ALIAS:Record<string,AppPage>={"water-change":"waterchange","waterChange":"waterchange"};
 
