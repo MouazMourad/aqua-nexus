@@ -16,6 +16,7 @@ import { BiologicalCyclePanel } from "@/components/cycle/BiologicalCyclePanel";
 import { syncPushReminders } from "@/lib/pushNotifications";
 import { validateTankSetupEntry } from "@/domain/inputSanity";
 import { validateChemistryValues } from "@/domain/chemistryDataQuality";
+import { archivedPageAllowed,isTankArchived } from "@/domain/tankLifecycle";
 
 const equipOptions: {kind:EquipmentKind;ar:string;en:string}[] = [
  {kind:"lighting",ar:"إضاءة",en:"Lighting"},
@@ -37,13 +38,21 @@ export function AquaDashboard() {
  const system=tank?systemHealth(tank):null;
  const showOnboarding=realTanks.length===0&&!trainingPreviewId;
  const cycle=tank?biologicalCycleStatus(tank):null;
+ const archived=Boolean(tank&&isTankArchived(tank));
  const allPages:AppPage[]=["dashboard","tanks","equipment","sump","livestock","acclimation","library","chemistry","maintenance","inventory","diseases","timeline","journal","waterchange","feeding","dosing","quarantine","emergency","rodi","expenses","alerts","reports","settings"];
- const lockedPages:AppPage[]=cycle?.active?allPages.filter(p=>!isCyclePageAllowed(p)):[];
- const navigatePage=(next:AppPage)=>{if(cycle?.active&&!isCyclePageAllowed(next)){setPage("dashboard");return;}setPage(next)};
+ const lockedPages:AppPage[]=archived
+  ?allPages.filter(p=>!archivedPageAllowed(p))
+  :(cycle?.active?allPages.filter(p=>!isCyclePageAllowed(p)):[]);
+ const navigatePage=(next:AppPage)=>{
+  if(archived&&!archivedPageAllowed(next)){setPage("dashboard");return;}
+  if(cycle?.active&&!isCyclePageAllowed(next)){setPage("dashboard");return;}
+  setPage(next);
+ };
 
  useEffect(()=>{
+  if(archived&&!archivedPageAllowed(page)){setPage("dashboard");return;}
   if(cycle?.active&&!isCyclePageAllowed(page))setPage("dashboard");
- },[cycle?.active,page,tank?.id]);
+ },[archived,cycle?.active,page,tank?.id]);
 
  useEffect(()=>{
   if(typeof window==="undefined"||!("Notification" in window)||Notification.permission!=="granted")return;
