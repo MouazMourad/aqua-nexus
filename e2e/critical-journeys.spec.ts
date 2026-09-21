@@ -486,7 +486,6 @@ test("Lighting depth map shows actual livestock depth and keeps it editable",asy
   const diagram=page.locator(".lighting-depth-tank");
   await expect(diagram).toBeVisible();
   await expect(diagram).toContainText(/مرجان تورش|Torch Coral/);
-  await expect(diagram).toContainText(/32/);
   const resident=diagram.locator(".lighting-depth-resident").filter({hasText:/مرجان تورش|Torch Coral/}).first();
   const depth=resident.locator('input[type="number"]');
   await expect(depth).toHaveValue("32");
@@ -549,8 +548,10 @@ test("Lighting screenshot import uses Vision analysis, fills editable values and
   const review=page.locator(".lighting-import-review");
   await expect(review).toBeVisible({timeout:25000});
   await expect(review).toContainText("88%");
-  await expect(page.locator(".lighting-channel-row").filter({hasText:"UV"}).first()).toBeVisible();
-  await expect(page.locator(".lighting-channel-row").filter({hasText:"Royal Blue"}).first()).toBeVisible();
+  const importedNames=page.locator('.lighting-channel-row input[aria-label="Channel name"]');
+  await expect(importedNames).toHaveCount(2);
+  await expect(importedNames.nth(0)).toHaveValue("UV");
+  await expect(importedNames.nth(1)).toHaveValue("Royal Blue");
   const table=page.locator(".lighting-points-table");
   const editable=table.locator('input[type="number"]').nth(3);
   await editable.fill("66");
