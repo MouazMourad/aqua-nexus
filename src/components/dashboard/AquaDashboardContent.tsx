@@ -18,6 +18,7 @@ import { tr } from "@/i18n";
 import { maintenanceTaskDue } from "@/domain/maintenanceSchedule";
 import { estimatedParAt,formatLightMinute,lightingAtMinute } from "@/domain/lightingIntelligence";
 import { DashboardFeatureBubble } from "@/components/dashboard/DashboardFeatureBubble";
+import { markFeatureLearned } from "@/lib/featureDiscovery";
 
 type ModuleId="chemistry"|"lighting"|"maintenance"|"bioload"|"forecast"|"intelligence"|"digitalTwin"|"equipment"|"predictions"|"memory"|"context"|"journey";
 type SceneMode="tank"|"equipment"|"flow"|"empty";
@@ -193,7 +194,7 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
    </div>
    <div className="pd-intelligence-proof"><b>✦ {lang==="ar"?"محرك Aqua Nexus يربط بيانات الحوض ببعضها":"Aqua Nexus connects tank evidence across the system"}</b><span>{knownComponents.length}/{system.components.length} {lang==="ar"?"محاور صحة لديها أدلة":"health domains with evidence"}</span><span>{lang==="ar"?"ثقة القرار":"Decision confidence"} {core.dataConfidence}%</span><span>{activeActionCount} {lang==="ar"?"إجراء ذكي نشط":"active smart action(s)"}</span><span>{tank.intelligenceEvents?.length??0} {lang==="ar"?"حدث مترابط":"linked event(s)"}</span><span>{memory.length} {lang==="ar"?"رابط متعلّم":"learned link(s)"}</span></div>
    <div className="pd-system-health-strip">{system.components.map(x=>{const cs=componentState(x.score,x.known);return <span key={x.key} className={`state-${cs.tone}`}><small>{lang==="ar"?x.ar:x.en}</small><b>{lang==="ar"?cs.ar:cs.en}</b><em>{x.known?`${x.score}%`:"—"}</em></span>})}</div>
-   <div className="pd-hero-footer"><span className={critical?"warn":"good"}>{critical?`⚠ ${critical} ${lang==="ar"?"إشارة تحتاج انتباه":"signal(s) need attention"}`:`✓ ${lang==="ar"?"لا يوجد تنبيه حرج":"No critical alert"}`}</span><div className="pd-hero-actions"><button className="btn glass-button pd-share-button" onClick={()=>setShareOpen(v=>!v)}>↗ {lang==="ar"?"مشاركة":"Share"}</button><div className="pd-customize-wrap"><small>ⓘ {lang==="ar"?"يمكنك إخفاء أو إظهار الصناديق وتغيير ترتيبها":"Hide, show or reorder dashboard cards"}</small><button className="btn glass-button" onClick={()=>setCustomizing(v=>!v)}>⚙ {lang==="ar"?"تعديل الواجهة":"Customize"}</button></div></div></div>
+   <div className="pd-hero-footer"><span className={critical?"warn":"good"}>{critical?`⚠ ${critical} ${lang==="ar"?"إشارة تحتاج انتباه":"signal(s) need attention"}`:`✓ ${lang==="ar"?"لا يوجد تنبيه حرج":"No critical alert"}`}</span><div className="pd-hero-actions"><button className="btn glass-button pd-share-button" onClick={()=>setShareOpen(v=>!v)}>↗ {lang==="ar"?"مشاركة":"Share"}</button><div className="pd-customize-wrap"><small>ⓘ {lang==="ar"?"يمكنك إخفاء أو إظهار الصناديق وتغيير ترتيبها":"Hide, show or reorder dashboard cards"}</small><button className="btn glass-button" onClick={()=>{markFeatureLearned("dashboard-customize");setCustomizing(v=>!v)}}>⚙ {lang==="ar"?"تعديل الواجهة":"Customize"}</button></div></div></div>
   </section>
 
   {shareOpen&&<section className="card panel pd-inline-share"><div className="module-head"><h3>↗ {lang==="ar"?"مشاركة حالة الحوض":"Share tank status"}</h3><button className="icon-btn" onClick={()=>setShareOpen(false)}>×</button></div><TankHealthShareCard tank={tank}/></section>}
