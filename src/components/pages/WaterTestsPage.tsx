@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Tank } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
 import { Modal } from "@/components/ui/Modal";
+import { validateChemistryValues } from "@/domain/chemistryDataQuality";
 
 type WaterTestValues = Record<string, number>;
 
@@ -17,6 +18,8 @@ export function WaterTestsPage({ tank }: { tank: Tank }) {
   const [values, setValues] = useState<WaterTestValues>(() => ({ ...initial }));
 
   function save() {
+    const issues=validateChemistryValues(tank,values);
+    if(issues.length){window.alert(issues[0].ar);return}
     addReading(tank.id, { timestamp: new Date().toISOString(), values });
     setOpen(false);
   }
