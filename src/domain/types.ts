@@ -164,6 +164,8 @@ export interface LivestockItem {
   plantColor?: "normal" | "pale" | "yellow" | "redWeak" | "spots";
   algaePresent?: boolean;
   lastTrimmedAt?: string;
+  /** Actual vertical placement below the water surface for photosynthetic livestock. */
+  lightingDepthCm?: number;
 }
 
 export interface LivestockExitEvent {
