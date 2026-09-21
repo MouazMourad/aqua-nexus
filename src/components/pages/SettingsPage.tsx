@@ -11,6 +11,7 @@ import { externalizeAllTankPhotos,hydrateTankPhotosForBackup } from "@/lib/photo
 import { activeRelocation,activeVacation,isTankArchived } from "@/domain/tankLifecycle";
 import { sanitizeBounded,validateEnergySettings } from "@/domain/inputSanity";
 import { buildVacationTaskDrafts,vacationDays } from "@/domain/vacationPlan";
+import { clearTankHistoryArchive,hydrateAllTankHistoryArchives } from "@/lib/historyArchiveStorage";
 
 export function SettingsPage({tank}:{tank:Tank}) {
  const state=useAquaStore(),patch=useAquaStore(s=>s.patchTank),del=useAquaStore(s=>s.deleteTank),replace=useAquaStore(s=>s.replaceData),[name,setName]=useState(tank.name),file=useRef<HTMLInputElement>(null),lang=state.language;
@@ -23,7 +24,7 @@ export function SettingsPage({tank}:{tank:Tank}) {
  const vacation=activeVacation(tank),relocation=activeRelocation(tank),archived=isTankArchived(tank);
  const profile=tank.ecosystemProfile??"auto";
  const energy=tank.energySettings??{pricePerKwh:0,currency:"USD"};
- const exportBackup=async()=>{const tanks=await hydrateTankPhotosForBackup(state.tanks);downloadText(`Aqua_Nexus_Backup_${today()}.json`,JSON.stringify({app:"Aqua Nexus",schemaVersion:CURRENT_BACKUP_SCHEMA,exportedAt:new Date().toISOString(),language:state.language,aquariumExperience:state.aquariumExperience,selectedTankId:state.selectedTankId,tanks},null,2));};
+ const exportBackup=async()=>{const tanks=await hydrateAllTankHistoryArchives(await hydrateTankPhotosForBackup(state.tanks));downloadText(`Aqua_Nexus_Backup_${today()}.json`,JSON.stringify({app:"Aqua Nexus",schemaVersion:CURRENT_BACKUP_SCHEMA,exportedAt:new Date().toISOString(),language:state.language,aquariumExperience:state.aquariumExperience,selectedTankId:state.selectedTankId,tanks},null,2));};
 
  useEffect(()=>{
   if(typeof window==="undefined")return;
@@ -42,6 +43,7 @@ export function SettingsPage({tank}:{tank:Tank}) {
     const validated=validateBackupPayload(parsed);
     if(!validated.ok){setBackupNote({kind:"danger",text:(lang==="ar"?"النسخة الاحتياطية غير صالحة: ":"Invalid backup: ")+validated.error});return}
     const tanks=await externalizeAllTankPhotos(validated.data.tanks);
+    for(const imported of tanks)await clearTankHistoryArchive(imported.id);
     replace({...validated.data,tanks});
     setBackupNote({kind:"good",text:lang==="ar"?`تم التحقق من النسخة واستيراد ${tanks.length} حوض بأمان، مع نقل الصور الكبيرة إلى مخزن الوسائط المحلي.`:`Backup validated and ${tanks.length} tank(s) imported safely; large images were moved to local media storage.`});
    }catch{
