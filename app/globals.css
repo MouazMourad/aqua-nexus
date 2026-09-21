@@ -2200,3 +2200,37 @@ button:disabled{opacity:.45;cursor:not-allowed}
   font-size:7px;
   color:#bdeef3;
 }
+
+
+/* Lighting Intelligence */
+.lighting-page{--light-border:rgba(89,205,237,.16)}
+.lighting-command{background:linear-gradient(135deg,rgba(9,42,58,.92),rgba(4,23,34,.96))}
+.lighting-controls{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.lighting-controls .inline-alert{grid-column:1/-1}
+.lighting-map-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.lighting-heat-grid{display:grid;gap:2px;border:1px solid var(--light-border);padding:5px;border-radius:14px;background:rgba(2,12,18,.7);overflow:hidden}
+.lighting-heat-cell{aspect-ratio:1.55/1;border-radius:3px;display:grid;place-items:center;min-width:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.025)}
+.lighting-heat-cell span{font-size:8px;font-weight:800;color:#f5fdff;text-shadow:0 1px 4px #000}
+.lighting-heat-grid.front .lighting-heat-cell{aspect-ratio:1.65/1}
+.lighting-curve{margin:14px 0;border:1px solid var(--light-border);border-radius:15px;padding:10px;background:rgba(2,15,23,.6)}
+.lighting-curve svg{display:block;width:100%;height:auto;max-height:250px}
+.lighting-curve svg .grid{stroke:rgba(255,255,255,.08);stroke-width:1}
+.lighting-curve svg text{fill:rgba(220,246,252,.6);font-size:9px}
+.lighting-curve-legend{display:flex;gap:9px;flex-wrap:wrap;margin-top:6px}
+.lighting-curve-legend span{display:flex;gap:5px;align-items:center;font-size:9px;opacity:.75}
+.lighting-curve-legend i{width:9px;height:9px;border-radius:99px}
+.lighting-channel-editor{display:grid;gap:7px;margin:10px 0 14px}
+.lighting-channel-row{display:grid;grid-template-columns:auto minmax(120px,1fr) minmax(120px,.8fr) 120px auto;gap:7px;align-items:end;padding:8px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.018)}
+.lighting-channel-row>input,.lighting-channel-row>select,.lighting-points-table input{width:100%;min-height:36px;border:1px solid rgba(101,202,225,.16);border-radius:9px;background:rgba(1,16,24,.72);color:inherit;padding:6px 8px}
+.lighting-points-wrap{overflow:auto;border-top:1px solid rgba(255,255,255,.07);padding-top:12px}
+.lighting-points-table{width:100%;border-collapse:separate;border-spacing:5px;min-width:680px}
+.lighting-points-table th{font-size:9px;opacity:.62;text-align:start}.lighting-points-table td{min-width:88px}
+.lighting-fixtures{display:grid;gap:10px}
+.lighting-fixture-card{display:grid;gap:10px;padding:12px;border:1px solid var(--light-border);border-radius:14px;background:rgba(255,255,255,.018)}
+.lighting-fixture-card>div:first-child{display:grid;gap:2px}.lighting-fixture-card small{opacity:.58;font-size:9px}
+.lighting-brain-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.lighting-brain-grid>div{display:grid;align-content:start;gap:7px;padding:10px;border:1px solid rgba(255,255,255,.065);border-radius:13px;background:rgba(255,255,255,.016)}
+.lighting-brain-grid h4{margin:0 0 2px;font-size:11px}
+.input-like{min-height:39px;display:flex;align-items:center;padding:7px 9px;border:1px solid rgba(101,202,225,.16);border-radius:9px;background:rgba(1,16,24,.72)}
+@media(max-width:850px){.lighting-map-pair,.lighting-brain-grid{grid-template-columns:1fr}.lighting-channel-row{grid-template-columns:auto 1fr 1fr}.lighting-channel-row .field.mini{grid-column:2/4}}
+@media(max-width:650px){.lighting-controls{grid-template-columns:1fr}.lighting-channel-row{grid-template-columns:1fr 1fr}.lighting-channel-row .checkbox-row{grid-column:1/-1}.lighting-channel-row .field.mini{grid-column:auto}.lighting-heat-cell span{font-size:7px}}
