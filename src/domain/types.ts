@@ -164,6 +164,14 @@ export interface LivestockItem {
   plantColor?: "normal" | "pale" | "yellow" | "redWeak" | "spots";
   algaePresent?: boolean;
   lastTrimmedAt?: string;
+  /** Actual vertical placement below the water surface for photosynthetic livestock. */
+  lightingDepthCm?: number;
+  /** Horizontal placement across display length: 0 = left, 100 = right. */
+  lightingXPct?: number;
+  /** Front-to-back placement across display width: 0 = front, 100 = back. */
+  lightingZPct?: number;
+  /** Local hardscape/canopy exposure correction when full 3D occlusion is not modeled. */
+  lightingExposure?: "open"|"partialShade"|"shade";
 }
 
 export interface LivestockExitEvent {
@@ -730,6 +738,22 @@ export interface LightingCalibrationPoint {
   notes?:string;
 }
 
+export interface LightingImportRecord {
+  id:string;
+  importedAt:string;
+  sourceCompany:"generic"|"maxspect"|"redsea"|"ai-mobius"|"ecotech"|"apex"|"hydros"|"ghl"|"other";
+  fileName:string;
+  fileType:string;
+  fileSize:number;
+  status:"parsed"|"analyzed"|"metadata-only"|"unsupported";
+  analysisMode?:"structured-file"|"ai-text"|"ai-image";
+  confidence?:number;
+  detectedChannels?:number;
+  detectedPoints?:number;
+  warnings?:string[];
+  notes?:string;
+}
+
 export interface TankLightingState {
   activeProgram?:LightingProgram;
   history?:LightingProgramSnapshot[];
@@ -738,6 +762,7 @@ export interface TankLightingState {
   mapDepthPct?:number;
   /** Optional global correction after calibration; normally derived from calibration points. */
   manualCalibrationFactor?:number;
+  imports?:LightingImportRecord[];
 }
 
 export interface Tank {

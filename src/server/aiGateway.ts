@@ -4,6 +4,7 @@ import { aquaAISystemPrompt,buildTankAIContext } from "@/domain/aiContext";
 import { query } from "./db";
 import { ensureWorkspace } from "./workspace";
 import { isAquariumScopedQuestion,offTopicAquaAnswer } from "@/domain/aquaAIScope";
+import { normalizeLightingImportCandidate,type LightingImportSourceKind } from "@/domain/lightingImport";
 
 export interface GatewayResult {
   mode:"local"|"external";
@@ -104,5 +105,67 @@ export async function runAquaVision(input:{workspace:string;tank:Tank;imageDataU
   const text=typeof raw==="string"?raw.slice(0,12000):JSON.stringify(raw).slice(0,12000);
   const answer={text,contextSchema:context.schema,secondOpinion:true};
   await audit(input.workspace,input.tank.id,"vision",input.question,"external",cfg.model,answer);
+  return {mode:"external",provider:"configured AI provider",model:cfg.model,answer};
+}
+
+
+export async function runAquaLightingImport(input:{
+  workspace:string;
+  tank:Tank;
+  sourceKind:LightingImportSourceKind;
+  sourceCompany?:string;
+  fileName?:string;
+  fileType?:string;
+  imageDataUrl?:string;
+  textContent?:string;
+  language?:"ar"|"en";
+}):Promise<GatewayResult>{
+  const cfg=providerConfig();
+  if(!cfg.configured){
+    const answer={providerConfigured:false,error:"Lighting import AI provider is not configured."};
+    await audit(input.workspace,input.tank.id,"lighting-import",input.fileName,"local",undefined,answer);
+    return {mode:"local",provider:"Aqua Nexus lighting import",answer};
+  }
+  const language=input.language||"ar";
+  const context=buildTankAIContext(input.tank);
+  const schemaPrompt=[
+    "You extract aquarium lighting schedules from screenshots or export text.",
+    "Return JSON only. Do not add prose outside JSON.",
+    "Never invent a channel, time point, fixture model, wattage or value that is not visible or strongly evidenced.",
+    "If a graph requires approximation, use the closest defensible value and add a warning; lower confidence accordingly.",
+    "All channel intensity values must be 0..100 and times must be minute-of-day 0..1439.",
+    "Allowed spectrum values: uv,violet,royalBlue,blue,cyan,green,red,warmWhite,coolWhite,white,other.",
+    "Output exactly: {confidence:number,vendorDetected?:string,programName?:string,fixture?:{brand?:string,model?:string,powerWatts?:number,mountingHeightCm?:number},channels:[{key:string,name:string,spectrum:string,parWeight?:number,confidence?:number}],points:[{minute:number,values:{[channelKey]:number}}],warnings:string[],evidence:string[]}.",
+    "Use the same channel keys in every point. Missing visible values should be 0 only when the screenshot/export clearly shows zero; otherwise include a warning and keep confidence low.",
+    "This is data extraction for editable review. It is not permission to make aquarium treatment or dosing decisions."
+  ].join("\n");
+  const sourceMeta="Vendor selected by user: "+(input.sourceCompany||"unknown")+"\nFilename: "+(input.fileName||"unknown")+"\nFile type: "+(input.fileType||"unknown");
+  const userContent:any[]=[{type:"text",text:schemaPrompt+"\n\n"+sourceMeta}];
+  if(input.imageDataUrl)userContent.push({type:"image_url",image_url:{url:input.imageDataUrl}});
+  else userContent[0].text+="\n\nEXPORT CONTENT:\n"+String(input.textContent||"").slice(0,180000);
+
+  const response=await fetch(`${cfg.base}/chat/completions`,{
+    method:"POST",
+    signal:AbortSignal.timeout(60_000),
+    headers:{"content-type":"application/json","authorization":`Bearer ${cfg.key}`},
+    body:JSON.stringify({
+      model:cfg.model,
+      temperature:0,
+      max_tokens:1800,
+      messages:[
+        {role:"system",content:aquaAISystemPrompt(language)},
+        {role:"system",content:"You are Aqua Nexus Lighting Import Extractor. Extract only lighting-program data and preserve uncertainty."},
+        {role:"system",content:`AQUA_NEXUS_TANK_CONTEXT\n${JSON.stringify(context)}`},
+        {role:"user",content:userContent}
+      ]
+    })
+  });
+  if(!response.ok)throw Object.assign(new Error(`Lighting import provider returned ${response.status}`),{status:502});
+  const json:any=await response.json();
+  const raw=json?.choices?.[0]?.message?.content??json?.output_text??json;
+  const normalized=normalizeLightingImportCandidate(typeof raw==="string"?raw:JSON.stringify(raw),input.sourceKind);
+  if(!normalized.ok)throw Object.assign(new Error(normalized.error),{status:422});
+  const answer={candidate:normalized.candidate,contextSchema:context.schema};
+  await audit(input.workspace,input.tank.id,"lighting-import",input.fileName,"external",cfg.model,answer);
   return {mode:"external",provider:"configured AI provider",model:cfg.model,answer};
 }

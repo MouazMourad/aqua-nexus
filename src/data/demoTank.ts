@@ -28,7 +28,7 @@ export const demoMarineTank: Tank = {
   },
   systemVolumeLiters: 578.2,
   equipment: [
-    { id:"e1", name:"Maxspect L165", kind:"lighting", legacyKind:"Lighting", brand:"Maxspect", model:"L165", location:"display", status:"on", installedAt:"2026-01-01", lastServiceAt:"2026-08-01", serviceIntervalDays:180 },
+    { id:"e1", name:"Maxspect L165", kind:"lighting", legacyKind:"Lighting", brand:"Maxspect", model:"L165", location:"display", status:"on", installedAt:"2026-01-01", lastServiceAt:"2026-08-01", serviceIntervalDays:180, powerWatts:65, mountingHeightCm:20, parAtTargetDepth:240, parReferenceDepthCm:35, coverageLengthCm:90, coverageWidthCm:60, displayPosition:{xPct:50,yPct:116,zPct:50,scale:1} },
     { id:"e2", name:"Jebao Wave Maker Left", kind:"waveMaker", legacyKind:"Wave Maker", brand:"Jebao", location:"display", status:"on", lastServiceAt:"2026-08-15", serviceIntervalDays:60 },
     { id:"e3", name:"Jebao Wave Maker Right", kind:"waveMaker", legacyKind:"Wave Maker", brand:"Jebao", location:"display", status:"on", lastServiceAt:"2026-08-15", serviceIntervalDays:60 },
     { id:"e4", name:"Protein Skimmer", kind:"skimmer", legacyKind:"Skimmer", location:"sump:c2", status:"on", lastServiceAt:"2026-09-01", serviceIntervalDays:30 },
@@ -38,6 +38,25 @@ export const demoMarineTank: Tank = {
     { id:"e8", name:"Heater 300W", kind:"heater", legacyKind:"Heater", location:"sump:c5", status:"on" },
     { id:"e9", name:"Aqua Medic Ozone 30", kind:"ozone", legacyKind:"Ozone", brand:"Aqua Medic", model:"Ozone 30", location:"external", status:"on" }
   ],
+  lighting:{
+    activeProgram:{
+      id:"training-marine-light",name:"Training Reef Day",createdAt:now,updatedAt:now,
+      channels:[
+        {id:"uv",name:"UV",spectrum:"uv",parWeight:.88,enabled:true},
+        {id:"violet",name:"Violet",spectrum:"violet",parWeight:.96,enabled:true},
+        {id:"royalBlue",name:"Royal Blue",spectrum:"royalBlue",parWeight:1,enabled:true},
+        {id:"blue",name:"Blue",spectrum:"blue",parWeight:.98,enabled:true},
+        {id:"white",name:"White",spectrum:"coolWhite",parWeight:.72,enabled:true}
+      ],
+      points:[
+        {id:"tm-p1",minute:540,values:{uv:0,violet:0,royalBlue:0,blue:0,white:0}},
+        {id:"tm-p2",minute:660,values:{uv:25,violet:38,royalBlue:55,blue:50,white:10}},
+        {id:"tm-p3",minute:900,values:{uv:42,violet:58,royalBlue:72,blue:66,white:20}},
+        {id:"tm-p4",minute:1260,values:{uv:30,violet:44,royalBlue:58,blue:54,white:12}},
+        {id:"tm-p5",minute:1380,values:{uv:0,violet:0,royalBlue:0,blue:0,white:0}}
+      ]
+    },mapDepthPct:50,calibrationPoints:[]
+  },
   chemistry: [
    {timestamp:now,values:{temperature:25,pH:8.1,salinity:1.025,KH:8,Ca:430,Mg:1300,NO3:10,PO4:0.08,NH3:0}},
    {timestamp:daysAgoISO(3),values:{temperature:25.2,pH:8.15,salinity:1.025,KH:7.6,Ca:435,Mg:1270,NO3:16,PO4:0.12,NH3:0}},
@@ -54,7 +73,7 @@ export const demoMarineTank: Tank = {
   livestock: [
     { id:"l1", libraryId:"clown", name:"سمكة المهرج", nameEn:"Clownfish", category:"fish", quantity:2, health:"good", load:1.2, addedAt:"2026-01-01" },
     { id:"l2", libraryId:"chromis", name:"كروميس أخضر", nameEn:"Green Chromis", category:"fish", quantity:2, health:"good", load:1, addedAt:"2026-02-01" },
-    { id:"l3", libraryId:"torch", name:"مرجان تورش", nameEn:"Torch Coral", category:"coral", quantity:1, health:"good", load:.3, addedAt:"2026-03-01" }
+    { id:"l3", libraryId:"torch", name:"مرجان تورش", nameEn:"Torch Coral", category:"coral", quantity:1, health:"good", load:.3, addedAt:"2026-03-01", lightingDepthCm:32, lightingXPct:56, lightingZPct:48, lightingExposure:"open" }
   ],
   inventory: [
     { id:"i1", name:"ملح بحري", nameEn:"Marine Salt", category:"مياه", categoryEn:"Water", quantity:5, unit:"kg", minimum:2 },
@@ -90,7 +109,25 @@ export const demoFreshwaterTank: Tank = {
   display:{ length:100,width:50,height:60,displacementPercent:15,grossLiters:300,netLiters:255 },
   systemVolumeLiters:330,
   sump:{...demoMarineTank.sump,enabled:false,chambers:[]},
-  equipment: demoMarineTank.equipment.filter(e=>["lighting","heater","returnPump"].includes(e.kind)).map((e,i)=>({...e,id:`fw-e${i}`,location:"external"})),
+  equipment: demoMarineTank.equipment.filter(e=>["lighting","heater","returnPump"].includes(e.kind)).map((e,i)=>({...e,id:`fw-e${i}`,location:e.kind==="lighting"?"display":"external",powerWatts:e.kind==="lighting"?45:e.powerWatts,parAtTargetDepth:e.kind==="lighting"?120:e.parAtTargetDepth,parReferenceDepthCm:e.kind==="lighting"?30:e.parReferenceDepthCm,coverageLengthCm:e.kind==="lighting"?85:e.coverageLengthCm,coverageWidthCm:e.kind==="lighting"?45:e.coverageWidthCm})),
+  lighting:{
+    activeProgram:{
+      id:"training-freshwater-light",name:"Training Planted Day",createdAt:now,updatedAt:now,
+      channels:[
+        {id:"white",name:"White",spectrum:"coolWhite",parWeight:.78,enabled:true},
+        {id:"red",name:"Red",spectrum:"red",parWeight:.66,enabled:true},
+        {id:"green",name:"Green",spectrum:"green",parWeight:.54,enabled:true},
+        {id:"blue",name:"Blue",spectrum:"blue",parWeight:.84,enabled:true}
+      ],
+      points:[
+        {id:"tf-p1",minute:480,values:{white:0,red:0,green:0,blue:0}},
+        {id:"tf-p2",minute:540,values:{white:52,red:28,green:20,blue:28}},
+        {id:"tf-p3",minute:780,values:{white:70,red:38,green:27,blue:36}},
+        {id:"tf-p4",minute:1080,values:{white:55,red:30,green:22,blue:30}},
+        {id:"tf-p5",minute:1140,values:{white:0,red:0,green:0,blue:0}}
+      ]
+    },mapDepthPct:50,calibrationPoints:[]
+  },
   chemistry:[
    {timestamp:now,values:{temperature:25,pH:7.2,GH:8,KH:5,NH3:0,NO2:0,NO3:12,TDS:200}},
    {timestamp:daysAgoISO(3),values:{temperature:25.1,pH:7.25,GH:8,KH:5,NH3:0,NO2:0,NO3:18,TDS:215}},
@@ -105,7 +142,9 @@ export const demoFreshwaterTank: Tank = {
   ],
   livestock:[
    {id:"fw-l1",libraryId:"neonTetra",name:"نيون تترا",nameEn:"Neon Tetra",category:"fish",quantity:8,health:"good",load:.35,addedAt:daysAgoDate(45)},
-   {id:"fw-l2",libraryId:"cherryShrimp",name:"جمبري شيري",nameEn:"Cherry Shrimp",category:"invert",quantity:6,health:"good",load:.15,addedAt:daysAgoDate(30)}
+   {id:"fw-l2",libraryId:"cherryShrimp",name:"جمبري شيري",nameEn:"Cherry Shrimp",category:"invert",quantity:6,health:"good",load:.15,addedAt:daysAgoDate(30)},
+   {id:"fw-l3",libraryId:"anubias",name:"أنوبياس",nameEn:"Anubias",category:"plant",quantity:3,health:"good",load:.05,addedAt:daysAgoDate(28),lightingDepthCm:45,lightingXPct:34,lightingZPct:62,lightingExposure:"shade"},
+   {id:"fw-l4",libraryId:"rotala",name:"روتالا",nameEn:"Rotala",category:"plant",quantity:6,health:"good",load:.05,addedAt:daysAgoDate(21),lightingDepthCm:28,lightingXPct:68,lightingZPct:42,lightingExposure:"open"}
   ],
   inventory:[],
   timeline:[

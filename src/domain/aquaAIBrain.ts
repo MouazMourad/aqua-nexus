@@ -481,13 +481,18 @@ function lightingAnswer(tank:Tank):AquaAIAnswer{
  const light=lightingIntelligence(tank),schedule=light.schedule;
  const firstIssue=light.issues[0];
  const calibrated=light.calibrationPoints>0;
+ const latestImport=light.latestImport;
+ const placementFactsAr=light.placementRecommendations.slice(0,6).map(x=>x.name+": "+(x.placementStatus==="unset"?"الموقع غير مكتمل؛ المطلوب X/Z/العمق. العمق المقترح "+Math.round(x.recommendedDepthMinCm)+"–"+Math.round(x.recommendedDepthMaxCm)+" سم تحت السطح":"X "+Math.round(x.actualXPct??0)+"% • Z "+Math.round(x.actualZPct??0)+"% • عمق "+Math.round(x.actualDepthCm??0)+" سم • "+(x.exposure==="open"?"ضوء مفتوح":x.exposure==="partialShade"?"ظل جزئي":"ظل")+" • PAR ≈ "+Math.round(x.estimatedPeakParAtActualDepth??0)+" • "+(x.placementStatus==="within"?"ضمن المجال المقترح":"خارج المجال المقترح"))+".");
+ const placementFactsEn=light.placementRecommendations.slice(0,6).map(x=>x.name+": "+(x.placementStatus==="unset"?"position incomplete; X/Z/depth required. Suggested depth "+Math.round(x.recommendedDepthMinCm)+"–"+Math.round(x.recommendedDepthMaxCm)+" cm below surface":"X "+Math.round(x.actualXPct??0)+"% • Z "+Math.round(x.actualZPct??0)+"% • depth "+Math.round(x.actualDepthCm??0)+" cm • "+(x.exposure==="open"?"open light":x.exposure==="partialShade"?"partial shade":"shade")+" • PAR ≈ "+Math.round(x.estimatedPeakParAtActualDepth??0)+" • "+(x.placementStatus==="within"?"within suggested range":"outside suggested range"))+".");
  const detailsAr=[
   `وحدات الإنارة الفعالة: ${light.fixtures}.`,
   light.program?`البرنامج: ${light.program.name} • الفترة ${(schedule.photoperiodMinutes/60).toFixed(1)} ساعة • Peak ${Math.round(schedule.peakPercent)}% عند ${formatLightMinute(schedule.peakMinute)}.`:"برنامج الإنارة غير محفوظ بعد.",
   light.program?`PAR المقدر في وسط الحوض عند عمق ${Math.round(light.depthPct)}%: حوالي ${Math.round(light.centerPeak)}.`:"ما في تقدير PAR موثوق بدون برنامج إنارة.",
   calibrated?`النموذج معاير بـ ${light.calibrationPoints} نقطة PAR فعلية ومعامل ×${light.calibrationFactor.toFixed(2)}.`:"الخريطة حالياً Estimated؛ أضف قياسات PAR حقيقية لرفع الثقة.",
   ...light.issues.slice(0,3).map(x=>x.ar),
-  ...(light.chemistrySignals.length?["إشارات كيميائية قريبة: "+light.chemistrySignals.join(" • ")+" — ارتباط زمني محتمل وليس إثبات سببية."]:[])
+  ...(light.chemistrySignals.length?["إشارات كيميائية قريبة: "+light.chemistrySignals.join(" • ")+" — ارتباط زمني محتمل وليس إثبات سببية."]:[]),
+  ...(latestImport?[`آخر مصدر استيراد: ${latestImport.fileName} • ${latestImport.analysisMode??latestImport.status}${typeof latestImport.confidence==="number"?" • ثقة "+Math.round(latestImport.confidence)+"%":""}.`]:[]),
+  ...placementFactsAr
  ];
  const detailsEn=[
   `Active lighting fixtures: ${light.fixtures}.`,
@@ -495,17 +500,19 @@ function lightingAnswer(tank:Tank):AquaAIAnswer{
   light.program?`Estimated center PAR at ${Math.round(light.depthPct)}% depth: about ${Math.round(light.centerPeak)}.`:"A reliable PAR estimate needs a saved lighting program.",
   calibrated?`The model is calibrated with ${light.calibrationPoints} measured PAR point(s), factor ×${light.calibrationFactor.toFixed(2)}.`:"The map is currently estimated; add measured PAR points to improve confidence.",
   ...light.issues.slice(0,3).map(x=>x.en),
-  ...(light.chemistrySignals.length?["Nearby chemistry signals: "+light.chemistrySignals.join(" • ")+" — possible temporal association, not proof of causation."]:[])
+  ...(light.chemistrySignals.length?["Nearby chemistry signals: "+light.chemistrySignals.join(" • ")+" — possible temporal association, not proof of causation."]:[]),
+  ...(latestImport?[`Latest import source: ${latestImport.fileName} • ${latestImport.analysisMode??latestImport.status}${typeof latestImport.confidence==="number"?" • "+Math.round(latestImport.confidence)+"% confidence":""}.`]:[]),
+  ...placementFactsEn
  ];
  return{
   titleAr:"تحليل إنارة الحوض",titleEn:"Tank lighting analysis",
   summaryAr:firstIssue?(firstIssue.ar+" "+(calibrated?"الخريطة معايرة بقياسات فعلية.":"اعتبر قيم PAR تقديرية حتى تتم المعايرة.")):"الإنارة الحالية لا تظهر مشكلة رئيسية من البيانات المسجلة، مع بقاء PAR تقديرياً حتى تتم المعايرة.",
   summaryEn:firstIssue?(firstIssue.en+" "+(calibrated?"The map is calibrated with measured PAR.":"Treat PAR as estimated until calibrated.")):"Current lighting data shows no major issue; PAR remains estimated until calibrated.",
   detailsAr,detailsEn,
-  evidenceAr:[`${light.fixtures} وحدات إنارة`,`${light.calibrationPoints} نقاط PAR`,`ثقة النموذج ${light.confidence}%`,`جرعة نسبية ${schedule.relativeDoseHours.toFixed(1)} h-eq`],
-  evidenceEn:[`${light.fixtures} lighting fixtures`,`${light.calibrationPoints} PAR points`,`${light.confidence}% model confidence`,`${schedule.relativeDoseHours.toFixed(1)} h-eq relative dose`],
-  missingEvidenceAr:calibrated?[]:["قياسات PAR فعلية موزعة على الحوض","سجل حجم تعويض الماء/ATO إذا بدنا قياس أثر التبخر"],
-  missingEvidenceEn:calibrated?[]:["Measured PAR points across the tank","Measured top-off/ATO volume history to quantify evaporation response"],
+  evidenceAr:[`${light.fixtures} وحدات إنارة`,`${light.calibrationPoints} نقاط PAR`,`ثقة النموذج ${light.confidence}%`,`جرعة نسبية ${schedule.relativeDoseHours.toFixed(1)} h-eq`,...(latestImport?[`استيراد ${latestImport.analysisMode??latestImport.status}${typeof latestImport.confidence==="number"?" "+Math.round(latestImport.confidence)+"%":""}`]:[])],
+  evidenceEn:[`${light.fixtures} lighting fixtures`,`${light.calibrationPoints} PAR points`,`${light.confidence}% model confidence`,`${schedule.relativeDoseHours.toFixed(1)} h-eq relative dose`,...(latestImport?[`Import ${latestImport.analysisMode??latestImport.status}${typeof latestImport.confidence==="number"?" "+Math.round(latestImport.confidence)+"%":""}`]:[])],
+  missingEvidenceAr:[...(calibrated?[]:["قياسات PAR فعلية موزعة على الحوض","سجل حجم تعويض الماء/ATO إذا بدنا قياس أثر التبخر"]),...(light.placementRecommendations.some(x=>x.placementStatus==="unset")?["الموقع الفعلي X/Z والعمق للمرجان/النباتات غير المكتملة بياناتها"]:[])],
+  missingEvidenceEn:[...(calibrated?[]:["Measured PAR points across the tank","Measured top-off/ATO volume history to quantify evaporation response"]),...(light.placementRecommendations.some(x=>x.placementStatus==="unset")?["Actual X/Z position and depth for coral/plants with incomplete placement data"]:[])],
   confidence:light.confidence>=80?"high":light.confidence>=45?"medium":"low",
   action:{page:"lighting",ar:"افتح صفحة الإنارة والـ3D",en:"Open Lighting Intelligence & 3D"}
  };
@@ -531,7 +538,9 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   const meta=metaAnswer(question);if(meta)return meta;
   if(!isAquariumScopedQuestion(question,tank))return offTopicAquaAnswer(question);
   const q=(question||"").trim().toLowerCase();
-  if(/انار|إضاءة|اضاءة|ضوء|lighting|light|photoperiod|spectrum|par\b|uv\b|royal blue/.test(q))return lightingAnswer(tank);
+  const lightingQ=normText(question);
+  const lightingTokens=["انار","اضاء","ضوء","ضو","lighting","light","photoperiod","spectrum","par","uv","royal blue"];
+  if(lightingTokens.some(token=>lightingQ.includes(token)))return lightingAnswer(tank);
   const intent=parseAquaQuestion(question);
   const cycle=biologicalCycleStatus(tank);
   const explicitCycleQuestion=/cycle|cycling|nitrogen cycle|دورة بيولوج|الدورة البيولوج|دورة النيتروجين/.test(q);

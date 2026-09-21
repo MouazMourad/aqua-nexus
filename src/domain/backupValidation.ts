@@ -1,7 +1,7 @@
 import type { AquariumExperienceLevel,Language,Tank } from "./types";
 import { validateChemistryValues } from "./chemistryDataQuality";
 
-export const CURRENT_BACKUP_SCHEMA=11;
+export const CURRENT_BACKUP_SCHEMA=15;
 
 export interface ValidBackupPayload{
   language:Language;
@@ -69,6 +69,9 @@ function nestedDataIssue(tank:Record<string,unknown>){
   }
   for(const [i,row] of (((tank.livestock as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validText(row.name,300)||!finite(row.quantity)||Number(row.quantity)<=0)return `livestock #${i+1} is invalid`;
+    if(row.lightingDepthCm!==undefined&&(!finite(row.lightingDepthCm)||Number(row.lightingDepthCm)<0||Number(row.lightingDepthCm)>Number((tank.display as Record<string,unknown>).height)))return `livestock #${i+1} has invalid lightingDepthCm`;
+    for(const key of ["lightingXPct","lightingZPct"]){const value=row[key];if(value!==undefined&&(!finite(value)||Number(value)<0||Number(value)>100))return `livestock #${i+1} has invalid ${key}`;}
+    if(row.lightingExposure!==undefined&&!["open","partialShade","shade"].includes(String(row.lightingExposure)))return `livestock #${i+1} has invalid lightingExposure`;
   }
   for(const [i,row] of (((tank.dosing as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp))return `dosing #${i+1} is invalid`;
@@ -85,7 +88,7 @@ function nestedDataIssue(tank:Record<string,unknown>){
   }
   for(const [i,row] of (((tank.equipment as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validText(row.name,300)||!validText(row.kind,80))return `equipment #${i+1} is invalid`;
-    for(const key of ["parAtTargetDepth","mountingHeightCm","parReferenceDepthCm","coverageLengthCm","coverageWidthCm"]){
+    for(const key of ["powerWatts","parAtTargetDepth","mountingHeightCm","parReferenceDepthCm","coverageLengthCm","coverageWidthCm"]){
       const value=row[key];
       if(value!==undefined&&(!finite(value)||Number(value)<0))return `equipment #${i+1} has invalid ${key}`;
     }
@@ -163,6 +166,17 @@ function nestedDataIssue(tank:Record<string,unknown>){
       }
     }
     if(lighting.history!==undefined&&(!Array.isArray(lighting.history)||lighting.history.length>100))return "lighting.history is invalid";
+    if(lighting.imports!==undefined){
+      if(!Array.isArray(lighting.imports)||lighting.imports.length>100)return "lighting.imports is invalid";
+      for(const [i,row] of lighting.imports.entries()){
+        if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.importedAt)||!validText(row.sourceCompany,80)||!validText(row.fileName,500)||!validText(row.fileType,120)||!finite(row.fileSize)||Number(row.fileSize)<0)return `lighting.imports #${i+1} is invalid`;
+        if(!["parsed","analyzed","metadata-only","unsupported"].includes(String(row.status)))return `lighting.imports #${i+1} has invalid status`;
+        if(row.analysisMode!==undefined&&!["structured-file","ai-text","ai-image"].includes(String(row.analysisMode)))return `lighting.imports #${i+1} has invalid analysisMode`;
+        if(row.confidence!==undefined&&(!finite(row.confidence)||Number(row.confidence)<0||Number(row.confidence)>100))return `lighting.imports #${i+1} has invalid confidence`;
+        if(row.warnings!==undefined&&(!Array.isArray(row.warnings)||row.warnings.length>50||row.warnings.some(x=>typeof x!=="string"||x.length>1000)))return `lighting.imports #${i+1} has invalid warnings`;
+        for(const key of ["detectedChannels","detectedPoints"]){const value=row[key];if(value!==undefined&&(!finite(value)||Number(value)<0||Number(value)>10000))return `lighting.imports #${i+1} has invalid ${key}`;}
+      }
+    }
   }
 
   if(tank.lifecycle!==undefined){

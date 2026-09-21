@@ -430,8 +430,11 @@ test("Lighting Intelligence edits, visualizes and calibrates the tank light mode
   await expect(page.locator(".lighting-curve")).toBeVisible();
   await expect(page.locator(".lighting-page")).toContainText(/LIGHTING INTELLIGENCE|الإنارة الذكية/);
 
+  const programName=page.getByLabel(/اسم البرنامج|Program name/).first();
+  await programName.fill("Lighting Save Probe");
   const save=page.getByRole("button",{name:/حفظ البرنامج|Save program/}).first();
-  if(await save.isEnabled())await save.click();
+  await expect(save).toBeEnabled();
+  await save.click();
   await expect(page.locator(".lighting-page")).toContainText(/البرنامج محفوظ|Program saved|SAVED/);
 
   const calibration=page.locator(".card.panel.full-span").filter({hasText:"PAR CALIBRATION"}).first();
@@ -440,5 +443,136 @@ test("Lighting Intelligence edits, visualizes and calibrates the tank light mode
   await measured.fill("180");
   await calibration.getByRole("button",{name:/إضافة نقطة معايرة|Add calibration point/}).click();
   await expect(calibration).toContainText("180 PAR");
+});
+
+test("Lighting mobile layout stays inside the viewport and the 10x demo follows time",async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await openTrainingDashboard(page);
+  await goToPage(page,"lighting");
+  await expect(page.locator(".lighting-page")).toBeVisible();
+  const overflow=await page.evaluate(()=>{
+    const el=document.querySelector(".lighting-page") as HTMLElement|null;
+    return {
+      page:(el?.scrollWidth??0)-(el?.clientWidth??0),
+      document:document.documentElement.scrollWidth-window.innerWidth
+    };
+  });
+  expect(overflow.page).toBeLessThanOrEqual(2);
+  expect(overflow.document).toBeLessThanOrEqual(2);
+
+  const field=page.locator(".lighting-3d-wrap");
+  const timeSlider=page.getByLabel("Lighting simulation time");
+  await timeSlider.fill("0");
+  const nightIntensity=Number(await field.getAttribute("data-light-intensity"));
+  const nightColor=await field.getAttribute("data-light-color");
+  await timeSlider.fill("900");
+  const dayIntensity=Number(await field.getAttribute("data-light-intensity"));
+  const dayColor=await field.getAttribute("data-light-color");
+  expect(dayIntensity).toBeGreaterThan(nightIntensity);
+  expect(dayColor).not.toBe(nightColor);
+
+  const clock=page.locator(".lighting-demo-clock");
+  const before=(await clock.textContent())?.trim();
+  await page.getByRole("button",{name:/ديمو اليوم 10×|Day demo 10×/}).click();
+  await page.waitForTimeout(1200);
+  const after=(await clock.textContent())?.trim();
+  expect(after).not.toBe(before);
+  await page.getByRole("button",{name:/إيقاف الديمو|Pause demo/}).click();
+});
+
+test("Lighting depth map uses real X/Z/depth and shade changes per-livestock PAR",async({page})=>{
+  await openTrainingDashboard(page);
+  await goToPage(page,"lighting");
+  const diagram=page.locator(".lighting-depth-tank");
+  await expect(diagram).toBeVisible();
+  await expect(diagram).toContainText(/مرجان تورش|Torch Coral/);
+  const resident=diagram.locator('[data-livestock-id="l3"]');
+  await expect(resident).toBeVisible();
+  const depth=resident.locator('input[aria-label^="Depth "]');
+  const x=resident.locator('input[aria-label^="X "]');
+  const z=resident.locator('input[aria-label^="Z "]');
+  const exposure=resident.locator('select[aria-label^="Exposure "]');
+  await expect(depth).toHaveValue("32");
+  await expect(x).toHaveValue("56");
+  await expect(z).toHaveValue("48");
+  await expect(exposure).toHaveValue("open");
+  await expect(resident.locator(".lighting-position-mini i")).toBeVisible();
+  const openPar=Number(await resident.getAttribute("data-light-par"));
+  expect(openPar).toBeGreaterThan(0);
+  await exposure.selectOption("shade");
+  await expect(exposure).toHaveValue("shade");
+  await expect.poll(async()=>Number(await resident.getAttribute("data-light-par"))).toBeLessThan(openPar*.6);
+  await depth.fill("36");
+  await depth.blur();
+  await expect(depth).toHaveValue("36");
+  await expect(resident).toContainText(/PAR|cm/);
+});
+
+test("Lighting import records vendor file and date and parses a generic CSV for review",async({page})=>{
+  await openTrainingDashboard(page);
+  await goToPage(page,"lighting");
+  const file=page.locator('input[type="file"]').first();
+  await file.setInputFiles({
+    name:"lighting-demo.csv",
+    mimeType:"text/csv",
+    buffer:Buffer.from("Time,Blue,White\n09:00,0,0\n12:00,60,20\n18:00,0,0\n")
+  });
+  await expect(page.locator(".lighting-import-panel")).toContainText("lighting-demo.csv");
+  await expect(page.locator(".lighting-import-panel")).toContainText(/2 ch|قناة|parsed/i);
+  await expect(page.getByRole("button",{name:/حفظ البرنامج|Save program/}).first()).toBeEnabled();
+});
+
+test("dashboard exposes live lighting intensity and opens Lighting Intelligence",async({page})=>{
+  await openTrainingDashboard(page);
+  const card=page.locator('[data-dashboard-module="lighting"]');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText(/الإنارة|Lighting/);
+  await card.locator(".pd-module-button").click();
+  await expect(card).toContainText(/PAR|الإنارة الآن|Lighting now/);
+  await card.getByRole("button",{name:/فتح صفحة الإنارة|Open Lighting Intelligence/}).click();
+  await expect(page.locator(".lighting-page")).toBeVisible();
+});
+
+test("Lighting screenshot import uses Vision analysis, fills editable values and stays reviewable before save",async({page})=>{
+  await page.addInitScript((mockCandidate)=>{
+    const original=window.fetch.bind(window);
+    window.fetch=async(input:RequestInfo|URL,init?:RequestInit)=>{
+      const url=typeof input==="string"?input:input instanceof Request?input.url:String(input);
+      if(url.includes("/api/ai/lighting-import")){
+        return new Response(JSON.stringify({ok:true,mode:"external",provider:"test-vision",model:"test",answer:{candidate:mockCandidate}}),{status:200,headers:{"content-type":"application/json"}});
+      }
+      return original(input,init);
+    };
+  },{
+        sourceKind:"image",confidence:88,vendorDetected:"Maxspect",programName:"Screenshot Program",
+        fixture:{brand:"Maxspect",model:"L165",powerWatts:65},
+        channels:[
+          {key:"uv",name:"UV",spectrum:"uv",parWeight:.88,confidence:92},
+          {key:"royal",name:"Royal Blue",spectrum:"royalBlue",parWeight:1,confidence:90}
+        ],
+        points:[
+          {minute:540,values:{uv:0,royal:0}},
+          {minute:900,values:{uv:35,royal:70}},
+          {minute:1320,values:{uv:0,royal:0}}
+        ],
+        warnings:["One value was visually approximated"],evidence:["Visible time axis","Visible channel labels"]
+      });
+  await openTrainingDashboard(page);
+  await goToPage(page,"lighting");
+  const png=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2r0sAAAAASUVORK5CYII=","base64");
+  await page.getByTestId("lighting-import-input").setInputFiles({name:"maxspect-screenshot.png",mimeType:"image/png",buffer:png});
+  const review=page.locator(".lighting-import-review");
+  await expect(review).toBeVisible({timeout:25000});
+  await expect(review).toContainText("88%");
+  const importedNames=page.locator('.lighting-channel-row input[aria-label="Channel name"]');
+  await expect(importedNames).toHaveCount(2);
+  await expect(importedNames.nth(0)).toHaveValue("UV");
+  await expect(importedNames.nth(1)).toHaveValue("Royal Blue");
+  const table=page.locator(".lighting-points-table");
+  const editable=table.locator('input[type="number"]').nth(3);
+  await editable.fill("66");
+  await expect(editable).toHaveValue("66");
+  await expect(page.getByRole("button",{name:/حفظ البرنامج|Save program/}).first()).toBeEnabled();
+  await expect(review).toContainText(/One value was visually approximated/);
 });
 

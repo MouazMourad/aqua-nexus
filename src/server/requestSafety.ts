@@ -43,12 +43,12 @@ export async function enforceRateLimitDistributed(key:string,limit:number,window
   try{
     const result=await query<{count:number;reset_at:string}>(`
       INSERT INTO aqua_rate_limits(bucket_key,count,reset_at)
-      VALUES($1,1,now()+($3::text||' milliseconds')::interval)
+      VALUES($1,1,now()+($2::text||' milliseconds')::interval)
       ON CONFLICT(bucket_key) DO UPDATE SET
         count=CASE WHEN aqua_rate_limits.reset_at<=now() THEN 1 ELSE aqua_rate_limits.count+1 END,
-        reset_at=CASE WHEN aqua_rate_limits.reset_at<=now() THEN now()+($3::text||' milliseconds')::interval ELSE aqua_rate_limits.reset_at END
+        reset_at=CASE WHEN aqua_rate_limits.reset_at<=now() THEN now()+($2::text||' milliseconds')::interval ELSE aqua_rate_limits.reset_at END
       RETURNING count,reset_at
-    `,[key,limit,windowMs]);
+    `,[key,windowMs]);
     const row=result.rows[0],count=Number(row?.count||1),reset=new Date(row?.reset_at||Date.now()+windowMs).getTime();
     if(count>limit)return{ok:false as const,remaining:0,retryAfterSeconds:Math.max(1,Math.ceil((reset-Date.now())/1000))};
     return{ok:true as const,remaining:Math.max(0,limit-count),retryAfterSeconds:0};
