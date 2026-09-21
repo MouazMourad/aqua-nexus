@@ -730,6 +730,19 @@ export interface LightingCalibrationPoint {
   notes?:string;
 }
 
+export interface LightingImportRecord {
+  id:string;
+  importedAt:string;
+  sourceCompany:"generic"|"maxspect"|"redsea"|"ai-mobius"|"ecotech"|"apex"|"hydros"|"ghl"|"other";
+  fileName:string;
+  fileType:string;
+  fileSize:number;
+  status:"parsed"|"metadata-only"|"unsupported";
+  detectedChannels?:number;
+  detectedPoints?:number;
+  notes?:string;
+}
+
 export interface TankLightingState {
   activeProgram?:LightingProgram;
   history?:LightingProgramSnapshot[];
@@ -738,6 +751,7 @@ export interface TankLightingState {
   mapDepthPct?:number;
   /** Optional global correction after calibration; normally derived from calibration points. */
   manualCalibrationFactor?:number;
+  imports?:LightingImportRecord[];
 }
 
 export interface Tank {
