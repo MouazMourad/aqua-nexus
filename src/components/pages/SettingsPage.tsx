@@ -22,7 +22,7 @@ export function SettingsPage({tank}:{tank:Tank}) {
  const vacation=activeVacation(tank),relocation=activeRelocation(tank),archived=isTankArchived(tank);
  const profile=tank.ecosystemProfile??"auto";
  const energy=tank.energySettings??{pricePerKwh:0,currency:"USD"};
- const exportBackup=async()=>{const tanks=await hydrateTankPhotosForBackup(state.tanks);downloadText(`Aqua_Nexus_Backup_${today()}.json`,JSON.stringify({app:"Aqua Nexus",schemaVersion:CURRENT_BACKUP_SCHEMA,exportedAt:new Date().toISOString(),language:state.language,selectedTankId:state.selectedTankId,tanks},null,2));};
+ const exportBackup=async()=>{const tanks=await hydrateTankPhotosForBackup(state.tanks);downloadText(`Aqua_Nexus_Backup_${today()}.json`,JSON.stringify({app:"Aqua Nexus",schemaVersion:CURRENT_BACKUP_SCHEMA,exportedAt:new Date().toISOString(),language:state.language,aquariumExperience:state.aquariumExperience,selectedTankId:state.selectedTankId,tanks},null,2));};
 
  useEffect(()=>{
   if(typeof window==="undefined")return;
