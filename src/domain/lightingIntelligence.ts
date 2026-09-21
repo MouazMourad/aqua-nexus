@@ -126,9 +126,13 @@ function rawEstimatedPar(tank:Tank,xPct:number,zPct:number,depthPct:number,atMin
     const covZ=clamp((f.coverageWidthCm??tank.display.width*.78)/Math.max(1,tank.display.width)*100,20,150);
     const dx=(xPct-pos.xPct)/(covX*.52),dz=(zPct-pos.zPct)/(covZ*.52);
     const spread=Math.exp(-1.55*(dx*dx+dz*dz));
-    const depthFactor=Math.exp(-.009*(depthPct-50));
-    const mountFactor=Math.pow(116/Math.max(104,pos.yPct),1.15);
-    total+=base*intensity*spread*depthFactor*mountFactor;
+    const depthCm=(depthPct/100)*tank.display.height;
+    const refDepthCm=typeof f.parReferenceDepthCm==="number"?clamp(f.parReferenceDepthCm,0,tank.display.height):tank.display.height*.5;
+    const waterAttenuation=Math.exp(-.018*(depthCm-refDepthCm));
+    const mountCm=typeof f.mountingHeightCm==="number"?clamp(f.mountingHeightCm,1,150):Math.max(5,(pos.yPct-100)/100*tank.display.height+10);
+    const referenceMount=20;
+    const mountFactor=Math.pow((referenceMount+refDepthCm)/(mountCm+depthCm+.1),1.15)*Math.pow((referenceMount+refDepthCm)/(referenceMount+refDepthCm),-.15);
+    total+=base*intensity*spread*waterAttenuation*mountFactor;
   });
   return Math.max(0,total);
 }
