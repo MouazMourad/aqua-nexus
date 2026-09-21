@@ -1,5 +1,5 @@
 "use client";
-import { useMemo,useState } from "react";
+import { useEffect,useMemo,useRef,useState } from "react";
 import type { Equipment,LightingChannel,LightingProgram,Tank } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -25,6 +25,85 @@ function heatCss(value:number,max:number){
  return "hsl("+hue+" 86% "+(36+t*18)+"%)";
 }
 function levelClass(level:string){return level==="danger"?"danger":level==="warn"?"warn":"good";}
+
+
+const IMPORT_COMPANIES=[
+ {id:"generic",ar:"ملف عام / Generic",en:"Generic file"},
+ {id:"maxspect",ar:"Maxspect",en:"Maxspect"},
+ {id:"redsea",ar:"Red Sea / ReefBeat",en:"Red Sea / ReefBeat"},
+ {id:"ai-mobius",ar:"AI / Mobius",en:"AI / Mobius"},
+ {id:"ecotech",ar:"EcoTech / Mobius",en:"EcoTech / Mobius"},
+ {id:"apex",ar:"Neptune Apex",en:"Neptune Apex"},
+ {id:"hydros",ar:"HYDROS",en:"HYDROS"},
+ {id:"ghl",ar:"GHL",en:"GHL"},
+ {id:"other",ar:"شركة أخرى",en:"Other vendor"}
+] as const;
+type ImportCompany=typeof IMPORT_COMPANIES[number]["id"];
+
+function inferSpectrum(name:string):LightingChannel["spectrum"]{
+ const n=name.toLowerCase();
+ if(/royal/.test(n))return"royalBlue";
+ if(/uv|ultra/.test(n))return"uv";
+ if(/violet|purple/.test(n))return"violet";
+ if(/cyan/.test(n))return"cyan";
+ if(/green/.test(n))return"green";
+ if(/red/.test(n))return"red";
+ if(/warm.*white/.test(n))return"warmWhite";
+ if(/white/.test(n))return"coolWhite";
+ if(/blue/.test(n))return"blue";
+ return"other";
+}
+function channelWeight(s:LightingChannel["spectrum"]){
+ const row=[...LIGHTING_SPECTRA].find(x=>x.id===s);
+ return row?.weight??.7;
+}
+function parseTimeCell(value:unknown){
+ if(typeof value==="number"&&Number.isFinite(value))return clamp(value<=24?Math.round(value*60):Math.round(value),0,1439);
+ const s=String(value??"").trim();
+ const m=s.match(/^(\d{1,2}):(\d{2})/);
+ if(m)return clamp(Number(m[1])*60+Number(m[2]),0,1439);
+ const n=Number(s);return Number.isFinite(n)?clamp(n<=24?Math.round(n*60):Math.round(n),0,1439):null;
+}
+function normalizedImportedProgram(rows:Array<Record<string,unknown>>,name:string):LightingProgram|null{
+ if(rows.length<2)return null;
+ const keys=Object.keys(rows[0]??{});
+ const timeKey=keys.find(k=>/^(time|hour|minute|timestamp|وقت|الوقت)$/i.test(k.trim()))??keys.find(k=>/time|hour|وقت/i.test(k));
+ if(!timeKey)return null;
+ const channelKeys=keys.filter(k=>k!==timeKey&&rows.some(r=>Number.isFinite(Number(r[k])))).slice(0,24);
+ if(!channelKeys.length)return null;
+ const channels:LightingChannel[]=channelKeys.map((k,i)=>{const spectrum=inferSpectrum(k);return{id:"imp-"+i+"-"+k.replace(/[^a-z0-9]+/gi,"-").slice(0,24),name:k,nameEn:k,spectrum,parWeight:channelWeight(spectrum),enabled:true}});
+ const points=rows.map((row,i)=>{
+  const minute=parseTimeCell(row[timeKey]);if(minute===null)return null;
+  const values=Object.fromEntries(channels.map((ch,ci)=>[ch.id,clamp(Number(row[channelKeys[ci]])||0,0,100)]));
+  return{id:"imp-p-"+i,minute,values};
+ }).filter((x):x is NonNullable<typeof x>=>Boolean(x)).sort((a,b)=>a.minute-b.minute);
+ if(points.length<2)return null;
+ const now=nowISO();return{id:uid("light-import"),name,createdAt:now,updatedAt:now,channels,points,notes:"Imported for review in Aqua Nexus"};
+}
+function parseLightingFile(text:string,fileName:string,company:ImportCompany):LightingProgram|null{
+ const vendor=IMPORT_COMPANIES.find(x=>x.id===company)?.en??company;
+ if(fileName.toLowerCase().endsWith(".json")||text.trim().startsWith("{")||text.trim().startsWith("[")){
+  try{
+   const data=JSON.parse(text);
+   const direct=data?.program??data?.lightingProgram??data;
+   if(direct&&Array.isArray(direct.channels)&&Array.isArray(direct.points)){
+    const channels:LightingChannel[]=direct.channels.slice(0,24).map((x:any,i:number)=>{const name=String(x.name??x.label??x.id??("Channel "+(i+1))),spectrum=inferSpectrum(String(x.spectrum??name));return{id:String(x.id??("imp-"+i)),name,nameEn:String(x.nameEn??name),spectrum,parWeight:clamp(Number(x.parWeight??channelWeight(spectrum)),0,2),enabled:x.enabled!==false}});
+    const points=direct.points.slice(0,288).map((x:any,i:number)=>({id:String(x.id??("imp-p-"+i)),minute:parseTimeCell(x.minute??x.time??x.hour)??0,values:Object.fromEntries(channels.map((ch,ci)=>[ch.id,clamp(Number(x.values?.[ch.id]??x.values?.[ci]??x[ch.name]??0),0,100)]))}));
+    if(channels.length&&points.length>=2){const now=nowISO();return{id:uid("light-import"),name:vendor+" Import",createdAt:now,updatedAt:now,channels,points,notes:"Imported JSON • review before saving"}}
+   }
+   const rows=Array.isArray(data)?data:(Array.isArray(data?.rows)?data.rows:Array.isArray(data?.data)?data.data:null);
+   if(rows)return normalizedImportedProgram(rows,vendor+" Import");
+  }catch{}
+ }
+ const lines=text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+ if(lines.length>=3){
+  const delimiter=lines[0].includes("\t")?"\t":lines[0].includes(";")?";":",";
+  const headers=lines[0].split(delimiter).map(x=>x.trim().replace(/^["']|["']$/g,""));
+  const rows=lines.slice(1,500).map(line=>{const cells=line.split(delimiter).map(x=>x.trim().replace(/^["']|["']$/g,""));return Object.fromEntries(headers.map((h,i)=>[h,cells[i]??""]))});
+  return normalizedImportedProgram(rows,vendor+" Import");
+ }
+ return null;
+}
 
 function ProgramCurve({program}:{program:LightingProgram}){
  const pts=[...program.points].sort((a,b)=>a.minute-b.minute);
@@ -56,9 +135,13 @@ export function LightingPage({tank,onEquipment}:{tank:Tank;onEquipment:()=>void}
  const saved=tank.lighting?.activeProgram;
  const [draft,setDraft]=useState<LightingProgram>(()=>clone(saved??defaultLightingProgram(tank)));
  const initialSchedule=lightingSchedule(draft);
- const [viewMinute,setViewMinute]=useState(initialSchedule.peakMinute);
+ const now=new Date(),initialMinute=now.getHours()*60+now.getMinutes();
+ const [viewMinute,setViewMinute]=useState(initialMinute);
+ const [demoPlaying,setDemoPlaying]=useState(false);
  const [depthPct,setDepthPct]=useState(tank.lighting?.mapDepthPct??50);
  const [calX,setCalX]=useState(50),[calZ,setCalZ]=useState(50),[calDepth,setCalDepth]=useState(50),[calPar,setCalPar]=useState(0);
+ const importInput=useRef<HTMLInputElement>(null);
+ const [importCompany,setImportCompany]=useState<ImportCompany>("generic"),[importNote,setImportNote]=useState("");
  const previewTank=useMemo<Tank>(()=>({...tank,lighting:{...(tank.lighting??{}),activeProgram:draft,mapDepthPct:depthPct}}),[tank,draft,depthPct]);
  const intel=useMemo(()=>lightingIntelligence(previewTank),[previewTank]);
  const schedule=intel.schedule;
@@ -67,6 +150,11 @@ export function LightingPage({tank,onEquipment}:{tank:Tank;onEquipment:()=>void}
  const front=useMemo(()=>lightingFrontGrid(previewTank,{minute:viewMinute,zPct:50,cols:13,rows:7}),[previewTank,viewMinute]);
  const fixtures=tank.equipment.filter(x=>x.kind==="lighting"&&x.location==="display");
  const dirty=JSON.stringify(saved??null)!==JSON.stringify(draft);
+ useEffect(()=>{
+  if(!demoPlaying)return;
+  const timer=window.setInterval(()=>setViewMinute(m=>(m+2.5)%1440),250); // 10 simulated minutes per real second
+  return()=>window.clearInterval(timer);
+ },[demoPlaying]);
 
  function mutateProgram(mutator:(p:LightingProgram)=>void){
   setDraft(current=>{const next=clone(current);mutator(next);next.updatedAt=nowISO();return next});
@@ -107,6 +195,21 @@ export function LightingPage({tank,onEquipment}:{tank:Tank;onEquipment:()=>void}
   const ts=nowISO();
   patch(tank.id,t=>({...t,equipment:t.equipment.map(x=>x.id===id?{...x,...partial}:x),timeline:[{id:uid("ev"),timestamp:ts,type:"lighting-fixture-model",textAr:"تم تحديث نموذج وحدة إنارة لتحسين تقدير التوزيع الضوئي.",textEn:"A lighting fixture model was updated to improve light-distribution estimation."},...t.timeline]}));
  }
+ async function importLightingFile(file?:File){
+  if(!file)return;
+  setImportNote("");
+  let text="";try{text=await file.text()}catch{setImportNote(bi(lang,"تعذر قراءة الملف.","Could not read the file."));return}
+  const parsed=parseLightingFile(text,file.name,importCompany),ts=nowISO();
+  const source=IMPORT_COMPANIES.find(x=>x.id===importCompany);
+  patch(tank.id,t=>({...t,lighting:{...(t.lighting??{}),imports:[{id:uid("light-import-log"),importedAt:ts,sourceCompany:importCompany,fileName:file.name,fileType:file.type||file.name.split(".").pop()||"unknown",fileSize:file.size,status:parsed?"parsed":"unsupported",detectedChannels:parsed?.channels.length,detectedPoints:parsed?.points.length},...(t.lighting?.imports??[])].slice(0,50)},timeline:[{id:uid("ev"),timestamp:ts,type:"lighting-import",textAr:`تم تسجيل استيراد إنارة من ${source?.ar??importCompany}: ${file.name}${parsed?" وتم تفسير البرنامج للمراجعة.":" لكن تنسيق الملف لم يُفسر تلقائياً."}`,textEn:`Lighting import recorded from ${source?.en??importCompany}: ${file.name}${parsed?" and the schedule was parsed for review.":" but the format could not be mapped automatically."}`},...t.timeline]}));
+  if(parsed){
+   setDraft(parsed);
+   setViewMinute(new Date().getHours()*60+new Date().getMinutes());
+   setImportNote(bi(lang,`تم تفسير ${parsed.channels.length} قناة و${parsed.points.length} نقطة زمنية. راجع البرنامج والـ3D ثم اضغط حفظ.`,`Parsed ${parsed.channels.length} channels and ${parsed.points.length} time points. Review the program/3D, then save.`));
+  }else setImportNote(bi(lang,"تم حفظ اسم الشركة والملف وتاريخ الاستيراد، لكن هذا التنسيق يحتاج Adapter خاص أو ملف عينة حتى نفسره بأمان.","Vendor, filename and import date were recorded, but this format needs a dedicated adapter or sample file before Aqua Nexus can map it safely."));
+  if(importInput.current)importInput.current.value="";
+ }
+
  function addCalibration(){
   if(!Number.isFinite(calPar)||calPar<=0){window.alert(bi(lang,"أدخل قراءة PAR فعلية أكبر من صفر.","Enter a measured PAR value greater than zero."));return}
   const ts=nowISO(),row={id:uid("par"),timestamp:ts,xPct:clamp(calX,0,100),zPct:clamp(calZ,0,100),depthPct:clamp(calDepth,0,100),measuredPar:clamp(calPar,1,3000),minute:viewMinute};
