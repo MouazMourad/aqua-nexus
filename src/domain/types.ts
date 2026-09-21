@@ -1,6 +1,7 @@
 export type Language = "ar" | "en";
 export type TankType = "marine" | "freshwater";
 export type TankStatus = "new" | "cycling" | "established";
+export type AquariumExperienceLevel = "beginner" | "intermediate" | "advanced";
 
 export type EquipmentKind =
   | "lighting" | "waveMaker" | "skimmer" | "returnPump" | "filterSock"
@@ -730,6 +731,8 @@ export interface Tank {
 
 export interface AquaState {
   language: Language;
+  /** Aquarium-hobby expertise only. It never represents software/UI skill. */
+  aquariumExperience: AquariumExperienceLevel;
   selectedTankId: string;
   tanks: Tank[];
 }
