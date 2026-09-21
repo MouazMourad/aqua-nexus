@@ -430,8 +430,11 @@ test("Lighting Intelligence edits, visualizes and calibrates the tank light mode
   await expect(page.locator(".lighting-curve")).toBeVisible();
   await expect(page.locator(".lighting-page")).toContainText(/LIGHTING INTELLIGENCE|الإنارة الذكية/);
 
+  const programName=page.getByLabel(/اسم البرنامج|Program name/).first();
+  await programName.fill("Lighting Save Probe");
   const save=page.getByRole("button",{name:/حفظ البرنامج|Save program/}).first();
-  if(await save.isEnabled())await save.click();
+  await expect(save).toBeEnabled();
+  await save.click();
   await expect(page.locator(".lighting-page")).toContainText(/البرنامج محفوظ|Program saved|SAVED/);
 
   const calibration=page.locator(".card.panel.full-span").filter({hasText:"PAR CALIBRATION"}).first();
@@ -518,9 +521,10 @@ test("Lighting screenshot import uses Vision analysis, fills editable values and
   const png=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2r0sAAAAASUVORK5CYII=","base64");
   await page.locator('input[type="file"]').first().setInputFiles({name:"maxspect-screenshot.png",mimeType:"image/png",buffer:png});
   const review=page.locator(".lighting-import-review");
-  await expect(review).toBeVisible();
+  await expect(review).toBeVisible({timeout:25000});
   await expect(review).toContainText("88%");
-  await expect(page.locator(".lighting-channel-row")).toContainText(/UV|Royal Blue/);
+  await expect(page.locator(".lighting-channel-row").filter({hasText:"UV"}).first()).toBeVisible();
+  await expect(page.locator(".lighting-channel-row").filter({hasText:"Royal Blue"}).first()).toBeVisible();
   const table=page.locator(".lighting-points-table");
   const editable=table.locator('input[type="number"]').nth(3);
   await editable.fill("66");
