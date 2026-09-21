@@ -10,7 +10,7 @@ import { inventoryForConsumer } from "@/domain/inventoryIntelligence";
 import { claimCriticalAction } from "@/lib/actionGuard";
 
 export function FeedingPage({tank}:{tank:Tank}) {
- const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),[food,setFood]=useState(""),[amount,setAmount]=useState(""),[notes,setNotes]=useState(""),[inventoryItemId,setInventoryItemId]=useState(""),[used,setUsed]=useState(""),[showDetails,setShowDetails]=useState(false),[showHistory,setShowHistory]=useState(false);
+ const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),[food,setFood]=useState(""),[amount,setAmount]=useState(""),[notes,setNotes]=useState(""),[inventoryItemId,setInventoryItemId]=useState(""),[used,setUsed]=useState(""),[showDetails,setShowDetails]=useState(false),[showHistory,setShowHistory]=useState(false),[historyLimit,setHistoryLimit]=useState(100);
  const plan=useMemo(()=>feedingIntelligence(tank),[tank]);
  const feedingStock=useMemo(()=>inventoryForConsumer(tank,"feeding"),[tank]);
  const todayKey=new Date().toDateString();
@@ -85,7 +85,7 @@ export function FeedingPage({tank}:{tank:Tank}) {
  <section className="card panel full-span">
   <div className="module-head"><div><small className="eyebrow-mini">{bi(lang,"السجل","HISTORY")}</small><h3>{bi(lang,"آخر التغذيات","Recent feedings")}</h3><p className="note">{latest?bi(lang,`آخر تسجيل: ${latest.food} • ${latest.amount||"—"}`,`Latest: ${latest.food} • ${latest.amount||"—"}`):bi(lang,"لسا ما في تغذية مسجلة.","No feeding has been logged yet.")}</p></div>{tank.feeding.length>0&&<button className="btn" onClick={()=>setShowHistory(v=>!v)}>{showHistory?bi(lang,"إخفاء السجل","Hide history"):bi(lang,`عرض السجل (${tank.feeding.length})`,`Show history (${tank.feeding.length})`)}</button>}</div>
   {!showHistory&&latest&&<div className="feeding-latest"><div><b>{latest.food} • {latest.amount||"—"}</b><span>{new Date(latest.timestamp).toLocaleString()}</span></div><small>{latest.notes||bi(lang,"بدون ملاحظات","No notes")}</small></div>}
-  {showHistory&&<div className="history-list">{tank.feeding.map(x=><div className="history-row" key={x.id}><b>{x.food} • {x.amount}</b><span>{new Date(x.timestamp).toLocaleString()}</span><small>{x.notes}</small></div>)}</div>}
+  {showHistory&&<><div className="history-list">{tank.feeding.slice(0,historyLimit).map(x=><div className="history-row" key={x.id}><b>{x.food} • {x.amount}</b><span>{new Date(x.timestamp).toLocaleString()}</span><small>{x.notes}</small></div>)}</div>{historyLimit<tank.feeding.length&&<button className="btn" onClick={()=>setHistoryLimit(n=>n+100)}>{bi(lang,`عرض 100 أقدم — باقي ${tank.feeding.length-historyLimit}`,`Show 100 older — ${tank.feeding.length-historyLimit} remaining`)}</button>}</>}
  </section>
 
  <style jsx>{`
