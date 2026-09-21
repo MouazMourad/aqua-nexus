@@ -579,7 +579,7 @@ test("Lighting screenshot import uses Vision analysis, fills editable values and
 test("Equipment CSV import is editable, routes data to Tank Brain and supports alert acknowledgement",async({page})=>{
   await openTrainingDashboard(page);
   await goToPage(page,"equipment");
-  await page.getByRole("button",{name:/استيراد|Import/}).first().click();
+  await page.getByTestId("equipment-smart-import-toggle").click();
   const workspace=page.locator(".equipment-import-workspace");
   await expect(workspace).toBeVisible();
   await workspace.getByLabel(/الشركة|Vendor/).selectOption("neptune-apex");
@@ -622,7 +622,7 @@ test("Equipment screenshot import uses Vision analysis and applies edited device
   });
   await openTrainingDashboard(page);
   await goToPage(page,"equipment");
-  await page.getByRole("button",{name:/استيراد|Import/}).first().click();
+  await page.getByTestId("equipment-smart-import-toggle").click();
   const workspace=page.locator(".equipment-import-workspace");
   await workspace.getByLabel(/الشركة|Vendor/).selectOption("hydros");
   const png=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2r0sAAAAASUVORK5CYII=","base64");
