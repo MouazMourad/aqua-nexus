@@ -538,7 +538,7 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   const meta=metaAnswer(question);if(meta)return meta;
   if(!isAquariumScopedQuestion(question,tank))return offTopicAquaAnswer(question);
   const q=(question||"").trim().toLowerCase();
-  if(/انار|إضاءة|اضاءة|ضوء|lighting|light|photoperiod|spectrum|par\b|uv\b|royal blue/.test(q))return lightingAnswer(tank);
+  if(/انار|إنار|إضاءة|اضاءة|ضوء|(?:^|\s)ضو(?:\s|$)|الضو|lighting|light|photoperiod|spectrum|par\b|uv\b|royal blue/.test(q))return lightingAnswer(tank);
   const intent=parseAquaQuestion(question);
   const cycle=biologicalCycleStatus(tank);
   const explicitCycleQuestion=/cycle|cycling|nitrogen cycle|دورة بيولوج|الدورة البيولوج|دورة النيتروجين/.test(q);
