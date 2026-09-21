@@ -5,7 +5,7 @@ import { sendWorkspacePush } from "@/server/push";
 export const runtime="nodejs";
 
 type PushTankState={
-  id:string;name:string;lastVisit?:number;unstable?:boolean;overall?:number;chemistry?:number;maintenance?:number;trend?:string;
+  id:string;name:string;lastVisit?:number;unstable?:boolean;critical?:boolean;vacationActive?:boolean;vacationPlannedEndAt?:string|null;overall?:number;chemistry?:number;maintenance?:number;trend?:string;
   equipmentWarnings?:number;cyclingActive?:boolean;cycleDay?:number;cycleReady?:boolean;cycleNextAr?:string|null;cycleNextEn?:string|null;
   activeEmergencyCount?:number;emergencyTitleAr?:string|null;emergencyTitleEn?:string|null;
   nextDoseAt?:string|null;doseOrganism?:string|null;activeQuarantineCount?:number;treatmentCount?:number;watchCount?:number;
@@ -19,8 +19,12 @@ function reminderFor(row:PushStateRow){
   const emergency=tanks.find(t=>(t.activeEmergencyCount??0)>0);
   const dueDose=tanks.find(t=>t.nextDoseAt&&new Date(t.nextDoseAt).getTime()<=now+day);
   const cycling=tanks.find(t=>t.cyclingActive);
-  const unstable=tanks.filter(t=>t.unstable===true||Number(t.overall)<80||Number(t.chemistry)<75||Number(t.maintenance)<70||t.trend==="declining"||Number(t.equipmentWarnings)>0);
-  const stale=tanks.filter(t=>Number.isFinite(Number(t.lastVisit))&&now-Number(t.lastVisit)>=week);
+  const unstable=tanks.filter(t=>{
+    const isUnstable=t.unstable===true||Number(t.overall)<80||Number(t.chemistry)<75||Number(t.maintenance)<70||t.trend==="declining"||Number(t.equipmentWarnings)>0;
+    if(!isUnstable)return false;
+    return !t.vacationActive||t.critical===true||Number(t.overall)<60||Number(t.equipmentWarnings)>0;
+  });
+  const stale=tanks.filter(t=>!t.vacationActive&&Number.isFinite(Number(t.lastVisit))&&now-Number(t.lastVisit)>=week);
   if(!emergency&&!dueDose&&!cycling&&!unstable.length&&!stale.length)return null;
   const ar=row.language!=="en";
   if(emergency)return{
