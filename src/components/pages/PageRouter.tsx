@@ -1,5 +1,5 @@
 "use client";
-import type { ReactNode } from "react";
+import { useEffect,type ReactNode } from "react";
 import type { Tank } from "@/domain/types";
 import type { AppPage } from "@/components/navigation/MainNav";
 import { AquaDashboardContent } from "@/components/dashboard/AquaDashboardContent";
@@ -30,9 +30,11 @@ import { SettingsPage } from "./SettingsPage";
 import { biologicalCycleStatus,isCyclePageAllowed } from "@/domain/biologicalCycle";
 import { useAquaStore } from "@/store/useAquaStore";
 import { bi } from "@/i18n";
+import { markPageFeaturesLearned } from "@/lib/featureDiscovery";
 
 export function PageRouter({page,tank,tanks,selectedTankId,onSelectTank,onNavigate}:{page:AppPage;tank:Tank;tanks:Tank[];selectedTankId:string;onSelectTank:(id:string)=>void;onNavigate:(p:AppPage)=>void}) {
  const lang=useAquaStore(s=>s.language),cycle=biologicalCycleStatus(tank);
+ useEffect(()=>{markPageFeaturesLearned(page)},[page]);
  let content:ReactNode;
  if(cycle.active&&!isCyclePageAllowed(page)){
   content=<section className="page-grid"><div className="card panel full-span"><div className="inline-alert warn"><b>🔒 {bi(lang,"هالوحدة مقفلة خلال الدورة البيولوجية.","This module is locked during biological cycling.")}</b><p>{bi(lang,"Aqua Nexus عم يوقف العمليات غير المرتبطة بالدورة لحماية الحوض. كمّل خطوات الدورة والقياسات أولاً.","Aqua Nexus pauses non-cycle workflows to protect the tank. Complete cycling steps and measured tests first.")}</p><button className="btn primary" onClick={()=>onNavigate("dashboard")}>{bi(lang,"العودة لمتابعة الدورة","Back to cycle tracking")}</button></div></div></section>;
