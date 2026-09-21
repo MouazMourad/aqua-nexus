@@ -1,6 +1,6 @@
 "use client";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls,Text } from "@react-three/drei";
+import { Html,OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import type { Tank } from "@/domain/types";
 import { lightingGrid,lightingIntelligence } from "@/domain/lightingIntelligence";
@@ -19,7 +19,7 @@ function FixtureMarker({x,y,z,label}:{x:number;y:number;z:number;label:string}){
  return <group position={[x,y,z]}>
   <mesh castShadow><boxGeometry args={[.55,.06,.18]}/><meshStandardMaterial color="#172b3b" metalness={.65} roughness={.28}/></mesh>
   <mesh position={[0,-.035,0]}><boxGeometry args={[.45,.012,.10]}/><meshStandardMaterial color="#78a8ff" emissive="#547cff" emissiveIntensity={2}/></mesh>
-  <Text position={[0,.16,0]} fontSize={.07} color="#dffaff" anchorX="center" anchorY="middle">{label}</Text>
+  <Html position={[0,.16,0]} center distanceFactor={8} style={{pointerEvents:"none"}}><div className="scene-device-tag dom-tag" style={{whiteSpace:"nowrap"}}>{label}</div></Html>
  </group>;
 }
 
@@ -47,7 +47,8 @@ function HeatScene({tank,minute,depthPct}:{tank:Tank;minute:number;depthPct:numb
   {fixtures.map((f,i)=>{
     const p=f.displayPosition??{xPct:(i+1)/(fixtures.length+1)*100,yPct:116,zPct:50};
     const x=-w/2+(clamp(p.xPct,0,100)/100)*w,z=-d/2+(clamp(p.zPct,0,100)/100)*d;
-    const y=top+.13+((clamp(p.yPct,100,150)-110)/100)*h;
+    const mountCm=typeof f.mountingHeightCm==="number"?clamp(f.mountingHeightCm,1,150):Math.max(5,(clamp(p.yPct,100,150)-100)/100*tank.display.height+10);
+    const y=top+cm(mountCm);
     return <FixtureMarker key={f.id} x={x} y={y} z={z} label={f.name}/>;
   })}
   <gridHelper args={[Math.max(w,d)*1.25,12,"#123a4b","#0b2633"]} position={[0,bottom-.05,0]}/>
