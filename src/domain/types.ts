@@ -166,6 +166,12 @@ export interface LivestockItem {
   lastTrimmedAt?: string;
   /** Actual vertical placement below the water surface for photosynthetic livestock. */
   lightingDepthCm?: number;
+  /** Horizontal placement across display length: 0 = left, 100 = right. */
+  lightingXPct?: number;
+  /** Front-to-back placement across display width: 0 = front, 100 = back. */
+  lightingZPct?: number;
+  /** Local hardscape/canopy exposure correction when full 3D occlusion is not modeled. */
+  lightingExposure?: "open"|"partialShade"|"shade";
 }
 
 export interface LivestockExitEvent {
