@@ -36,11 +36,15 @@ import { repeatedResponsePatterns,tankLearningMaturity } from "@/domain/tankPatt
 import { claimCriticalAction,releaseCriticalAction } from "@/lib/actionGuard";
 import { deriveExtendedIntelligenceEvents } from "@/domain/extendedEventIntelligence";
 import { buildTankBrainSnapshot } from "@/domain/tankBrainSnapshot";
-import { validateAcclimationItemEntry,validateAcclimationWater,validateDoserChannelEntry,validateEquipmentEntry,validateExpenseEntry,validateInventoryEntry,validateRodiEntry,validateTreatmentSetup,validateWaterChangeEntry } from "@/domain/inputSanity";
+import { validateAbsencePlan,validateAcclimationItemEntry,validateAcclimationWater,validateDoserChannelEntry,validateEquipmentEntry,validateExpenseEntry,validateGrowthMeasurement,validateInventoryEntry,validateLivestockEntry,validateRodiEntry,validateTreatmentSetup,validateWaterChangeEntry } from "@/domain/inputSanity";
 import { photoNeedsExternalization } from "@/lib/photoStorage";
 import { interventionDensityAlert,interventionGate } from "@/domain/interventionSafety";
 import { createActionPlan,evaluatePlanOutcome } from "@/domain/actionPlanEngine";
 import { activeRelocation,activeVacation,archivedPageAllowed,isTankArchived } from "@/domain/tankLifecycle";
+import { TANK_EVENT_COVERAGE,eventedTankFields } from "@/domain/eventCoverage";
+import { domainOutcomeLearning } from "@/domain/outcomeLearning";
+import { historyPage } from "@/domain/historyPagination";
+import { buildVacationTaskDrafts,vacationDays } from "@/domain/vacationPlan";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -916,3 +920,89 @@ describe("Recovery torture checks",()=>{
     expect(result.ok).toBe(false);
   });
 });
+
+describe("Final hardening contracts",()=>{
+  it("keeps every Tank field under an explicit event-coverage policy",()=>{
+    const modes=Object.values(TANK_EVENT_COVERAGE);
+    expect(modes.length).toBeGreaterThan(35);
+    expect(modes.every(x=>["evented","derived","immutable","recovery-exempt"].includes(x))).toBe(true);
+    expect(eventedTankFields).toContain("display");
+    expect(eventedTankFields).toContain("aiActionPlans");
+    expect(eventedTankFields).toContain("lifecycle");
+  });
+
+  it("records core edits, removals and AI-plan progress as explicit memory",()=>{
+    const before=structuredClone(demoMarineTank) as any,after=structuredClone(demoMarineTank) as any;
+    after.name="Renamed Reef";
+    after.ageMonths=(after.ageMonths??1)+1;
+    after.display={...after.display,length:after.display.length+1};
+    after.maintenance=after.maintenance.slice(1);
+    after.inventory=after.inventory.slice(1);
+    after.aiActionPlans=[{id:"plan-hardening",createdAt:new Date().toISOString(),sourceQuestion:"test",titleAr:"خطة",titleEn:"Plan",status:"active",baselineScore:70,reviewAfterHours:24,steps:[{id:"s1",titleAr:"x",titleEn:"x",done:false}],focus:{domain:"chemistry",metrics:[]}}];
+    const events=deriveExtendedIntelligenceEvents(before,after);
+    expect(events.some(x=>x.verb==="tank_identity_changed")).toBe(true);
+    expect(events.some(x=>x.verb==="task_removed")).toBe(before.maintenance.length>0);
+    expect(events.some(x=>x.verb==="item_removed")).toBe(before.inventory.length>0);
+    expect(events.some(x=>x.verb==="ai_plan_created")).toBe(true);
+  });
+
+  it("rejects NaN, impossible livestock size and invalid absence duration at save boundaries",()=>{
+    expect(validateLivestockEntry({quantity:Number.NaN}).ok).toBe(false);
+    expect(validateLivestockEntry({quantity:2,sizeCm:1001}).ok).toBe(false);
+    expect(validateLivestockEntry({quantity:2,sizeCm:12}).ok).toBe(true);
+    expect(validateGrowthMeasurement({sizeCm:Number.POSITIVE_INFINITY}).ok).toBe(false);
+    expect(validateAbsencePlan({daysAway:0}).ok).toBe(false);
+    expect(validateAbsencePlan({daysAway:365}).ok).toBe(true);
+  });
+
+  it("learns repeated outcomes inside the target domain without overriding safety",()=>{
+    const t=structuredClone(demoMarineTank) as any;
+    t.aiActionPlans=[
+      {id:"p1",createdAt:"2026-01-01T00:00:00Z",sourceQuestion:"KH",titleAr:"",titleEn:"",status:"completed",baselineScore:70,reviewAfterHours:24,steps:[],focus:{domain:"chemistry",metrics:[]},outcome:"improved"},
+      {id:"p2",createdAt:"2026-02-01T00:00:00Z",sourceQuestion:"KH",titleAr:"",titleEn:"",status:"completed",baselineScore:70,reviewAfterHours:24,steps:[],focus:{domain:"chemistry",metrics:[]},outcome:"improved"},
+      {id:"p3",createdAt:"2026-03-01T00:00:00Z",sourceQuestion:"KH",titleAr:"",titleEn:"",status:"completed",baselineScore:70,reviewAfterHours:24,steps:[],focus:{domain:"chemistry",metrics:[]},outcome:"stable"}
+    ];
+    const learned=domainOutcomeLearning(t);
+    expect(learned[0]?.domain).toBe("chemistry");
+    expect(learned[0]?.samples).toBe(3);
+    expect(learned[0]?.ar).toMatch(/قواعد الأمان|تاريخ هذا الحوض/);
+  });
+
+  it("paginates tens of thousands of history rows with stable cursors and no duplicates",()=>{
+    const t=structuredClone(demoMarineTank) as any,base=Date.now();
+    t.timeline=Array.from({length:10_000},(_,i)=>({id:`stress-t-${i}`,timestamp:new Date(base-i*60000).toISOString(),type:"stress",textAr:`حدث ${i}`,textEn:`Event ${i}`}));
+    t.intelligenceEvents=Array.from({length:10_000},(_,i)=>({id:`stress-i-${i}`,timestamp:new Date(base-i*60000-30000).toISOString(),kind:"fact",domain:"system",verb:"stress",confidence:100,sourcePage:"timeline",textAr:`ذاكرة ${i}`,textEn:`Memory ${i}`}));
+    const first=historyPage(t,{limit:200});
+    const second=historyPage(t,{limit:200,cursor:first.nextCursor});
+    expect(first.rows).toHaveLength(200);
+    expect(second.rows).toHaveLength(200);
+    expect(first.nextCursor).toBeTruthy();
+    expect(new Set([...first.rows,...second.rows].map(x=>x.id)).size).toBe(400);
+  });
+
+  it("builds one lifecycle-aware vacation plan with pre-trip, caretaker and return checks",()=>{
+    expect(vacationDays("2026-09-21","2026-09-28")).toBe(7);
+    const tasks=buildVacationTaskDrafts({departure:"2026-09-21",daysAway:7,caretaker:"Caregiver",tankType:"marine"});
+    expect(tasks.some(x=>/قبل السفر|before travel/i.test(`${x.title} ${x.titleEn}`))).toBe(true);
+    expect(tasks.some(x=>/Caregiver/.test(`${x.title} ${x.titleEn}`))).toBe(true);
+    expect(tasks.some(x=>/بعد العودة|After return/i.test(`${x.title} ${x.titleEn}`))).toBe(true);
+  });
+
+  it("rejects recovery payloads that would reintroduce unsafe numeric data",()=>{
+    const poisoned=structuredClone(demoMarineTank) as any;
+    poisoned.chemistry=[{timestamp:new Date().toISOString(),values:{salinity:1025},source:"manual",confidence:"high"}];
+    let result=validateBackupPayload({app:"Aqua Nexus",schemaVersion:10,language:"ar",selectedTankId:poisoned.id,tanks:[poisoned]});
+    expect(result.ok).toBe(false);
+
+    const badDoser=structuredClone(demoMarineTank) as any;
+    badDoser.doserChannels=[{id:"d1",name:"Bad",material:"x",capacityMl:100,currentMl:500,consumption:1,period:"daily"}];
+    result=validateBackupPayload({app:"Aqua Nexus",schemaVersion:10,language:"ar",selectedTankId:badDoser.id,tanks:[badDoser]});
+    expect(result.ok).toBe(false);
+
+    const badVacation=structuredClone(demoMarineTank) as any;
+    badVacation.lifecycle={vacations:[{id:"v1",startedAt:"2026-09-21T00:00:00Z",plannedEndAt:"2026-09-20"}]};
+    result=validateBackupPayload({app:"Aqua Nexus",schemaVersion:10,language:"ar",selectedTankId:badVacation.id,tanks:[badVacation]});
+    expect(result.ok).toBe(false);
+  });
+});
+
