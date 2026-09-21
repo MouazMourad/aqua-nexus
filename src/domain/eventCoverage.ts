@@ -26,6 +26,7 @@ export const TANK_EVENT_COVERAGE={
   externalImports:"evented",
   deviceTelemetry:"evented",
   topOff:"evented",
+  deviceAlerts:"evented",
   energySettings:"evented",
   lighting:"evented",
   chemistry:"evented",
