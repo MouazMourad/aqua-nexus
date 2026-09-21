@@ -285,6 +285,16 @@ export function LightingPage({tank,onEquipment}:{tank:Tank;onEquipment:()=>void}
    </div>
   </section>
 
+  <section className="card panel full-span lighting-import-panel">
+   <div className="module-head"><div><small className="eyebrow-mini">IMPORT</small><h3>{bi(lang,"استيراد برنامج إنارة","Import lighting program")}</h3><p className="note">{bi(lang,"حدد الشركة ثم ارفع ملف التصدير. Aqua Nexus يسجل الشركة، اسم الملف، نوعه وتاريخ الاستيراد، ويحاول تفسير JSON/CSV تلقائياً للمراجعة قبل الحفظ.","Choose the vendor and upload its export file. Aqua Nexus records vendor, filename, file type and import date, and safely attempts JSON/CSV mapping for review before saving.")}</p></div><button className="btn primary" onClick={()=>importInput.current?.click()}>⇧ {bi(lang,"اختيار ملف","Choose file")}</button></div>
+   <div className="form-grid compact-fields">
+    <label className="field"><span>{bi(lang,"الشركة / النظام","Vendor / system")}</span><select value={importCompany} onChange={e=>setImportCompany(e.target.value as ImportCompany)}>{IMPORT_COMPANIES.map(x=><option value={x.id} key={x.id}>{lang==="ar"?x.ar:x.en}</option>)}</select></label>
+    <div className="field"><span>{bi(lang,"آخر استيراد","Last import")}</span><b className="input-like">{tank.lighting?.imports?.[0]?new Date(tank.lighting.imports[0].importedAt).toLocaleString():"—"}</b></div>
+   </div>
+   {importNote&&<div className="inline-alert info">{importNote}</div>}
+   {(tank.lighting?.imports??[]).length>0&&<div className="history-list lighting-import-history">{(tank.lighting?.imports??[]).slice(0,8).map(x=><div className="history-row" key={x.id}><div><b>{(IMPORT_COMPANIES.find(v=>v.id===x.sourceCompany)?.[lang==="ar"?"ar":"en"]??x.sourceCompany)+" • "+x.fileName}</b><small>{new Date(x.importedAt).toLocaleString()+" • "+x.fileType+" • "+(x.fileSize/1024).toFixed(1)+" KB"+(x.detectedChannels?(" • "+x.detectedChannels+" ch • "+x.detectedPoints+" pts"):"")}</small></div><span className={"status "+(x.status==="parsed"?"good":"warn")}>{x.status}</span></div>)}</div>}
+  </section>
+
   <section className="card panel full-span">
    <div className="module-head"><div><small className="eyebrow-mini">FIXTURES</small><h3>{bi(lang,"وحدات الإنارة والنموذج البصري","Fixtures & optical model")}</h3><p className="note">{bi(lang,"الأجهزة نفسها تأتي من صفحة Equipment. هون نكمل المعلومات التي يحتاجها حساب الضوء فقط.","Hardware comes from Equipment; this section adds only the optical data needed for light modelling.")}</p></div><button className="btn" onClick={onEquipment}>{bi(lang,"فتح المعدات","Open Equipment")}</button></div>
    {!fixtures.length&&<div className="inline-alert warn">{bi(lang,"ما في وحدة Lighting مسجلة فوق الحوض. أضفها من Equipment أولاً؛ الصفحة لن تخترع جهازاً غير موجود.","No display Lighting fixture is registered. Add the real hardware in Equipment first; this page will not invent a fixture.")}</div>}
