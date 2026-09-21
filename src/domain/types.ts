@@ -721,6 +721,8 @@ export interface LightingCalibrationPoint {
   /** Depth below water surface: 0 = surface, 100 = bottom. */
   depthPct:number;
   measuredPar:number;
+  /** Program minute when the PAR reading was taken; defaults to program peak when omitted. */
+  minute?:number;
   notes?:string;
 }
 
