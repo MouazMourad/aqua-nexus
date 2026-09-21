@@ -311,10 +311,12 @@ export interface JournalPhoto {
   id: string;
   timestamp: string;
   caption: string;
-  /** Small local preview kept with tank state for fast/offline rendering. */
+  /** Legacy/import recovery payload only. Normal persisted tank state keeps this empty. */
   dataUrl: string;
   /** Full-resolution compressed asset stored outside Zustand/localStorage. */
   assetKey?: string;
+  /** Small display preview stored outside Zustand/localStorage as well. */
+  previewKey?: string;
   fullResolutionStored?: boolean;
   livestockId?: string;
   estimatedSizeCm?: number;
