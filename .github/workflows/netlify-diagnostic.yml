@@ -1,0 +1,24 @@
+name: Netlify parity diagnostic
+
+on:
+  push:
+    branches:
+      - feature/full-audit-hardening
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  netlify-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Run Netlify build locally
+        run: npx --yes netlify-cli@latest build --context deploy-preview
