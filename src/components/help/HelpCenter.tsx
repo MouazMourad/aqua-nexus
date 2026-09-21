@@ -41,6 +41,14 @@ const HELP:Record<AppPage,PageHelp>={
  settings:{titleAr:"الإعدادات",titleEn:"Settings",summaryAr:"إعدادات الحوض والتطبيق والخيارات العامة التي تتحكم بسلوك Aqua Nexus وتجربة الاستخدام.",summaryEn:"Tank and application settings that control Aqua Nexus behavior and the user experience.",capabilitiesAr:["إعدادات الحوض والبروفايل","خيارات العرض واللغة","إدارة فقاعات تعليم الميزات","إخفاء الفقاعات أو تشغيلها حسب ما تعلمته","استعادة كل تعليمات الميزات من الصفر"],capabilitiesEn:["Tank/profile settings","Display and language options","Feature discovery bubble controls","Hide bubbles or show only unlearned features","Restore all feature tips from the beginning"],featuresAr:["Aqua Nexus يتذكر الميزات التي فتحتها على هذا الجهاز","استعادة التعليمات لا تغيّر أي بيانات بالحوض","التخصيص بدون كسر بيانات الحوض"],featuresEn:["Aqua Nexus remembers features opened on this device","Restoring tips does not change tank data","Customization without breaking tank data"]}
 };
 
+type HelpSensitivity="info"|"important"|"safety";
+const PAGE_HELP_SENSITIVITY:Record<AppPage,HelpSensitivity>={
+ dashboard:"info",tanks:"info",equipment:"important",lighting:"important",sump:"important",livestock:"important",
+ acclimation:"safety",library:"info",chemistry:"safety",maintenance:"important",inventory:"important",diseases:"safety",
+ timeline:"info",journal:"info",waterchange:"important",feeding:"important",dosing:"safety",quarantine:"safety",
+ emergency:"safety",rodi:"important",expenses:"info",alerts:"safety",reports:"info",settings:"info"
+};
+
 const order=(Object.keys(HELP) as AppPage[]);
 
 function PageHelpBody({page,lang}:{page:AppPage;lang:Language}){
@@ -81,7 +89,7 @@ export function PageHelpButton({page}:{page:AppPage}){
  const [open,setOpen]=useState(false);
  const h=HELP[page];
  return <>
-  <button type="button" className="page-help-button" onClick={()=>{if(page==="dashboard")markFeatureLearned("tank-brain");setOpen(true)}} aria-label={lang==="ar"?`تعليمات ${h.titleAr}`:`${h.titleEn} help`} title={lang==="ar"?`تعليمات ${h.titleAr}`:`${h.titleEn} help`}>? <span>{lang==="ar"?"تعليمات الصفحة":"Page help"}</span></button>
+  <button type="button" className={`page-help-button help-${PAGE_HELP_SENSITIVITY[page]}`} data-help-sensitivity={PAGE_HELP_SENSITIVITY[page]} onClick={()=>{if(page==="dashboard")markFeatureLearned("tank-brain");setOpen(true)}} aria-label={lang==="ar"?`تعليمات ${h.titleAr}`:`${h.titleEn} help`} title={lang==="ar"?`تعليمات ${h.titleAr}`:`${h.titleEn} help`}>? <span>{lang==="ar"?"تعليمات الصفحة":"Page help"}</span><i aria-hidden="true">{PAGE_HELP_SENSITIVITY[page]==="safety"?"◆":PAGE_HELP_SENSITIVITY[page]==="important"?"•":""}</i></button>
   <Modal open={open} title={lang==="ar"?`تعليمات • ${h.titleAr}`:`Help • ${h.titleEn}`} onClose={()=>setOpen(false)}><PageHelpBody page={page} lang={lang}/></Modal>
  </>;
 }
