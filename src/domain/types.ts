@@ -59,8 +59,12 @@ export interface Equipment {
   ratedVolumeLiters?: number;
   /** Nominal water flow in liters/hour for pumps, wavemakers, filters, etc. */
   flowLph?: number;
-  /** Measured/estimated PAR at the livestock target depth for aquarium lighting. */
+  /** Measured/estimated PAR at a known reference depth for aquarium lighting. */
   parAtTargetDepth?: number;
+  /** Physical fixture height above the water surface, used by Lighting Intelligence. */
+  mountingHeightCm?: number;
+  /** Depth below the water surface at which parAtTargetDepth was measured. */
+  parReferenceDepthCm?: number;
   /** Manufacturer or measured lighting coverage dimensions. */
   coverageLengthCm?: number;
   coverageWidthCm?: number;
