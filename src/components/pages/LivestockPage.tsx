@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Modal } from "@/components/ui/Modal";
 import { uid,today,nowISO } from "@/lib/appUtils";
 import { PlantCarePanel } from "@/components/plant/PlantCarePanel";
+import { validateLivestockEntry } from "@/domain/inputSanity";
 
 type EntryCategory=LivestockItem["category"]|"macroalgae";
 
