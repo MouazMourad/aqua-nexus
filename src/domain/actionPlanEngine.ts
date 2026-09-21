@@ -6,6 +6,7 @@ import { reasonLocally } from "./aquaAILocalReasoner";
 import { chemistryCatalogForTank } from "./chemistryProfile";
 import { equipmentAdequacy } from "./equipmentAdequacy";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
+import { sumpIntelligence } from "./sumpIntelligence";
 
 export interface AquaActionStep{ id:string; titleAr:string; titleEn:string; done:boolean; completedAt?:string; }
 export type AquaPlanMetricDirection="lower"|"higher"|"ideal-range";
@@ -46,6 +47,9 @@ function metricValue(tank:Tank,key:string){
  if(key==="quarantine:concern")return quarantineConcern(tank);
  if(key==="livestock:concern")return tank.livestock.filter(x=>x.health!=="good").length;
  if(key==="rodi:tdsOut")return latestTdsOut(tank);
+ if(key==="acclimation:active")return (tank.acclimationSessions??[]).filter(x=>x.status!=="completed").length;
+ if(key==="inventory:low")return tank.inventory.filter(x=>x.quantity<=x.minimum).length;
+ if(key==="sump:issues")return sumpIntelligence(tank).issues.length;
  return null;
 }
 function uniqueParams(params:string[]){return [...new Set(params.filter(Boolean))];}
@@ -73,6 +77,22 @@ function buildPlanFocus(tank:Tank,page:string,question:string):AquaPlanFocus|und
  if(page==="quarantine")return{domain:"quarantine",metrics:[{key:"quarantine:concern",labelAr:"حالات العلاج التي ما زالت مقلقة",labelEn:"Treatment cases still concerning",before:quarantineConcern(tank),direction:"lower",tolerance:0}]};
  if(page==="livestock")return{domain:"livestock",metrics:[{key:"livestock:concern",labelAr:"كائنات تحتاج متابعة",labelEn:"Livestock needing attention",before:metricValue(tank,"livestock:concern"),direction:"lower",tolerance:0}]};
  if(page==="rodi")return{domain:"rodi",metrics:[{key:"rodi:tdsOut",labelAr:"TDS الخارج",labelEn:"Output TDS",before:latestTdsOut(tank),direction:"lower",tolerance:0}]};
+ if(page==="feeding"||page==="waterchange"){
+  const params=page==="feeding"?(tank.type==="marine"?["NO3","PO4"]:["NO3"]):(tank.type==="marine"?["NO3","PO4","salinity"]:["NO3","pH"]);
+  const metrics=params.map(param=>{
+    const meta=catalog?.[param],ideal=Array.isArray(meta?.ideal)?meta.ideal:[];
+    return {key:`chem:${param}`,labelAr:param,labelEn:param,before:latestChemistry(tank,param),direction:"ideal-range" as const,
+      idealMin:Number.isFinite(Number(ideal[0]))?Number(ideal[0]):undefined,idealMax:Number.isFinite(Number(ideal[1]))?Number(ideal[1]):undefined,
+      tolerance:param==="PO4"?.01:param==="NO3"?1:param==="salinity"?.001:param==="pH"?.05:0};
+  }).filter(x=>x.before!==null);
+  if(metrics.length)return{domain:page==="feeding"?"feeding":"waterChange",metrics};
+ }
+ if(page==="acclimation")return{domain:"acclimation",metrics:[
+  {key:"acclimation:active",labelAr:"جلسات الإقلمة النشطة",labelEn:"Active acclimation sessions",before:metricValue(tank,"acclimation:active"),direction:"lower",tolerance:0},
+  {key:"livestock:concern",labelAr:"كائنات تحتاج متابعة",labelEn:"Livestock needing attention",before:metricValue(tank,"livestock:concern"),direction:"lower",tolerance:0}
+ ]};
+ if(page==="sump")return{domain:"sump",metrics:[{key:"sump:issues",labelAr:"ملاحظات السامب",labelEn:"Sump issues",before:metricValue(tank,"sump:issues"),direction:"lower",tolerance:0}]};
+ if(page==="inventory")return{domain:"inventory",metrics:[{key:"inventory:low",labelAr:"مواد مخزون منخفض",labelEn:"Low-stock items",before:metricValue(tank,"inventory:low"),direction:"lower",tolerance:0}]};
  return undefined;
 }
 
