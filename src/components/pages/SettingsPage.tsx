@@ -196,7 +196,7 @@ export function SettingsPage({tank}:{tank:Tank}) {
   </div>
  </div>
 
- <div className="card panel full-span"><AdvancedSection titleAr="بروفايل الحوض والحسابات" titleEn="Tank profile & calculations" summaryAr="إعدادات تؤثر على أهداف الكيمياء وتقييم المعدات والطاقة؛ Auto مناسب لمعظم المستخدمين." summaryEn="Settings that affect chemistry targets, equipment assessment and energy; Auto is suitable for most users." defaultOpen={false}>
+ <div className="card panel full-span"><AdvancedSection titleAr="بروفايل الحوض والحسابات" titleEn="Tank profile & calculations" summaryAr="إعدادات تؤثر على أهداف الكيمياء وتقييم المعدات والطاقة؛ Auto مناسب لمعظم المستخدمين." summaryEn="Settings that affect chemistry targets, equipment assessment and energy; Auto is suitable for most users.">
   <div style={{display:"grid",gap:10,paddingTop:10}}>
    <ContextHint id="settings-system-profile" lang={lang} ar="اترك البروفايل Auto إذا ما عندك سبب واضح لتثبيته. التحديد اليدوي يفيد لما طبيعة الحوض معروفة وبدك أهدافاً أدق." en="Leave the profile on Auto unless you have a clear reason to pin it. Manual selection helps when the aquarium type is known and you want more specific targets."/>
      <h3>{bi(lang,"بروفايل الحوض والحسابات","Tank profile & calculations")}</h3>
