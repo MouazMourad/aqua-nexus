@@ -283,7 +283,7 @@ test("indexed long-term archive paginates old records without keeping them hot",
   await goToPage(page,"timeline");
   await expect(page.locator(".timeline")).toContainText(/Very old archive event|حدث أرشيف قديم/);
   await openAdvancedSection(page,/الأرشيف طويل الأمد|Long-term archive/,'[data-testid="history-domain"]');
-  await page.getByRole("button",{name:/أرشفة السجلات القديمة|Archive old history/}).click();
+  await page.getByRole("button",{name:/^(أرشفة السجلات القديمة|Archive old history)$/}).click();
   await expect(page.locator(".page-grid")).toContainText(/مخزن تاريخي مفهرس|indexed historical store/i);
   await page.getByTestId("history-domain").selectOption("timeline");
   await expect(page.getByTestId("archived-history-list")).toContainText(/Very old archive event|حدث أرشيف قديم/);
