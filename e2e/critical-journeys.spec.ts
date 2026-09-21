@@ -491,3 +491,41 @@ test("dashboard exposes live lighting intensity and opens Lighting Intelligence"
   await expect(page.locator(".lighting-page")).toBeVisible();
 });
 
+test("Lighting screenshot import uses Vision analysis, fills editable values and stays reviewable before save",async({page})=>{
+  await page.route("**/api/ai/lighting-import",async route=>{
+    const body=route.request().postDataJSON() as any;
+    expect(body.sourceKind).toBe("image");
+    await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({
+      ok:true,mode:"external",provider:"test-vision",model:"test",
+      answer:{candidate:{
+        sourceKind:"image",confidence:88,vendorDetected:"Maxspect",programName:"Screenshot Program",
+        fixture:{brand:"Maxspect",model:"L165",powerWatts:65},
+        channels:[
+          {key:"uv",name:"UV",spectrum:"uv",parWeight:.88,confidence:92},
+          {key:"royal",name:"Royal Blue",spectrum:"royalBlue",parWeight:1,confidence:90}
+        ],
+        points:[
+          {minute:540,values:{uv:0,royal:0}},
+          {minute:900,values:{uv:35,royal:70}},
+          {minute:1320,values:{uv:0,royal:0}}
+        ],
+        warnings:["One value was visually approximated"],evidence:["Visible time axis","Visible channel labels"]
+      }}
+    })});
+  });
+  await openTrainingDashboard(page);
+  await goToPage(page,"lighting");
+  const png=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2r0sAAAAASUVORK5CYII=","base64");
+  await page.locator('input[type="file"]').first().setInputFiles({name:"maxspect-screenshot.png",mimeType:"image/png",buffer:png});
+  const review=page.locator(".lighting-import-review");
+  await expect(review).toBeVisible();
+  await expect(review).toContainText("88%");
+  await expect(page.locator(".lighting-channel-row")).toContainText(/UV|Royal Blue/);
+  const table=page.locator(".lighting-points-table");
+  const editable=table.locator('input[type="number"]').nth(3);
+  await editable.fill("66");
+  await expect(editable).toHaveValue("66");
+  await expect(page.getByRole("button",{name:/حفظ البرنامج|Save program/}).first()).toBeEnabled();
+  await expect(review).toContainText(/One value was visually approximated/);
+});
+
