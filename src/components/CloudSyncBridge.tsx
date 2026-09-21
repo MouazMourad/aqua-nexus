@@ -7,6 +7,7 @@ import { clearCloudDeleteTombstone,cloudDeleteTombstones } from "@/lib/cloudTomb
 import type { Tank } from "@/domain/types";
 import { downloadText } from "@/lib/appUtils";
 import { CURRENT_BACKUP_SCHEMA } from "@/domain/backupValidation";
+import { clearTankHistoryArchive,hydrateTankHistoryArchive } from "@/lib/historyArchiveStorage";
 
 function stableValue(value:unknown):unknown{
   if(Array.isArray(value))return value.map(stableValue);
@@ -63,9 +64,9 @@ export function CloudSyncBridge(){
             baseline.set(local.id,"");
             continue;
           }
-          const cloudSig=signature(cloud);
+          const cloudSig=signature(cloud),fullLocal=await hydrateTankHistoryArchive(local);
           baseline.set(local.id,localSig);
-          if(cloudSig!==localSig)conflicts.add(local.id);
+          if(cloudSig!==signature(fullLocal))conflicts.add(local.id);
         }
 
         baselineRef.current=baseline;
@@ -160,6 +161,7 @@ export function CloudSyncBridge(){
     try{
       const remote=await restoreTanks(),cloud=remote.tanks.find(t=>t.id===id);
       if(!cloud){setError("CONFLICT:"+id);return}
+      await clearTankHistoryArchive(id);
       replaceTankSnapshot(id,cloud);
       versionsRef.current[id]=remote.versions?.[id]??versionsRef.current[id];
       baselineRef.current.set(id,signature(cloud));conflictsRef.current.delete(id);
