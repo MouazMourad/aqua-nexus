@@ -3,7 +3,7 @@ import type { JournalPhoto,Tank } from "./types";
 function tail<T>(rows:T[]|undefined,limit:number){return (rows??[]).slice(0,limit);}
 function photoMeta(photo:JournalPhoto){
   const {dataUrl,...meta}=photo;
-  return {...meta,hasLocalPreview:Boolean(dataUrl),previewBytes:dataUrl?.length??0};
+  return {...meta,hasStoredPreview:Boolean(photo.previewKey)||Boolean(dataUrl),embeddedPreviewBytes:dataUrl?.length??0};
 }
 
 /**
