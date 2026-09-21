@@ -158,8 +158,8 @@ test("new wizard tank enters biological cycling and locks non-cycle workflows",a
 
 
 test("progressive navigation keeps every module reachable and supports keyboard search",async({page})=>{
-  await expect(page.getByRole("button",{name:/بحث في Aqua Nexus|Search Aqua Nexus/})).toBeVisible();
   await openTrainingDashboard(page);
+  await expect(page.getByRole("button",{name:/بحث في Aqua Nexus|Search Aqua Nexus/})).toBeVisible();
   await expect(page.locator('[data-aqua-page="chemistry"]')).toBeVisible();
   await expect(page.locator('[data-aqua-page="diseases"]')).toHaveCount(0);
   await page.getByRole("button",{name:/كل الوحدات|All modules/}).click();
