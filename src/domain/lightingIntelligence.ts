@@ -112,6 +112,15 @@ function defaultPeakPar(tank:Tank){
   return 85;
 }
 
+function wattDerivedReferencePar(tank:Tank,f:Equipment){
+  if(typeof f.powerWatts!=="number"||!Number.isFinite(f.powerWatts)||f.powerWatts<=0)return defaultPeakPar(tank);
+  const coverageM2=Math.max(.08,((f.coverageLengthCm??tank.display.length*.62)/100)*((f.coverageWidthCm??tank.display.width*.78)/100));
+  const efficacy=tank.type==="marine"?1.75:1.55;
+  const usableFraction=tank.type==="marine"?.78:.72;
+  const photonFlux=f.powerWatts*efficacy*usableFraction;
+  return clamp(photonFlux/coverageM2,20,900);
+}
+
 function rawEstimatedPar(tank:Tank,xPct:number,zPct:number,depthPct:number,atMinute:number){
   const fixtures=tank.equipment.filter(x=>x.kind==="lighting"&&x.location==="display"&&x.status!=="off");
   const program=tank.lighting?.activeProgram;
@@ -121,7 +130,7 @@ function rawEstimatedPar(tank:Tank,xPct:number,zPct:number,depthPct:number,atMin
   let total=0;
   fixtures.forEach((f,i)=>{
     const pos=fixturePosition(f,i,fixtures.length);
-    const base=Math.max(10,f.parAtTargetDepth??defaultPeakPar(tank))*pos.scale;
+    const base=Math.max(10,f.parAtTargetDepth??wattDerivedReferencePar(tank,f))*pos.scale;
     const covX=clamp((f.coverageLengthCm??tank.display.length*.62)/Math.max(1,tank.display.length)*100,18,130);
     const covZ=clamp((f.coverageWidthCm??tank.display.width*.78)/Math.max(1,tank.display.width)*100,20,150);
     const dx=(xPct-pos.xPct)/(covX*.52),dz=(zPct-pos.zPct)/(covZ*.52);
@@ -173,6 +182,51 @@ export function lightingFrontGrid(tank:Tank,opts:{minute:number;zPct?:number;col
   return{cols,rows,cells:out,max:Math.max(1,...out.map(x=>x.par)),min:Math.min(...out.map(x=>x.par))};
 }
 
+
+export interface LightingPlacementRecommendation{
+  livestockId:string;
+  name:string;
+  category:"coral"|"plant";
+  zone:"top"|"mid"|"bottom"|"shade";
+  parMin:number;
+  parMax:number;
+  ar:string;
+  en:string;
+}
+
+function normalizedName(value:string){
+  return value.toLowerCase()
+    .replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه")
+    .replace(/[^a-z0-9\u0600-\u06ff]+/g," ");
+}
+
+export function lightingPlacementRecommendations(tank:Tank):LightingPlacementRecommendation[]{
+  const rows:LightingPlacementRecommendation[]=[];
+  for(const item of tank.livestock){
+    if(tank.type==="marine"&&item.category==="coral"){
+      const n=normalizedName([item.name,item.nameEn,item.libraryId,item.notes].filter(Boolean).join(" "));
+      let zone:LightingPlacementRecommendation["zone"]="mid",min=75,max=180,kindAr="مرجان متوسط الإضاءة",kindEn="moderate-light coral";
+      if(/acropora|acro|montipora|pocillopora|stylophora|sps|اكروبورا|مونتيبورا/.test(n)){zone="top";min=200;max=350;kindAr="SPS عالي الإضاءة";kindEn="high-light SPS";}
+      else if(/mushroom|ricordea|rhodactis|discosoma|leather|zoa|zoanthid|مشروم|ريكورديا|روداكتس|ليذر|زوا/.test(n)){zone="bottom";min=40;max=110;kindAr="Soft/مشروم منخفض إلى متوسط";kindEn="low-to-moderate soft coral";}
+      else if(/torch|hammer|frogspawn|euphyllia|candy|acan|blasto|chalice|lps|تورش|هامر|فروغ|كاندي|اكان|بلاستو|شالس/.test(n)){zone="mid";min=70;max=170;kindAr="LPS متوسط الإضاءة";kindEn="moderate-light LPS";}
+      rows.push({livestockId:item.id,name:item.name,category:"coral",zone,parMin:min,parMax:max,
+        ar:`${kindAr}: ابدأ تقريباً ضمن ${min}–${max} PAR وراقب الاستجابة قبل أي رفع.`,
+        en:`${kindEn}: start around ${min}–${max} PAR and observe before increasing.`});
+    }
+    if(tank.type==="freshwater"&&item.category==="plant"){
+      const n=normalizedName([item.name,item.nameEn,item.libraryId,item.notes].filter(Boolean).join(" "));
+      let zone:LightingPlacementRecommendation["zone"]="mid",min=40,max=100,kindAr="نبات متوسط الإضاءة",kindEn="moderate-light plant";
+      if(/anubias|java fern|microsorum|buce|bucephalandra|moss|انوبيا|جافا|بوس|موس/.test(n)){zone="shade";min=20;max=55;kindAr="نبات ظل/منخفض الإضاءة";kindEn="shade/low-light plant";}
+      else if(/cryptocoryne|crypt|كريبت/.test(n)){zone="bottom";min=30;max=75;kindAr="Crypt منخفض إلى متوسط";kindEn="low-to-moderate Crypt";}
+      else if(/monte carlo|glossostigma|hemianthus|hc cuba|rotala|ludwigia|alternanthera|carpet|مونتي|روتالا|لودويجيا/.test(n)){zone="top";min=80;max=180;kindAr="نبات قوي/كاربت يحتاج إضاءة أعلى";kindEn="higher-light stem/carpet plant";}
+      rows.push({livestockId:item.id,name:item.name,category:"plant",zone,parMin:min,parMax:max,
+        ar:`${kindAr}: استهدف تقريباً ${min}–${max} PAR مع مراعاة CO₂ والمغذيات.`,
+        en:`${kindEn}: target roughly ${min}–${max} PAR while considering CO₂ and nutrients.`});
+    }
+  }
+  return rows;
+}
+
 export interface LightingIssue{
   id:string;level:"info"|"warn"|"danger";ar:string;en:string;
 }
@@ -182,6 +236,8 @@ export function lightingIntelligence(tank:Tank){
   const program=tank.lighting?.activeProgram;
   const issues:LightingIssue[]=[];
   if(!fixtures.length)issues.push({id:"no-fixture",level:"warn",ar:"لا توجد وحدة إنارة فعالة ومسجلة فوق الحوض.",en:"No active display-light fixture is registered."});
+  const missingPower=fixtures.filter(x=>!(typeof x.powerWatts==="number"&&Number.isFinite(x.powerWatts)&&x.powerWatts>0));
+  if(missingPower.length)issues.push({id:"fixture-power-missing",level:"warn",ar:`قوة ${missingPower.length} وحدة إنارة غير محددة بالواط. تحديد القدرة شرط أساسي لتحسين تقدير التوزيع الضوئي.`,en:`${missingPower.length} lighting fixture(s) are missing wattage. Rated power is required to improve the light-field estimate.`});
   if(!program)issues.push({id:"no-program",level:"warn",ar:"برنامج الإنارة غير مسجل بعد، لذلك Tank Brain لا يستطيع تقييم الجرعة الضوئية.",en:"No lighting program is registered yet, so Tank Brain cannot evaluate light dose."});
   const schedule=program?lightingSchedule(program):{firstMinute:null,lastMinute:null,photoperiodMinutes:0,peakPercent:0,peakMinute:720,relativeDoseHours:0};
   const photosynthetic=tank.type==="marine"
@@ -216,14 +272,14 @@ export function lightingIntelligence(tank:Tank){
   if(typeof temp==="number"&&typeof oldTemp==="number"&&Math.abs(temp-oldTemp)>=.7)links.push(`Temp Δ ${(temp-oldTemp).toFixed(1)}°C`);
   const calibration=tank.lighting?.calibrationPoints??[];
   const confidence=Math.round(clamp(
-    (fixtures.length?25:0)+(program?25:0)+(fixtures.some(x=>Boolean(x.parAtTargetDepth||x.coverageLengthCm))?20:0)+Math.min(30,calibration.length*10),
+    (fixtures.length?20:0)+(program?20:0)+(fixtures.length&&fixtures.every(x=>typeof x.powerWatts==="number"&&x.powerWatts>0)?20:0)+(fixtures.some(x=>Boolean(x.parAtTargetDepth||x.coverageLengthCm))?15:0)+Math.min(25,calibration.length*10),
     0,100
   ));
   const level=issues.some(x=>x.level==="danger")?"danger":issues.some(x=>x.level==="warn")?"warn":"good";
   return{
     level,fixtures:fixtures.length,program,schedule,centerPeak,depthPct:depth,
     calibrationFactor:lightingCalibrationFactor(tank),calibrationPoints:calibration.length,
-    confidence,issues,chemistrySignals:links,
+    confidence,issues,chemistrySignals:links,placementRecommendations:lightingPlacementRecommendations(tank),
     missingEvidence:[
       ...(calibration.length?[]:["PAR calibration points"]),
       ...((tank.equipment.some(x=>x.kind==="ato"))?["measured top-off volume history"]:[])
