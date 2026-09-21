@@ -1,9 +1,10 @@
-import type { Language,Tank } from "./types";
+import type { AquariumExperienceLevel,Language,Tank } from "./types";
 
 export const CURRENT_BACKUP_SCHEMA=10;
 
 export interface ValidBackupPayload{
   language:Language;
+  aquariumExperience:AquariumExperienceLevel;
   selectedTankId:string;
   tanks:Tank[];
 }
@@ -177,8 +178,11 @@ export function validateBackupPayload(input:unknown):BackupValidationResult{
     tanks.push(result.tank);
   }
   const language:Language=input.language==="en"?"en":"ar";
+  const aquariumExperience:AquariumExperienceLevel=["beginner","intermediate","advanced"].includes(String(input.aquariumExperience))
+    ? input.aquariumExperience as AquariumExperienceLevel
+    : "beginner";
   const selected=typeof input.selectedTankId==="string"&&ids.has(input.selectedTankId)?input.selectedTankId:(tanks[0]?.id??"");
-  return{ok:true,data:{language,selectedTankId:selected,tanks}};
+  return{ok:true,data:{language,aquariumExperience,selectedTankId:selected,tanks}};
 }
 
 export function validateTankImportPayload(input:unknown):{ok:true;tanks:Tank[]}|{ok:false;error:string}{
