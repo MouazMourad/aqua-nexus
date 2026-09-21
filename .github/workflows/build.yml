@@ -12,7 +12,24 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: aqua
+          POSTGRES_PASSWORD: aqua
+          POSTGRES_DB: aqua_nexus
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aqua -d aqua_nexus"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://aqua:aqua@127.0.0.1:5432/aqua_nexus
+      DATABASE_SSL: disable
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,8 +42,16 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Regression tests
         run: npm test
+      - name: Apply PostgreSQL migrations
+        run: |
+          psql "$DATABASE_URL" -f db/migrations/001_backend.sql
+          psql "$DATABASE_URL" -f db/migrations/002_push_state.sql
+          psql "$DATABASE_URL" -f db/migrations/003_vercel_push_reminders.sql
+          psql "$DATABASE_URL" -f db/migrations/004_rate_limits.sql
       - name: Build
         run: npm run build
+      - name: Backend integration
+        run: npm run test:backend
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium webkit
       - name: Critical journey E2E

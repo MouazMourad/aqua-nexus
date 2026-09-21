@@ -15,6 +15,7 @@ import { requiresPostDoseRetest } from "@/domain/dosingSafety";
 import { claimCriticalAction } from "@/lib/actionGuard";
 import { interventionGate } from "@/domain/interventionSafety";
 import { sanitizeBounded,validateDoserChannelEntry } from "@/domain/inputSanity";
+import { useSafetyOverrideDialog } from "@/components/ui/SafetyOverrideDialog";
 
 const colors=["#27c2dc","#62d48f","#f6c85f","#c877ff","#ff7e79","#4b8bff"];
 function idealTarget(tank:Tank,param:DosingParameter){const meta:any=chemistryCatalogForTank(tank)?.[param];return meta?.ideal?(Number(meta.ideal[0])+Number(meta.ideal[1]))/2:param==="KH"?8:param==="Ca"?430:1325;}
@@ -22,6 +23,7 @@ function datePlusDays(days:number){return new Date(Date.now()+days*86400000).toI
 
 export function DosingPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),availableParams:DosingParameter[]=tank.type==="marine"?["KH","Ca","Mg"]:["KH"];
+ const {requestOverride,overrideDialog}=useSafetyOverrideDialog(lang);
  const [param,setParam]=useState<DosingParameter>("KH"),[target,setTarget]=useState(()=>idealTarget(tank,"KH")),[form,setForm]=useState<DosingForm>("dry"),[presetId,setPresetId]=useState("nahco3"),[purity,setPurity]=useState(100),[stockGramsPerLiter,setStockGramsPerLiter]=useState(84),[productRaise,setProductRaise]=useState(0),[productName,setProductName]=useState(""),[inventoryItemId,setInventoryItemId]=useState(""),[routineItemId,setRoutineItemId]=useState(""),[routineAmount,setRoutineAmount]=useState(""),[showAdvanced,setShowAdvanced]=useState(false),[showDoser,setShowDoser]=useState(false);
  useEffect(()=>{setTarget(idealTarget(tank,param));const first=DOSING_PRESETS.find(x=>x.parameter===param);if(first)setPresetId(first.id);},[param,tank.id]);
  const presets=DOSING_PRESETS.filter(x=>x.parameter===param),chosen=presets.find(x=>x.id===presetId)??presets[0],guide=useMemo(()=>chemistryGuidance(tank),[tank]),sample=useMemo(()=>latestParameterSample(tank,param),[tank,param]);
@@ -42,14 +44,15 @@ export function DosingPage({tank}:{tank:Tank}) {
   const capacity=sanitizeBounded(next.capacityMl,.1,1_000_000,x.capacityMl);
   return {...next,capacityMl:capacity,currentMl:sanitizeBounded(next.currentMl,0,capacity,Math.min(x.currentMl,capacity)),consumption:sanitizeBounded(next.consumption,0,1_000_000,x.consumption)};
  })}))}
- function log(){
+ async function log(){
   if(!calc.valid||!dosingReady||current===undefined||targetCheck.blocked)return;
   if(targetCheck.level==="warn"&&!window.confirm(lang==="ar"?`${targetCheck.ar} هل تريد المتابعة ضمن المجال الآمن؟`:`${targetCheck.en} Continue within the safe range?`))return;
   const intervention=interventionGate(tank,"correctiveDosing");
   if(intervention.level==="warn"&&!window.confirm(lang==="ar"?intervention.ar+" هل تريد المتابعة بعد مراجعة السبب؟":intervention.en+" Continue after reviewing the reason?"))return;
+  let overrideReason="";
   if(intervention.level==="danger"){
-   if(!window.confirm(lang==="ar"?"⚠️ "+intervention.ar+" هل يوجد سبب واضح يستدعي الجرعة الآن؟":"⚠️ "+intervention.en+" Is there a clear reason this dose is needed now?"))return;
-   if(!window.confirm(lang==="ar"?"تأكيد أخير: نفّذ عامل واحد فقط قدر الإمكان، ثم أعد القياس قبل أي تدخل كبير إضافي. متابعة؟":"Final confirmation: change only one major factor when possible, then retest before another major intervention. Continue?"))return;
+   const reason=await requestOverride({title:lang==="ar"?"تجاوز تحذير جرعة عالية الخطورة":"High-risk dosing override",message:lang==="ar"?intervention.ar:intervention.en,requireReason:true});
+   if(!reason)return;overrideReason=reason;
   }
   const stockItem=inventoryItemId?correctiveStock.find(x=>x.id===inventoryItemId):undefined;
   if(inventoryItemId&&!stockItem){window.alert(lang==="ar"?"مادة المخزون المختارة لا تطابق نوع الجرعة الحالية. أعد اختيار المادة.":"The selected inventory item does not match the current dosing setup. Select it again.");return}
@@ -74,7 +77,7 @@ export function DosingPage({tank}:{tank:Tank}) {
     inventory:consume?t.inventory.map(x=>x.id===linked?.id?{...x,quantity:Math.max(0,x.quantity-consume)}:x):t.inventory,
     doserChannels:channels,
     dosing:[dose,...t.dosing],
-    timeline:[{id:uid("ev"),timestamp:ts,type:"dosing",textAr:calc.steps>1?`تم إنشاء خطة تصحيح ${param}: ${amountText} من ${material} على ${calc.steps} جرعات. المخزون سيُخصم عند تنفيذ كل خطوة.`:`تم تسجيل جرعة ${material}: ${amountText} اعتماداً على القراءة الموثقة ${current} للوصول إلى ${target}.`,textEn:calc.steps>1?`Created a ${param} correction plan: ${amountText} of ${material} over ${calc.steps} doses. Inventory will be deducted as each step is executed.`:`Logged ${material} dose: ${amountText}, based on verified reading ${current} toward ${target}.`},...t.timeline],
+    timeline:[...(overrideReason?[{id:uid("ev"),timestamp:ts,type:"safety-override",textAr:`تم تجاوز تحذير جرعة عالية الخطورة. السبب: ${overrideReason}`,textEn:`High-risk dosing warning overridden. Reason: ${overrideReason}`}]:[]),{id:uid("ev"),timestamp:ts,type:"dosing",textAr:calc.steps>1?`تم إنشاء خطة تصحيح ${param}: ${amountText} من ${material} على ${calc.steps} جرعات. المخزون سيُخصم عند تنفيذ كل خطوة.`:`تم تسجيل جرعة ${material}: ${amountText} اعتماداً على القراءة الموثقة ${current} للوصول إلى ${target}.`,textEn:calc.steps>1?`Created a ${param} correction plan: ${amountText} of ${material} over ${calc.steps} doses. Inventory will be deducted as each step is executed.`:`Logged ${material} dose: ${amountText}, based on verified reading ${current} toward ${target}.`},...t.timeline],
     maintenance:[...t.maintenance,...stepTasks,...retestTasks]
    };
   });
@@ -128,7 +131,7 @@ export function DosingPage({tank}:{tank:Tank}) {
  const doseAction=lang==="ar"
   ?doseState==="blocked"?gateReason:doseState==="none"?`القراءة الحالية ${current} ليست أقل من الهدف ${target}. راقب فقط ولا تضف جرعة تصحيحية.`:doseState==="ready"?(calc.steps>1?`ابدأ بالخطوة الأولى فقط: ${stepLabel}. بعدها أعد قياس ${param} قبل الخطوة التالية.`:`الكمية الحالية: ${amountLabel}. بعد التنفيذ رح ينشئ Aqua Nexus مهمة إعادة قياس.`):missingSetup
   :doseState==="blocked"?gateReason:doseState==="none"?`Current value ${current} is not below the target ${target}. Monitor only; do not add a corrective dose.`:doseState==="ready"?(calc.steps>1?`Start only with step 1: ${stepLabel}. Retest ${param} before the next step.`:`Current amount: ${amountLabel}. Aqua Nexus will create a retest task after logging.`):missingSetup;
- return <section className="page-grid dosing-page"><PageHeader eyebrow="DOSING & CHEMISTRY" title={tr(lang,"dosing")}/>
+ return <>{overrideDialog}<section className="page-grid dosing-page"><PageHeader eyebrow="DOSING & CHEMISTRY" title={tr(lang,"dosing")}/>
 
  <section className="card panel full-span dosing-command-card">
   <div className="module-head"><div><small className="eyebrow-mini">{lang==="ar"?"قرار الجرعة الآن":"DOSING DECISION NOW"}</small><h3>{doseHeadline}</h3><p className="note">{doseAction}</p></div><span className={`status ${doseState==="blocked"?"danger":doseState==="ready"?"good":doseState==="setup"?"warn":""}`}>{doseState==="blocked"?(lang==="ar"?"موقوف":"BLOCKED"):doseState==="ready"?(lang==="ar"?"جاهز":"READY"):doseState==="none"?(lang==="ar"?"مراقبة":"MONITOR"):(lang==="ar"?"إعداد":"SETUP")}</span></div><DecisionGuidance what={doseHeadline} why={sample?`${param} ${current??"—"} • ${Math.max(0,Math.floor(readingAgeHours))}h • ${sample.confidence}`:gateReason||missingSetup} next={doseAction} safety={targetCheck.blocked?(lang==="ar"?targetCheck.ar:targetCheck.en):bi(lang,"أي جرعة تصحيحية تتبعها إعادة قياس قبل تدخل كبير جديد.","Any corrective dose is followed by a retest before another major intervention.")}/>
@@ -206,5 +209,5 @@ export function DosingPage({tank}:{tank:Tank}) {
   @media(max-width:900px){.dosing-guided-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
   @media(max-width:620px){.dosing-first-look,.dosing-guided-grid{grid-template-columns:1fr}.dosing-primary-action{align-items:stretch;flex-direction:column}.dosing-primary-action .btn{width:100%}}
  `}</style>
- </section>;
+ </section></>;
 }

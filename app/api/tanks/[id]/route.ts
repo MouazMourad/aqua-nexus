@@ -3,7 +3,7 @@ import type { Tank } from "@/domain/types";
 import { deleteTankVersioned,getTank,upsertTank } from "@/server/tankRepository";
 import { workspaceKey } from "@/server/workspace";
 import { validateTankShape } from "@/domain/backupValidation";
-import { declaredBodyTooLarge,publicApiError } from "@/server/requestSafety";
+import { publicApiError,readJsonBodyLimited } from "@/server/requestSafety";
 
 export const runtime="nodejs";
 
@@ -20,9 +20,8 @@ export async function GET(request:NextRequest,{params}:Params){
 
 export async function PUT(request:NextRequest,{params}:Params){
   try{
-    if(declaredBodyTooLarge(request,8*1024*1024))return NextResponse.json({ok:false,error:"Tank payload exceeds the server size limit."},{status:413});
     const workspace=workspaceKey(request),{id}=await params;
-    const body=await request.json() as {tank?:Tank;expectedVersion?:number};
+    const body=await readJsonBodyLimited<{tank?:Tank;expectedVersion?:number}>(request,8*1024*1024);
     if(!body.tank||body.tank.id!==id)return NextResponse.json({ok:false,error:"Tank id mismatch."},{status:400});
     const validated=validateTankShape(body.tank,0);
     if(!validated.ok)return NextResponse.json({ok:false,error:validated.error},{status:400});

@@ -1,41 +1,46 @@
-# Aqua Nexus 3D Migration Roadmap
+# Aqua Nexus Roadmap — v0.2.0 RC
 
-## Milestone 1 — DONE in this package
-- Final React/Next architecture
-- Multi-tank store
-- Real WebGL/Three.js Canvas
-- Dynamic display tank glass
-- Animated shader water
-- Dynamic sump
-- Real chamber geometry
-- Procedural 3D equipment
-- Animated downflow / return flow
-- Health engine 70/30
-- System Overview
-- Equipment list
-- Marine/Freshwater switching
+## Complete in the current RC
 
-## Milestone 2
-- Import existing prototype LocalStorage (`aquaNexus.full.v6`)
-- Rebuild setup wizard in React
-- Sump Builder with drag/drop plan editor
-- Blender-quality GLB equipment library
+- Local-first multi-tank React/Next architecture
+- Marine and freshwater workflows
+- Smart Setup + biological cycling locks
+- Dashboard + 3D digital twin
+- Chemistry, maintenance, equipment, sump, livestock, inventory
+- Feeding, dosing, water changes, RO/DI
+- Acclimation with parallel timers, distress lanes and Coral Dip/Rinse gates
+- Disease, treatment, quarantine and emergency workflows
+- Journal/photos, expenses, reports and Full Recovery Backup
+- Tank Brain, deterministic safety gates and Local Best AI
+- Domain-specific action-plan outcome learning
+- Runtime + compile-time event coverage contracts
+- Global numeric sanity enforcement
+- Vacation / relocation / restart / archive lifecycle
+- Indexed long-term historical store with cursor pagination
+- Storage failure recovery and torture tests
+- Optional Device Backup with optimistic versioning
+- PostgreSQL/API integration tests in CI
+- Distributed database-backed rate limiting
+- Streamed request-size enforcement
+- Arabic/English document locale synchronization
+- Desktop Chromium, Android Chromium and iPhone WebKit critical journeys
 
-## Milestone 3
-- Move Chemistry, Maintenance, Inventory, Dosing
-- Charts and historical trends
-- Alerts engine
+## Current product policy
 
-## Milestone 4
-- Livestock library, compatibility and bioload
-- Disease/treatment/quarantine
-- Timeline/photo journal
+Aqua Nexus stays **local-first during controlled testing**.
 
-## Milestone 5
-- Cloud database + authentication + sync
-- PWA offline cache
-- Backups and reports
-- Feature flags / subscriptions
+Device Backup is optional and off by default. It is not presented as an account or cross-device sync service.
 
-## Rule
-No feature will be removed during migration. The old prototype remains a reference until its module is rebuilt and verified in the new architecture.
+## Next phase after tester feedback
+
+Only after controlled testing confirms the RC:
+- refine UX from real tester feedback
+- finish deeper component decomposition where it improves maintainability
+- tune long-term historical retention defaults
+- add an account/recovery architecture if multi-device SaaS becomes a real requirement
+- harden public-abuse controls if the product opens to anonymous public traffic
+- package store/mobile wrappers only after web/PWA behavior is stable
+
+## Release rule
+
+No new feature is accepted into the RC unless it addresses a verified tester problem, a safety issue, data integrity, accessibility, or production reliability.

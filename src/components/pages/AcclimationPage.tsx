@@ -8,6 +8,7 @@ import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi,categoryText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DecisionGuidance } from "@/components/ui/DecisionGuidance";
+import { useSafetyOverrideDialog } from "@/components/ui/SafetyOverrideDialog";
 import { stockingReadiness } from "@/domain/stockingReadiness";
 import { coralDipBatchRun,coralTransferGate } from "@/domain/acclimationSafety";
 import { uid,nowISO,today } from "@/lib/appUtils";
@@ -15,75 +16,11 @@ import { buildDelimitedText,downloadDelimitedFile,field,numberField,parseDelimit
 import { inventoryForConsumer } from "@/domain/inventoryIntelligence";
 import { allowedAcclimationCategories,livestockCategoryFromAcclimation,normalizeAcclimationCategory } from "@/domain/acclimationCategories";
 import { sanitizeBounded,validateAcclimationItemEntry,validateAcclimationWater } from "@/domain/inputSanity";
-
-type Cat=AcclimationItem["category"];
-const icon:Record<string,string>={fish:"🐠",invert:"🦐",coral:"🪸",plant:"🌿",macroalgae:"🌿",other:"◌"};
-const healthOptions=["unknown","good","fair","stressed","critical"] as const;
-const temperamentOptions=["peaceful","semi","aggressive"] as const;
-const sensitivityOptions=["normal","sensitive","hardy"] as const;
-
-function fmt(ms:number){const s=Math.max(0,Math.ceil(ms/1000)),m=Math.floor(s/60),ss=s%60;return `${String(m).padStart(2,"0")}:${String(ss).padStart(2,"0")}`}
-function itemDuration(i:AcclimationItem){return Math.max(0,(i.dripMinutes+(i.extraMinutes??0))*60000)}
-function remaining(i:AcclimationItem,now:number){if((i.status==="acclimating"||i.status==="emergency")&&i.endAt)return Math.max(0,i.endAt-now);return i.remainingMs??itemDuration(i)}
-function score(x:AcclimationItem){const cat={fish:0,invert:10,coral:20,plant:20,macroalgae:20,other:15}[x.category]||0;const t={peaceful:0,semi:20,aggressive:40}[x.temperament||"peaceful"]||0;const s={sensitive:-5,normal:0,hardy:3}[x.sensitivity||"normal"]||0;return cat+t+s}
-function healthLabel(lang:"ar"|"en",h:string){const ar:any={unknown:"لم يتم التقييم",good:"جيدة / مستقرة",fair:"متوسطة",stressed:"مجهدة",critical:"حرجة"},en:any={unknown:"Not assessed",good:"Good / stable",fair:"Fair",stressed:"Stressed",critical:"Critical"};return (lang==="ar"?ar:en)[h]||h}
-function temperamentLabel(lang:"ar"|"en",v:string){const ar:any={peaceful:"مسالم",semi:"نصف عدواني",aggressive:"عدواني / إقليمي"},en:any={peaceful:"Peaceful",semi:"Semi-aggressive",aggressive:"Aggressive / territorial"};return (lang==="ar"?ar:en)[v]||v}
-function sensitivityLabel(lang:"ar"|"en",v:string){const ar:any={normal:"عادي",sensitive:"حساس",hardy:"قوي التحمل"},en:any={normal:"Normal",sensitive:"Sensitive",hardy:"Hardy"};return (lang==="ar"?ar:en)[v]||v}
-function subtypeLabel(lang:"ar"|"en",v?:string){
- const ar:any={crustacean:"قشريات",snail:"حلزون",echinoderm:"قنفذ / نجم بحر",worm:"وورمز / ديدان أنبوبية",macroalgae:"ماكرو ألجي"};
- const en:any={crustacean:"Crustaceans",snail:"Snails",echinoderm:"Urchin / Starfish",worm:"Worms",macroalgae:"Macroalgae"};
- return v?((lang==="ar"?ar:en)[v]||v):"";
-}
-function acclimationStatusLabel(lang:"ar"|"en",v?:string){
- const ar:any={waiting:"بانتظار البدء",running:"قيد التشغيل",paused:"متوقف مؤقتاً",ready:"جاهز للفحص",done:"مكتمل",acclimating:"قيد الإقلمة",added:"تم التنزيل",deferred:"مؤجل",emergency:"استثنائي"};
- const en:any={waiting:"Waiting",running:"Running",paused:"Paused",ready:"Ready for check",done:"Done",acclimating:"Acclimating",added:"Added",deferred:"Deferred",emergency:"Emergency"};
- return (lang==="ar"?ar:en)[v||""]||v||"";
-}
-function releasePriority(i:AcclimationItem){
- const health:any={critical:-25,stressed:-14,watch:-10,fair:-5,unknown:0,good:3};
- const sensitivity:any={sensitive:0,normal:12,hardy:22};
- const temperament:any={peaceful:0,semi:18,aggressive:36};
- const category:any={fish:0,invert:6,coral:10,plant:12,macroalgae:12,other:14};
- return (health[i.health]??0)+(sensitivity[i.sensitivity||"normal"]??12)+(temperament[i.temperament||"peaceful"]??0)+(category[i.category]??14);
-}
-function suggestedBatchSize(total:number){
- if(total>24)return 6;
- if(total>12)return 5;
- if(total>8)return 4;
- return Math.max(1,total);
-}
-function emergencyDuration(i:AcclimationItem){
- const baseMinutes:any={fish:10,invert:20,coral:10,plant:5,macroalgae:5,other:10};
- const base=baseMinutes[i.category]??10;
- const sensitivityExtra=i.sensitivity==="sensitive"?5:0;
- return Math.max(5,base+sensitivityExtra)*60000;
-}
-function releaseLaneKey(i:AcclimationItem){
- if(i.category==="fish")return "fish";
- if(i.category==="coral")return "coral";
- if(i.category==="macroalgae")return "macroalgae";
- if(i.category==="plant")return i.subtype==="macroalgae"?"macroalgae":"plant";
- if(i.category==="invert"){
-  if(i.subtype==="crustacean")return "crustacean";
-  if(i.subtype==="snail")return "snail";
-  if(i.subtype==="echinoderm")return "echinoderm";
-  if(i.subtype==="worm")return "worm";
-  return "invert";
- }
- return "other";
-}
-function releaseLaneLabel(lang:"ar"|"en",key:string){
- const ar:any={fish:"الأسماك",crustacean:"القشريات",snail:"الحلزون",echinoderm:"القنافذ ونجوم البحر",worm:"الوورمز / الديدان الأنبوبية",coral:"المرجان",macroalgae:"الماكرو ألجي",plant:"النباتات",invert:"اللافقاريات الأخرى",other:"أخرى"};
- const en:any={fish:"Fish",crustacean:"Crustaceans",snail:"Snails",echinoderm:"Urchins & Starfish",worm:"Worms / Feather Dusters",coral:"Corals",macroalgae:"Macroalgae",plant:"Plants",invert:"Other Invertebrates",other:"Other"};
- return (lang==="ar"?ar:en)[key]||key;
-}
-function releaseLaneIcon(key:string){
- const icons:any={fish:"🐠",crustacean:"🦐",snail:"🐌",echinoderm:"⭐",worm:"🪱",coral:"🪸",macroalgae:"🌿",plant:"🌿",invert:"🦐",other:"◌"};
- return icons[key]||"◌";
-}
+import { acclimationIcon as icon,healthOptions,temperamentOptions,sensitivityOptions,formatTimer as fmt,acclimationItemDuration as itemDuration,acclimationRemaining as remaining,acclimationScore as score,healthLabel,temperamentLabel,sensitivityLabel,subtypeLabel,acclimationStatusLabel,releasePriority,suggestedBatchSize,emergencyDuration,releaseLaneKey,releaseLaneLabel,releaseLaneIcon,buildAcclimationGuide,type AcclimationCategory as Cat } from "@/components/acclimation/acclimationUi";
 
 export function AcclimationPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
+ const {requestOverride,overrideDialog}=useSafetyOverrideDialog(lang);
  const sessions=tank.acclimationSessions??[],currentSession=sessions.find(s=>s.status!=="completed"),active=currentSession??sessions[0],sessionCompleted=active?.status==="completed";
  const [now,setNow]=useState(Date.now());
  const [category,setCategory]=useState<Cat>("fish"),[selected,setSelected]=useState(""),[custom,setCustom]=useState(""),[qty,setQty]=useState(1),[drip,setDrip]=useState(15),[interval,setIntervalMin]=useState(15),[placement,setPlacement]=useState(""),[notes,setNotes]=useState(""),[health,setHealth]=useState<AcclimationItem["health"]>("unknown"),[temperament,setTemperament]=useState<"peaceful"|"semi"|"aggressive">("peaceful"),[sensitivity,setSensitivity]=useState<"normal"|"sensitive"|"hardy">("normal"),[subtype,setSubtype]=useState(""),[imageData,setImageData]=useState(""),[importNote,setImportNote]=useState("");
@@ -154,124 +91,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const exceptionPendingItems=useMemo(()=>exceptionAllItems.filter(i=>!["added","deferred"].includes(i.status)),[exceptionAllItems]);
  const exceptionCandidates=useMemo(()=>[...(active?.items??[])].filter(i=>!i.emergency&&!["added","deferred"].includes(i.status)),[active?.items]);
  const step=active?.wizardStep??1;
- const acclimationGuide=useMemo(()=>{
-  const items=active?.items??[];
-  const ready=items.filter(i=>i.status==="ready"&&!i.emergency);
-  const running=items.filter(i=>i.status==="acclimating"&&!i.emergency);
-  const waiting=items.filter(i=>i.status==="waiting"&&!i.emergency);
-  const completed=items.filter(i=>i.status==="added"||i.status==="deferred");
-  if(!active)return{stage:1,title:"",detail:"",tone:"info" as const};
-  if(!active.floatConfirmed){
-   if(active.floatStatus==="ready")return{stage:1,title:bi(lang,"أكد انتهاء موازنة الحرارة","Confirm temperature equalization"),detail:bi(lang,"العداد الكبير انتهى. تأكد أن حرارة الأكياس قريبة من حرارة الحوض، ثم أكد انتهاء المرحلة. بعدها سيبدأ تلقائياً عداد 5 دقائق لنقل كل الكائنات إلى الأوعية.","The main timer has finished. Confirm bag temperature is close to tank temperature, then confirm the stage. A 5-minute transfer-to-containers timer will start automatically next."),tone:"ready" as const};
-   return{stage:1,title:bi(lang,"موازنة حرارة كل الشحنة","Temperature equalization for the whole shipment"),detail:bi(lang,"هذا العداد يخص كل الشحنة. حالياً اترك جميع الأكياس مغلقة حتى ينتهي العداد.","This timer applies to the whole shipment. Keep all bags sealed until it finishes."),tone:"info" as const};
-  }
-  if(active.bucketStatus!=="done"){
-   if(active.bucketStatus==="ready")return{stage:2,title:bi(lang,"انتهى وقت النقل إلى الأوعية","Container-transfer time is complete"),detail:bi(lang,"تأكد أن كل الأسماك والقشريات والمرجان وبقية الكائنات نُقلت إلى أوعيتها المخصصة. بعد ذلك أكد المرحلة وابدأ التنقيط لجميع الدفعات دفعة واحدة.","Confirm all fish, crustaceans, corals and other livestock have been moved to their dedicated containers. Then confirm this stage and start drip acclimation for all batches together."),tone:"ready" as const};
-   if(!active.bucketStatus||active.bucketStatus==="waiting")return{stage:2,title:bi(lang,"جاهز لبدء نقل الكائنات إلى الأوعية","Ready to start transfer to containers"),detail:bi(lang,"اضغط «ابدأ عداد النقل — 5 دقائق»، ثم انقل كل مجموعة إلى وعائها المخصص وجهّز خطوط التنقيط. هذا العداد يخص كل الشحنة.","Tap “Start transfer timer — 5 min,” then move every group into its dedicated container and prepare the drip lines. This timer applies to the whole shipment."),tone:"action" as const};
-   return{stage:2,title:bi(lang,"انقل كل الكائنات إلى الأوعية الآن","Move all livestock to containers now"),detail:bi(lang,"عداد 5 دقائق هذا عام لكل الشحنة. خلاله انقل كل مجموعة إلى وعائها المخصص وجهّز خطوط التنقيط. لا تبدأ التنقيط قبل انتهاء هذه المرحلة.","This 5-minute timer applies to the whole shipment. Use it to move every group into its dedicated container and prepare drip lines. Do not start dripping before this stage ends."),tone:"action" as const};
-  }
-  if(!active.dripStartedAt){
-   return{stage:3,title:bi(lang,"ابدأ التنقيط لجميع الدفعات","Start drip acclimation for all batches"),detail:bi(lang,"كل الكائنات أصبحت في أوعيتها. اضغط «ابدأ التنقيط» مرة واحدة؛ بعدها ستظهر صناديق الدفعات وتبدأ كل عداداتها معاً بالتوازي.","All livestock is now in its containers. Tap “Start drip acclimation” once; the batch boxes will appear and all their timers will start together in parallel."),tone:"action" as const};
-  }
-  const rinseRun=(active.coralDipRuns??[]).find(r=>r.status==="ready_to_rinse");
-  if(rinseRun)return{stage:4,title:bi(lang,"Coral Dip انتهى — الشطف الآن","Coral Dip finished — rinse now"),detail:bi(lang,"انقل المرجان إلى ماء شطف منفصل ثم أكد الشطف. النقل إلى الحوض مقفول لحد ما تتأكد هالخطوة، وبقية العدادات تكمل طبيعي.","Move the coral to separate rinse water, then confirm the rinse. Tank transfer stays blocked until this is confirmed; all other timers continue normally."),tone:"ready" as const};
-  const transferableReady=ready.filter(i=>i.category!=="coral"||!active.coralDipEnabled||coralTransferGate(active,i).allowed);
-  if(transferableReady.length){
-   return{stage:4,title:bi(lang,"دفعة أو أكثر جاهزة للفحص والنقل","One or more batches are ready to inspect and transfer"),detail:bi(lang,"افحص الكائنات الجاهزة وانقلها واحدة واحدة. إذا في مرجان، زر النقل ما رح يظهر قبل اكتمال الـDip والشطف المطلوبين. بقية العدادات مستمرة بالتوازي.","Inspect ready livestock and transfer them one by one. Coral transfer remains gated until any required dip and rinse are complete. All other timers continue in parallel."),tone:"ready" as const};
-  }
-  const coralNeedsDip=ready.find(i=>i.category==="coral"&&active.coralDipEnabled&&!coralTransferGate(active,i).allowed&&!coralTransferGate(active,i).run);
-  if(coralNeedsDip)return{stage:4,title:bi(lang,"دفعة مرجان جاهزة للـCoral Dip","A coral batch is ready for Coral Dip"),detail:bi(lang,"التنقيط خلص للمرجان. افتح صندوق دفعة المرجان وابدأ الـDip؛ عند البدء فقط رح ينخصم تحضير واحد من المخزون ويبدأ عداده المستقل.","Coral drip acclimation is complete. Open the coral batch and start the dip; one bath is deducted from inventory only when it actually starts, then its independent timer begins."),tone:"action" as const};
-  const runningDip=(active.coralDipRuns??[]).find(r=>r.status==="running");
-  if(runningDip)return{stage:4,title:bi(lang,"Coral Dip شغال بالتوازي","Coral Dip is running in parallel"),detail:bi(lang,"راقب عداد الـDip وبقية دفعات الإقلمة. عند انتهاء الـDip رح يعطيك Aqua Nexus تنبيه مستقل ويطلب الشطف قبل النقل.","Monitor the dip timer alongside the other acclimation batches. When it ends, Aqua Nexus will alert you separately and require a rinse before transfer."),tone:"running" as const};
-  if(running.length){
-   return{stage:3,title:bi(lang,"التنقيط شغال لكل الدفعات بالتوازي","All batch drip timers are running in parallel"),detail:bi(lang,"كل صندوق له عداده الخاص. لا تحتاج تعمل شي الآن غير المراقبة؛ عند انتهاء أي دفعة سيظهر تنبيه وصوت مميز وتُفتح تلقائياً للفحص والنقل.","Every batch box has its own timer. For now, just monitor them; when any batch finishes, you’ll get a distinct alert and sound and that box will open automatically for inspection and transfer."),tone:"running" as const};
-  }
-  if(items.length&&completed.length===items.length){
-   return{stage:5,title:bi(lang,"اكتملت جلسة الإقلمة","Acclimation session complete"),detail:bi(lang,"تم نقل كل الدفعات ومعالجة كل العناصر. راجع سجل الإدخال للتأكد من توثيق الكائنات بالحوض.","All batches have been processed and transferred. Review the input register to confirm all livestock is recorded in the tank."),tone:"done" as const};
-  }
-  if(waiting.length)return{stage:3,title:bi(lang,"جاهز لبدء التنقيط","Ready to start drip acclimation"),detail:bi(lang,"اضغط زر بدء التنقيط العام ليبدأ عداد كل دفعة بالتوازي.","Tap the global start-drip button to start every batch timer in parallel."),tone:"action" as const};
-  return{stage:4,title:bi(lang,"راجع الدفعات الجاهزة","Review ready batches"),detail:bi(lang,"راجع الصناديق المفتوحة وانقل الكائنات الجاهزة إلى الحوض واحداً واحداً.","Review the open batch boxes and transfer ready livestock to the tank one by one."),tone:"ready" as const};
- },[active?.items,active?.floatConfirmed,active?.floatStatus,active?.bucketStatus,active?.dripStartedAt,lang]);
- useEffect(()=>{const id=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(id)},[]);
- useEffect(()=>{
-  if(!active)return;
-  let changed=false,next={...active,items:active.items.map(i=>{
-    if((i.status==="acclimating"||i.status==="emergency")&&i.endAt&&i.endAt<=now){changed=true;return {...i,status:"ready" as const,endAt:null,remainingMs:0,readyAt:nowISO()}}
-    return i;
-  })};
-  if(active.floatStatus==="running"&&active.floatEndAt&&active.floatEndAt<=now){changed=true;next={...next,floatStatus:"ready",floatEndAt:null,floatRemainingMs:0};}
-  if(active.bucketStatus==="running"&&active.bucketEndAt&&active.bucketEndAt<=now){changed=true;next={...next,bucketStatus:"ready",bucketEndAt:null,bucketRemainingMs:0};}
-  const coralDipRuns=(active.coralDipRuns??[]).map(run=>{
-   if(run.status==="running"&&run.endAt&&run.endAt<=now){
-    changed=true;
-    return {...run,status:"ready_to_rinse" as const,endAt:null,remainingMs:0,completedAt:nowISO()};
-   }
-   return run;
-  });
-  next={...next,coralDipRuns};
-  if(changed)saveSession(next,false);
- },[now]);
- useEffect(()=>{
-  if(!active||step<5)return;
-  if(active.floatStatus==="ready"&&active.floatStartedAt){
-   const key=`${active.id}:global-float`;
-   if(!notifiedTimersRef.current.has(key)){
-    notifiedTimersRef.current.add(key);
-    setTimerAlerts(prev=>[{id:uid("alert"),lane:"global",message:bi(lang,"انتهى عداد موازنة حرارة الأكياس — جاهزة للتأكيد.","Sealed-bag temperature timer finished — ready for confirmation.")},...prev].slice(0,5));
-    playTimerSound("global");
-   }
-  }
-  if(active.bucketStatus==="ready"&&active.bucketStartedAt){
-   const key=`${active.id}:bucket-transfer`;
-   if(!notifiedTimersRef.current.has(key)){
-    notifiedTimersRef.current.add(key);
-    setTimerAlerts(prev=>[{id:uid("alert"),lane:"global",message:bi(lang,"انتهت 5 دقائق نقل الكائنات إلى الأوعية — تأكد أن الجميع جاهز ثم ابدأ التنقيط.","The 5-minute transfer-to-containers stage is complete — confirm all groups are ready, then start drip acclimation.")},...prev].slice(0,5));
-    playTimerSound("global");
-   }
-  }
-  if(active.dripStartedAt){
-   for(const batch of releaseBatches){
-    const runtime=batchRuntime(batch);
-    const normalItems=runtime.allItems.filter((i:AcclimationItem)=>!i.emergency);
-    if(!normalItems.length)continue;
-    const finished=normalItems.every((i:AcclimationItem)=>["ready","added","deferred"].includes(i.status));
-    if(!finished)continue;
-    const key=`${active.id}:batch:${batch.id}`;
-    if(!notifiedTimersRef.current.has(key)){
-     notifiedTimersRef.current.add(key);
-     pushTimerAlert(batch.lane,batch.batch);
-     setExpandedBatches(v=>({...v,[batch.id]:true}));
-    }
-    if(runtime.allAdded)setExpandedBatches(v=>({...v,[batch.id]:false}));
-   }
-  }
-  if(exceptionAllItems.length){
-   const runtime=exceptionBoxRuntime();
-   const readyToTransfer=runtime.remainingItems.length>0&&runtime.remainingItems.every((i:AcclimationItem)=>i.status==="ready");
-   if(readyToTransfer){
-    const signature=exceptionAllItems.map(i=>i.id).sort().join(".");
-    const key=`${active.id}:exception-box:${signature}`;
-    if(!notifiedTimersRef.current.has(key)){
-     notifiedTimersRef.current.add(key);
-     setTimerAlerts(prev=>[{id:uid("alert"),lane:"emergency",message:bi(lang,"انتهى عداد صندوق الاستثناءات — افتح الصندوق وافحص الكائنات ثم انقلها إلى الحوض.","Exception Box timer finished — open the box, inspect the livestock, then transfer them to the tank.")},...prev].slice(0,5));
-     playTimerSound("emergency");
-     setExceptionBoxExpanded(true);
-    }
-   }
-  }
-  for(const run of active.coralDipRuns??[]){
-   if(run.status!=="ready_to_rinse")continue;
-   const key=`${active.id}:coral-dip:${run.id}`;
-   if(notifiedTimersRef.current.has(key))continue;
-   notifiedTimersRef.current.add(key);
-   const message=bi(lang,`انتهى عداد Coral Dip لـ ${run.productName} — انقل المرجان إلى ماء الشطف المنفصل ثم أكد الشطف.`,`Coral Dip timer for ${run.productName} finished — move the coral to separate rinse water, then confirm the rinse.`);
-   setTimerAlerts(prev=>[{id:uid("alert"),lane:"coral",message},...prev].slice(0,5));
-   playTimerSound("coral");
-   try{if("vibrate" in navigator)(navigator as any).vibrate([180,80,180,80,260]);}catch{}
-   void showCriticalAquariumNotification("Aqua Nexus",message,`acclimation-coral-${run.id}`);
-  }
- },[active?.items,active?.floatStatus,active?.bucketStatus,active?.dripStartedAt,active?.coralDipRuns,releaseBatches,emergencyItems,exceptionAllItems,step,lang]);
-
+ const acclimationGuide=useMemo(()=>buildAcclimationGuide(active,lang),[active,lang]);
  function ev(ar:string,en:string){return{id:uid("ace"),timestamp:nowISO(),textAr:ar,textEn:en}}
  function unlockAudio(){
   if(typeof window==="undefined")return;
@@ -378,7 +198,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   saveSession({...active,items:active.items.map(x=>ids.has(x.id)?{...x,status:"acclimating" as const,startedAt:nowISO(),remainingMs:x.remainingMs??itemDuration(x),endAt:start+(x.remainingMs??itemDuration(x))}:x),events:[ev(`بدأت الدفعة ${batch} من مسار ${releaseLaneLabel("ar",laneKey)}.`,`Started Batch ${batch} of the ${releaseLaneLabel("en",laneKey)} lane.`),...active.events]});
  }
  function saveSession(s:AcclimationSession,withLog=true){patch(tank.id,t=>({...t,acclimationSessions:[s,...(t.acclimationSessions??[]).filter(x=>x.id!==s.id)]}));}
- function newSession(){if(currentSession){window.alert(bi(lang,"في جلسة إقلمة شغالة حالياً. كمّلها أو عالج العناصر المؤجلة قبل بدء شحنة جديدة.","An acclimation session is already active. Finish it or resolve deferred items before starting another shipment."));return;}const intervention=interventionGate(tank,"livestockAddition");if(intervention.level!=="good"&&!window.confirm(lang==="ar"?(intervention.level==="danger"?"⚠️ ":"")+intervention.ar+" إذا الشحنة وصلت فعلياً، كمل الإقلمة فقط وتجنب أي تدخل كبير إضافي. بدء جلسة الإقلمة؟":(intervention.level==="danger"?"⚠️ ":"")+intervention.en+" If the shipment has actually arrived, proceed with acclimation only and avoid other major interventions. Start acclimation?"))return;const s:AcclimationSession={id:uid("acs"),startedAt:nowISO(),status:"setup",wizardStep:1,categories:[],tankSalinity:tank.type==="marine"?1.025:undefined,bagSalinity:tank.type==="marine"?1.020:undefined,temperature:25,existingNotes:"",coralDipEnabled:false,coralDipMinutes:10,coralDipQuantityPerPrep:0,coralDipRuns:[],coralDipSkippedItemIds:[],floatConfirmed:false,floatStatus:"waiting",floatRemainingMs:15*60000,bucketStatus:"waiting",bucketRemainingMs:5*60000,preflight:{},items:[],events:[ev("بدأت جلسة أقلمة جديدة.","New acclimation session started.")]};saveSession(s);}
+ async function newSession(){if(currentSession){window.alert(bi(lang,"في جلسة إقلمة شغالة حالياً. كمّلها أو عالج العناصر المؤجلة قبل بدء شحنة جديدة.","An acclimation session is already active. Finish it or resolve deferred items before starting another shipment."));return;}const intervention=interventionGate(tank,"livestockAddition");let overrideReason="";if(intervention.level==="danger"){const reason=await requestOverride({title:lang==="ar"?"بدء إقلمة أثناء حالة عالية الخطورة":"Start acclimation during a high-risk tank state",message:(lang==="ar"?intervention.ar:intervention.en)+" "+bi(lang,"إذا الشحنة وصلت فعلياً، أكمل الإقلمة فقط وتجنب أي تدخل كبير إضافي.","If the shipment has arrived, proceed with acclimation only and avoid other major interventions."),requireReason:true});if(!reason)return;overrideReason=reason;}else if(intervention.level==="warn"&&!window.confirm(lang==="ar"?intervention.ar+" إذا الشحنة وصلت فعلياً، كمل الإقلمة فقط وتجنب أي تدخل كبير إضافي. بدء الجلسة؟":intervention.en+" If the shipment has arrived, proceed with acclimation only and avoid other major interventions. Start session?"))return;const ts=nowISO();const s:AcclimationSession={id:uid("acs"),startedAt:ts,status:"setup",wizardStep:1,categories:[],tankSalinity:tank.type==="marine"?1.025:undefined,bagSalinity:tank.type==="marine"?1.020:undefined,temperature:25,existingNotes:"",coralDipEnabled:false,coralDipMinutes:10,coralDipQuantityPerPrep:0,coralDipRuns:[],coralDipSkippedItemIds:[],floatConfirmed:false,floatStatus:"waiting",floatRemainingMs:15*60000,bucketStatus:"waiting",bucketRemainingMs:5*60000,preflight:{},items:[],events:[...(overrideReason?[ev(`تجاوز تحذير بدء الإقلمة. السبب: ${overrideReason}`,`Acclimation-start warning overridden. Reason: ${overrideReason}`)]:[]),ev("بدأت جلسة أقلمة جديدة.","New acclimation session started.")]};saveSession(s);if(overrideReason)patch(tank.id,t=>({...t,timeline:[{id:uid("ev"),timestamp:ts,type:"safety-override",textAr:`تم تجاوز تحذير بدء الإقلمة. السبب: ${overrideReason}`,textEn:`Acclimation-start warning overridden. Reason: ${overrideReason}`},...t.timeline]}));}
  function sessionPatch(p:Partial<AcclimationSession>){if(!active)return;saveSession({...active,...p});}
  function setStep(n:number){sessionPatch({wizardStep:n})}
  function toggleCat(c:Cat){if(!active)return;const cats=active.categories??[];sessionPatch({categories:cats.includes(c)?cats.filter(x=>x!==c):[...cats,c]});}
@@ -507,32 +327,30 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    return {...t,acclimationSessions:[updated,...(t.acclimationSessions??[]).filter(s=>s.id!==active.id)],timeline:[{id:uid("ev"),timestamp:ts,type:"coral-dip-rinse",textAr:`تم تأكيد شطف Coral Dip (${run.productName}).`,textEn:`Coral Dip rinse confirmed (${run.productName}).`},...t.timeline]};
   });
  }
- function skipCoralDipForStress(item:AcclimationItem){
+ async function skipCoralDipForStress(item:AcclimationItem){
   if(!active||item.category!=="coral"||!item.emergency)return;
-  const ok=window.confirm(bi(lang,`تجاوز Coral Dip لـ ${item.name} بسبب حالته المجهدة؟ سيتم تسجيل القرار صراحة في السجل، وليس اعتباره Dip مكتمل.`,`Skip Coral Dip for ${item.nameEn||item.name} because of its distressed condition? The exception will be explicitly logged, not treated as a completed dip.`));
-  if(!ok)return;
+  const overrideReason=await requestOverride({title:bi(lang,"تجاوز Coral Dip بسبب الإجهاد","Skip Coral Dip due to distress"),message:bi(lang,`هذا استثناء للكائن المجهد ${item.name}. اكتب سبب القرار؛ لن يعتبر الـDip مكتملاً.`,`This is a distressed-livestock exception for ${item.nameEn||item.name}. Record the reason; the dip will not be treated as completed.`),requireReason:true});
+  if(!overrideReason)return;
   const ts=nowISO();
   patch(tank.id,t=>{
    const session=(t.acclimationSessions??[]).find(s=>s.id===active.id)??active;
    const skipped=[...new Set([...(session.coralDipSkippedItemIds??[]),item.id])];
    const updated={...session,coralDipSkippedItemIds:skipped,events:[ev(`تم تسجيل تجاوز Coral Dip لـ ${item.name} بسبب حالة الإجهاد ضمن المسار الاستثنائي.`,`Coral Dip was explicitly skipped for ${item.nameEn||item.name} because of distress in the exception track.`),...session.events]};
-   return {...t,acclimationSessions:[updated,...(t.acclimationSessions??[]).filter(s=>s.id!==active.id)],timeline:[{id:uid("ev"),timestamp:ts,type:"coral-dip-skip",textAr:`تجاوز Coral Dip لـ ${item.name} بسبب الإجهاد — قرار مسجل.`,textEn:`Coral Dip skipped for ${item.nameEn||item.name} because of distress — explicitly logged.`},...t.timeline]};
+   return {...t,acclimationSessions:[updated,...(t.acclimationSessions??[]).filter(s=>s.id!==active.id)],timeline:[{id:uid("ev"),timestamp:ts,type:"coral-dip-skip",textAr:`تجاوز Coral Dip لـ ${item.name} بسبب الإجهاد. السبب: ${overrideReason}`,textEn:`Coral Dip skipped for ${item.nameEn||item.name} because of distress. Reason: ${overrideReason}`},...t.timeline]};
   });
  }
- function markAdded(item:AcclimationItem){
+ async function markAdded(item:AcclimationItem){
   if(!active)return;
   const dipGate=coralTransferGate(active,item);
   if(!dipGate.allowed){window.alert(lang==="ar"?dipGate.reasonAr:dipGate.reasonEn);return;}
   const catalog:any=lib.find((x:any)=>x.id===item.libraryId);
   const readiness=stockingReadiness(tank,{candidate:catalog,quantity:item.quantity,candidateKnown:Boolean(catalog),candidateLabelAr:item.name,candidateLabelEn:item.nameEn||item.name});
-  let riskOverride=false;
+  let riskOverride=false,riskOverrideReason="";
   if(readiness.state!=="ready"){
     const reason=lang==="ar"?(readiness.blockersAr[0]||readiness.missingEvidenceAr[0]||"الجاهزية غير مؤكدة."):(readiness.blockersEn[0]||readiness.missingEvidenceEn[0]||"Readiness is not confirmed.");
-    const token=window.prompt(lang==="ar"
-      ?("قرار الجاهزية المركزي لا يسمح بتنزيل الكائن بشكل طبيعي الآن. "+reason+" إذا كان إبقاء الكائن في ماء الشحنة أخطر ولا يوجد بديل آمن، اكتب OVERRIDE لتسجيل تجاوز استثنائي.")
-      :("Central readiness does not support a normal release right now. "+reason+" If keeping the animal in shipping water is riskier and there is no safer alternative, type OVERRIDE to log an exceptional override."));
-    if(token!=="OVERRIDE")return;
-    riskOverride=true;
+    const override=await requestOverride({title:bi(lang,"Risk Override استثنائي","Exceptional Risk Override"),message:reason+" "+bi(lang,"استخدم التجاوز فقط إذا إبقاء الكائن في ماء الشحنة أخطر ولا يوجد بديل آمن.","Use this only if keeping the animal in shipping water is riskier and there is no safer alternative."),requireReason:true});
+    if(!override)return;
+    riskOverride=true;riskOverrideReason=override;
   }else if(readiness.requiresConfirmation){
     const ok=window.confirm(lang==="ar"?"الجاهزية تسمح مبدئياً لكن يوجد تنبيه مهم. هل تريد متابعة التنزيل وتسجيله؟":"Readiness is provisionally acceptable but has an important caution. Continue and log the release?");
     if(!ok)return;
@@ -541,7 +359,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   const livestock:LivestockItem={id:uid("live"),libraryId:item.libraryId,name:item.name,nameEn:item.nameEn,category:mappedCategory.category,subtype:mappedCategory.subtype,quantity:item.quantity,health:item.health==="critical"||item.health==="stressed"?"watch":"good",load:catalog?.load??1,addedAt:today()};
   const nextItems=active.items.map(x=>x.id===item.id?{...x,status:"added" as const,addedAt:nowISO()}:x);
   const allDone=nextItems.every(x=>x.status==="added"||x.status==="deferred");
-  patch(tank.id,t=>({...t,acclimationSessions:[{...active,status:allDone?"completed":"release",completedAt:allDone?nowISO():undefined,items:nextItems,events:[ev(`تم إدخال ${item.name} إلى الحوض بدون ماء الشحنة.`,`Transferred ${item.nameEn||item.name} to the aquarium without shipping water.`),...active.events]},...(t.acclimationSessions??[]).filter(x=>x.id!==active.id)],livestock:[...t.livestock,livestock],timeline:[{id:uid("ev"),timestamp:nowISO(),type:riskOverride?"acclimation-risk-override":"acclimation",textAr:riskOverride?`تم إدخال ${item.name} مع تسجيل Risk Override استثنائي بعد فحص الجاهزية المركزي.`:`اكتملت أقلمة ${item.name} وتم إدخاله بعد فحص الجاهزية المركزي.`,textEn:riskOverride?`Transferred ${item.nameEn||item.name} with an explicitly logged exceptional override after central readiness screening.`:`Acclimation completed for ${item.nameEn||item.name} after central readiness screening.`},...t.timeline]}));
+  patch(tank.id,t=>({...t,acclimationSessions:[{...active,status:allDone?"completed":"release",completedAt:allDone?nowISO():undefined,items:nextItems,events:[ev(`تم إدخال ${item.name} إلى الحوض بدون ماء الشحنة.`,`Transferred ${item.nameEn||item.name} to the aquarium without shipping water.`),...active.events]},...(t.acclimationSessions??[]).filter(x=>x.id!==active.id)],livestock:[...t.livestock,livestock],timeline:[{id:uid("ev"),timestamp:nowISO(),type:riskOverride?"acclimation-risk-override":"acclimation",textAr:riskOverride?`تم إدخال ${item.name} مع Risk Override. السبب: ${riskOverrideReason}`:`اكتملت أقلمة ${item.name} وتم إدخاله بعد فحص الجاهزية المركزي.`,textEn:riskOverride?`Transferred ${item.nameEn||item.name} with an exceptional Risk Override. Reason: ${riskOverrideReason}`:`Acclimation completed for ${item.nameEn||item.name} after central readiness screening.`},...t.timeline]}));
 }
  function downloadShipmentTemplate(kind:"csv"|"txt"){
   const headers=["libraryId","name","nameEn","category","quantity","health","temperament","sensitivity","subtype","dripMinutes","intervalMinutes","placement","notes"];
@@ -616,7 +434,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  function registryText(){if(!active)return"";const L=[bi(lang,"سجل إدخال الكائنات — Aqua Nexus","Livestock Input Register — Aqua Nexus"),`${bi(lang,"الحوض","Tank")}: ${tank.name}`,`${bi(lang,"بداية الجلسة","Session started")}: ${new Date(active.startedAt).toLocaleString()}`,""];active.items.forEach((x,i)=>{L.push(`${i+1}. ${lang==="ar"?x.name:(x.nameEn||x.name)} ×${x.quantity}`);L.push(`   ${categoryLabel(x.category)} • ${healthLabel(lang,x.health)} • ${x.status}`);L.push(`   ${bi(lang,"المكان","Placement")}: ${x.placement||"—"}`);if(x.notes)L.push(`   ${bi(lang,"ملاحظات","Notes")}: ${x.notes}`);L.push("")});return L.join("\n")}
  function exportTxt(){const blob=new Blob([registryText()],{type:"text/plain;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`Aqua_Nexus_Acclimation_${new Date().toISOString().slice(0,10)}.txt`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 
- if(!active)return <section className="page-grid acclimation-page"><PageHeader eyebrow="ACCLIMATION CONTROL" title={tr(lang,"acclimation")} actions={<div className="actions"><button className="btn" onClick={()=>downloadShipmentTemplate("csv")}>↓ Excel / CSV</button><button className="btn" onClick={()=>downloadShipmentTemplate("txt")}>↓ TXT</button><button className="btn primary" onClick={newSession}>+ {tr(lang,"newShipment")}</button></div>}/><div className="card panel full-span"><DecisionGuidance what={bi(lang,"لا توجد جلسة إقلمة نشطة","No acclimation session is active")} why={bi(lang,"الإقلمة تبدأ فقط عند وصول شحنة فعلية حتى لا تُنشأ عدادات أو سجلات وهمية.","Acclimation starts only for a real arrival so Aqua Nexus does not create fake timers or records.")} next={bi(lang,"ابدأ جلسة جديدة عند وصول الكائنات، ثم اتبع المراحل بالترتيب.","Start a new session when livestock arrives, then follow the stages in order.")} safety={bi(lang,"Aqua Nexus سيقفل النقل إذا شروط الجاهزية أو Coral Dip/الشطف المطلوبة غير مكتملة.","Aqua Nexus will block transfer when readiness or required coral dip/rinse steps are incomplete.")}/></div><div className="card panel full-span acclimation-empty"><div className="acclimation-empty-icon">⇄</div><h2>{bi(lang,"ابدأ جلسة أقلمة جديدة","Start a new acclimation session")}</h2><p className="note">{bi(lang,"للشحنات الكبيرة نزّل القالب، عبّيه في Excel أو TXT، وبعد بدء الجلسة ارفعه دفعة واحدة.","For large shipments, download the template, fill it in Excel or TXT, then upload it after starting the session.")}</p><button className="btn primary" onClick={newSession}>{tr(lang,"newShipment")}</button></div></section>;
+ if(!active)return <section className="page-grid acclimation-page">{overrideDialog}<PageHeader eyebrow="ACCLIMATION CONTROL" title={tr(lang,"acclimation")} actions={<div className="actions"><button className="btn" onClick={()=>downloadShipmentTemplate("csv")}>↓ Excel / CSV</button><button className="btn" onClick={()=>downloadShipmentTemplate("txt")}>↓ TXT</button><button className="btn primary" onClick={newSession}>+ {tr(lang,"newShipment")}</button></div>}/><div className="card panel full-span"><DecisionGuidance what={bi(lang,"لا توجد جلسة إقلمة نشطة","No acclimation session is active")} why={bi(lang,"الإقلمة تبدأ فقط عند وصول شحنة فعلية حتى لا تُنشأ عدادات أو سجلات وهمية.","Acclimation starts only for a real arrival so Aqua Nexus does not create fake timers or records.")} next={bi(lang,"ابدأ جلسة جديدة عند وصول الكائنات، ثم اتبع المراحل بالترتيب.","Start a new session when livestock arrives, then follow the stages in order.")} safety={bi(lang,"Aqua Nexus سيقفل النقل إذا شروط الجاهزية أو Coral Dip/الشطف المطلوبة غير مكتملة.","Aqua Nexus will block transfer when readiness or required coral dip/rinse steps are incomplete.")}/></div><div className="card panel full-span acclimation-empty"><div className="acclimation-empty-icon">⇄</div><h2>{bi(lang,"ابدأ جلسة أقلمة جديدة","Start a new acclimation session")}</h2><p className="note">{bi(lang,"للشحنات الكبيرة نزّل القالب، عبّيه في Excel أو TXT، وبعد بدء الجلسة ارفعه دفعة واحدة.","For large shipments, download the template, fill it in Excel or TXT, then upload it after starting the session.")}</p><button className="btn primary" onClick={newSession}>{tr(lang,"newShipment")}</button></div></section>;
 
  const cats=active.categories??[];
  const floatRem=active.floatStatus==="running"&&active.floatEndAt?Math.max(0,active.floatEndAt-now):(active.floatRemainingMs??15*60000);
@@ -631,7 +449,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const rinseDipCount=(active.coralDipRuns??[]).filter(x=>x.status==="ready_to_rinse").length;
  const urgentRinseRun=(active.coralDipRuns??[]).find(x=>x.status==="ready_to_rinse");
  const selectedCats=cats.length?cats:allowedCats;
- return <section className="page-grid acclimation-page">
+ return <section className="page-grid acclimation-page">{overrideDialog}
   <PageHeader eyebrow="ACCLIMATION CONTROL" title={tr(lang,"acclimation")} actions={<><span className="pill">{tank.type==="marine"?tr(lang,"marine"):tr(lang,"freshwater")} • {lang.toUpperCase()}</span><button className="btn" onClick={newSession} disabled={Boolean(currentSession)}>{currentSession?bi(lang,"جلسة نشطة","Session active"):`+ ${tr(lang,"newShipment")}`}</button></>}/><div className="card panel full-span"><DecisionGuidance what={acclimationGuide.title} why={bi(lang,"الإقلمة مسار مرحلي مقفول: كل انتقال يعتمد على اكتمال المرحلة السابقة، وحالة الكائن، ومتطلبات الـDip/الشطف عند المرجان.","Acclimation is a gated staged workflow: each transition depends on the prior stage, livestock condition, and coral dip/rinse requirements when applicable.")} next={acclimationGuide.detail} safety={bi(lang,"لا يتم نقل ماء الشحنة للحوض، والـRisk Override يبقى استثنائياً وموثقاً.","Shipping water is not transferred to the tank; any Risk Override remains exceptional and explicitly logged.")}/></div>
   {step<5&&<div className="card acclimation-wizard full-span">
     <div className="acclimation-wizard-hero"><span>{tank.type==="marine"?"🌊":"🌿"}</span><div><small>AQUA NEXUS</small><h2>{bi(lang,"مساعد الإقلمة الذكي","Smart Acclimation Wizard")}</h2><p>{bi(lang,"لغة البرنامج ونوع الحوض مطبقان تلقائياً.","App language and selected tank type are applied automatically.")}</p></div></div>

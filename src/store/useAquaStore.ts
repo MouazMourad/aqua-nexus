@@ -14,6 +14,7 @@ import { deriveExtendedIntelligenceEvents } from "@/domain/extendedEventIntellig
 import { recordCloudDeleteTombstone } from "@/lib/cloudTombstones";
 import { aquaStateStorage } from "@/lib/aquaStateStorage";
 import { clearTankHistoryArchive } from "@/lib/historyArchiveStorage";
+import { clearLongTermHistory } from "@/lib/longTermHistory";
 
 interface AquaStore extends AquaState {
   setLanguage: (language: Language) => void;
@@ -182,6 +183,7 @@ export const useAquaStore = create<AquaStore>()(
         if(target?.isTraining)return state;
         recordCloudDeleteTombstone(tankId);
         void clearTankHistoryArchive(tankId);
+        void clearLongTermHistory(tankId);
         const tanks=state.tanks.filter(t=>t.id!==tankId);
         const real=tanks.filter(t=>!t.isTraining);
         return {

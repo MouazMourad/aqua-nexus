@@ -11,6 +11,7 @@ import { tankMood } from "@/domain/tankLearning";
 import { learnedTankSignals } from "@/domain/tankPatterns";
 import { domainOutcomeLearning } from "@/domain/outcomeLearning";
 import { createActionPlan,evaluatePlanOutcome,type AquaActionPlan } from "@/domain/actionPlanEngine";
+import { AquaAIActionPlanCard } from "@/components/ai/AquaAIActionPlanCard";
 import { uid,nowISO } from "@/lib/appUtils";
 import { askAquaAI } from "@/lib/aquaAIClient";
 
@@ -144,7 +145,7 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
     <button className="btn glass-button ai-new-question" onClick={resetConversation}>＋ {lang==="ar"?"سؤال جديد":"New question"}</button>
    </div>}
 
-   {currentPlan&&visibleStage>=3&&<div className="aqua-ai-plan"><div className="module-head"><div><small>ACTION PLAN</small><b>{lang==="ar"?currentPlan.titleAr:currentPlan.titleEn}</b></div><span className="scene-badge">{currentPlan.steps.filter(x=>x.done).length}/{currentPlan.steps.length}</span></div>{currentPlan.steps.map((s,i)=><button type="button" key={s.id} className={`ai-plan-step ${s.done?"done":""}`} onClick={()=>toggleStep(currentPlan.id,s.id)}><i>{s.done?"✓":i+1}</i><span>{lang==="ar"?s.titleAr:s.titleEn}</span></button>)}<div className="note">{lang==="ar"?`خط الأساس عند إنشاء الخطة: ${currentPlan.baselineScore}% • مراجعة مقترحة بعد ${currentPlan.reviewAfterHours} ساعة.`:`Baseline at creation: ${currentPlan.baselineScore}% • suggested review after ${currentPlan.reviewAfterHours}h.`}</div><button className="btn good" disabled={!currentPlan.steps.every(x=>x.done)} onClick={()=>reviewPlan(currentPlan)}>{lang==="ar"?"قيّم النتيجة وأغلق الخطة":"Review outcome & close plan"}</button></div>}
+   {currentPlan&&visibleStage>=3&&<AquaAIActionPlanCard plan={currentPlan} lang={lang} onToggle={stepId=>toggleStep(currentPlan.id,stepId)} onReview={()=>reviewPlan(currentPlan)}/>}
    {planNote&&<div className="inline-alert info">{planNote}</div>}
   </section>}
   <button className="aqua-ai-fish-button" onClick={()=>{setGreeting(false);setOpen(v=>!v)}} aria-label="Local Best AI"><FishMascot state={state}/><span className="aqua-ai-fish-label">Local Best AI</span>{state!=="normal"&&<i className="aqua-ai-alert-dot"/>}</button>

@@ -251,7 +251,7 @@ test("dirty local fallback wins over stale IndexedDB and repairs durable storage
   expect(repaired.fallback).toBeNull();
 });
 
-test("verified two-year archive keeps old events searchable while shrinking hot history",async({page})=>{
+test("indexed long-term archive paginates old records without keeping them hot",async({page})=>{
   await openTrainingDashboard(page);
   await page.waitForTimeout(600);
   await page.evaluate(async()=>{
@@ -261,7 +261,8 @@ test("verified two-year archive keeps old events searchable while shrinking hot 
     const parsed=JSON.parse(raw),source=structuredClone(parsed.state.tanks[0]),old="2020-01-01T00:00:00.000Z";
     source.id="archive-e2e";source.name="Archive E2E";source.isTraining=false;
     source.timeline=[{id:"archive-old-timeline",timestamp:old,type:"manual",textAr:"حدث أرشيف قديم",textEn:"Very old archive event"},...(source.timeline||[])];
-    source.intelligenceEvents=[{id:"archive-old-intel",timestamp:old,kind:"fact",domain:"system",verb:"old_event",confidence:100,sourcePage:"timeline",textAr:"ذاكرة أرشيف قديمة",textEn:"Very old archive memory"},...(source.intelligenceEvents||[])];
+    source.chemistry=[{timestamp:old,values:{KH:7.1,NO3:22},confidence:"high",source:"manual"},...(source.chemistry||[])];
+    source.waterChanges=[{id:"archive-old-wc",timestamp:old,liters:50,percent:20},...(source.waterChanges||[])];
     parsed.state.tanks=[...parsed.state.tanks.filter((x:any)=>x.id!=="archive-e2e"),source];
     parsed.state.selectedTankId=source.id;
     const next=JSON.stringify(parsed);
@@ -272,13 +273,14 @@ test("verified two-year archive keeps old events searchable while shrinking hot 
   await goToPage(page,"timeline");
   await expect(page.locator(".timeline")).toContainText(/Very old archive event|حدث أرشيف قديم/);
   await page.getByRole("button",{name:/أرشفة القديم|Archive old history/}).click();
-  await expect(page.locator(".page-grid")).toContainText(/تم نقل التاريخ الأقدم|History older than two years/);
-  await expect(page.locator(".timeline")).toContainText(/Very old archive event|حدث أرشيف قديم/);
+  await expect(page.locator(".page-grid")).toContainText(/مخزن تاريخي مفهرس|indexed historical store/i);
+  await page.getByTestId("history-domain").selectOption("timeline");
+  await expect(page.getByTestId("archived-history-list")).toContainText(/Very old archive event|حدث أرشيف قديم/);
   const archived=await page.evaluate(async()=>{
-    const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open("aqua-nexus-history-v1",1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
-    return await new Promise<number>((resolve,reject)=>{const tx=db.transaction("tank-history","readonly"),r=tx.objectStore("tank-history").get("archive-e2e");r.onsuccess=()=>resolve((r.result?.timeline?.length||0)+(r.result?.intelligenceEvents?.length||0));r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close()});
+    const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open("aqua-nexus-long-history-v1",1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+    return await new Promise<number>((resolve,reject)=>{const tx=db.transaction("records","readonly"),r=tx.objectStore("records").getAll();r.onsuccess=()=>resolve((r.result||[]).filter((x:any)=>x.tankId==="archive-e2e").length);r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close()});
   });
-  expect(archived).toBeGreaterThanOrEqual(2);
+  expect(archived).toBeGreaterThanOrEqual(3);
 });
 
 test("high-risk decision pages expose a consistent What Why Next Safety pattern",async({page})=>{
@@ -350,5 +352,72 @@ test("corrupt dirty fallback never overrides a valid IndexedDB state",async({pag
   await page.waitForTimeout(600);
   const dirty=await page.evaluate(()=>localStorage.getItem("aqua-nexus-3d-v1:fallback-dirty"));
   expect(dirty).toBeNull();
+});
+
+test("document locale and accessibility smoke stay valid in Arabic and English",async({page})=>{
+  await openTrainingDashboard(page);
+  await expect(page.locator("html")).toHaveAttribute("lang","ar");
+  await expect(page.locator("html")).toHaveAttribute("dir","rtl");
+
+  const issues=await page.evaluate(()=>{
+    const problems:string[]=[];
+    const ids=[...document.querySelectorAll("[id]")].map(x=>x.id).filter(Boolean);
+    const seen=new Set<string>();
+    for(const id of ids){if(seen.has(id))problems.push("duplicate-id:"+id);seen.add(id)}
+    for(const button of document.querySelectorAll("button")){
+      const el=button as HTMLButtonElement;
+      if(el.offsetParent===null)continue;
+      const name=(el.getAttribute("aria-label")||el.getAttribute("title")||el.textContent||"").trim();
+      if(!name)problems.push("unnamed-button");
+    }
+    for(const image of document.querySelectorAll("img")){
+      if(!image.hasAttribute("alt"))problems.push("image-without-alt");
+    }
+    return problems;
+  });
+  expect(issues).toEqual([]);
+
+  const english=page.getByRole("button",{name:"EN"}).first();
+  await english.click();
+  await expect(page.locator("html")).toHaveAttribute("lang","en");
+  await expect(page.locator("html")).toHaveAttribute("dir","ltr");
+});
+
+test("device backup is explicit opt-in and off by default",async({page})=>{
+  await openTrainingDashboard(page);
+  await page.evaluate(()=>localStorage.removeItem("aqua-nexus-device-backup-enabled-v1"));
+  await page.reload();
+  await openTrainingDashboard(page);
+  await goToPage(page,"settings");
+  const toggle=page.getByRole("checkbox",{name:/Device Backup/});
+  await expect(toggle).not.toBeChecked();
+  expect(await page.evaluate(()=>localStorage.getItem("aqua-nexus-device-backup-enabled-v1"))).toBeNull();
+  await toggle.check();
+  expect(await page.evaluate(()=>localStorage.getItem("aqua-nexus-device-backup-enabled-v1"))).toBe("1");
+});
+
+test("persistence failure is surfaced instead of silently accepted",async({page})=>{
+  await openTrainingDashboard(page);
+  await page.waitForTimeout(500);
+  await page.evaluate(()=>{
+    const w=window as any;
+    w.__idbPut=IDBObjectStore.prototype.put;
+    w.__storageSet=Storage.prototype.setItem;
+    IDBObjectStore.prototype.put=function(){throw new DOMException("forced IDB failure","QuotaExceededError") as any};
+    Storage.prototype.setItem=function(){throw new DOMException("forced localStorage failure","QuotaExceededError")};
+  });
+  await goToPage(page,"expenses");
+  const panel=page.locator(".card.panel").first();
+  await panel.locator("input").nth(0).fill("Persistence Failure Probe");
+  await panel.locator('input[type="number"]').fill("3.21");
+  await panel.getByRole("button",{name:/إضافة مصروف|Add expense/}).click();
+  await page.waitForTimeout(400);
+  await page.evaluate(()=>{
+    const w=window as any;
+    if(w.__idbPut)IDBObjectStore.prototype.put=w.__idbPut;
+    if(w.__storageSet)Storage.prototype.setItem=w.__storageSet;
+  });
+  await goToPage(page,"settings");
+  await expect(page.locator(".page-grid")).toContainText(/FAILED|recent changes may not survive reload/i);
 });
 

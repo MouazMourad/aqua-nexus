@@ -160,3 +160,33 @@ export async function hydrateTankPhotosForBackup(tanks:Tank[]){
   }
   return out;
 }
+
+export interface PhotoBackupAudit{
+  expected:number;
+  complete:number;
+  missing:Array<{tankId:string;photoId:string;assetKey?:string}>;
+}
+
+export async function hydrateTankPhotosForBackupStrict(tanks:Tank[]){
+  const out:Tank[]=[],audit:PhotoBackupAudit={expected:0,complete:0,missing:[]};
+  for(const tank of tanks){
+    const photos:JournalPhoto[]=[];
+    for(const photo of tank.photos){
+      audit.expected++;
+      const full=await resolveFullPhoto(photo);
+      if(!full||!full.startsWith("data:image/")){
+        audit.missing.push({tankId:tank.id,photoId:photo.id,assetKey:photo.assetKey});
+        photos.push({...photo,dataUrl:""});
+        continue;
+      }
+      audit.complete++;
+      photos.push({...photo,dataUrl:full});
+    }
+    out.push({...tank,photos});
+  }
+  if(audit.missing.length){
+    const error=new Error(`Recovery backup is incomplete: ${audit.missing.length} photo asset(s) are unavailable.`) as Error&{audit?:PhotoBackupAudit};
+    error.audit=audit;throw error;
+  }
+  return{tanks:out,audit};
+}

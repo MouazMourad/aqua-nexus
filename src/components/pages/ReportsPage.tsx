@@ -8,9 +8,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { downloadText,today } from "@/lib/appUtils";
 import { unifiedInventory } from "@/domain/inventoryIntelligence";
 import { tankIntelligenceCore } from "@/domain/intelligenceCore";
-import { CURRENT_BACKUP_SCHEMA } from "@/domain/backupValidation";
-import { hydrateTankPhotosForBackup } from "@/lib/photoStorage";
-import { hydrateAllTankHistoryArchives } from "@/lib/historyArchiveStorage";
+import { buildCompleteRecoveryBackup } from "@/lib/recoveryBackup";
 
 export function ReportsPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),state=useAquaStore();
@@ -19,7 +17,7 @@ export function ReportsPage({tank}:{tank:Tank}) {
  const overdue=recurring.filter(x=>maintenanceEffectiveState(x,now).overdue);
  const upcoming=recurring.filter(x=>!maintenanceEffectiveState(x,now).completed&&!maintenanceEffectiveState(x,now).overdue);
  const chemAge=Math.floor(chemistryAgeDays(tank));
- async function backup(){const tanks=await hydrateAllTankHistoryArchives(await hydrateTankPhotosForBackup(state.tanks));downloadText(`Aqua_Nexus_Backup_${today()}.json`,JSON.stringify({app:"Aqua Nexus",schemaVersion:CURRENT_BACKUP_SCHEMA,exportedAt:new Date().toISOString(),language:state.language,selectedTankId:state.selectedTankId,tanks},null,2))}
+ async function backup(){const full=await buildCompleteRecoveryBackup({tanks:state.tanks,language:state.language,aquariumExperience:state.aquariumExperience,selectedTankId:state.selectedTankId});downloadText(`Aqua_Nexus_Backup_${today()}.json`,JSON.stringify(full,null,2))}
  function csv(){const rows=[["Section","Name","Value"],["Tank","Name",tank.name],["Tank","System Volume",tank.systemVolumeLiters],["Health","System",sys.score],["Health","Chemistry",sys.chemistry],["Health","Maintenance",sys.maintenance],["Health","Bioload",sys.bioload],["Health","Equipment",sys.equipment],["Health","Compatibility",sys.compatibility],["Health","Livestock",sys.livestock],["Chemistry","Age Days",chemAge],...recurring.map(x=>["Maintenance",lang==="ar"?x.title:(x.titleEn||x.title),`${x.cadence} / ${x.nextDue??""}`]),...tank.livestock.map(x=>["Livestock",x.name,x.quantity]),...stock.rows.map(x=>["Inventory",x.name,`${x.quantity} ${x.unit} / min ${x.minimum}`]),...alerts.map(x=>["Alert",x.domain,lang==="ar"?x.ar:x.en])];downloadText(`Aqua_Nexus_${tank.name}_${today()}.csv`,rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n"),"text/csv")}
  return <section className="page-grid"><PageHeader eyebrow="REPORTING" title={tr(lang,"reports")} actions={<button className="btn primary" onClick={()=>window.print()}>{tr(lang,"print")} / PDF</button>}/>
  <article className="report-action card panel"><h3>{tr(lang,"backup")}</h3><button className="btn" onClick={()=>void backup()}>JSON</button> <button className="btn" onClick={csv}>CSV</button></article>
