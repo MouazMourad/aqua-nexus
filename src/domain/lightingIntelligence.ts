@@ -271,6 +271,7 @@ export function lightingIntelligence(tank:Tank){
   const temp=latest?.values?.temperature,oldTemp=previous?.values?.temperature;
   if(typeof temp==="number"&&typeof oldTemp==="number"&&Math.abs(temp-oldTemp)>=.7)links.push(`Temp Δ ${(temp-oldTemp).toFixed(1)}°C`);
   const calibration=tank.lighting?.calibrationPoints??[];
+  const latestImport=tank.lighting?.imports?.[0];
   const confidence=Math.round(clamp(
     (fixtures.length?20:0)+(program?20:0)+(fixtures.length&&fixtures.every(x=>typeof x.powerWatts==="number"&&x.powerWatts>0)?20:0)+(fixtures.some(x=>Boolean(x.parAtTargetDepth||x.coverageLengthCm))?15:0)+Math.min(25,calibration.length*10),
     0,100
@@ -279,7 +280,7 @@ export function lightingIntelligence(tank:Tank){
   return{
     level,fixtures:fixtures.length,program,schedule,centerPeak,depthPct:depth,
     calibrationFactor:lightingCalibrationFactor(tank),calibrationPoints:calibration.length,
-    confidence,issues,chemistrySignals:links,placementRecommendations:lightingPlacementRecommendations(tank),
+    confidence,issues,chemistrySignals:links,placementRecommendations:lightingPlacementRecommendations(tank),latestImport,
     missingEvidence:[
       ...(calibration.length?[]:["PAR calibration points"]),
       ...((tank.equipment.some(x=>x.kind==="ato"))?["measured top-off volume history"]:[])
