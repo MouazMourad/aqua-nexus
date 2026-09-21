@@ -142,7 +142,7 @@ export async function readAllHistoricalDomain<T=unknown>(tankId:string,domain:Hi
 }
 
 export async function hydrateLongTermHistoryStrict(tank:Tank):Promise<Tank>{
-  if(!available())return tank;
+  if(!available())throw new Error("IndexedDB unavailable while verifying long-term history");
   const next:any={...tank};
   for(const domain of historicalDomains){
     const archived=await readAllHistoricalDomain<any>(tank.id,domain);
