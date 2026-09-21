@@ -7,6 +7,7 @@ import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi,categoryText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { DecisionGuidance } from "@/components/ui/DecisionGuidance";
 import { stockingReadiness } from "@/domain/stockingReadiness";
 import { coralDipBatchRun,coralTransferGate } from "@/domain/acclimationSafety";
 import { uid,nowISO,today } from "@/lib/appUtils";
@@ -631,7 +632,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const urgentRinseRun=(active.coralDipRuns??[]).find(x=>x.status==="ready_to_rinse");
  const selectedCats=cats.length?cats:allowedCats;
  return <section className="page-grid acclimation-page">
-  <PageHeader eyebrow="ACCLIMATION CONTROL" title={tr(lang,"acclimation")} actions={<><span className="pill">{tank.type==="marine"?tr(lang,"marine"):tr(lang,"freshwater")} • {lang.toUpperCase()}</span><button className="btn" onClick={newSession} disabled={Boolean(currentSession)}>{currentSession?bi(lang,"جلسة نشطة","Session active"):`+ ${tr(lang,"newShipment")}`}</button></>}/>
+  <PageHeader eyebrow="ACCLIMATION CONTROL" title={tr(lang,"acclimation")} actions={<><span className="pill">{tank.type==="marine"?tr(lang,"marine"):tr(lang,"freshwater")} • {lang.toUpperCase()}</span><button className="btn" onClick={newSession} disabled={Boolean(currentSession)}>{currentSession?bi(lang,"جلسة نشطة","Session active"):`+ ${tr(lang,"newShipment")}`}</button></>}/><div className="card panel full-span"><DecisionGuidance what={acclimationGuide.title} why={bi(lang,"الإقلمة مسار مرحلي مقفول: كل انتقال يعتمد على اكتمال المرحلة السابقة، وحالة الكائن، ومتطلبات الـDip/الشطف عند المرجان.","Acclimation is a gated staged workflow: each transition depends on the prior stage, livestock condition, and coral dip/rinse requirements when applicable.")} next={acclimationGuide.detail} safety={bi(lang,"لا يتم نقل ماء الشحنة للحوض، والـRisk Override يبقى استثنائياً وموثقاً.","Shipping water is not transferred to the tank; any Risk Override remains exceptional and explicitly logged.")}/></div>
   {step<5&&<div className="card acclimation-wizard full-span">
     <div className="acclimation-wizard-hero"><span>{tank.type==="marine"?"🌊":"🌿"}</span><div><small>AQUA NEXUS</small><h2>{bi(lang,"مساعد الإقلمة الذكي","Smart Acclimation Wizard")}</h2><p>{bi(lang,"لغة البرنامج ونوع الحوض مطبقان تلقائياً.","App language and selected tank type are applied automatically.")}</p></div></div>
     <div className="acclimation-stepper">{[1,2,3,4].map(n=><i key={n} className={n<step?"done":n===step?"active":""}/>)}</div>
