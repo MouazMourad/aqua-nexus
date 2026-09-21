@@ -1,7 +1,7 @@
 import type { AquariumExperienceLevel,Language,Tank } from "./types";
 import { validateChemistryValues } from "./chemistryDataQuality";
 
-export const CURRENT_BACKUP_SCHEMA=13;
+export const CURRENT_BACKUP_SCHEMA=14;
 
 export interface ValidBackupPayload{
   language:Language;
@@ -69,6 +69,7 @@ function nestedDataIssue(tank:Record<string,unknown>){
   }
   for(const [i,row] of (((tank.livestock as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validText(row.name,300)||!finite(row.quantity)||Number(row.quantity)<=0)return `livestock #${i+1} is invalid`;
+    if(row.lightingDepthCm!==undefined&&(!finite(row.lightingDepthCm)||Number(row.lightingDepthCm)<0||Number(row.lightingDepthCm)>Number((tank.display as Record<string,unknown>).height)))return `livestock #${i+1} has invalid lightingDepthCm`;
   }
   for(const [i,row] of (((tank.dosing as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp))return `dosing #${i+1} is invalid`;
