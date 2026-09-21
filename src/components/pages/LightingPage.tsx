@@ -206,20 +206,95 @@ export function LightingPage({tank,onEquipment}:{tank:Tank;onEquipment:()=>void}
   const ts=nowISO();
   patch(tank.id,t=>({...t,equipment:t.equipment.map(x=>x.id===id?{...x,...partial}:x),timeline:[{id:uid("ev"),timestamp:ts,type:"lighting-fixture-model",textAr:"تم تحديث نموذج وحدة إنارة لتحسين تقدير التوزيع الضوئي.",textEn:"A lighting fixture model was updated to improve light-distribution estimation."},...t.timeline]}));
  }
+ async function analyzeLightingImportWithAI(args:{file:File;sourceKind:"image"|"text";imageDataUrl?:string;textContent?:string}){
+  const response=await fetch("/api/ai/lighting-import",{
+   method:"POST",
+   headers:aquaWorkspaceHeaders({"content-type":"application/json"}),
+   body:JSON.stringify({
+    tank,
+    sourceKind:args.sourceKind,
+    sourceCompany:importCompany,
+    fileName:args.file.name,
+    fileType:args.file.type||args.file.name.split(".").pop()||"unknown",
+    imageDataUrl:args.imageDataUrl,
+    textContent:args.textContent,
+    language:lang
+   })
+  });
+  const json=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(json?.error||("Lighting import analysis failed ("+response.status+")"));
+  const normalized=normalizeLightingImportCandidate(json?.answer?.candidate,args.sourceKind);
+  if(!normalized.ok)throw new Error(normalized.error);
+  return normalized.candidate;
+ }
+ function applyImportedCandidate(candidate:LightingImportCandidate,file:File,mode:"structured-file"|"ai-text"|"ai-image"){
+  const source=IMPORT_COMPANIES.find(x=>x.id===importCompany),ts=nowISO();
+  const program=lightingCandidateToProgram(candidate,(source?.en??importCompany)+" Import");
+  const importRecord:LightingImportRecord={
+   id:uid("light-import-log"),importedAt:ts,sourceCompany:importCompany,fileName:file.name,
+   fileType:file.type||file.name.split(".").pop()||"unknown",fileSize:file.size,
+   status:mode==="structured-file"?"parsed":"analyzed",analysisMode:mode,confidence:candidate.confidence,
+   detectedChannels:program.channels.length,detectedPoints:program.points.length,warnings:candidate.warnings
+  };
+  patch(tank.id,t=>({...t,lighting:{...(t.lighting??{}),imports:[importRecord,...(t.lighting?.imports??[])].slice(0,50)},timeline:[{id:uid("ev"),timestamp:ts,type:"lighting-import",textAr:"تم تحليل استيراد إنارة من "+(source?.ar??importCompany)+": "+file.name+" وتحويله لمسودة قابلة للتعديل. الثقة "+Math.round(candidate.confidence)+"%.",textEn:"Lighting import from "+(source?.en??importCompany)+": "+file.name+" was analyzed into an editable draft. Confidence "+Math.round(candidate.confidence)+"%."},...t.timeline]}));
+  setDraft(program);
+  setImportAnalysis(candidate);
+  setViewMinute(new Date().getHours()*60+new Date().getMinutes());
+  setImportNote(bi(lang,
+   "تم تعبئة القنوات والأوقات والنسب داخل الصفحة كمسودة قابلة للتعديل. راجع أي تحذير وعدّل القيم إذا لزم، ثم احفظ لتصبح جزءاً من Tank Brain وLocal Best AI.",
+   "Channels, times and intensities were filled into the page as an editable draft. Review warnings, edit if needed, then save to make it active in Tank Brain and Local Best AI."
+  ));
+ }
  async function importLightingFile(file?:File){
   if(!file)return;
-  setImportNote("");
-  let text="";try{text=await file.text()}catch{setImportNote(bi(lang,"تعذر قراءة الملف.","Could not read the file."));return}
-  const parsed=parseLightingFile(text,file.name,importCompany),ts=nowISO();
-  const source=IMPORT_COMPANIES.find(x=>x.id===importCompany);
-  const importRecord:LightingImportRecord={id:uid("light-import-log"),importedAt:ts,sourceCompany:importCompany,fileName:file.name,fileType:file.type||file.name.split(".").pop()||"unknown",fileSize:file.size,status:parsed?"parsed":"unsupported",detectedChannels:parsed?.channels.length,detectedPoints:parsed?.points.length};
-  patch(tank.id,t=>({...t,lighting:{...(t.lighting??{}),imports:[importRecord,...(t.lighting?.imports??[])].slice(0,50)},timeline:[{id:uid("ev"),timestamp:ts,type:"lighting-import",textAr:`تم تسجيل استيراد إنارة من ${source?.ar??importCompany}: ${file.name}${parsed?" وتم تفسير البرنامج للمراجعة.":" لكن تنسيق الملف لم يُفسر تلقائياً."}`,textEn:`Lighting import recorded from ${source?.en??importCompany}: ${file.name}${parsed?" and the schedule was parsed for review.":" but the format could not be mapped automatically."}`},...t.timeline]}));
-  if(parsed){
-   setDraft(parsed);
-   setViewMinute(new Date().getHours()*60+new Date().getMinutes());
-   setImportNote(bi(lang,`تم تفسير ${parsed.channels.length} قناة و${parsed.points.length} نقطة زمنية. راجع البرنامج والـ3D ثم اضغط حفظ.`,`Parsed ${parsed.channels.length} channels and ${parsed.points.length} time points. Review the program/3D, then save.`));
-  }else setImportNote(bi(lang,"تم حفظ اسم الشركة والملف وتاريخ الاستيراد، لكن هذا التنسيق يحتاج Adapter خاص أو ملف عينة حتى نفسره بأمان.","Vendor, filename and import date were recorded, but this format needs a dedicated adapter or sample file before Aqua Nexus can map it safely."));
-  if(importInput.current)importInput.current.value="";
+  setImportNote("");setImportAnalysis(null);setImportPreview(null);setImportBusy(true);
+  try{
+   const lower=file.name.toLowerCase(),isImage=file.type.startsWith("image/")||/\.(png|jpe?g|webp)$/i.test(lower);
+   if(isImage){
+    if(file.size>5*1024*1024)throw new Error(bi(lang,"الصورة أكبر من 5MB؛ صغّرها قبل التحليل.","Image is larger than 5MB; resize it before analysis."));
+    const imageDataUrl=await fileAsDataUrl(file);
+    setImportPreview(imageDataUrl);
+    const candidate=await analyzeLightingImportWithAI({file,sourceKind:"image",imageDataUrl});
+    applyImportedCandidate(candidate,file,"ai-image");
+   }else{
+    if(file.size>2*1024*1024)throw new Error(bi(lang,"ملف النص أكبر من 2MB؛ صدّر نطاق الإنارة فقط.","Text export is larger than 2MB; export the lighting range only."));
+    const textContent=await file.text();
+    const parsed=parseLightingFile(textContent,file.name,importCompany);
+    if(parsed){
+     const candidateRaw={
+      confidence:100,
+      programName:parsed.name,
+      channels:parsed.channels.map(ch=>({key:ch.id,name:ch.name,spectrum:ch.spectrum,parWeight:ch.parWeight,confidence:100})),
+      points:parsed.points.map(p=>({minute:p.minute,values:p.values})),
+      warnings:[],evidence:["Parsed directly from structured export"]
+     };
+     const normalized=normalizeLightingImportCandidate(candidateRaw,"structured");
+     if(!normalized.ok)throw new Error(normalized.error);
+     applyImportedCandidate(normalized.candidate,file,"structured-file");
+    }else{
+     const candidate=await analyzeLightingImportWithAI({file,sourceKind:"text",textContent});
+     applyImportedCandidate(candidate,file,"ai-text");
+    }
+   }
+  }catch(error){
+   const ts=nowISO(),source=IMPORT_COMPANIES.find(x=>x.id===importCompany),message=error instanceof Error?error.message:String(error);
+   const importRecord:LightingImportRecord={id:uid("light-import-log"),importedAt:ts,sourceCompany:importCompany,fileName:file.name,fileType:file.type||file.name.split(".").pop()||"unknown",fileSize:file.size,status:"unsupported",notes:message};
+   patch(tank.id,t=>({...t,lighting:{...(t.lighting??{}),imports:[importRecord,...(t.lighting?.imports??[])].slice(0,50)},timeline:[{id:uid("ev"),timestamp:ts,type:"lighting-import",textAr:"فشل تحليل استيراد الإنارة "+file.name+": "+message,textEn:"Lighting import analysis failed for "+file.name+": "+message},...t.timeline]}));
+   setImportNote(message);
+  }finally{
+   setImportBusy(false);
+   if(importInput.current)importInput.current.value="";
+  }
+ }
+ function applyImportedFixtureHint(){
+  const hint=importAnalysis?.fixture,fixture=fixtures[0];
+  if(!hint||!fixture)return;
+  updateFixture(fixture.id,{
+   brand:hint.brand??fixture.brand,
+   model:hint.model??fixture.model,
+   powerWatts:hint.powerWatts??fixture.powerWatts,
+   mountingHeightCm:hint.mountingHeightCm??fixture.mountingHeightCm
+  });
  }
 
  function addCalibration(){
