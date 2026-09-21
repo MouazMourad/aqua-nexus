@@ -3,7 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import { Html,OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import type { Tank } from "@/domain/types";
-import { lightingGrid,lightingIntelligence } from "@/domain/lightingIntelligence";
+import { estimatedParAt,lightingGrid,lightingIntelligence } from "@/domain/lightingIntelligence";
 import { cm } from "@/lib/units";
 import { clamp } from "@/lib/displayLayout";
 import { GlassBox } from "@/components/three/GlassBox";
@@ -58,12 +58,13 @@ function HeatScene({tank,minute,depthPct}:{tank:Tank;minute:number;depthPct:numb
 
 export function LightingHeatmap3D({tank,minute,depthPct}:{tank:Tank;minute:number;depthPct:number}){
  const intel=lightingIntelligence(tank);
+ const currentCenterPar=estimatedParAt(tank,50,50,depthPct,minute);
  const mode=intel.calibrationPoints?("calibrated ×"+intel.calibrationFactor.toFixed(2)):"estimated";
  return <div className="lighting-3d-wrap">
   <Canvas camera={{position:[3.5,2.4,5.1],fov:40}} dpr={[1,1.6]} gl={{antialias:true,powerPreference:"high-performance"}} onCreated={({gl})=>{gl.toneMapping=THREE.ACESFilmicToneMapping;gl.toneMappingExposure=1.1}}>
    <HeatScene tank={tank} minute={minute} depthPct={depthPct}/>
   </Canvas>
-  <div className="lighting-3d-badge"><b>{Math.round(intel.centerPeak)} PAR</b><small>{mode}</small></div>
+  <div className="lighting-3d-badge"><b>{Math.round(currentCenterPar)} PAR</b><small>{mode}</small></div>
   <style jsx>{`
    .lighting-3d-wrap{height:430px;position:relative;border:1px solid rgba(91,205,231,.16);border-radius:18px;overflow:hidden;background:#020b14}
    .lighting-3d-badge{position:absolute;inset-inline-end:12px;top:12px;display:grid;gap:2px;padding:8px 10px;border:1px solid rgba(112,214,245,.2);border-radius:11px;background:rgba(3,22,32,.8);backdrop-filter:blur(8px)}
