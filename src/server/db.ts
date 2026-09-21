@@ -54,8 +54,10 @@ CREATE TABLE IF NOT EXISTS aqua_push_state (
   workspace_key text PRIMARY KEY REFERENCES aqua_workspaces(workspace_key) ON DELETE CASCADE,
   language text NOT NULL DEFAULT 'ar',
   tanks jsonb NOT NULL DEFAULT '[]'::jsonb,
+  last_notified_at timestamptz,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE aqua_push_state ADD COLUMN IF NOT EXISTS last_notified_at timestamptz;
 CREATE TABLE IF NOT EXISTS aqua_media_assets (
   id text PRIMARY KEY,
   workspace_key text NOT NULL REFERENCES aqua_workspaces(workspace_key) ON DELETE CASCADE,
