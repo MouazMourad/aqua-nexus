@@ -47,10 +47,18 @@ try{
   const isolated=await json("/api/tanks/ci-tank",{headers:{...headers,"x-aqua-device-id":"ci-device-other-1234567890"}});
   if(isolated.r.status!==404)throw new Error("Workspace isolation failed "+isolated.r.status);
 
+  const tinyPng="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2r0sAAAAASUVORK5CYII=";
+  const lightingVision=await json("/api/ai/lighting-import",{method:"POST",headers,body:JSON.stringify({
+    tank:tank("Lighting Vision CI"),sourceKind:"image",sourceCompany:"generic",fileName:"schedule.png",fileType:"image/png",imageDataUrl:tinyPng,language:"en"
+  })});
+  if(lightingVision.r.status!==503||!String(lightingVision.body?.error||"").toLowerCase().includes("provider")){
+    throw new Error("Lighting import route did not fail closed without a configured AI provider "+JSON.stringify(lightingVision.body));
+  }
+
   x=await json("/api/tanks/ci-tank?expectedVersion=2",{method:"DELETE",headers});
   if(!x.r.ok||x.body.deleted!==true)throw new Error("Versioned delete failed "+JSON.stringify(x.body));
 
-  console.log("Backend integration: health, migrations, workspace isolation and optimistic versioning OK");
+  console.log("Backend integration: health, migrations, workspace isolation, optimistic versioning and lighting-import guard OK");
 }finally{
   if(server.exitCode===null){
     server.kill("SIGTERM");
