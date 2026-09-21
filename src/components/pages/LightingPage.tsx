@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { DecisionGuidance } from "@/components/ui/DecisionGuidance";
 import { LightingHeatmap3D } from "@/components/lighting/LightingHeatmap3D";
 import { defaultLightingProgram,formatLightMinute,lightingAtMinute,lightingFrontGrid,lightingGrid,lightingIntelligence,lightingSchedule,LIGHTING_SPECTRA } from "@/domain/lightingIntelligence";
+import { lightingCandidateToProgram,normalizeLightingImportCandidate,type LightingImportCandidate } from "@/domain/lightingImport";
+import { aquaWorkspaceHeaders } from "@/lib/anonymousWorkspace";
 import { bi,tr } from "@/i18n";
 import { nowISO,uid } from "@/lib/appUtils";
 
@@ -25,6 +27,14 @@ function heatCss(value:number,max:number){
  return "hsl("+hue+" 86% "+(36+t*18)+"%)";
 }
 function levelClass(level:string){return level==="danger"?"danger":level==="warn"?"warn":"good";}
+function fileAsDataUrl(file:File){
+ return new Promise<string>((resolve,reject)=>{
+  const reader=new FileReader();
+  reader.onload=()=>resolve(String(reader.result||""));
+  reader.onerror=()=>reject(reader.error??new Error("File read failed"));
+  reader.readAsDataURL(file);
+ });
+}
 
 
 const IMPORT_COMPANIES=[
@@ -142,6 +152,7 @@ export function LightingPage({tank,onEquipment}:{tank:Tank;onEquipment:()=>void}
  const [calX,setCalX]=useState(50),[calZ,setCalZ]=useState(50),[calDepth,setCalDepth]=useState(50),[calPar,setCalPar]=useState(0);
  const importInput=useRef<HTMLInputElement>(null);
  const [importCompany,setImportCompany]=useState<ImportCompany>("generic"),[importNote,setImportNote]=useState("");
+ const [importAnalysis,setImportAnalysis]=useState<LightingImportCandidate|null>(null),[importPreview,setImportPreview]=useState<string|null>(null),[importBusy,setImportBusy]=useState(false);
  const previewTank=useMemo<Tank>(()=>({...tank,lighting:{...(tank.lighting??{}),activeProgram:draft,mapDepthPct:depthPct}}),[tank,draft,depthPct]);
  const intel=useMemo(()=>lightingIntelligence(previewTank),[previewTank]);
  const schedule=intel.schedule;
