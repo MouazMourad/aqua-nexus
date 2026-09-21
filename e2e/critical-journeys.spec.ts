@@ -480,16 +480,30 @@ test("Lighting mobile layout stays inside the viewport and the 10x demo follows 
   await page.getByRole("button",{name:/إيقاف الديمو|Pause demo/}).click();
 });
 
-test("Lighting depth map shows actual livestock depth and keeps it editable",async({page})=>{
+test("Lighting depth map uses real X/Z/depth and shade changes per-livestock PAR",async({page})=>{
   await openTrainingDashboard(page);
   await goToPage(page,"lighting");
   const diagram=page.locator(".lighting-depth-tank");
   await expect(diagram).toBeVisible();
   await expect(diagram).toContainText(/مرجان تورش|Torch Coral/);
-  const resident=diagram.locator(".lighting-depth-resident").filter({hasText:/مرجان تورش|Torch Coral/}).first();
-  const depth=resident.locator('input[type="number"]');
+  const resident=diagram.locator('[data-livestock-id="l3"]');
+  await expect(resident).toBeVisible();
+  const depth=resident.locator('input[aria-label^="Depth "]');
+  const x=resident.locator('input[aria-label^="X "]');
+  const z=resident.locator('input[aria-label^="Z "]');
+  const exposure=resident.locator('select[aria-label^="Exposure "]');
   await expect(depth).toHaveValue("32");
+  await expect(x).toHaveValue("56");
+  await expect(z).toHaveValue("48");
+  await expect(exposure).toHaveValue("open");
+  await expect(resident.locator(".lighting-position-mini i")).toBeVisible();
+  const openPar=Number(await resident.getAttribute("data-light-par"));
+  expect(openPar).toBeGreaterThan(0);
+  await exposure.selectOption("shade");
+  await expect(exposure).toHaveValue("shade");
+  await expect.poll(async()=>Number(await resident.getAttribute("data-light-par"))).toBeLessThan(openPar*.6);
   await depth.fill("36");
+  await depth.blur();
   await expect(depth).toHaveValue("36");
   await expect(resident).toContainText(/PAR|cm/);
 });
