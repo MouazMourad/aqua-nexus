@@ -71,9 +71,10 @@ export function DashboardFeatureBubble(){
         42%{transform:translate3d(-10px,-52vh,0) scale(1)}
         82%{opacity:.9}
         94%{transform:translate3d(8px,-112vh,0) scale(1.04);opacity:.82}
-        98%{transform:translate3d(8px,-118vh,0) scale(1.08);opacity:.76}\n        100%{transform:translate3d(8px,-122vh,0) scale(1.52);opacity:0}
+        98%{transform:translate3d(8px,-118vh,0) scale(1.08);opacity:.76}
+        100%{transform:translate3d(8px,-122vh,0) scale(1.52);opacity:0}
       }
-      @media(max-width:620px){.feature-bubble{inset-inline-end:10px;width:min(330px,calc(100vw - 20px))}.feature-bubble-body{padding:11px 31px 11px 12px;grid-template-columns:32px 1fr}.feature-bubble-icon{width:32px;height:32px}.feature-bubble-body small{font-size:8.5px}}
+      @media(max-width:620px){.feature-bubble{inset-inline-end:10px;width:min(330px,calc(100vw - 20px))}.feature-bubble-body{padding:11px 12px;grid-template-columns:32px 1fr}.feature-bubble-icon{width:32px;height:32px}.feature-bubble-body small{font-size:8.5px}}
       @media(prefers-reduced-motion:reduce){.feature-bubble{animation:aquaBubbleFade 5s ease forwards}@keyframes aquaBubbleFade{0%,100%{opacity:0}10%,88%{opacity:.95}}}
     `}</style>
   </div>;
