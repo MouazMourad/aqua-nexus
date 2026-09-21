@@ -7,6 +7,7 @@ export interface DataSafetyStatus{
 }
 
 const KEY="aqua-nexus-data-safety-v1";
+const globalSafety=globalThis as typeof globalThis&{aquaDataSafetyStatus?:DataSafetyStatus};
 const EVENT="aqua:data-safety";
 
 function storage(){
@@ -14,6 +15,7 @@ function storage(){
 }
 
 export function readDataSafetyStatus():DataSafetyStatus{
+  if(globalSafety.aquaDataSafetyStatus)return globalSafety.aquaDataSafetyStatus;
   const s=storage();
   if(!s)return{persistence:"degraded",lastFailure:"Browser storage is unavailable"};
   try{
@@ -24,6 +26,7 @@ export function readDataSafetyStatus():DataSafetyStatus{
 }
 
 export function writeDataSafetyStatus(next:DataSafetyStatus){
+  globalSafety.aquaDataSafetyStatus=next;
   const s=storage();
   try{s?.setItem(KEY,JSON.stringify(next))}catch{}
   if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent(EVENT,{detail:next}));
