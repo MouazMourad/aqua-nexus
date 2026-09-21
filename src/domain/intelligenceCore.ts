@@ -8,6 +8,7 @@ import { healthTimeline,tankForecast,tankStateView } from "./tankIntelligence";
 import { proactivePredictions,biologicalMemory } from "./tankLearning";
 import { isBiologicalCycleActive,isCyclePageAllowed } from "./biologicalCycle";
 import { lightingIntelligence } from "./lightingIntelligence";
+import { equipmentImportIntelligence } from "./equipmentImport";
 
 export type IntelligenceDomain =
  "chemistry"|"dosing"|"maintenance"|"equipment"|"lighting"|"livestock"|"inventory"|"feeding"|
@@ -36,6 +37,7 @@ export interface TankIntelligenceCore{
  state:ReturnType<typeof tankStateView>;
  chemistry:ReturnType<typeof chemistryHealthAssessment>;
  maintenance:number;
+ deviceData:ReturnType<typeof equipmentImportIntelligence>;
  lighting:ReturnType<typeof lightingIntelligence>;
  bioload:ReturnType<typeof bioload>;
  alerts:ReturnType<typeof systemAlerts>;
@@ -70,6 +72,7 @@ export function tankIntelligenceCore(tank:Tank):TankIntelligenceCore{
  const maint=maintenanceHealth(tank);
  const bio=bioload(tank);
  const lighting=lightingIntelligence(tank);
+ const deviceData=equipmentImportIntelligence(tank);
  const guidanceActions:GuidanceAction[]=deriveGuidanceActions(tank);
  const rank={danger:0,warn:1,info:2};
  const cycling=isBiologicalCycleActive(tank);
@@ -87,6 +90,10 @@ export function tankIntelligenceCore(tank:Tank):TankIntelligenceCore{
  if(lightingPrimary&&!cycling){
   actionMap.set("lighting-primary",{id:"lighting-primary",domain:"lighting",level:lightingPrimary.level,page:"lighting",ar:lightingPrimary.ar,en:lightingPrimary.en,priority:rank[lightingPrimary.level]});
  }
+ const devicePrimary=deviceData.issues.find(x=>x.level==="danger")??deviceData.issues.find(x=>x.level==="warn");
+ if(devicePrimary&&!cycling){
+  actionMap.set("device-import-primary",{id:"device-import-primary",domain:"equipment",level:devicePrimary.level,page:"equipment",ar:devicePrimary.ar,en:devicePrimary.en,priority:rank[devicePrimary.level]});
+ }
  const actions:IntelligenceAction[]=[...actionMap.values()].sort((a,b)=>a.priority-b.priority);
 
  // Confidence means confidence in the whole decision, not merely a pretty score.
@@ -102,7 +109,7 @@ export function tankIntelligenceCore(tank:Tank):TankIntelligenceCore{
  )));
 
  return {
-  generatedAt:new Date().toISOString(),health,state,chemistry,maintenance:maint,lighting,bioload:bio,
+  generatedAt:new Date().toISOString(),health,state,chemistry,maintenance:maint,deviceData,lighting,bioload:bio,
   alerts,insights,forecast,history,predictions,memory,actions,guidanceActions,dataConfidence,
   critical:alerts.some(x=>x.level==="danger")||health.chemistryCritical
  };

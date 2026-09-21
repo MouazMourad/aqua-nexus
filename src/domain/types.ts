@@ -19,6 +19,70 @@ export interface DisplayEquipmentPosition {
   scale?: number;
 }
 
+export type ExternalImportVendor =
+  | "generic" | "neptune-apex" | "redsea-reefbeat" | "hydros" | "ghl"
+  | "ai-mobius" | "ecotech-mobius" | "maxspect" | "seneye" | "other";
+
+export interface ExternalImportRecord {
+  id:string;
+  importedAt:string;
+  vendor:ExternalImportVendor;
+  sourceName:string;
+  sourceType:"image"|"csv"|"json"|"text"|"other";
+  fingerprint:string;
+  analysisMode:"structured-file"|"ai-text"|"ai-image";
+  confidence:number;
+  status:"reviewed"|"applied"|"partial"|"failed";
+  counts:{
+    equipment:number;
+    chemistry:number;
+    dosing:number;
+    topOff:number;
+    telemetry:number;
+    alerts:number;
+  };
+  warnings?:string[];
+  notes?:string;
+}
+
+export interface DeviceTelemetryLog {
+  id:string;
+  timestamp:string;
+  metric:string;
+  value:number;
+  unit?:string;
+  equipmentId?:string;
+  sourceDevice?:string;
+  sourceSystem?:string;
+  sourceImportId?:string;
+  sourceRecordId?:string;
+  notes?:string;
+}
+
+export interface TopOffLog {
+  id:string;
+  timestamp:string;
+  liters:number;
+  equipmentId?:string;
+  sourceSystem?:string;
+  sourceImportId?:string;
+  sourceRecordId?:string;
+  notes?:string;
+}
+
+export interface ExternalDeviceAlert {
+  id:string;
+  timestamp:string;
+  level:"info"|"warn"|"danger";
+  message:string;
+  equipmentId?:string;
+  sourceDevice?:string;
+  sourceSystem?:string;
+  sourceImportId?:string;
+  sourceRecordId?:string;
+  acknowledgedAt?:string;
+}
+
 export interface EquipmentFailureEvent {
   id:string;
   timestamp:string;
@@ -78,6 +142,9 @@ export interface Equipment {
   failures?: EquipmentFailureEvent[];
   consumables?: EquipmentConsumable[];
   postActionCheckAt?: string;
+  sourceSystem?: string;
+  sourceImportId?: string;
+  sourceRecordId?: string;
   co2Mode?: "lowTech" | "injected";
   co2CylinderRemainingPercent?: number;
   co2DropChecker?: "blue" | "green" | "yellow" | "unknown";
@@ -121,6 +188,9 @@ export interface ChemistryReading {
   source?: "manual"|"import"|"device";
   testKit?: string;
   confidence?: "high"|"medium"|"low";
+  sourceSystem?: string;
+  sourceImportId?: string;
+  sourceRecordId?: string;
 }
 
 export interface MaintenanceTask {
@@ -441,6 +511,9 @@ export interface DosingLog {
   calculatorMode?: "dry" | "stock" | "product" | "routine";
   status?: "planned" | "in_progress" | "logged";
   verifyAfter?: string;
+  sourceSystem?: string;
+  sourceImportId?: string;
+  sourceRecordId?: string;
 }
 
 export interface DoserChannel {
@@ -788,6 +861,10 @@ export interface Tank {
   sump: Sump;
   systemVolumeLiters: number;
   equipment: Equipment[];
+  externalImports?: ExternalImportRecord[];
+  deviceTelemetry?: DeviceTelemetryLog[];
+  topOff?: TopOffLog[];
+  deviceAlerts?: ExternalDeviceAlert[];
   energySettings?: EnergySettings;
   lighting?: TankLightingState;
   chemistry: ChemistryReading[];

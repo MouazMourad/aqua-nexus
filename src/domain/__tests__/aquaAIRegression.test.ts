@@ -48,6 +48,8 @@ import { historyPage } from "@/domain/historyPagination";
 import { buildVacationTaskDrafts,vacationDays } from "@/domain/vacationPlan";
 import { defaultLightingProgram,estimatedParAt,lightingCalibrationFactor,lightingGrid,lightingIntelligence,lightingPlacementRecommendations,lightingSchedule } from "@/domain/lightingIntelligence";
 import { lightingCandidateToProgram,normalizeLightingImportCandidate } from "@/domain/lightingImport";
+import { equipmentImportIntelligence,normalizeEquipmentImportCandidate,parseGenericEquipmentExport } from "@/domain/equipmentImport";
+import { prepareEquipmentImportApplication } from "@/domain/equipmentImportApply";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -1162,6 +1164,105 @@ describe("Lighting Intelligence regression",()=>{
     t.lighting.activeProgram.points[0].values[t.lighting.activeProgram.channels[0].id]=999;
     const result=validateBackupPayload({app:"Aqua Nexus",schemaVersion:14,language:"ar",selectedTankId:t.id,tanks:[t]});
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("Unified equipment import regression",()=>{
+  it("parses a generic CSV into canonical device, chemistry, telemetry, top-off and alert candidates",()=>{
+    const csv=[
+      "timestamp,device,kind,brand,model,power_watts,metric,value,unit,topoff_liters,alert,severity",
+      "2026-09-20T12:00:00Z,Main Probe,probe,Neptune,Apex Probe,5,pH,8.15,,4.5,,",
+      "2026-09-20T12:05:00Z,Return Pump,returnPump,Generic,RP-1,55,flow,4200,L/h,,Flow low,warning"
+    ].join("\n");
+    const candidate=parseGenericEquipmentExport(csv,"apex.csv","neptune-apex");
+    expect(candidate).toBeTruthy();
+    expect(candidate!.devices.length).toBeGreaterThan(0);
+    expect(candidate!.measurements.some(x=>x.parameter==="pH"&&x.destination==="chemistry")).toBe(true);
+    expect(candidate!.measurements.some(x=>x.parameter==="flow"&&x.destination==="telemetry")).toBe(true);
+    expect(candidate!.topOff.some(x=>x.liters===4.5)).toBe(true);
+    expect(candidate!.alerts.some(x=>x.level==="warn")).toBe(true);
+  });
+
+  it("normalizes AI screenshot extraction without inventing unsupported rows",()=>{
+    const result=normalizeEquipmentImportCandidate({
+      confidence:87,vendorDetected:"HYDROS",
+      devices:[{name:"WaveEngine",kind:"waveMaker",brand:"HYDROS",model:"WaveEngine",powerWatts:30}],
+      measurements:[{timestamp:"2026-09-20T10:00:00Z",parameter:"temperature",value:25.4,unit:"C",deviceName:"WaveEngine"}],
+      doses:[],topOff:[],alerts:[],
+      warnings:["One device label was partially obscured"],evidence:["Visible device card and temperature row"]
+    },"image");
+    expect(result.ok).toBe(true);
+    if(!result.ok)return;
+    expect(result.candidate.devices[0].kind).toBe("waveMaker");
+    expect(result.candidate.measurements[0].destination).toBe("chemistry");
+    expect(result.candidate.confidence).toBe(87);
+  });
+
+  it("applies reviewed imports into canonical domains and Tank Brain sees device alerts",()=>{
+    const t=structuredClone(demoMarineTank);
+    const normalized=normalizeEquipmentImportCandidate({
+      confidence:92,vendorDetected:"Neptune Apex",
+      devices:[{sourceRecordId:"pump-1",name:"Return Pump Import",kind:"returnPump",brand:"Neptune",model:"COR",powerWatts:65,flowLph:4500,status:"on"}],
+      measurements:[
+        {sourceRecordId:"ph-1",timestamp:new Date().toISOString(),parameter:"pH",value:8.18,deviceName:"Apex pH"},
+        {sourceRecordId:"watts-1",timestamp:new Date().toISOString(),parameter:"powerWatts",value:63,unit:"W",deviceName:"Return Pump Import"}
+      ],
+      doses:[{sourceRecordId:"dose-1",timestamp:new Date().toISOString(),parameter:"KH",ml:6,material:"Alkalinity",deviceName:"DOS"}],
+      topOff:[{sourceRecordId:"ato-1",timestamp:new Date().toISOString(),liters:5.2,deviceName:"ATK"}],
+      alerts:[{sourceRecordId:"alert-1",timestamp:new Date().toISOString(),level:"danger",message:"Return pump offline",deviceName:"Return Pump Import"}],
+      warnings:[],evidence:["fixture"]
+    },"structured");
+    expect(normalized.ok).toBe(true);if(!normalized.ok)return;
+    const app=prepareEquipmentImportApplication(t,normalized.candidate,{
+      importId:"import-test",importedAt:new Date().toISOString(),vendor:"neptune-apex",sourceName:"apex-export.json",sourceType:"json",fingerprint:"abc",analysisMode:"structured-file"
+    });
+    expect(app.blockedIssues).toHaveLength(0);
+    expect(app.tank.equipment.some(x=>x.name==="Return Pump Import"&&x.sourceSystem==="neptune-apex")).toBe(true);
+    expect(app.tank.chemistry.some(x=>x.source==="device"&&x.sourceSystem==="neptune-apex"&&x.values.pH===8.18)).toBe(true);
+    expect(app.tank.deviceTelemetry?.some(x=>x.metric==="powerWatts"&&x.value===63)).toBe(true);
+    expect(app.tank.dosing.some(x=>x.sourceSystem==="neptune-apex"&&x.ml===6)).toBe(true);
+    expect(app.tank.topOff?.some(x=>x.liters===5.2)).toBe(true);
+    expect(app.tank.deviceAlerts?.some(x=>x.level==="danger"&&x.message.includes("offline"))).toBe(true);
+
+    const imported=equipmentImportIntelligence(app.tank);
+    expect(imported.dangerAlerts).toBe(1);
+    const core=tankIntelligenceCore(app.tank);
+    expect(core.deviceData.dangerAlerts).toBe(1);
+    expect(core.actions.some(x=>x.domain==="equipment")).toBe(true);
+
+    const answer=aquaAIAnswer("شو وضع بيانات جهاز Apex والتنبيهات؟",app.tank,"equipment");
+    expect(answer.action?.page).toBe("equipment");
+    expect(answer.detailsAr.join(" ")).toMatch(/Apex|تنبيه|Telemetry|تعويض/);
+  });
+
+  it("blocks implausible imported chemistry instead of silently writing it",()=>{
+    const t=structuredClone(demoMarineTank);
+    const normalized=normalizeEquipmentImportCandidate({
+      confidence:90,devices:[],
+      measurements:[{timestamp:new Date().toISOString(),parameter:"salinity",value:1025}],
+      doses:[],topOff:[],alerts:[],warnings:[],evidence:[]
+    },"structured");
+    expect(normalized.ok).toBe(true);if(!normalized.ok)return;
+    normalized.candidate.measurements[0].destination="chemistry";
+    const app=prepareEquipmentImportApplication(t,normalized.candidate,{
+      importId:"bad-chem",importedAt:new Date().toISOString(),vendor:"generic",sourceName:"bad.csv",sourceType:"csv",fingerprint:"bad",analysisMode:"structured-file"
+    });
+    expect(app.blockedIssues.length).toBeGreaterThan(0);
+    expect(app.tank.chemistry.some(x=>x.sourceImportId==="bad-chem")).toBe(false);
+  });
+
+  it("marks all new equipment import fields as evented and validates them in recovery backup",()=>{
+    expect(TANK_EVENT_COVERAGE.externalImports).toBe("evented");
+    expect(TANK_EVENT_COVERAGE.deviceTelemetry).toBe("evented");
+    expect(TANK_EVENT_COVERAGE.topOff).toBe("evented");
+    expect(TANK_EVENT_COVERAGE.deviceAlerts).toBe("evented");
+    const t=structuredClone(demoMarineTank) as any;
+    t.externalImports=[{id:"i",importedAt:new Date().toISOString(),vendor:"generic",sourceName:"x.csv",sourceType:"csv",fingerprint:"x",analysisMode:"structured-file",confidence:100,status:"applied",counts:{equipment:0,chemistry:0,dosing:0,topOff:0,telemetry:0,alerts:0}}];
+    t.deviceTelemetry=[{id:"tele",timestamp:new Date().toISOString(),metric:"flow",value:1200}];
+    t.topOff=[{id:"ato",timestamp:new Date().toISOString(),liters:4}];
+    t.deviceAlerts=[{id:"al",timestamp:new Date().toISOString(),level:"warn",message:"Test alert"}];
+    const result=validateBackupPayload({app:"Aqua Nexus",schemaVersion:17,language:"ar",selectedTankId:t.id,tanks:[t]});
+    expect(result.ok).toBe(true);
   });
 });
 

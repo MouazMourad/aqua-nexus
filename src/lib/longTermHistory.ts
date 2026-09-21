@@ -6,7 +6,7 @@ const INDEX="tank-domain-time";
 
 export type HistoricalDomain=
   |"timeline"|"intelligenceEvents"|"chemistry"|"healthSnapshots"|"feeding"|"dosing"
-  |"expenses"|"waterChanges"|"rodi"|"rodiServiceEvents"|"plantCare"
+  |"expenses"|"waterChanges"|"rodi"|"rodiServiceEvents"|"plantCare"|"deviceTelemetry"|"topOff"|"deviceAlerts"
   |"acclimationSessions"|"emergencySessions"|"livestockExits"|"aiActionPlans";
 
 export interface HistoricalRecord{
@@ -68,7 +68,7 @@ async function countDomain(tankId:string,domain:HistoricalDomain){
 
 export const historicalDomains:HistoricalDomain[]=[
   "timeline","intelligenceEvents","chemistry","healthSnapshots","feeding","dosing",
-  "expenses","waterChanges","rodi","rodiServiceEvents","plantCare",
+  "expenses","waterChanges","rodi","rodiServiceEvents","plantCare","deviceTelemetry","topOff","deviceAlerts",
   "acclimationSessions","emergencySessions","livestockExits","aiActionPlans"
 ];
 
@@ -108,6 +108,19 @@ export async function archiveHistoricalDomains(tank:Tank,beforeISO:string){
   }catch{
     return{ok:false as const,reason:"archive-write-failed",tank,archived:0,byDomain:{}};
   }
+}
+
+export async function appendHistoricalDomainRows<T=unknown>(tankId:string,domain:HistoricalDomain,rows:T[]){
+  if(!available())throw new Error("IndexedDB unavailable while writing imported history");
+  const records:HistoricalRecord[]=[];
+  rows.forEach((row:any,index)=>{
+    const ts=timestampOf(domain,row);
+    if(!ts)throw new Error("Imported "+domain+" row has no valid timestamp");
+    const id=idOf(domain,row,index);
+    records.push({key:keyOf(tankId,domain,ts.timestampMs,id),tankId,domain,timestampMs:ts.timestampMs,timestamp:ts.timestamp,id,payload:row});
+  });
+  await putRecords(records);
+  return records.length;
 }
 
 export async function readHistoricalPage<T=unknown>(tankId:string,domain:HistoricalDomain,opts:{limit?:number;cursor?:{timestampMs:number;id:string}|null}={}):Promise<HistoricalPage<T>>{
