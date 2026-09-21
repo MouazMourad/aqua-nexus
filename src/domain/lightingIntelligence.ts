@@ -190,6 +190,12 @@ export interface LightingPlacementRecommendation{
   zone:"top"|"mid"|"bottom"|"shade";
   parMin:number;
   parMax:number;
+  recommendedDepthMinCm:number;
+  recommendedDepthMaxCm:number;
+  actualDepthCm?:number;
+  actualZone?:"top"|"mid"|"bottom";
+  placementStatus:"unset"|"within"|"outside";
+  estimatedPeakParAtActualDepth?:number;
   ar:string;
   en:string;
 }
@@ -202,27 +208,45 @@ function normalizedName(value:string){
 
 export function lightingPlacementRecommendations(tank:Tank):LightingPlacementRecommendation[]{
   const rows:LightingPlacementRecommendation[]=[];
+  const height=Math.max(1,tank.display.height);
+  const zoneDepth=(zone:LightingPlacementRecommendation["zone"])=>{
+    if(zone==="top")return{min:Math.max(2,height*.08),max:height*.35};
+    if(zone==="mid")return{min:height*.28,max:height*.68};
+    if(zone==="bottom")return{min:height*.60,max:height*.95};
+    return{min:height*.55,max:height*.95};
+  };
+  const actualZone=(depth:number):"top"|"mid"|"bottom"=>depth<=height*.35?"top":depth<=height*.68?"mid":"bottom";
+  const program=tank.lighting?.activeProgram;
+  const peakMinute=program?lightingSchedule(program).peakMinute:720;
+
   for(const item of tank.livestock){
+    let row:{zone:LightingPlacementRecommendation["zone"];min:number;max:number;kindAr:string;kindEn:string}|null=null;
     if(tank.type==="marine"&&item.category==="coral"){
       const n=normalizedName([item.name,item.nameEn,item.libraryId,item.notes].filter(Boolean).join(" "));
-      let zone:LightingPlacementRecommendation["zone"]="mid",min=75,max=180,kindAr="مرجان متوسط الإضاءة",kindEn="moderate-light coral";
-      if(/acropora|acro|montipora|pocillopora|stylophora|sps|اكروبورا|مونتيبورا/.test(n)){zone="top";min=200;max=350;kindAr="SPS عالي الإضاءة";kindEn="high-light SPS";}
-      else if(/mushroom|ricordea|rhodactis|discosoma|leather|zoa|zoanthid|مشروم|ريكورديا|روداكتس|ليذر|زوا/.test(n)){zone="bottom";min=40;max=110;kindAr="Soft/مشروم منخفض إلى متوسط";kindEn="low-to-moderate soft coral";}
-      else if(/torch|hammer|frogspawn|euphyllia|candy|acan|blasto|chalice|lps|تورش|هامر|فروغ|كاندي|اكان|بلاستو|شالس/.test(n)){zone="mid";min=70;max=170;kindAr="LPS متوسط الإضاءة";kindEn="moderate-light LPS";}
-      rows.push({livestockId:item.id,name:item.name,category:"coral",zone,parMin:min,parMax:max,
-        ar:`${kindAr}: ابدأ تقريباً ضمن ${min}–${max} PAR وراقب الاستجابة قبل أي رفع.`,
-        en:`${kindEn}: start around ${min}–${max} PAR and observe before increasing.`});
+      row={zone:"mid",min:75,max:180,kindAr:"مرجان متوسط الإضاءة",kindEn:"moderate-light coral"};
+      if(/acropora|acro|montipora|pocillopora|stylophora|sps|اكروبورا|مونتيبورا/.test(n))row={zone:"top",min:200,max:350,kindAr:"SPS عالي الإضاءة",kindEn:"high-light SPS"};
+      else if(/mushroom|ricordea|rhodactis|discosoma|leather|zoa|zoanthid|مشروم|ريكورديا|روداكتس|ليذر|زوا/.test(n))row={zone:"bottom",min:40,max:110,kindAr:"Soft/مشروم منخفض إلى متوسط",kindEn:"low-to-moderate soft coral"};
+      else if(/torch|hammer|frogspawn|euphyllia|candy|acan|blasto|chalice|lps|تورش|هامر|فروغ|كاندي|اكان|بلاستو|شالس/.test(n))row={zone:"mid",min:70,max:170,kindAr:"LPS متوسط الإضاءة",kindEn:"moderate-light LPS"};
     }
     if(tank.type==="freshwater"&&item.category==="plant"){
       const n=normalizedName([item.name,item.nameEn,item.libraryId,item.notes].filter(Boolean).join(" "));
-      let zone:LightingPlacementRecommendation["zone"]="mid",min=40,max=100,kindAr="نبات متوسط الإضاءة",kindEn="moderate-light plant";
-      if(/anubias|java fern|microsorum|buce|bucephalandra|moss|انوبيا|جافا|بوس|موس/.test(n)){zone="shade";min=20;max=55;kindAr="نبات ظل/منخفض الإضاءة";kindEn="shade/low-light plant";}
-      else if(/cryptocoryne|crypt|كريبت/.test(n)){zone="bottom";min=30;max=75;kindAr="Crypt منخفض إلى متوسط";kindEn="low-to-moderate Crypt";}
-      else if(/monte carlo|glossostigma|hemianthus|hc cuba|rotala|ludwigia|alternanthera|carpet|مونتي|روتالا|لودويجيا/.test(n)){zone="top";min=80;max=180;kindAr="نبات قوي/كاربت يحتاج إضاءة أعلى";kindEn="higher-light stem/carpet plant";}
-      rows.push({livestockId:item.id,name:item.name,category:"plant",zone,parMin:min,parMax:max,
-        ar:`${kindAr}: استهدف تقريباً ${min}–${max} PAR مع مراعاة CO₂ والمغذيات.`,
-        en:`${kindEn}: target roughly ${min}–${max} PAR while considering CO₂ and nutrients.`});
+      row={zone:"mid",min:40,max:100,kindAr:"نبات متوسط الإضاءة",kindEn:"moderate-light plant"};
+      if(/anubias|java fern|microsorum|buce|bucephalandra|moss|انوبيا|جافا|بوس|موس/.test(n))row={zone:"shade",min:20,max:55,kindAr:"نبات ظل/منخفض الإضاءة",kindEn:"shade/low-light plant"};
+      else if(/cryptocoryne|crypt|كريبت/.test(n))row={zone:"bottom",min:30,max:75,kindAr:"Crypt منخفض إلى متوسط",kindEn:"low-to-moderate Crypt"};
+      else if(/monte carlo|glossostigma|hemianthus|hc cuba|rotala|ludwigia|alternanthera|carpet|مونتي|روتالا|لودويجيا/.test(n))row={zone:"top",min:80,max:180,kindAr:"نبات قوي/كاربت يحتاج إضاءة أعلى",kindEn:"higher-light stem/carpet plant"};
     }
+    if(!row)continue;
+    const depth=zoneDepth(row.zone);
+    const actual=typeof item.lightingDepthCm==="number"&&Number.isFinite(item.lightingDepthCm)?clamp(item.lightingDepthCm,0,height):undefined;
+    const status:LightingPlacementRecommendation["placementStatus"]=actual===undefined?"unset":(actual>=depth.min&&actual<=depth.max?"within":"outside");
+    const peakPar=actual!==undefined&&program?estimatedParAt(tank,50,50,actual/height*100,peakMinute):undefined;
+    rows.push({
+      livestockId:item.id,name:item.name,category:item.category as "coral"|"plant",zone:row.zone,parMin:row.min,parMax:row.max,
+      recommendedDepthMinCm:depth.min,recommendedDepthMaxCm:depth.max,actualDepthCm:actual,actualZone:actual===undefined?undefined:actualZone(actual),
+      placementStatus:status,estimatedPeakParAtActualDepth:peakPar,
+      ar:`${row.kindAr}: نطاق بداية ${row.min}–${row.max} PAR، وعمق مقترح ${Math.round(depth.min)}–${Math.round(depth.max)} سم تحت سطح الماء.`,
+      en:`${row.kindEn}: starting range ${row.min}–${row.max} PAR, suggested depth ${Math.round(depth.min)}–${Math.round(depth.max)} cm below the surface.`
+    });
   }
   return rows;
 }
