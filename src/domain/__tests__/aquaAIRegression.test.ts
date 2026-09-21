@@ -1125,7 +1125,7 @@ describe("Lighting Intelligence regression",()=>{
     expect(light.issues.some(x=>x.id==="photosynthetic-placement")).toBe(true);
     const core=tankIntelligenceCore(t);
     expect(core.lighting.placementRecommendations.some(x=>x.livestockId==="brain-coral")).toBe(true);
-    expect(core.nextActions.some(x=>x.domain==="lighting")).toBe(true);
+    expect(core.actions.some(x=>x.domain==="lighting")).toBe(true);
     const answer=aquaAIAnswer("وين Torch Brain Link وقديش واصله ضو؟",t,"lighting");
     const joined=answer.detailsAr.join(" ");
     expect(joined).toContain("Torch Brain Link");
