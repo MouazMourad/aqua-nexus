@@ -76,6 +76,9 @@ export function TimelinePage({tank}:{tank:Tank}) {
   </div>
  </AdvancedSection></div>
  <div className="timeline full-span">{rows.length?rows.map(x=><article className="timeline-item" key={x.id}><span className="timeline-dot"/><div><small>{new Date(x.timestamp).toLocaleString()}</small><b>{lang==="ar"?x.textAr:x.textEn}</b><em>{x.type}{x.source==="intelligence"?" • Tank Brain":""}</em></div></article>):<div className="empty-state">{tr(lang,"timelineEmpty")}</div>}{nextCursor&&<button className="btn" onClick={loadMore}>{bi(lang,"عرض 200 حدث أقدم","Show 200 older events")}</button>}</div>
- <Modal open={open} title={tr(lang,"addEvent")} onClose={()=>setOpen(false)}><div className="form-grid"><label className="field"><span>العربية</span><textarea value={ar} onChange={e=>setAr(e.target.value)}/></label><label className="field"><span>English</span><textarea value={en} onChange={e=>setEn(e.target.value)}/></label></div><div className="modal-actions"><button className="btn" onClick={()=>setOpen(false)}>{tr(lang,"cancel")}</button><button className="btn primary" onClick={add}>{tr(lang,"save")}</button></div></Modal>
+ <Modal open={open} title={tr(lang,"addEvent")} onClose={()=>setOpen(false)}>
+  <div className="form-grid"><label className="field full-field"><span>{lang==="ar"?"وصف الحدث":"Event description"}</span><textarea value={lang==="ar"?ar:en} onChange={e=>lang==="ar"?setAr(e.target.value):setEn(e.target.value)}/></label></div>
+  <AdvancedSection titleAr="الوصف باللغة الثانية" titleEn="Second-language description" summaryAr="اختياري؛ يفيد إذا بدلت لغة البرنامج لاحقاً." summaryEn="Optional; useful if you switch the app language later."><div className="form-grid" style={{paddingTop:10}}><label className="field full-field"><span>{lang==="ar"?"English":"العربية"}</span><textarea value={lang==="ar"?en:ar} onChange={e=>lang==="ar"?setEn(e.target.value):setAr(e.target.value)}/></label></div></AdvancedSection>
+  <div className="modal-actions"><button className="btn" onClick={()=>setOpen(false)}>{tr(lang,"cancel")}</button><button className="btn primary" onClick={add}>{tr(lang,"save")}</button></div></Modal>
  </section>;
 }
