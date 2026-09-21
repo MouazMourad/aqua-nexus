@@ -5,6 +5,7 @@ import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DecisionGuidance } from "@/components/ui/DecisionGuidance";
+import { ContextHint } from "@/components/ui/ContextHint";
 import { uid,nowISO } from "@/lib/appUtils";
 import { chemistryCatalogForTank } from "@/domain/chemistryProfile";
 import { calculateDose,DOSING_PRESETS,type DosingForm,type DosingParameter } from "@/domain/dosingCalculator";
@@ -157,6 +158,7 @@ export function DosingPage({tank}:{tank:Tank}) {
   {form==="product"&&<div className="form-grid" style={{marginTop:12}}><label className="field"><span>{lang==="ar"?"اسم المنتج التجاري":"Commercial product name"}</span><input value={productName} onChange={e=>setProductName(e.target.value)} placeholder={lang==="ar"?"مثال: منتج KH محدد":"e.g. a specific KH product"}/></label><label className="field"><span>{lang==="ar"?`من العبوة: 1 mL لكل 100 L بيرفع ${param} قديش؟`:`From the label: how much does 1 mL per 100 L raise ${param}?`}</span><input type="number" min="0" step="any" value={productRaise||""} onChange={e=>setProductRaise(Number(e.target.value))} placeholder={lang==="ar"?"اكتب الرقم الموجود على الملصق":"Enter the label value"}/></label></div>}
 
   {showAdvanced&&<div className="dosing-advanced">
+   <ContextHint id="dosing-purity" lang={lang} tone="important" ar="غيّر النقاوة فقط إذا عندك قيمة موثقة للمادة. تركها 100% أفضل من إدخال تخمين يغيّر كمية الجرعة المحسوبة." en="Change purity only when you have a verified material value. Leaving it at 100% is safer than entering a guess that changes the calculated dose."/>
    <div className="module-head"><div><h4>{lang==="ar"?"ضبط دقيق وحسابات متقدمة":"Fine tuning & advanced calculation"}</h4><p className="note">{lang==="ar"?"هاي التفاصيل مو مطلوبة لمعظم الاستخدام اليومي، لكنها موجودة للمستخدم الخبير وللمواد غير القياسية.":"These details are not needed for most daily use, but remain available for expert and non-standard setups."}</p></div></div>
    <div className="form-grid">
     {form!=="product"&&<label className="field"><span>{lang==="ar"?"النقاوة الفعلية للمادة %":"Actual material purity %"}</span><input type="number" min="1" max="100" step="1" value={purity} onChange={e=>setPurity(Number(e.target.value))}/></label>}
