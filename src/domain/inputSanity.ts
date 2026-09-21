@@ -80,3 +80,74 @@ export function sanitizeSumpFill(value:number,fallback:number){
 export function sanitizeNonNegative(value:number,fallback=0,max=1_000_000){
   return finite(value)?Math.max(0,Math.min(max,value)):Math.max(0,fallback);
 }
+
+
+export function validateEquipmentEntry(input:{
+  serviceIntervalDays:number;powerWatts:number;hoursPerDay:number;ratedVolumeLiters:number;flowLph:number;
+  parAtTargetDepth:number;coverageLengthCm:number;coverageWidthCm:number;
+}){
+  const issues:InputSanityIssue[]=[]; const add=(x:InputSanityIssue|undefined)=>{if(x)issues.push(x)};
+  add(range("serviceIntervalDays",input.serviceIntervalDays,1,3650,"فترة الصيانة بالأيام","Service interval days"));
+  add(range("powerWatts",input.powerWatts,0,100000,"القدرة بالواط","Power watts"));
+  add(range("hoursPerDay",input.hoursPerDay,0,24,"ساعات التشغيل اليومية","Hours per day"));
+  add(range("ratedVolumeLiters",input.ratedVolumeLiters,0,5_000_000,"الحجم المصنف","Rated volume"));
+  add(range("flowLph",input.flowLph,0,20_000_000,"التدفق","Flow"));
+  add(range("parAtTargetDepth",input.parAtTargetDepth,0,5000,"PAR","PAR"));
+  add(range("coverageLengthCm",input.coverageLengthCm,0,5000,"طول التغطية","Coverage length"));
+  add(range("coverageWidthCm",input.coverageWidthCm,0,5000,"عرض التغطية","Coverage width"));
+  return{ok:!issues.some(x=>x.level==="danger"),issues};
+}
+
+export function validateInventoryEntry(input:{quantity:number;minimum:number;unit:string;name:string}){
+  const issues:InputSanityIssue[]=[]; const add=(x:InputSanityIssue|undefined)=>{if(x)issues.push(x)};
+  add(range("quantity",input.quantity,0,1_000_000_000,"كمية المخزون","Inventory quantity"));
+  add(range("minimum",input.minimum,0,1_000_000_000,"حد المخزون الأدنى","Minimum stock"));
+  if(!input.name.trim())issues.push({field:"name",level:"danger",ar:"اسم المادة مطلوب.",en:"Item name is required."});
+  if(!input.unit.trim())issues.push({field:"unit",level:"danger",ar:"وحدة القياس مطلوبة.",en:"Unit is required."});
+  if(input.minimum>input.quantity&&input.quantity>0)issues.push({field:"minimum",level:"warn",ar:"الحد الأدنى أعلى من الكمية الحالية؛ ستظهر المادة كمخزون منخفض مباشرة.",en:"Minimum stock is above current quantity; the item will immediately appear low."});
+  return{ok:!issues.some(x=>x.level==="danger"),issues};
+}
+
+export function validateExpenseEntry(input:{amount:number;description:string;currency:string}){
+  const issues:InputSanityIssue[]=[]; const add=(x:InputSanityIssue|undefined)=>{if(x)issues.push(x)};
+  add(range("amount",input.amount,.000001,1_000_000_000,"قيمة المصروف","Expense amount"));
+  if(!input.description.trim())issues.push({field:"description",level:"danger",ar:"وصف المصروف مطلوب.",en:"Expense description is required."});
+  if(!/^[A-Za-z0-9 ._-]{2,12}$/.test(input.currency.trim()))issues.push({field:"currency",level:"danger",ar:"رمز العملة غير منطقي. استخدم رمزاً قصيراً مثل USD أو EUR.",en:"Currency code looks invalid. Use a short code such as USD or EUR."});
+  return{ok:!issues.some(x=>x.level==="danger"),issues};
+}
+
+export function validateWaterChangeEntry(input:{liters:number;systemVolumeLiters:number;salinity?:number;temperature?:number}){
+  const issues:InputSanityIssue[]=[]; const add=(x:InputSanityIssue|undefined)=>{if(x)issues.push(x)};
+  add(range("liters",input.liters,.1,Math.max(.1,input.systemVolumeLiters*2),"حجم تغيير الماء","Water-change volume"));
+  if(input.salinity!==undefined)add(range("salinity",input.salinity,.99,1.06,"ملوحة ماء التعويض","Replacement salinity"));
+  if(input.temperature!==undefined)add(range("temperature",input.temperature,0,45,"حرارة ماء التعويض","Replacement temperature"));
+  if(input.systemVolumeLiters>0&&input.liters>input.systemVolumeLiters)issues.push({field:"liters",level:"danger",ar:"حجم تغيير الماء أكبر من حجم النظام المسجل.",en:"Water-change volume is larger than the recorded system volume."});
+  return{ok:!issues.some(x=>x.level==="danger"),issues};
+}
+
+export function validateDoserChannelEntry(input:{capacityMl:number;currentMl:number;consumption:number}){
+  const issues:InputSanityIssue[]=[]; const add=(x:InputSanityIssue|undefined)=>{if(x)issues.push(x)};
+  add(range("capacityMl",input.capacityMl,.1,1_000_000,"سعة قناة الدوزر","Doser capacity"));
+  add(range("currentMl",input.currentMl,0,1_000_000,"الكمية المتبقية","Doser remaining volume"));
+  add(range("consumption",input.consumption,0,1_000_000,"الاستهلاك","Doser consumption"));
+  if(input.currentMl>input.capacityMl)issues.push({field:"currentMl",level:"danger",ar:"الكمية المتبقية لا يمكن أن تكون أكبر من سعة الخزان.",en:"Remaining volume cannot exceed reservoir capacity."});
+  return{ok:!issues.some(x=>x.level==="danger"),issues};
+}
+
+export function validateFilterMediaEntry(input:{amountGrams:number;referenceLifeDays:number}){
+  const issues:InputSanityIssue[]=[]; const add=(x:InputSanityIssue|undefined)=>{if(x)issues.push(x)};
+  add(range("amountGrams",input.amountGrams,.1,100_000,"كمية الميديا","Media amount"));
+  add(range("referenceLifeDays",input.referenceLifeDays,1,3650,"العمر المرجعي","Reference life"));
+  return{ok:!issues.some(x=>x.level==="danger"),issues};
+}
+
+export function validateEnergySettings(input:{pricePerKwh:number;currency:string}){
+  const issues:InputSanityIssue[]=[]; const add=(x:InputSanityIssue|undefined)=>{if(x)issues.push(x)};
+  add(range("pricePerKwh",input.pricePerKwh,0,1_000_000,"سعر الكهرباء","Electricity price"));
+  if(input.currency.trim()&&!/^[A-Za-z0-9 ._-]{2,12}$/.test(input.currency.trim()))issues.push({field:"currency",level:"danger",ar:"رمز العملة غير منطقي.",en:"Currency code looks invalid."});
+  return{ok:!issues.some(x=>x.level==="danger"),issues};
+}
+
+export function sanitizeBounded(value:number,min:number,max:number,fallback=min){
+  return finite(value)?Math.max(min,Math.min(max,value)):fallback;
+}
