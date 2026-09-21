@@ -8,6 +8,7 @@ import { uid,today,nowISO } from "@/lib/appUtils";
 import { claimCriticalAction } from "@/lib/actionGuard";
 import { inventoryForConsumer } from "@/domain/inventoryIntelligence";
 import { interventionGate } from "@/domain/interventionSafety";
+import { useSafetyOverrideDialog } from "@/components/ui/SafetyOverrideDialog";
 import { validatePositiveQuantity,validateTreatmentSetup } from "@/domain/inputSanity";
 
 function addHoursISO(hours:number){return new Date(Date.now()+Math.max(1,hours)*3600000).toISOString();}
@@ -15,6 +16,7 @@ function dateOnly(iso?:string){return iso?new Date(iso).toISOString().slice(0,10
 
 export function QuarantinePage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
+ const {requestOverride,overrideDialog}=useSafetyOverrideDialog(lang);
  const [organism,setOrganism]=useState(""),[subjectId,setSubjectId]=useState(""),[reason,setReason]=useState(""),[plan,setPlan]=useState("");
  const [volume,setVolume]=useState(Math.max(20,Math.round(tank.systemVolumeLiters*.12)));
  const [product,setProduct]=useState(""),[labelDose,setLabelDose]=useState(0),[intervalHours,setIntervalHours]=useState(24),[totalDoses,setTotalDoses]=useState(1),[medInventoryId,setMedInventoryId]=useState("");
@@ -46,7 +48,7 @@ export function QuarantinePage({tank}:{tank:Tank}) {
   setOrganism("");setSubjectId("");setReason("");setPlan("");setProduct("");setLabelDose(0);setTotalDoses(1);
  }
 
- function logDose(id:string){
+ async function logDose(id:string){
   const q=tank.quarantine.find(x=>x.id===id);
   if(!q||q.status!=="active"||!q.treatmentProduct||!q.labelDoseMlPer100L||!q.quarantineVolumeLiters)return;
   const setupCheck=validateTreatmentSetup({volumeLiters:q.quarantineVolumeLiters,labelDoseMlPer100L:q.labelDoseMlPer100L,intervalHours:q.intervalHours??24,totalDoses:q.totalDoses??1});
@@ -63,7 +65,11 @@ export function QuarantinePage({tank}:{tank:Tank}) {
   const ts=nowISO();
   const intervention=interventionGate(tank,"medication");
   if(intervention.level==="warn"&&!window.confirm(lang==="ar"?intervention.ar+" هل جرعة العلاج مستحقة الآن حسب الخطة؟":intervention.en+" Is the treatment dose due now according to the plan?"))return;
-  if(intervention.level==="danger"&&!window.confirm(lang==="ar"?"⚠️ "+intervention.ar+" لا تكمل إلا إذا الجرعة العلاجية مطلوبة الآن فعلاً حسب الخطة/الملصق. متابعة؟":"⚠️ "+intervention.en+" Continue only if this treatment dose is genuinely due now under the plan/product label. Continue?"))return;
+  let overrideReason="";
+  if(intervention.level==="danger"){
+   const reason=await requestOverride({title:lang==="ar"?"تجاوز تحذير جرعة علاج":"Treatment-dose safety override",message:lang==="ar"?intervention.ar:intervention.en,requireReason:true});
+   if(!reason)return;overrideReason=reason;
+  }
   if(!claimCriticalAction(`quarantine-dose:${tank.id}:${id}`))return;
   const inv=q.medicationInventoryItemId?medicationStock.find(i=>i.id===q.medicationInventoryItemId):undefined;
   const consume=q.medicationQuantityPerDose??dose;
@@ -73,7 +79,7 @@ export function QuarantinePage({tank}:{tank:Tank}) {
    inventory:inv?t.inventory.map(i=>i.id===inv.id?{...i,quantity:Math.max(0,i.quantity-consume)}:i):t.inventory,
    quarantine:t.quarantine.map(x=>x.id===id?{...x,dosesGiven,lastDoseAt:ts,nextDoseAt,responseObservedAt:undefined}:x),
    maintenance:more?[...t.maintenance,{id:uid("task"),title:`جرعة حجر: ${q.treatmentProduct} — ${q.organism}`,titleEn:`Quarantine dose: ${q.treatmentProduct} — ${q.organism}`,cadence:"once",done:false,nextDue:dateOnly(nextDoseAt),manual:true}]:t.maintenance,
-   timeline:[{id:uid("ev"),timestamp:ts,type:"quarantine-dose",textAr:`تم تسجيل جرعة ${dose.toFixed(2)} mL من ${q.treatmentProduct} لـ ${q.organism} (${dosesGiven}/${total}) حسب ملصق المنتج.`,textEn:`Logged ${dose.toFixed(2)} mL of ${q.treatmentProduct} for ${q.organism} (${dosesGiven}/${total}) using the product-label rate.`},...t.timeline]
+   timeline:[...(overrideReason?[{id:uid("ev"),timestamp:ts,type:"safety-override",textAr:`تم تجاوز تحذير جرعة علاج. السبب: ${overrideReason}`,textEn:`Treatment-dose safety warning overridden. Reason: ${overrideReason}`}]:[]),{id:uid("ev"),timestamp:ts,type:"quarantine-dose",textAr:`تم تسجيل جرعة ${dose.toFixed(2)} mL من ${q.treatmentProduct} لـ ${q.organism} (${dosesGiven}/${total}) حسب ملصق المنتج.`,textEn:`Logged ${dose.toFixed(2)} mL of ${q.treatmentProduct} for ${q.organism} (${dosesGiven}/${total}) using the product-label rate.`},...t.timeline]
   }));
  }
 
@@ -88,7 +94,7 @@ export function QuarantinePage({tank}:{tank:Tank}) {
   }));
  }
 
- return <section className="page-grid"><PageHeader eyebrow="QUARANTINE PROTOCOL" title={tr(lang,"quarantine")}/>
+ return <>{overrideDialog}<section className="page-grid"><PageHeader eyebrow="QUARANTINE PROTOCOL" title={tr(lang,"quarantine")}/>
  <div className="card panel full-span">
   <div className="module-head"><div><h3>{bi(lang,"إنشاء حالة حجر أو علاج","Create quarantine / treatment case")}</h3><p className="note">{bi(lang,"أدخل جرعة المنتج كما هي مكتوبة على الملصق فقط. Aqua Nexus يحسب الحجم للحوض الحجري ويتابع المواعيد، ولا يفترض تركيزاً دوائياً من عنده.","Enter the dose exactly as printed on the product label. Aqua Nexus scales it to quarantine volume and tracks timing without assuming medication concentration.")}</p></div></div>
   <div className="form-grid">
@@ -111,5 +117,5 @@ export function QuarantinePage({tank}:{tank:Tank}) {
   const given=x.dosesGiven??0,total=Math.max(1,x.totalDoses??1),completeTreatment=given>=total;
   return <div className="case-row" key={x.id} style={{alignItems:"flex-start"}}><div style={{flex:1}}><b>{x.organism}</b><span>{x.reason}</span><small>{x.plan}</small>{x.treatmentProduct&&<div className="note" style={{marginTop:6}}><b>{x.treatmentProduct}</b> • {dose.toFixed(2)} mL / dose • {given}/{total}{x.nextDoseAt?` • ${bi(lang,"القادمة","next")}: ${new Date(x.nextDoseAt).toLocaleString()}`:""}</div>}</div><span className={`status ${x.status==="active"?"warn":""}`}>{tr(lang,x.status==="active"?"active":"completed")}</span>{x.status==="active"&&<div className="modal-actions" style={{marginTop:0}}>{x.treatmentProduct&&!completeTreatment&&<button className="btn primary" onClick={()=>logDose(x.id)}>{bi(lang,"تسجيل الجرعة","Log dose")}</button>}<button className="btn good" onClick={()=>close(x.id,true)}>✓ {bi(lang,"تم التعافي","Resolved")}</button><button className="btn" onClick={()=>close(x.id,false)}>{bi(lang,"إغلاق مع مراقبة","Close • watch")}</button></div>}</div>
  })}</div></div>
- </section>;
+ </section></>;
 }
