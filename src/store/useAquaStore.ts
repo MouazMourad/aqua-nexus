@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage,persist } from "zustand/middleware";
 import type { AquaState, ChemistryReading, Equipment, HealthSnapshot, Language, Tank } from "@/domain/types";
 import { demoMarineTank, demoFreshwaterTank } from "@/data/demoTank";
 import { liters, round1 } from "@/lib/units";
@@ -12,6 +12,7 @@ import { tankIntelligenceCore } from "@/domain/intelligenceCore";
 import { deriveIntelligenceEvents,mergeIntelligenceEvents,reconcileGuidanceActions } from "@/domain/eventIntelligence";
 import { deriveExtendedIntelligenceEvents } from "@/domain/extendedEventIntelligence";
 import { recordCloudDeleteTombstone } from "@/lib/cloudTombstones";
+import { aquaStateStorage } from "@/lib/aquaStateStorage";
 
 interface AquaStore extends AquaState {
   setLanguage: (language: Language) => void;
@@ -239,6 +240,7 @@ export const useAquaStore = create<AquaStore>()(
     {
       name:"aqua-nexus-3d-v1",
       version:9,
+      storage:createJSONStorage(()=>aquaStateStorage),
       migrate:(persisted:any,fromVersion:number)=>{
         const p=persisted??{};
         // Release migrations are non-destructive. Preserve real tanks and add/
