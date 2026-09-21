@@ -206,6 +206,10 @@ export function LightingPage({tank,onEquipment}:{tank:Tank;onEquipment:()=>void}
   const ts=nowISO();
   patch(tank.id,t=>({...t,equipment:t.equipment.map(x=>x.id===id?{...x,...partial}:x),timeline:[{id:uid("ev"),timestamp:ts,type:"lighting-fixture-model",textAr:"تم تحديث نموذج وحدة إنارة لتحسين تقدير التوزيع الضوئي.",textEn:"A lighting fixture model was updated to improve light-distribution estimation."},...t.timeline]}));
  }
+ function updateLivestockLightingDepth(id:string,value:number|undefined){
+  const ts=nowISO(),depth=value===undefined?undefined:clamp(value,0,tank.display.height);
+  patch(tank.id,t=>({...t,livestock:t.livestock.map(x=>x.id===id?{...x,lightingDepthCm:depth}:x),timeline:[{id:uid("ev"),timestamp:ts,type:"lighting-livestock-depth",textAr:depth===undefined?"تم حذف عمق التموضع الضوئي للكائن.":"تم ضبط عمق الكائن على "+Math.round(depth)+" سم تحت سطح الماء.",textEn:depth===undefined?"Photosynthetic livestock depth was cleared.":"Livestock depth set to "+Math.round(depth)+" cm below the water surface."},...t.timeline]}));
+ }
  async function analyzeLightingImportWithAI(args:{file:File;sourceKind:"image"|"text";imageDataUrl?:string;textContent?:string}){
   const response=await fetch("/api/ai/lighting-import",{
    method:"POST",
@@ -345,8 +349,45 @@ export function LightingPage({tank,onEquipment}:{tank:Tank;onEquipment:()=>void}
   </section>
 
   <section className="card panel full-span lighting-placement-panel">
-   <div className="module-head"><div><small className="eyebrow-mini">{tank.type==="marine"?"CORAL PLACEMENT":"PLANT PLACEMENT"}</small><h3>{tank.type==="marine"?bi(lang,"تموضع المرجان حسب حاجته للضوء","Coral placement by light demand"):bi(lang,"تموضع النباتات حسب النوع والحاجة للضوء","Plant placement by species & light demand")}</h3><p className="note">{tank.type==="marine"?bi(lang,"Aqua Nexus يفرق بين SPS وLPS والـSoft/مشروم ويعطي نطاق PAR ومكان بداية محافظ.","Aqua Nexus separates SPS, LPS and soft/mushroom corals and gives a conservative starting PAR/zone."):bi(lang,"Aqua Nexus يفرق بين نباتات الظل والـCrypt والنباتات الساقية/الكاربت ويعطي نطاق PAR ومكان مناسب.","Aqua Nexus separates shade plants, Crypts and higher-light stem/carpet plants with suitable PAR zones.")}</p></div><span className="scene-badge">{intel.placementRecommendations.length}</span></div>
-   {intel.placementRecommendations.length?<div className="lighting-placement-grid">{intel.placementRecommendations.map(x=><article className={"lighting-placement-card zone-"+x.zone} key={x.livestockId}><div><b>{x.name}</b><span>{x.zone==="top"?bi(lang,"أعلى","TOP"):x.zone==="mid"?bi(lang,"وسط","MID"):x.zone==="shade"?bi(lang,"ظل","SHADE"):bi(lang,"أسفل","BOTTOM")}</span></div><strong>{x.parMin}–{x.parMax} PAR</strong><p>{lang==="ar"?x.ar:x.en}</p></article>)}</div>:<div className="inline-alert info">{tank.type==="marine"?bi(lang,"سجّل المرجان بالحوض حتى تظهر توصيات التموضع الخاصة بكل نوع.","Register corals to get per-species placement guidance."):bi(lang,"سجّل النباتات بالحوض حتى تظهر توصيات التموضع الخاصة بكل نوع.","Register plants to get per-species placement guidance.")}</div>}
+   <div className="module-head"><div><small className="eyebrow-mini">{tank.type==="marine"?"CORAL DEPTH MAP":"PLANT DEPTH MAP"}</small><h3>{tank.type==="marine"?bi(lang,"مخطط مستويات المرجان داخل الحوض","Coral depth-level map"):bi(lang,"مخطط مستويات النباتات داخل الحوض","Plant depth-level map")}</h3><p className="note">{bi(lang,"المخطط مقسوم حسب المسافة الحقيقية تحت سطح الماء. الكائن الموجود بالحوض يظهر بمستواه الفعلي إذا سجلت عمقه؛ وإذا ما تسجل بعد، يظهر بالمستوى المقترح بوضوح.","The diagram is divided by real distance below the water surface. Existing livestock appears at its actual level once depth is recorded; otherwise it is clearly shown in the suggested level.")}</p></div><span className="scene-badge">{Math.round(tank.display.height)} cm</span></div>
+   <div className="lighting-depth-layout">
+    <div className="lighting-depth-ruler" aria-hidden="true"><span>0 cm</span><span>{Math.round(tank.display.height*.35)} cm</span><span>{Math.round(tank.display.height*.68)} cm</span><span>{Math.round(tank.display.height)} cm</span></div>
+    <div className="lighting-depth-tank">
+     {(["top","mid","bottom"] as const).map(zone=>{
+      const min=zone==="top"?0:zone==="mid"?tank.display.height*.35:tank.display.height*.68;
+      const max=zone==="top"?tank.display.height*.35:zone==="mid"?tank.display.height*.68:tank.display.height;
+      const suitable=tank.type==="marine"
+       ?zone==="top"?bi(lang,"SPS عالي الإضاءة: Acropora • Montipora • Stylophora","High-light SPS: Acropora • Montipora • Stylophora")
+        :zone==="mid"?bi(lang,"LPS ومتوسط الإضاءة: Torch • Hammer • Frogspawn • Acan • Candy Cane","Moderate-light LPS: Torch • Hammer • Frogspawn • Acan • Candy Cane")
+        :bi(lang,"Soft/منخفض الإضاءة: Mushroom • Ricordea • Zoanthids • Leather","Lower-light soft: Mushroom • Ricordea • Zoanthids • Leather")
+       :zone==="top"?bi(lang,"الجزء العلوي/الكانوبي: Rotala • Ludwigia • Alternanthera والنباتات الطافية","Upper canopy: Rotala • Ludwigia • Alternanthera and floating plants")
+        :zone==="mid"?bi(lang,"كانوبي متوسط وإبيفايت: stems متوسطة • Buce على صخور مرتفعة","Mid canopy and epiphytes: medium stems • elevated Buce")
+        :bi(lang,"القاع والسابستريت: Crypts • carpets • rooted plants","Bottom/substrate: Crypts • carpets • rooted plants");
+      const residents=intel.placementRecommendations.filter(x=>{
+       if(x.actualZone)return x.actualZone===zone;
+       if(x.zone==="shade")return zone==="bottom";
+       return x.zone===zone;
+      });
+      return <div className={"lighting-depth-zone depth-"+zone} key={zone}>
+       <div className="lighting-depth-zone-head"><div><b>{zone==="top"?bi(lang,"المستوى العلوي","UPPER LEVEL"):zone==="mid"?bi(lang,"المستوى المتوسط","MID LEVEL"):bi(lang,"المستوى السفلي","BOTTOM LEVEL")}</b><small>{Math.round(min)}–{Math.round(max)} {bi(lang,"سم تحت السطح","cm below surface")}</small></div><span>{zone==="top"?"☀☀☀":zone==="mid"?"☀☀":"☀"}</span></div>
+       <p className="lighting-depth-suitable">{suitable}</p>
+       {zone==="bottom"&&<div className="lighting-shade-pocket"><b>{bi(lang,"منطقة ظل","SHADE POCKET")}</b><small>{tank.type==="marine"?bi(lang,"Soft منخفض الإضاءة أو مرحلة acclimation؛ الظل ليس عمقاً ثابتاً.","Low-light soft coral or acclimation; shade is not a fixed depth."):bi(lang,"Anubias • Java Fern • Buce • Moss تحت hardscape أو بعيداً عن الذروة.","Anubias • Java Fern • Buce • Moss under hardscape or away from the peak.")}</small></div>}
+       <div className="lighting-depth-residents">
+        {residents.length?residents.map(x=><article className={"lighting-depth-resident "+(x.placementStatus==="outside"?"outside":x.placementStatus==="within"?"within":"suggested")} key={x.livestockId}>
+         <div className="lighting-depth-resident-title"><div><b>{x.name}</b><small>{x.category==="coral"?bi(lang,"مرجان","CORAL"):bi(lang,"نبات","PLANT")} • {x.parMin}–{x.parMax} PAR</small></div><span>{x.actualDepthCm===undefined?bi(lang,"مقترح","SUGGESTED"):x.placementStatus==="within"?bi(lang,"مناسب","OK"):bi(lang,"راجع الموقع","CHECK")}</span></div>
+         <div className="lighting-depth-resident-metrics">
+          <label className="field mini"><span>{bi(lang,"بعده عن سطح الماء","Depth below surface")}</span><div className="lighting-depth-input"><input type="number" min="0" max={tank.display.height} step="1" value={x.actualDepthCm??""} placeholder={Math.round((x.recommendedDepthMinCm+x.recommendedDepthMaxCm)/2).toString()} onChange={e=>updateLivestockLightingDepth(x.livestockId,e.target.value===""?undefined:Number(e.target.value))}/><b>cm</b></div></label>
+          <div><small>{bi(lang,"العمق المقترح","Suggested depth")}</small><b>{Math.round(x.recommendedDepthMinCm)}–{Math.round(x.recommendedDepthMaxCm)} cm</b></div>
+          <div><small>{bi(lang,"PAR عند موقعه","PAR at position")}</small><b>{typeof x.estimatedPeakParAtActualDepth==="number"?"≈ "+Math.round(x.estimatedPeakParAtActualDepth):"—"}</b></div>
+         </div>
+         <p>{lang==="ar"?x.ar:x.en}</p>
+        </article>):<div className="lighting-depth-empty">{bi(lang,"ما في كائن مسجل بهذا المستوى حالياً.","No registered livestock at this level yet.")}</div>}
+       </div>
+      </div>;
+     })}
+    </div>
+   </div>
+   {intel.placementRecommendations.length===0&&<div className="inline-alert info">{tank.type==="marine"?bi(lang,"سجّل المرجان بالحوض حتى يظهر داخل مخطط المستويات.","Register corals so they can appear inside the depth map."):bi(lang,"سجّل النباتات بالحوض حتى تظهر داخل مخطط المستويات.","Register plants so they can appear inside the depth map.")}</div>}
   </section>
 
   <section className="card panel full-span">
