@@ -45,7 +45,7 @@ import { TANK_EVENT_COVERAGE,eventedTankFields } from "@/domain/eventCoverage";
 import { domainOutcomeLearning } from "@/domain/outcomeLearning";
 import { historyPage } from "@/domain/historyPagination";
 import { buildVacationTaskDrafts,vacationDays } from "@/domain/vacationPlan";
-import { defaultLightingProgram,estimatedParAt,lightingCalibrationFactor,lightingGrid,lightingIntelligence,lightingSchedule } from "@/domain/lightingIntelligence";
+import { defaultLightingProgram,estimatedParAt,lightingCalibrationFactor,lightingGrid,lightingIntelligence,lightingPlacementRecommendations,lightingSchedule } from "@/domain/lightingIntelligence";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -1050,6 +1050,29 @@ describe("Lighting Intelligence regression",()=>{
     const answer=aquaAIAnswer("شو وضع الإنارة والـ PAR بالحوض؟",t,"lighting");
     expect(answer.action?.page).toBe("lighting");
     expect(answer.detailsAr.join(" ")).toMatch(/PAR|الإنارة|البرنامج/);
+  });
+  it("separates marine coral and freshwater plant placement guidance",()=>{
+    const marine=litTank();
+    marine.livestock.push({id:"coral-sps",name:"Acropora Test",category:"coral",quantity:1,health:"good"} as any);
+    const coral=lightingPlacementRecommendations(marine).find(x=>x.livestockId==="coral-sps");
+    expect(coral?.zone).toBe("top");
+    expect(coral?.parMin).toBeGreaterThanOrEqual(180);
+
+    const freshwater=structuredClone(demoFreshwaterTank);
+    freshwater.livestock.push({id:"plant-low",name:"Anubias Nana",category:"plant",quantity:1,health:"good"} as any);
+    const plant=lightingPlacementRecommendations(freshwater).find(x=>x.livestockId==="plant-low");
+    expect(plant?.zone).toBe("shade");
+    expect(plant?.parMax).toBeLessThanOrEqual(60);
+  });
+  it("uses fixture wattage when no measured reference PAR exists",()=>{
+    const t=litTank();
+    const light=t.equipment.find(x=>x.kind==="lighting")!;
+    delete light.parAtTargetDepth;
+    light.powerWatts=120;
+    const peak=lightingSchedule(t.lighting!.activeProgram!).peakMinute;
+    expect(estimatedParAt(t,50,50,50,peak)).toBeGreaterThan(20);
+    light.powerWatts=0;
+    expect(lightingIntelligence(t).issues.some(x=>x.id==="fixture-power-missing")).toBe(true);
   });
   it("keeps Lighting accessible during cycling and covered by the Tank event contract",()=>{
     expect(isCyclePageAllowed("lighting")).toBe(true);
