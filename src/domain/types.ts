@@ -726,6 +726,8 @@ export interface Tank {
   biologicalCycle?: BiologicalCycleState;
   lifecycle?: TankLifecycleState;
   acclimationSessions?: AcclimationSession[];
+  /** Local Best AI follow-up plans; kept in Tank memory and backup history. */
+  aiActionPlans?: unknown[];
   createdAt: string;
 }
 

@@ -1,4 +1,5 @@
 import type { AquariumExperienceLevel,Language,Tank } from "./types";
+import { validateChemistryValues } from "./chemistryDataQuality";
 
 export const CURRENT_BACKUP_SCHEMA=10;
 
@@ -15,6 +16,7 @@ export type BackupValidationResult=
 
 const MAX_TANKS=100;
 const MAX_TEXT=500;
+const MAX_ROWS_PER_COLLECTION=250_000;
 
 function isObject(value:unknown):value is Record<string,unknown>{
   return Boolean(value)&&typeof value==="object"&&!Array.isArray(value);
@@ -32,7 +34,7 @@ function validDimensions(value:unknown){
 }
 function arraysAreArrays(tank:Record<string,unknown>){
   const fields=["equipment","chemistry","maintenance","livestock","inventory","timeline","intelligenceEvents","guidanceActions","healthSnapshots","photos","visionAssessments","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi","rodiServiceEvents","plantCare","acclimationSessions","emergencySessions","filterMedia","livestockExits","aiActionPlans"];
-  return fields.every(key=>tank[key]===undefined||Array.isArray(tank[key]));
+  return fields.every(key=>tank[key]===undefined||(Array.isArray(tank[key])&&(tank[key] as unknown[]).length<=MAX_ROWS_PER_COLLECTION));
 }
 
 function validTimestamp(value:unknown){
@@ -103,6 +105,7 @@ function nestedDataIssue(tank:Record<string,unknown>){
   for(const [i,row] of (((tank.doserChannels as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validText(row.name,300))return `doserChannels #${i+1} is invalid`;
     for(const key of ["capacityMl","currentMl","consumption"]){const value=row[key];if(value!==undefined&&(!finite(value)||Number(value)<0))return `doserChannels #${i+1} has an invalid ${key}`;}
+    if(finite(row.capacityMl)&&finite(row.currentMl)&&Number(row.currentMl)>Number(row.capacityMl))return `doserChannels #${i+1} has current volume above capacity`;
   }
   for(const [i,row] of (((tank.filterMedia as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validText(row.name,300)||!finite(row.amountGrams)||Number(row.amountGrams)<0)return `filterMedia #${i+1} is invalid`;
@@ -131,10 +134,14 @@ function nestedDataIssue(tank:Record<string,unknown>){
       if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.startedAt))return `lifecycle.vacations #${i+1} is invalid`;
       if(row.plannedEndAt!==undefined&&!validTimestamp(row.plannedEndAt)&&!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(row.plannedEndAt)))return `lifecycle.vacations #${i+1} has invalid plannedEndAt`;
       if(row.endedAt!==undefined&&!validTimestamp(row.endedAt))return `lifecycle.vacations #${i+1} has invalid endedAt`;
+      const startAt=new Date(String(row.startedAt)).getTime(),planned=row.plannedEndAt?new Date(String(row.plannedEndAt)).getTime():null,ended=row.endedAt?new Date(String(row.endedAt)).getTime():null;
+      if(planned!==null&&Number.isFinite(planned)&&planned<startAt)return `lifecycle.vacations #${i+1} ends before it starts`;
+      if(ended!==null&&Number.isFinite(ended)&&ended<startAt)return `lifecycle.vacations #${i+1} endedAt precedes startedAt`;
     }
     for(const [i,row] of (((lifecycle.relocations as unknown[])??[])).entries()){
       if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.startedAt)||!["planned","in_progress","completed"].includes(String(row.status)))return `lifecycle.relocations #${i+1} is invalid`;
       if(row.completedAt!==undefined&&!validTimestamp(row.completedAt))return `lifecycle.relocations #${i+1} has invalid completedAt`;
+      if(row.completedAt!==undefined&&new Date(String(row.completedAt)).getTime()<new Date(String(row.startedAt)).getTime())return `lifecycle.relocations #${i+1} completed before it started`;
     }
     for(const [i,row] of (((lifecycle.restarts as unknown[])??[])).entries()){
       if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp))return `lifecycle.restarts #${i+1} is invalid`;
@@ -160,7 +167,12 @@ export function validateTankShape(value:unknown,index=0):{ok:true;tank:Tank}|{ok
   if(!arraysAreArrays(value))return{ok:false,error:`Tank #${index+1} contains an invalid collection field.`};
   const nested=nestedDataIssue(value);
   if(nested)return{ok:false,error:`Tank #${index+1}: ${nested}.`};
-  return{ok:true,tank:value as unknown as Tank};
+  const candidate=value as unknown as Tank;
+  for(const [readingIndex,reading] of candidate.chemistry.entries()){
+    const chemistryIssues=validateChemistryValues(candidate,reading.values);
+    if(chemistryIssues.length)return{ok:false,error:`Tank #${index+1}: chemistry #${readingIndex+1}: ${chemistryIssues[0].en}`};
+  }
+  return{ok:true,tank:candidate};
 }
 
 export function validateBackupPayload(input:unknown):BackupValidationResult{

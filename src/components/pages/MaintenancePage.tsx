@@ -10,6 +10,9 @@ import { today,uid,nowISO } from "@/lib/appUtils";
 import { completeMaintenanceTask,maintenanceEffectiveState } from "@/domain/maintenanceSchedule";
 import { biologicalCycleStatus,cycleRelevantMaintenanceTask } from "@/domain/biologicalCycle";
 import { BiologicalCyclePanel } from "@/components/cycle/BiologicalCyclePanel";
+import { DecisionGuidance } from "@/components/ui/DecisionGuidance";
+import { validateAbsencePlan } from "@/domain/inputSanity";
+import { buildVacationTaskDrafts } from "@/domain/vacationPlan";
 
 const cadences:MaintenanceTask["cadence"][]=["daily","weekly","monthly","quarterly","semiannual","annual"];
 
@@ -74,34 +77,25 @@ export function MaintenancePage({tank}:{tank:Tank}) {
 
  function generateTravelPlan(){
   if(cycle.active)return;
-  const span=Math.max(1,Math.min(60,Math.round(daysAway||1)));
-  const who=caretaker.trim();
-  const prefix="[TRAVEL]";
-  const preDate=addDateDays(departure,-1);
-  const generated:MaintenanceTask[]=[];
-  const addTask=(ar:string,en:string,due:string)=>generated.push({id:uid("travel"),title:`${prefix} ${ar}`,titleEn:`${prefix} ${en}`,cadence:"once",done:false,nextDue:due,manual:true});
-  addTask("فحص كيمياء كامل وتسجيل القيم الأساسية قبل السفر","Run a full chemistry test and save baseline values before travel",preDate);
-  addTask("فحص مضخة الرجوع والسخان والويف ميكر والـATO والتأكد من عدم وجود إنذارات","Inspect return pump, heater, wave makers and ATO; confirm there are no warnings",preDate);
-  addTask("تعبئة خزان ATO وخزانات الدوزر وتجهيز حصص الطعام بدون زيادة","Refill ATO/doser reservoirs and prepare pre-portioned food without overfeeding",preDate);
-  if(tank.type==="marine")addTask("تأكد من الملوحة وثبات حرارة ماء التعويض وعدم ترك خلطات غير موثقة","Confirm salinity and top-off setup; do not leave undocumented mixes",preDate);
-  const interval=span<=14?1:2;
-  for(let d=0;d<span;d+=interval){
-    const due=addDateDays(departure,d);
-    const day=d+1;
-    addTask(`سفر يوم ${day}: نظرة بصرية على الكائنات + الحرارة + مستوى الماء + عمل المضخات${who?` — المسؤول: ${who}`:""}`,`Travel day ${day}: visual livestock check + temperature + water level + pump operation${who?` — caretaker: ${who}`:""}`,due);
-    if(d%7===6||day===span)addTask(`سفر يوم ${day}: مراجعة التنبيهات وعدم تعديل الجرعات أو المعدات بدون سبب واضح`,`Travel day ${day}: review alerts; avoid changing dosing or equipment without a clear reason`,due);
-  }
-  if(span>=7)addTask("فحص كيمياء مختصر أثناء الغياب إذا كان الشخص المسؤول قادر عليه","Run a limited chemistry check during absence if the caretaker can do it safely",addDateDays(departure,Math.min(7,span-1)));
-  addTask("بعد العودة: فحص كيمياء كامل ومقارنة الحالة مع خط الأساس قبل السفر","After return: run a full chemistry test and compare with the pre-travel baseline",addDateDays(departure,span));
+  const sanity=validateAbsencePlan({daysAway});
+  if(!sanity.ok){window.alert(lang==="ar"?sanity.issues[0]?.ar:sanity.issues[0]?.en);return}
+  const span=Math.round(daysAway),who=caretaker.trim(),ts=nowISO();
+  const drafts=buildVacationTaskDrafts({departure,daysAway:span,caretaker:who,tankType:tank.type});
+  const generated:MaintenanceTask[]=drafts.map(x=>({...x,id:uid("travel")}));
   patch(tank.id,t=>{
-    const keep=t.maintenance.filter(x=>!x.title.startsWith(prefix)&&!(x.titleEn||"").startsWith(prefix));
-    return {...t,maintenance:[...generated,...keep],timeline:[{id:uid("ev"),timestamp:nowISO(),type:"travel",textAr:`تم إنشاء خطة غياب لمدة ${span} يوم تبدأ ${departure}${who?` والمسؤول ${who}`:""}.`,textEn:`A ${span}-day travel plan was generated starting ${departure}${who?` with ${who} as caretaker`:""}.`},...t.timeline]};
+    const keep=t.maintenance.filter(x=>!x.title.startsWith("[TRAVEL]")&&!(x.titleEn||"").startsWith("[TRAVEL]"));
+    const activeVacation=[...(t.lifecycle?.vacations??[])].reverse().find(x=>!x.endedAt);
+    const plannedEndAt=addDateDays(departure,span);
+    const vacations=activeVacation
+      ?(t.lifecycle?.vacations??[]).map(x=>x.id===activeVacation.id?{...x,plannedEndAt,notes:who?`Caretaker: ${who}`:x.notes}:x)
+      :[...(t.lifecycle?.vacations??[]),{id:uid("vac"),startedAt:ts,plannedEndAt,notes:who?`Caretaker: ${who}`:undefined}];
+    return {...t,maintenance:[...generated,...keep],lifecycle:{...(t.lifecycle??{}),vacations},timeline:[{id:uid("ev"),timestamp:ts,type:"travel",textAr:`تم إنشاء خطة غياب لمدة ${span} يوم تبدأ ${departure}${who?` والمسؤول ${who}`:""} وربطها بوضع السفر.`,textEn:`A ${span}-day travel plan was generated starting ${departure}${who?` with ${who} as caretaker`:""} and linked to vacation mode.`},...t.timeline]};
   });
   setTravelGenerated(true);window.setTimeout(()=>setTravelGenerated(false),2600);
  }
 
  return <section className="page-grid maintenance-page">
-  <PageHeader eyebrow="MAINTENANCE" title={tr(lang,"maintenance")} actions={<><button className="btn print-maintenance-btn" onClick={()=>window.print()}>🖨 {tr(lang,"printMaintenance")}</button>{!cycle.active&&<button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(lang,"addTask")}</button>}</>}/>
+  <PageHeader eyebrow="MAINTENANCE" title={tr(lang,"maintenance")} actions={<><button className="btn print-maintenance-btn" onClick={()=>window.print()}>🖨 {tr(lang,"printMaintenance")}</button>{!cycle.active&&<button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(lang,"addTask")}</button>}</>}/><div className="card panel full-span maintenance-page-guidance"><DecisionGuidance what={dueNow.length?bi(lang,`${dueNow.length} مهام تحتاج انتباه الآن`,`${dueNow.length} task(s) need attention now`):bi(lang,"الصيانة الحالية تحت السيطرة","Current maintenance is under control")} why={dueNow[0]?bi(lang,`الأولوية حسب موعد الاستحقاق: ${(lang==="ar"?dueNow[0].title:(dueNow[0].titleEn||dueNow[0].title)).replace("[TRAVEL] ","")}.`,`Priority is based on due date: ${(lang==="ar"?dueNow[0].title:(dueNow[0].titleEn||dueNow[0].title)).replace("[TRAVEL] ","")}.`):bi(lang,"لا توجد مهمة مستحقة أو متأخرة حالياً.","No task is currently due or overdue.")} next={dueNow[0]?bi(lang,"نفّذ المهمة الأولى وافتح خطواتها إذا لها Checklist.","Complete the first priority task and open its checklist when present."):bi(lang,"استمر بالجدول الحالي ولا تضف أعمالاً غير ضرورية.","Continue the current schedule and avoid unnecessary work.")} safety={bi(lang,"المهام التي لها Checklist لا يمكن إغلاقها قبل تنفيذ كل الخطوات.","Checklist tasks cannot be closed before every step is completed.")}/></div>
 
   {cycle.active&&<BiologicalCyclePanel tank={tank}/>}
   {cycle.active&&<div className="inline-alert warn full-span"><b>🔒 {bi(lang,"Cycle-only mode","Cycle-only mode")}</b> {bi(lang,"كل مهام الصيانة غير المرتبطة بالدورة مخفية وموقوفة مؤقتاً، وبتعود تلقائياً بعد اكتمال الدورة.","All non-cycle maintenance tasks are temporarily hidden and paused. They return automatically after cycling is complete.")}</div>}
@@ -143,7 +137,7 @@ export function MaintenancePage({tank}:{tank:Tank}) {
      <div><small className="eyebrow-mini">{bi(lang,"المهمة","WHAT")}</small><h3>{lang==="ar"?task.title:(task.titleEn||task.title)}</h3><p className="note">{task.sourceEquipmentName?`${bi(lang,"مرتبطة بالجهاز","Linked equipment")}: ${task.sourceEquipmentName}`:task.autoGenerated?bi(lang,"أنشأها Aqua Nexus تلقائياً من حالة النظام.","Created automatically by Aqua Nexus from system state."):bi(lang,"مهمة صيانة مسجلة بالحوض.","Maintenance task registered for this tank.")}</p></div>
      <div className="maintenance-progress-ring" style={{"--progress":`${progress.total?Math.round(progress.doneCount/progress.total*100):100}%`} as React.CSSProperties}><b>{progress.doneCount}/{progress.total}</b><small>{bi(lang,"منجزة","done")}</small></div>
     </div>
-    <div className="maintenance-progress-track" aria-label={bi(lang,"تقدم الصيانة","Maintenance progress")}><i style={{width:`${progress.total?progress.doneCount/progress.total*100:100}%`}}/></div>
+    <div className="maintenance-progress-track" aria-label={bi(lang,"تقدم الصيانة","Maintenance progress")}><i style={{width:`${progress.total?progress.doneCount/progress.total*100:100}%`}}/></div><DecisionGuidance what={lang==="ar"?task.title:(task.titleEn||task.title)} why={task.sourceEquipmentName?`${bi(lang,"مرتبطة بالجهاز","Linked equipment")}: ${task.sourceEquipmentName}`:task.autoGenerated?bi(lang,"أُنشئت تلقائياً من حالة النظام أو دورة حياة الجهاز.","Generated automatically from system/equipment lifecycle state."):bi(lang,"مهمة صيانة يدوية مسجلة للحوض.","Manual maintenance task registered for this tank.")} next={nextStep??bi(lang,"كل الخطوات مكتملة؛ يمكنك إغلاق المهمة.","All steps are complete; you can close the task.")} safety={bi(lang,"لا يمكن تعليم المهمة مكتملة قبل إنهاء جميع خطوات الـchecklist.","The task cannot be marked complete until every checklist step is finished.")}/>
     {nextStep&&!progress.complete&&<div className="maintenance-next-action"><small>{bi(lang,"الخطوة التالية","NEXT")}</small><b>{nextStep}</b></div>}
     <div className="maintenance-step-list">{(task.checklist??[]).map((step,i)=>{const checked=(task.checklistDone??[]).includes(i),isNext=i===progress.nextIndex;return <button type="button" key={i} className={`maintenance-step-card ${checked?"is-done":""} ${isNext?"is-next":""}`} aria-pressed={checked} onClick={()=>task.id!=="virtual-chem"&&patch(tank.id,t=>({...t,maintenance:t.maintenance.map(x=>x.id===task.id?{...x,checklistDone:checked?(x.checklistDone??[]).filter(n=>n!==i):[...new Set([...(x.checklistDone??[]),i])]}:x)}))}>
       <span className="maintenance-step-number">{checked?"✓":i+1}</span><span className="maintenance-step-copy"><b>{step}</b><small>{checked?bi(lang,"تم تنفيذ الخطوة","Completed"):isNext?bi(lang,"نفذ هذه الخطوة الآن","Do this next"):bi(lang,"بانتظار دورها","Pending")}</small></span>

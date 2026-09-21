@@ -1,5 +1,6 @@
 import type { Tank } from "@/domain/types";
 import { aquaWorkspaceHeaders } from "@/lib/anonymousWorkspace";
+import { hydrateAllTankHistoryArchives,hydrateTankHistoryArchive } from "@/lib/historyArchiveStorage";
 
 export async function backendHealth(){
   const response=await fetch("/api/health",{cache:"no-store"});
@@ -10,7 +11,7 @@ export async function backupTanks(tanks:Tank[]){
   const response=await fetch("/api/sync/import",{
     method:"POST",
     headers:aquaWorkspaceHeaders({"content-type":"application/json"}),
-    body:JSON.stringify({tanks})
+    body:JSON.stringify({tanks:await hydrateAllTankHistoryArchives(tanks)})
   });
   if(!response.ok)throw new Error(`Cloud backup failed (${response.status})`);
   return response.json();
@@ -26,7 +27,7 @@ export async function backupTank(tank:Tank,expectedVersion?:number){
   const response=await fetch(`/api/tanks/${encodeURIComponent(tank.id)}`,{
     method:"PUT",
     headers:aquaWorkspaceHeaders({"content-type":"application/json"}),
-    body:JSON.stringify({tank,expectedVersion})
+    body:JSON.stringify({tank:await hydrateTankHistoryArchive(tank),expectedVersion})
   });
   const json=await response.json();
   if(response.status===409)return {ok:false,conflict:true,...json};

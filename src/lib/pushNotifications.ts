@@ -4,6 +4,7 @@ import { systemAlerts } from "@/domain/alertEngine";
 import { maintenanceEffectiveState } from "@/domain/maintenanceSchedule";
 import { biologicalCycleStatus } from "@/domain/biologicalCycle";
 import { aquaWorkspaceHeaders,getAquaDeviceId } from "@/lib/anonymousWorkspace";
+import { activeVacation,isTankArchived } from "@/domain/tankLifecycle";
 
 const FALLBACK_VAPID_PUBLIC_KEY="BD9A5jEWZLVFsG8PGXEIZyM4OCv1H4QHOJyXTi26-AyWb8Cm-b9q0wuQZiMG4SVAdoQYsrMGu5SBPcmsxu1_c20";
 
@@ -44,6 +45,7 @@ function stabilityState(t:Tank){
     trend,
     equipmentWarnings:health.equipmentAudit.issues.length,
     unstable:health.score<80||alerts.some(x=>x.level==="danger"),
+    critical:health.score<60||alerts.some(x=>x.level==="danger"),
     reasons
   };
 }
@@ -90,11 +92,12 @@ export async function syncPushReminders(tanks:Tank[],language:Language,createSub
   }
   if(!subscription) return {ok:false,reason:"no-subscription"};
   const now=Date.now();
-  const tankState=tanks.map(t=>{
+  const tankState=tanks.filter(t=>!isTankArchived(t)).map(t=>{
     const key=`aqua-nexus-last-visit:${t.id}`;
     let lastVisit=Number(localStorage.getItem(key));
     if(!Number.isFinite(lastVisit)||lastVisit<=0){lastVisit=now;localStorage.setItem(key,String(now));}
-    return {id:t.id,name:t.name,lastVisit,...stabilityState(t),...backgroundAlertState(t)};
+    const vacation=activeVacation(t);
+    return {id:t.id,name:t.name,lastVisit,vacationActive:Boolean(vacation),vacationPlannedEndAt:vacation?.plannedEndAt??null,...stabilityState(t),...backgroundAlertState(t)};
   });
   const response=await fetch("/api/push/register",{
     method:"POST",

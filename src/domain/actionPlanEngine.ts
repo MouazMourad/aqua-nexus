@@ -6,6 +6,7 @@ import { reasonLocally } from "./aquaAILocalReasoner";
 import { chemistryCatalogForTank } from "./chemistryProfile";
 import { equipmentAdequacy } from "./equipmentAdequacy";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
+import { sumpIntelligence } from "./sumpIntelligence";
 
 export interface AquaActionStep{ id:string; titleAr:string; titleEn:string; done:boolean; completedAt?:string; }
 export type AquaPlanMetricDirection="lower"|"higher"|"ideal-range";
@@ -46,6 +47,9 @@ function metricValue(tank:Tank,key:string){
  if(key==="quarantine:concern")return quarantineConcern(tank);
  if(key==="livestock:concern")return tank.livestock.filter(x=>x.health!=="good").length;
  if(key==="rodi:tdsOut")return latestTdsOut(tank);
+ if(key==="acclimation:active")return (tank.acclimationSessions??[]).filter(x=>x.status!=="completed").length;
+ if(key==="inventory:low")return tank.inventory.filter(x=>x.quantity<=x.minimum).length;
+ if(key==="sump:issues")return sumpIntelligence(tank).issues.length;
  return null;
 }
 function uniqueParams(params:string[]){return [...new Set(params.filter(Boolean))];}
@@ -73,6 +77,22 @@ function buildPlanFocus(tank:Tank,page:string,question:string):AquaPlanFocus|und
  if(page==="quarantine")return{domain:"quarantine",metrics:[{key:"quarantine:concern",labelAr:"حالات العلاج التي ما زالت مقلقة",labelEn:"Treatment cases still concerning",before:quarantineConcern(tank),direction:"lower",tolerance:0}]};
  if(page==="livestock")return{domain:"livestock",metrics:[{key:"livestock:concern",labelAr:"كائنات تحتاج متابعة",labelEn:"Livestock needing attention",before:metricValue(tank,"livestock:concern"),direction:"lower",tolerance:0}]};
  if(page==="rodi")return{domain:"rodi",metrics:[{key:"rodi:tdsOut",labelAr:"TDS الخارج",labelEn:"Output TDS",before:latestTdsOut(tank),direction:"lower",tolerance:0}]};
+ if(page==="feeding"||page==="waterchange"){
+  const params=page==="feeding"?(tank.type==="marine"?["NO3","PO4"]:["NO3"]):(tank.type==="marine"?["NO3","PO4","salinity"]:["NO3","pH"]);
+  const metrics=params.map(param=>{
+    const meta=catalog?.[param],ideal=Array.isArray(meta?.ideal)?meta.ideal:[];
+    return {key:`chem:${param}`,labelAr:param,labelEn:param,before:latestChemistry(tank,param),direction:"ideal-range" as const,
+      idealMin:Number.isFinite(Number(ideal[0]))?Number(ideal[0]):undefined,idealMax:Number.isFinite(Number(ideal[1]))?Number(ideal[1]):undefined,
+      tolerance:param==="PO4"?.01:param==="NO3"?1:param==="salinity"?.001:param==="pH"?.05:0};
+  }).filter(x=>x.before!==null);
+  if(metrics.length)return{domain:page==="feeding"?"feeding":"waterChange",metrics};
+ }
+ if(page==="acclimation")return{domain:"acclimation",metrics:[
+  {key:"acclimation:active",labelAr:"جلسات الإقلمة النشطة",labelEn:"Active acclimation sessions",before:metricValue(tank,"acclimation:active"),direction:"lower",tolerance:0},
+  {key:"livestock:concern",labelAr:"كائنات تحتاج متابعة",labelEn:"Livestock needing attention",before:metricValue(tank,"livestock:concern"),direction:"lower",tolerance:0}
+ ]};
+ if(page==="sump")return{domain:"sump",metrics:[{key:"sump:issues",labelAr:"ملاحظات السامب",labelEn:"Sump issues",before:metricValue(tank,"sump:issues"),direction:"lower",tolerance:0}]};
+ if(page==="inventory")return{domain:"inventory",metrics:[{key:"inventory:low",labelAr:"مواد مخزون منخفض",labelEn:"Low-stock items",before:metricValue(tank,"inventory:low"),direction:"lower",tolerance:0}]};
  return undefined;
 }
 
@@ -114,6 +134,20 @@ export function createActionPlan(tank:Tank,question:string,answer:AquaAIAnswer):
   steps=[{titleAr:"أكمل بروتوكول الطوارئ النشط بالكامل",titleEn:"Complete the active emergency protocol"},{titleAr:"أكد استقرار الحرارة والتدفق والأكسجة",titleEn:"Confirm stable temperature, flow and oxygenation"},{titleAr:"أعد فحص الكيمياء بعد استقرار الحالة",titleEn:"Retest chemistry after stabilization"},{titleAr:"راجع سبب الحادث وسجل إجراء منع التكرار",titleEn:"Review root cause and log a prevention action"}];reviewAfterHours=12;
  } else if(page==="quarantine"){
   steps=[{titleAr:"راجع الجرعة والمنتج حسب ملصق الشركة",titleEn:"Verify medication dose/product label"},{titleAr:"راقب الكائن والسلوك قبل الجرعة التالية",titleEn:"Observe organism and behavior before next dose"},{titleAr:"سجل كل جرعة وتغيير ماء بالحجر",titleEn:"Log each dose and quarantine water change"},{titleAr:"قيّم الاستجابة قبل تمديد أو تغيير العلاج",titleEn:"Assess response before extending/changing treatment"}];reviewAfterHours=24;
+ } else if(page==="waterchange"){
+  steps=[{titleAr:"أكد سبب تغيير الماء والحجم المطلوب",titleEn:"Confirm the reason and required water-change volume"},{titleAr:"طابق حرارة ومواصفات ماء التعويض",titleEn:"Match replacement-water temperature and parameters"},{titleAr:"سجل التغيير والمواد/دفعة RO/DI المستخدمة",titleEn:"Log the change and linked preparation/RODI resources"},{titleAr:"أعد فحص المؤشرات المتأثرة وقارنها بخط الأساس",titleEn:"Retest affected parameters and compare with baseline"}];reviewAfterHours=24;
+ } else if(page==="feeding"){
+  steps=[{titleAr:"سجل كمية التغذية الفعلية بدقة",titleEn:"Log the actual feeding amount accurately"},{titleAr:"تجنب أي زيادة إضافية خلال فترة التقييم",titleEn:"Avoid extra feeding during the review window"},{titleAr:"راقب سلوك الكائنات وبقايا الطعام",titleEn:"Observe livestock response and uneaten food"},{titleAr:"راجع NO3/PO4 قبل تعديل الروتين بشكل دائم",titleEn:"Review NO3/PO4 before permanently changing the routine"}];reviewAfterHours=72;
+ } else if(page==="acclimation"){
+  steps=[{titleAr:"أكمل المرحلة الحالية بدون تجاوز البوابات",titleEn:"Complete the current stage without bypassing gates"},{titleAr:"سجل أي Stress أو مسار استثنائي",titleEn:"Log any stress or exception path"},{titleAr:"أكد Dip والشطف للمرجان عند الحاجة",titleEn:"Confirm coral dip and rinse when required"},{titleAr:"راجع صحة الكائن بعد النقل",titleEn:"Review livestock health after transfer"}];reviewAfterHours=24;
+ } else if(page==="sump"){
+  steps=[{titleAr:"راجع الحجرة أو الميديا المرتبطة بالمشكلة",titleEn:"Inspect the chamber or media linked to the issue"},{titleAr:"نفذ تغييراً واحداً موثقاً فقط",titleEn:"Make one documented change at a time"},{titleAr:"تحقق من مستوى التشغيل والـdrain-back",titleEn:"Verify operating level and drain-back safety"},{titleAr:"راجع أثر التغيير على التدفق والكيمياء",titleEn:"Review the effect on flow and chemistry"}];reviewAfterHours=48;
+ } else if(page==="inventory"){
+  steps=[{titleAr:"حدد المواد المنخفضة أو الحرجة فعلاً",titleEn:"Identify genuinely low or critical stock"},{titleAr:"صحح الكمية/الحد الأدنى إذا كانت البيانات غير دقيقة",titleEn:"Correct quantity/minimum if the record is inaccurate"},{titleAr:"اربط المواد بالاستهلاك الصحيح",titleEn:"Link stock to the correct consumption workflow"},{titleAr:"تأكد أن المخزون لم يعد تحت الحد المطلوب",titleEn:"Confirm stock is no longer below the required minimum"}];reviewAfterHours=12;
+ } else if(page==="rodi"){
+  steps=[{titleAr:"أكد TDS الداخل والخارج بقياس جديد",titleEn:"Confirm input/output TDS with a fresh measurement"},{titleAr:"راجع ضغط المصدر ونسبة الرفض",titleEn:"Review source pressure and membrane rejection"},{titleAr:"بدّل المستهلك الموثق فقط إذا لزم",titleEn:"Replace only the evidenced consumable if needed"},{titleAr:"سجل دفعة جديدة وقارن TDS بعد الخدمة",titleEn:"Log a new batch and compare post-service TDS"}];reviewAfterHours=24;
+ } else if(page==="livestock"){
+  steps=[{titleAr:"حدد الكائنات التي تحتاج متابعة فعلياً",titleEn:"Identify livestock that genuinely need attention"},{titleAr:"ثبت الكيمياء والبيئة قبل أي تغيير إضافي",titleEn:"Stabilize chemistry/environment before additional changes"},{titleAr:"سجل الملاحظة أو العلاج/الحجر المرتبط",titleEn:"Log the observation or linked treatment/quarantine"},{titleAr:"أعد تقييم الحالة والسلوك",titleEn:"Reassess condition and behavior"}];reviewAfterHours=24;
  } else {
   const ranked=reasoning.actions.slice(0,4);
   if(ranked.length){

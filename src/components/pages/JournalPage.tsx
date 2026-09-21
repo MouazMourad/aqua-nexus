@@ -9,6 +9,7 @@ import { buildVisionTriage,captureConsistency,type VisionMetrics,type VisionSymp
 import { visionDiseaseCandidates } from "@/domain/visionDifferential";
 import { askAquaVision } from "@/lib/aquaAIClient";
 import { externalizePhoto,resolveFullPhoto,resolvePhotoPreview } from "@/lib/photoStorage";
+import { validateGrowthMeasurement } from "@/domain/inputSanity";
 
 type GrowthPhoto=JournalPhoto&{livestockId?:string;estimatedSizeCm?:number;colorIndex?:number;brightnessIndex?:number;captureScore?:number;clarityIndex?:number;greenDominancePercent?:number;palePixelPercent?:number};
 
@@ -112,6 +113,8 @@ export function JournalPage({tank}:{tank:Tank}) {
 
  async function add(file?:File){
   if(!file)return;
+  const sanity=validateGrowthMeasurement({sizeCm:sizeCm>0?sizeCm:undefined});
+  if(!sanity.ok){window.alert(lang==="ar"?sanity.issues[0]?.ar:sanity.issues[0]?.en);return}
   try{
    const prepared=await prepareImage(file),ts=nowISO(),subject=tank.livestock.find(x=>x.id===livestockId);
    const photo:any={id:uid("ph"),timestamp:ts,caption,dataUrl:prepared.dataUrl,livestockId:livestockId||undefined,estimatedSizeCm:sizeCm>0?sizeCm:undefined,...prepared.metrics};

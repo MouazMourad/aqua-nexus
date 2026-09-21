@@ -3,6 +3,7 @@ import { useEffect,useRef,useState } from "react";
 import { useAquaStore } from "@/store/useAquaStore";
 import { syncPushReminders } from "@/lib/pushNotifications";
 import { bioload,chemistryHealth,maintenanceHealth,tankHealth,tankHealthTrend } from "@/domain/health";
+import { activeVacation,isTankArchived } from "@/domain/tankLifecycle";
 
 const PROMPT_KEY="aqua-nexus-notification-prompt-v1";
 
@@ -53,7 +54,11 @@ export function PushReminderSync(){
 
   useEffect(()=>{
     if(typeof window==="undefined"||!("Notification" in window)||Notification.permission!=="granted")return;
-    const unstable=tanks.filter(unstableTank);
+    const unstable=tanks.filter(t=>!isTankArchived(t)).filter(t=>{
+      if(!unstableTank(t))return false;
+      const vacation=activeVacation(t);
+      return !vacation||tankHealth(t)<60||t.equipment.some((x:any)=>x.status==="warning"||x.status==="service");
+    });
     if(!unstable.length)return;
     const signature=unstable.map(t=>`${t.id}:${tankHealth(t)}:${chemistryHealth(t)}:${maintenanceHealth(t)}:${tankHealthTrend(t)}`).join("|");
     const key=`aqua-nexus-unstable:${new Date().toISOString().slice(0,10)}`;

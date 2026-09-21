@@ -222,3 +222,74 @@ test("maintenance checklist is a guided step workflow and cannot be bypassed",as
   await workflow.locator(".maintenance-step-card").first().click();
   await expect(workflow.locator(".maintenance-step-card").first()).toHaveClass(/is-done/);
 });
+
+test("dirty local fallback wins over stale IndexedDB and repairs durable storage",async({page})=>{
+  await openTrainingDashboard(page);
+  await page.waitForTimeout(600);
+  const seeded=await page.evaluate(async()=>{
+    const key="aqua-nexus-3d-v1";
+    const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open("aqua-nexus-state-v1",1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+    const raw=await new Promise<string>((resolve,reject)=>{const tx=db.transaction("zustand","readonly"),r=tx.objectStore("zustand").get(key);r.onsuccess=()=>resolve(String(r.result||""));r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close()});
+    const parsed=JSON.parse(raw);
+    parsed.state.tanks[0].name="Recovery Fallback Probe";
+    const newer=JSON.stringify(parsed);
+    localStorage.setItem(key,newer);
+    localStorage.setItem(key+":fallback-dirty","1");
+    return raw!==newer;
+  });
+  expect(seeded).toBe(true);
+  await page.reload();
+  await page.waitForTimeout(900);
+  const repaired=await page.evaluate(async()=>{
+    const key="aqua-nexus-3d-v1";
+    const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open("aqua-nexus-state-v1",1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+    const raw=await new Promise<string>((resolve,reject)=>{const tx=db.transaction("zustand","readonly"),r=tx.objectStore("zustand").get(key);r.onsuccess=()=>resolve(String(r.result||""));r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close()});
+    return{rawName:JSON.parse(raw).state.tanks[0].name,dirty:localStorage.getItem(key+":fallback-dirty"),fallback:localStorage.getItem(key)};
+  });
+  expect(repaired.rawName).toBe("Recovery Fallback Probe");
+  expect(repaired.dirty).toBeNull();
+  expect(repaired.fallback).toBeNull();
+});
+
+test("verified two-year archive keeps old events searchable while shrinking hot history",async({page})=>{
+  await openTrainingDashboard(page);
+  await page.waitForTimeout(600);
+  await page.evaluate(async()=>{
+    const key="aqua-nexus-3d-v1";
+    const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open("aqua-nexus-state-v1",1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+    const raw=await new Promise<string>((resolve,reject)=>{const tx=db.transaction("zustand","readonly"),r=tx.objectStore("zustand").get(key);r.onsuccess=()=>resolve(String(r.result||""));r.onerror=()=>reject(r.error)});
+    const parsed=JSON.parse(raw),source=structuredClone(parsed.state.tanks[0]),old="2020-01-01T00:00:00.000Z";
+    source.id="archive-e2e";source.name="Archive E2E";source.isTraining=false;
+    source.timeline=[{id:"archive-old-timeline",timestamp:old,type:"manual",textAr:"حدث أرشيف قديم",textEn:"Very old archive event"},...(source.timeline||[])];
+    source.intelligenceEvents=[{id:"archive-old-intel",timestamp:old,kind:"fact",domain:"system",verb:"old_event",confidence:100,sourcePage:"timeline",textAr:"ذاكرة أرشيف قديمة",textEn:"Very old archive memory"},...(source.intelligenceEvents||[])];
+    parsed.state.tanks=[...parsed.state.tanks.filter((x:any)=>x.id!=="archive-e2e"),source];
+    parsed.state.selectedTankId=source.id;
+    const next=JSON.stringify(parsed);
+    await new Promise<void>((resolve,reject)=>{const tx=db.transaction("zustand","readwrite"),r=tx.objectStore("zustand").put(next,key);r.onerror=()=>reject(r.error);tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>reject(tx.error)});
+  });
+  await page.reload();
+  await openTrainingDashboard(page);
+  await goToPage(page,"timeline");
+  await expect(page.locator(".timeline")).toContainText(/Very old archive event|حدث أرشيف قديم/);
+  await page.getByRole("button",{name:/أرشفة القديم|Archive old history/}).click();
+  await expect(page.locator(".page-grid")).toContainText(/تم نقل التاريخ الأقدم|History older than two years/);
+  await expect(page.locator(".timeline")).toContainText(/Very old archive event|حدث أرشيف قديم/);
+  const archived=await page.evaluate(async()=>{
+    const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open("aqua-nexus-history-v1",1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
+    return await new Promise<number>((resolve,reject)=>{const tx=db.transaction("tank-history","readonly"),r=tx.objectStore("tank-history").get("archive-e2e");r.onsuccess=()=>resolve((r.result?.timeline?.length||0)+(r.result?.intelligenceEvents?.length||0));r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close()});
+  });
+  expect(archived).toBeGreaterThanOrEqual(2);
+});
+
+test("high-risk decision pages expose a consistent What Why Next Safety pattern",async({page})=>{
+  await openTrainingDashboard(page);
+  for(const key of ["dosing","waterchange","rodi","maintenance","acclimation"]){
+    await goToPage(page,key);
+    const guidance=page.locator(".decision-guidance").first();
+    await expect(guidance).toBeVisible();
+    await expect(guidance).toContainText("WHAT");
+    await expect(guidance).toContainText("WHY");
+    await expect(guidance).toContainText("NEXT");
+  }
+});
+

@@ -2,8 +2,9 @@
 import { useEffect,useMemo,useState } from "react";
 import type { DoserChannel,DosingLog,Tank } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
-import { tr } from "@/i18n";
+import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { DecisionGuidance } from "@/components/ui/DecisionGuidance";
 import { uid,nowISO } from "@/lib/appUtils";
 import { chemistryCatalogForTank } from "@/domain/chemistryProfile";
 import { calculateDose,DOSING_PRESETS,type DosingForm,type DosingParameter } from "@/domain/dosingCalculator";
@@ -130,7 +131,7 @@ export function DosingPage({tank}:{tank:Tank}) {
  return <section className="page-grid dosing-page"><PageHeader eyebrow="DOSING & CHEMISTRY" title={tr(lang,"dosing")}/>
 
  <section className="card panel full-span dosing-command-card">
-  <div className="module-head"><div><small className="eyebrow-mini">{lang==="ar"?"قرار الجرعة الآن":"DOSING DECISION NOW"}</small><h3>{doseHeadline}</h3><p className="note">{doseAction}</p></div><span className={`status ${doseState==="blocked"?"danger":doseState==="ready"?"good":doseState==="setup"?"warn":""}`}>{doseState==="blocked"?(lang==="ar"?"موقوف":"BLOCKED"):doseState==="ready"?(lang==="ar"?"جاهز":"READY"):doseState==="none"?(lang==="ar"?"مراقبة":"MONITOR"):(lang==="ar"?"إعداد":"SETUP")}</span></div>
+  <div className="module-head"><div><small className="eyebrow-mini">{lang==="ar"?"قرار الجرعة الآن":"DOSING DECISION NOW"}</small><h3>{doseHeadline}</h3><p className="note">{doseAction}</p></div><span className={`status ${doseState==="blocked"?"danger":doseState==="ready"?"good":doseState==="setup"?"warn":""}`}>{doseState==="blocked"?(lang==="ar"?"موقوف":"BLOCKED"):doseState==="ready"?(lang==="ar"?"جاهز":"READY"):doseState==="none"?(lang==="ar"?"مراقبة":"MONITOR"):(lang==="ar"?"إعداد":"SETUP")}</span></div><DecisionGuidance what={doseHeadline} why={sample?`${param} ${current??"—"} • ${Math.max(0,Math.floor(readingAgeHours))}h • ${sample.confidence}`:gateReason||missingSetup} next={doseAction} safety={targetCheck.blocked?(lang==="ar"?targetCheck.ar:targetCheck.en):bi(lang,"أي جرعة تصحيحية تتبعها إعادة قياس قبل تدخل كبير جديد.","Any corrective dose is followed by a retest before another major intervention.")}/>
   <div className="dosing-first-look">
    <div><small>{lang==="ar"?"شو القراءة؟":"Current reading"}</small><b>{current===undefined?"—":`${current} ${param==="KH"?"dKH":"ppm"}`}</b><span>{sample?(lang==="ar"?`منذ ${Math.max(0,Math.floor(readingAgeHours))} ساعة • ${sample.confidence}`:`${Math.max(0,Math.floor(readingAgeHours))}h ago • ${sample.confidence}`):(lang==="ar"?"ما في قياس موثّق":"No verified measurement")}</span></div>
    <div><small>{lang==="ar"?"شو الهدف؟":"Target"}</small><b>{target} {param==="KH"?"dKH":"ppm"}</b><span>{lang==="ar"?"الهدف محكوم بمجال الأمان":"Target is checked against the safe range"}</span></div>
