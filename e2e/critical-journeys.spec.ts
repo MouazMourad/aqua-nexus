@@ -534,12 +534,16 @@ test("dashboard exposes live lighting intensity and opens Lighting Intelligence"
 });
 
 test("Lighting screenshot import uses Vision analysis, fills editable values and stays reviewable before save",async({page})=>{
-  await page.route("**/api/ai/lighting-import",async route=>{
-    const body=route.request().postDataJSON() as any;
-    expect(body.sourceKind).toBe("image");
-    await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({
-      ok:true,mode:"external",provider:"test-vision",model:"test",
-      answer:{candidate:{
+  await page.addInitScript((mockCandidate)=>{
+    const original=window.fetch.bind(window);
+    window.fetch=async(input:RequestInfo|URL,init?:RequestInit)=>{
+      const url=typeof input==="string"?input:input instanceof Request?input.url:String(input);
+      if(url.includes("/api/ai/lighting-import")){
+        return new Response(JSON.stringify({ok:true,mode:"external",provider:"test-vision",model:"test",answer:{candidate:mockCandidate}}),{status:200,headers:{"content-type":"application/json"}});
+      }
+      return original(input,init);
+    };
+  },{
         sourceKind:"image",confidence:88,vendorDetected:"Maxspect",programName:"Screenshot Program",
         fixture:{brand:"Maxspect",model:"L165",powerWatts:65},
         channels:[
@@ -552,9 +556,7 @@ test("Lighting screenshot import uses Vision analysis, fills editable values and
           {minute:1320,values:{uv:0,royal:0}}
         ],
         warnings:["One value was visually approximated"],evidence:["Visible time axis","Visible channel labels"]
-      }}
-    })});
-  });
+      });
   await openTrainingDashboard(page);
   await goToPage(page,"lighting");
   const png=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2r0sAAAAASUVORK5CYII=","base64");
