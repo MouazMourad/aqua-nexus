@@ -20,5 +20,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
-      - name: Run Netlify build locally
-        run: npx --yes netlify-cli@latest build --context deploy-preview
+      - name: Netlify build parity (offline)
+        run: npx --yes netlify-cli@latest build --offline --context deploy-preview --debug
+      - name: Netlify functions bundle
+        if: always()
+        run: npx --yes netlify-cli@latest functions:build --src netlify/functions --functions .netlify/functions-dist --debug
