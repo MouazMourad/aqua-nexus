@@ -9,6 +9,7 @@ import { downloadText } from "@/lib/appUtils";
 import { CURRENT_BACKUP_SCHEMA } from "@/domain/backupValidation";
 import { clearTankHistoryArchive,hydrateTankHistoryArchive } from "@/lib/historyArchiveStorage";
 import { hydrateTankPhotosForBackup } from "@/lib/photoStorage";
+import { deviceBackupEnabled,subscribeDeviceBackupSetting } from "@/lib/deviceBackupSettings";
 
 function stableValue(value:unknown):unknown{
   if(Array.isArray(value))return value.map(stableValue);
@@ -25,6 +26,7 @@ export function CloudSyncBridge(){
   const selectedTankId=useAquaStore(s=>s.selectedTankId);
   const aquariumExperience=useAquaStore(s=>s.aquariumExperience);
   const replaceTankSnapshot=useAquaStore(s=>s.replaceTankSnapshot);
+  const [optedIn,setOptedIn]=useState(false);
   const [enabled,setEnabled]=useState(false);
   const [syncState,setSyncState]=useState<"idle"|"saving"|"ok"|"error">("idle");
   const [error,setError]=useState("");
@@ -35,7 +37,13 @@ export function CloudSyncBridge(){
   const initializedRef=useRef(false);
 
   useEffect(()=>{
+    setOptedIn(deviceBackupEnabled());
+    return subscribeDeviceBackupSetting(setOptedIn);
+  },[optedIn]);
+
+  useEffect(()=>{
     let cancelled=false;
+    if(!optedIn){setEnabled(false);initializedRef.current=false;return()=>{}}
     (async()=>{
       try{
         const health=await backendHealth();
