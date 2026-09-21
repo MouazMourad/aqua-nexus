@@ -39,7 +39,7 @@ export function AquaDashboard() {
  const showOnboarding=realTanks.length===0&&!trainingPreviewId;
  const cycle=tank?biologicalCycleStatus(tank):null;
  const archived=Boolean(tank&&isTankArchived(tank));
- const allPages:AppPage[]=["dashboard","tanks","equipment","sump","livestock","acclimation","library","chemistry","maintenance","inventory","diseases","timeline","journal","waterchange","feeding","dosing","quarantine","emergency","rodi","expenses","alerts","reports","settings"];
+ const allPages:AppPage[]=["dashboard","tanks","equipment","lighting","sump","livestock","acclimation","library","chemistry","maintenance","inventory","diseases","timeline","journal","waterchange","feeding","dosing","quarantine","emergency","rodi","expenses","alerts","reports","settings"];
  const lockedPages:AppPage[]=archived
   ?allPages.filter(p=>!archivedPageAllowed(p))
   :(cycle?.active?allPages.filter(p=>!isCyclePageAllowed(p)):[]);
