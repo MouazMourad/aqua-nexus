@@ -130,8 +130,7 @@ function rawEstimatedPar(tank:Tank,xPct:number,zPct:number,depthPct:number,atMin
     const refDepthCm=typeof f.parReferenceDepthCm==="number"?clamp(f.parReferenceDepthCm,0,tank.display.height):tank.display.height*.5;
     const waterAttenuation=Math.exp(-.018*(depthCm-refDepthCm));
     const mountCm=typeof f.mountingHeightCm==="number"?clamp(f.mountingHeightCm,1,150):Math.max(5,(pos.yPct-100)/100*tank.display.height+10);
-    const referenceMount=20;
-    const mountFactor=Math.pow((referenceMount+refDepthCm)/(mountCm+depthCm+.1),1.15)*Math.pow((referenceMount+refDepthCm)/(referenceMount+refDepthCm),-.15);
+    const mountFactor=Math.pow((mountCm+refDepthCm)/(mountCm+depthCm+.1),1.15);
     total+=base*intensity*spread*waterAttenuation*mountFactor;
   });
   return Math.max(0,total);
