@@ -35,6 +35,14 @@ function heatColor(value:number,max:number){
   return new THREE.Color().setHSL(hue,.9,.52);
 }
 
+function LightBeam({x,y,z,bottom,color,intensity,coverageX,coverageZ}:{x:number;y:number;z:number;bottom:number;color:THREE.Color;intensity:number;coverageX:number;coverageZ:number}){
+ const height=Math.max(.12,y-bottom),radius=Math.max(.12,Math.min(coverageX,coverageZ)*.48);
+ return <mesh position={[x,bottom+height/2,z]} scale={[Math.max(.35,coverageX/(radius*2)),1,Math.max(.35,coverageZ/(radius*2))]} renderOrder={2}>
+  <coneGeometry args={[radius,height,28,1,true]}/>
+  <meshBasicMaterial color={color} transparent opacity={Math.min(.22,intensity*.14)} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending}/>
+ </mesh>;
+}
+
 function FixtureMarker({x,y,z,label,color,intensity}:{x:number;y:number;z:number;label:string;color:THREE.Color;intensity:number}){
  return <group position={[x,y,z]}>
   <mesh castShadow><boxGeometry args={[.55,.06,.18]}/><meshStandardMaterial color="#172b3b" metalness={.65} roughness={.28}/></mesh>
@@ -55,7 +63,15 @@ function HeatScene({tank,minute,depthPct}:{tank:Tank;minute:number;depthPct:numb
   <color attach="background" args={[bg]}/><fog attach="fog" args={[bg,6,14]}/>
   <ambientLight intensity={.12+visual.intensity*.45} color={visual.color}/><directionalLight position={[3,5,4]} intensity={.08+visual.intensity*1.15} color={visual.color}/>
   <GlassBox width={w} depth={d} height={h} position={[0,centerY,0]} edge="#39dcff"/>
+  <mesh position={[0,centerY,0]} renderOrder={1}>
+   <boxGeometry args={[w*.97,h*.96,d*.97]}/>
+   <meshBasicMaterial color={visual.color} transparent opacity={Math.min(.11,visual.intensity*.075)} depthWrite={false} side={THREE.BackSide}/>
+  </mesh>
   <WaterSurface width={w*.985} depth={d*.985} y={top-.04}/>
+  <mesh position={[0,top-.035,0]} rotation={[-Math.PI/2,0,0]} renderOrder={3}>
+   <planeGeometry args={[w*.98,d*.98]}/>
+   <meshBasicMaterial color={visual.color} transparent opacity={Math.min(.20,visual.intensity*.12)} depthWrite={false} blending={THREE.AdditiveBlending}/>
+  </mesh>
   <group>
    {grid.cells.map((cell,i)=>{
     const xi=i%grid.cols,zi=Math.floor(i/grid.cols);
@@ -72,7 +88,11 @@ function HeatScene({tank,minute,depthPct}:{tank:Tank;minute:number;depthPct:numb
     const x=-w/2+(clamp(p.xPct,0,100)/100)*w,z=-d/2+(clamp(p.zPct,0,100)/100)*d;
     const mountCm=typeof f.mountingHeightCm==="number"?clamp(f.mountingHeightCm,1,150):Math.max(5,(clamp(p.yPct,100,150)-100)/100*tank.display.height+10);
     const y=top+cm(mountCm);
-    return <FixtureMarker key={f.id} x={x} y={y} z={z} label={f.name} color={visual.color} intensity={visual.intensity}/>;
+    const covX=cm(f.coverageLengthCm??tank.display.length*.62),covZ=cm(f.coverageWidthCm??tank.display.width*.78);
+    return <group key={f.id}>
+      <LightBeam x={x} y={y} z={z} bottom={bottom+.02} color={visual.color} intensity={visual.intensity} coverageX={covX} coverageZ={covZ}/>
+      <FixtureMarker x={x} y={y} z={z} label={f.name} color={visual.color} intensity={visual.intensity}/>
+    </group>;
   })}
   <gridHelper args={[Math.max(w,d)*1.25,12,"#123a4b","#0b2633"]} position={[0,bottom-.05,0]}/>
   <OrbitControls makeDefault target={[0,centerY,0]} minDistance={2.5} maxDistance={8} minPolarAngle={.45} maxPolarAngle={1.48} enablePan={false}/>
