@@ -4,6 +4,8 @@ import type { Tank } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { AdvancedSection } from "@/components/ui/AdvancedSection";
+import { ContextHint } from "@/components/ui/ContextHint";
 import { uid,today,nowISO } from "@/lib/appUtils";
 import { claimCriticalAction } from "@/lib/actionGuard";
 import { inventoryForConsumer } from "@/domain/inventoryIntelligence";
@@ -104,9 +106,11 @@ export function QuarantinePage({tank}:{tank:Tank}) {
    <label className="field"><span>{bi(lang,"اسم المنتج / الدواء","Product / medication")}</span><input value={product} onChange={e=>setProduct(e.target.value)}/></label>
    <label className="field"><span>{bi(lang,"جرعة الملصق mL لكل 100L","Label dose mL per 100L")}</span><input type="number" min=".000001" max="10000" step="any" value={labelDose||""} onChange={e=>setLabelDose(Number(e.target.value))}/></label>
    <label className="field"><span>{bi(lang,"الفاصل بين الجرعات (ساعة)","Dose interval (hours)")}</span><input type="number" min=".25" max="720" step=".25" value={intervalHours} onChange={e=>setIntervalHours(Number(e.target.value))}/></label>
-   <label className="field"><span>{bi(lang,"عدد الجرعات المخطط","Planned doses")}</span><input type="number" min="1" max="100" value={totalDoses} onChange={e=>setTotalDoses(Number(e.target.value))}/></label><label className="field"><span>{bi(lang,"ربط الدواء بالمخزون (اختياري)","Link medication to inventory (optional)")}</span><select value={medInventoryId} onChange={e=>setMedInventoryId(e.target.value)}><option value="">—</option>{medicationStock.map(i=><option key={i.id} value={i.id}>{lang==="ar"?i.name:(i.nameEn||i.name)} • {i.quantity} {i.unit}</option>)}</select></label>
-   <label className="field full-field"><span>{tr(lang,"plan")}</span><textarea value={plan} onChange={e=>setPlan(e.target.value)}/></label>
+   <label className="field"><span>{bi(lang,"عدد الجرعات المخطط","Planned doses")}</span><input type="number" min="1" max="100" value={totalDoses} onChange={e=>setTotalDoses(Number(e.target.value))}/></label>
   </div>
+  <ContextHint id="quarantine-label-dose" lang={lang} tone="safety" dismissible={false} ar="الجرعة لازم تكون من ملصق نفس المنتج المستخدم فعلياً. Aqua Nexus يحسب الحجم فقط وما بيخمن تركيز الدواء." en="The dose must come from the exact product label in use. Aqua Nexus scales volume only and never guesses medication concentration."/>
+  <AdvancedSection titleAr="توثيق العلاج المتقدم" titleEn="Advanced treatment documentation" summaryAr="ربط الدواء بالمخزون وخطة نصية إضافية؛ ما بيغيروا حساب الجرعة الأساسية." summaryEn="Inventory linking and extra plan notes; they do not change the core dose calculation."><div className="form-grid" style={{paddingTop:10}}><label className="field"><span>{bi(lang,"ربط الدواء بالمخزون (اختياري)","Link medication to inventory (optional)")}</span><select value={medInventoryId} onChange={e=>setMedInventoryId(e.target.value)}><option value="">—</option>{medicationStock.map(i=><option key={i.id} value={i.id}>{lang==="ar"?i.name:(i.nameEn||i.name)} • {i.quantity} {i.unit}</option>)}</select></label>
+   <label className="field full-field"><span>{tr(lang,"plan")}</span><textarea value={plan} onChange={e=>setPlan(e.target.value)}/></label></div></AdvancedSection>
   {product&&labelDose>0&&<div className="summary-strip" style={{marginTop:12}}><div className="summary"><small>{bi(lang,"الجرعة المحسوبة من الملصق","Label-scaled dose")}</small><b>{calculatedDose.toFixed(2)} mL</b></div><div className="summary"><small>{bi(lang,"حجم الحجر","Quarantine volume")}</small><b>{volume} L</b></div><div className="summary"><small>{bi(lang,"كل","Every")}</small><b>{intervalHours} h</b></div></div>}
   <div className="inline-alert warn" style={{marginTop:12}}>{bi(lang,"لا تستخدم الحاسبة لتخمين تركيز النحاس أو الفورمالين أو أي دواء. يجب إدخال معدل الجرعة من ملصق المنتج المستخدم فعلياً، وإعادة القياس عند وجود Test Kit خاص بالدواء.","Do not use this calculator to guess copper, formalin or other medication concentration. Enter the dosing rate from the exact product label and verify with the appropriate test kit when applicable.")}</div>
   <button className="btn primary" onClick={add} disabled={!organism.trim()} style={{marginTop:12}}>+ {tr(lang,"addCase")}</button>
