@@ -261,7 +261,7 @@ export function JournalPage({tank}:{tank:Tank}) {
    <div style={{flex:1,display:"grid",gap:4}}><b>{subject?(lang==="ar"?subject.name:(subject.nameEn||subject.name)):bi(lang,"الحوض كامل","Whole tank")} • {a.triage.level}</b><small>{new Date(a.timestamp).toLocaleString()} • {bi(lang,"ثقة","confidence")} {a.triage.confidenceScore}/100 • Capture {a.metrics.captureScore}/100</small><span>{lang==="ar"?a.triage.summaryAr:a.triage.summaryEn}</span>{candidate&&<small>{bi(lang,"أقرب مرجع أعراض:","Top symptom reference:")} {lang==="ar"?candidate.ar:candidate.en}</small>}</div>
    <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}><button className="btn" disabled={deepVisionBusyId===a.id} onClick={()=>void runDeepVision(a)}>{a.external?.status==="completed"?bi(lang,"إعادة الرأي الثاني","Repeat second opinion"):bi(lang,"AI رأي ثانٍ","AI second opinion")}</button>{a.livestockId&&<button className="btn" onClick={()=>markVisionWatch(a)}>👁</button>}<button className="btn" disabled={Boolean(a.followUpTaskId)} onClick={()=>createVisionFollowUp(a)}>{a.followUpTaskId?"✓":"＋24h"}</button>{a.livestockId&&<button className="btn" disabled={Boolean(a.quarantineCaseId)} onClick={()=>createVisionQuarantine(a)}>{a.quarantineCaseId?"✓ Q":"＋ Q"}</button>}</div>
   </div>})}</div>
- </div>}
+ </div>
 
 </div></AdvancedSection></div>}
 
