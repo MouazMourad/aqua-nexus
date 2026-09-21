@@ -37,6 +37,7 @@ import { repeatedResponsePatterns,tankLearningMaturity } from "@/domain/tankPatt
 import { claimCriticalAction,releaseCriticalAction } from "@/lib/actionGuard";
 import { deriveExtendedIntelligenceEvents } from "@/domain/extendedEventIntelligence";
 import { buildTankBrainSnapshot } from "@/domain/tankBrainSnapshot";
+import { buildTankAIContext } from "@/domain/aiContext";
 import { validateAbsencePlan,validateAcclimationItemEntry,validateAcclimationWater,validateDoserChannelEntry,validateEquipmentEntry,validateExpenseEntry,validateGrowthMeasurement,validateInventoryEntry,validateLivestockEntry,validateRodiEntry,validateTreatmentSetup,validateWaterChangeEntry } from "@/domain/inputSanity";
 import { photoNeedsExternalization } from "@/lib/photoStorage";
 import { interventionDensityAlert,interventionGate } from "@/domain/interventionSafety";
@@ -1224,11 +1225,27 @@ describe("Unified equipment import regression",()=>{
     expect(app.tank.topOff?.some(x=>x.liters===5.2)).toBe(true);
     expect(app.tank.deviceAlerts?.some(x=>x.level==="danger"&&x.message.includes("offline"))).toBe(true);
 
+    const brain=buildTankBrainSnapshot(app.tank);
+    expect(brain.equipment.deviceAlerts.some(x=>x.level==="danger"&&x.message.includes("offline"))).toBe(true);
+    expect(brain.equipment.telemetry.some(x=>x.metric==="powerWatts"&&x.value===63)).toBe(true);
+    expect(brain.equipment.topOff.some(x=>x.liters===5.2)).toBe(true);
+    expect(brain.equipment.imports.some(x=>x.id==="import-test")).toBe(true);
+    expect(brain.coverage.deviceAlerts).toBeGreaterThanOrEqual(1);
+
     const imported=equipmentImportIntelligence(app.tank);
     expect(imported.dangerAlerts).toBe(1);
+    const alerts=systemAlerts(app.tank);
+    expect(alerts.some(x=>x.id==="device-import-device-alert-danger"&&x.level==="danger")).toBe(true);
+
+    const context=buildTankAIContext(app.tank);
+    expect(context.equipment.deviceData.dangerAlerts).toBe(1);
+    expect(context.brain.equipment.deviceAlerts.length).toBeGreaterThan(0);
+    expect(context.operations.alerts.some(x=>x.id==="device-import-device-alert-danger")).toBe(true);
+
     const core=tankIntelligenceCore(app.tank);
     expect(core.deviceData.dangerAlerts).toBe(1);
     expect(core.actions.some(x=>x.domain==="equipment")).toBe(true);
+    expect(core.critical).toBe(true);
 
     const answer=aquaAIAnswer("شو وضع بيانات جهاز Apex والتنبيهات؟",app.tank,"equipment");
     expect(answer.action?.page).toBe("equipment");

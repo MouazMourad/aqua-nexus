@@ -5,6 +5,7 @@ import { maintenanceEffectiveState } from "./maintenanceSchedule";
 import { biologicalCycleAlert,biologicalCycleStatus } from "./biologicalCycle";
 import { interventionDensityAlert } from "./interventionSafety";
 import { activeRelocation,activeVacation,isTankArchived } from "./tankLifecycle";
+import { equipmentImportIntelligence } from "./equipmentImport";
 
 export type SystemAlertLevel="info"|"warn"|"danger";
 
@@ -27,11 +28,15 @@ export function systemAlerts(tank:Tank):SystemAlert[]{
   const system=systemHealth(tank);
   const today=new Date().toISOString().slice(0,10);
   const cycle=biologicalCycleStatus(tank);
+  const deviceData=equipmentImportIntelligence(tank);
   if(cycle.active){
     const alert=biologicalCycleAlert(tank);
     if(alert)pushUnique(out,{id:"biological-cycle",level:alert.level,domain:"system",ar:alert.ar,en:alert.en,actionPage:alert.page});
     for(const issue of system.equipmentAudit.issues.slice(0,6)){
       pushUnique(out,{id:`cycle-eq-${issue.id}`,level:issue.level==="danger"?"danger":"warn",domain:"equipment",ar:issue.ar,en:issue.en,actionPage:"equipment"});
+    }
+    for(const issue of deviceData.issues.slice(0,6)){
+      pushUnique(out,{id:`device-import-${issue.id}`,level:issue.level,domain:"equipment",ar:issue.ar,en:issue.en,actionPage:"equipment"});
     }
     const order={danger:0,warn:1,info:2};
     return out.sort((a,b)=>order[a.level]-order[b.level]);
@@ -54,6 +59,9 @@ export function systemAlerts(tank:Tank):SystemAlert[]{
 
   for(const issue of system.equipmentAudit.issues.slice(0,8)){
     pushUnique(out,{id:`eq-${issue.id}`,level:issue.level==="danger"?"danger":"warn",domain:"equipment",ar:issue.ar,en:issue.en,actionPage:"equipment"});
+  }
+  for(const issue of deviceData.issues.slice(0,8)){
+    pushUnique(out,{id:`device-import-${issue.id}`,level:issue.level,domain:"equipment",ar:issue.ar,en:issue.en,actionPage:"equipment"});
   }
   for(const issue of system.compatibilityAudit.issues.slice(0,8)){
     pushUnique(out,{id:`compat-${issue.ar}`,level:issue.level==="danger"?"danger":"warn",domain:"livestock",ar:issue.ar,en:issue.en,actionPage:"livestock"});
