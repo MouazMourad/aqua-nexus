@@ -190,7 +190,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
       <PageHelpButton page={active}/>
       <GlobalHelpButton lang={lang}/>
       <button type="button" className="nav-quick-trigger" onClick={()=>openPalette()} aria-label={lang==="ar"?"إجراءات سريعة":"Quick actions"}>＋ <span>{lang==="ar"?"تسجيل سريع":"Quick log"}</span></button>
-      <button type="button" className="nav-search-trigger nav-advanced-trigger" onClick={()=>openPalette()} aria-label={lang==="ar"?"متقدم":"Advanced"}>◇ <span>{lang==="ar"?"متقدم":"Advanced"}</span></button>
+      <button type="button" className="nav-search-trigger" onClick={()=>openPalette()} aria-label={lang==="ar"?"بحث في Aqua Nexus":"Search Aqua Nexus"}>⌕ <span>{lang==="ar"?"بحث":"Search"}</span></button>
     </div>
 
     <div className="dock-shell nav-primary-shell">
@@ -212,7 +212,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
     </div>}
 
     {paletteOpen&&typeof document!=="undefined"&&createPortal(<div className="command-palette-backdrop" role="presentation" onMouseDown={e=>{if(e.currentTarget===e.target){setPaletteOpen(false);setQuery("")}}}>
-      <section className="command-palette" role="dialog" aria-modal="true" aria-label={lang==="ar"?"أدوات Aqua Nexus المتقدمة":"Aqua Nexus advanced tools"}>
+      <section className="command-palette" role="dialog" aria-modal="true" aria-label={lang==="ar"?"بحث وأدوات Aqua Nexus":"Aqua Nexus search and tools"}>
         <div className="command-search"><span>⌕</span><input ref={searchRef} value={query} onChange={e=>setQuery(e.target.value)} placeholder={lang==="ar"?"ابحث: KH، Naso، Skimmer، صيانة، RO/DI…":"Search: KH, livestock, skimmer, maintenance, RO/DI…"} /><kbd>Esc</kbd></div>
         <div className="command-quick">
           <small>{lang==="ar"?"تسجيل سريع من أي صفحة":"QUICK ACTIONS"}</small>
@@ -236,7 +236,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
       .nav-help-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
       .nav-search-trigger,.nav-quick-trigger{min-height:34px;border:1px solid rgba(92,205,230,.22);border-radius:11px;background:rgba(8,38,52,.72);color:#c9edf4;padding:6px 9px;display:flex;align-items:center;gap:6px;font-size:10px}
       .nav-quick-trigger{margin-inline-start:auto;border-color:rgba(92,230,180,.2);background:rgba(22,75,62,.42)}
-      .command-search kbd{font:inherit;font-size:8px;padding:2px 5px;border:1px solid rgba(255,255,255,.13);border-radius:6px;opacity:.7}.nav-advanced-trigger{border-color:rgba(159,139,255,.25);background:linear-gradient(145deg,rgba(91,73,170,.36),rgba(8,38,52,.72))}
+      .command-search kbd{font:inherit;font-size:8px;padding:2px 5px;border:1px solid rgba(255,255,255,.13);border-radius:6px;opacity:.7}
       .primary-modules-nav{min-width:0!important;justify-content:flex-start!important;padding:3px 0}
       .primary-modules-nav .nav-item{min-width:78px;flex:0 0 auto}
       .nav-more{border-inline-start:1px solid rgba(255,255,255,.08)!important}
