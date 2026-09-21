@@ -2,7 +2,7 @@
 import { useEffect,useMemo,useState } from "react";
 import type { DoserChannel,DosingLog,Tank } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
-import { tr } from "@/i18n";
+import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DecisionGuidance } from "@/components/ui/DecisionGuidance";
 import { uid,nowISO } from "@/lib/appUtils";
