@@ -19,6 +19,7 @@ import { answerBiologicalCycleQuestion } from "./biologicalCycleKnowledge";
 import { isAquariumScopedQuestion,offTopicAquaAnswer } from "./aquaAIScope";
 import { tankLearningMaturity } from "./tankPatterns";
 import { formatLightMinute,lightingIntelligence } from "./lightingIntelligence";
+import { equipmentImportIntelligence } from "./equipmentImport";
 
 export type AquaAIConfidence="low"|"medium"|"high";
 export type AquaAIPage="dashboard"|"chemistry"|"maintenance"|"equipment"|"lighting"|"livestock"|"timeline"|"dosing"|"quarantine"|"emergency"|"rodi"|"journal"|"acclimation"|"inventory"|"feeding"|"waterchange"|"expenses"|"sump"|"diseases"|"alerts";
@@ -237,20 +238,37 @@ function rodiAnswer(tank:Tank):AquaAIAnswer{
 
 function equipmentAnswer(tank:Tank):AquaAIAnswer{
   const warnings=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
-  const energy=tankEnergy(tank);
+  const energy=tankEnergy(tank),deviceData=equipmentImportIntelligence(tank);
   const currency=tank.energySettings?.currency||"";
   const top=[...energy.rows].sort((a,b)=>b.monthlyKwh-a.monthlyKwh).slice(0,3);
+  const imported=deviceData.latestImport;
   const detailsAr=[
     `${tank.equipment.length} تجهيزة مسجلة؛ ${warnings.length} منها بحاجة انتباه أو صيانة.`,
     energy.configured?`الاستهلاك المحسوب تقريباً ${energy.monthlyKwh.toFixed(1)} kWh شهرياً${tank.energySettings?.pricePerKwh?`، بتكلفة ${energy.monthlyCost.toFixed(2)} ${currency}`:""}.`:"بيانات الطاقة غير مكتملة بعد لكل الأجهزة.",
-    ...(top.filter(x=>x.monthlyKwh>0).map(x=>`${x.equipment.name}: ${x.monthlyKwh.toFixed(1)} kWh/شهر.`))
+    ...(top.filter(x=>x.monthlyKwh>0).map(x=>`${x.equipment.name}: ${x.monthlyKwh.toFixed(1)} kWh/شهر.`)),
+    ...(imported?[`آخر استيراد: ${imported.vendor} • ${imported.sourceName} • ثقة ${Math.round(imported.confidence)}% • ${imported.counts.chemistry} كيمياء • ${imported.counts.telemetry} Telemetry • ${imported.counts.topOff} تعويض ماء • ${imported.counts.alerts} تنبيه.`]:[]),
+    ...(deviceData.recentTopOffLiters>0?[`تعويض الماء المستورد خلال آخر 7 أيام: ${deviceData.recentTopOffLiters.toFixed(1)} لتر.`]:[]),
+    ...deviceData.issues.map(x=>x.ar)
   ];
   const detailsEn=[
     `${tank.equipment.length} device(s) registered; ${warnings.length} need attention/service.`,
     energy.configured?`Estimated energy use is ${energy.monthlyKwh.toFixed(1)} kWh/month${tank.energySettings?.pricePerKwh?`, costing ${energy.monthlyCost.toFixed(2)} ${currency}`:""}.`:"Energy data is not complete for all devices yet.",
-    ...(top.filter(x=>x.monthlyKwh>0).map(x=>`${x.equipment.name}: ${x.monthlyKwh.toFixed(1)} kWh/month.`))
+    ...(top.filter(x=>x.monthlyKwh>0).map(x=>`${x.equipment.name}: ${x.monthlyKwh.toFixed(1)} kWh/month.`)),
+    ...(imported?[`Latest import: ${imported.vendor} • ${imported.sourceName} • ${Math.round(imported.confidence)}% confidence • ${imported.counts.chemistry} chemistry • ${imported.counts.telemetry} telemetry • ${imported.counts.topOff} top-off • ${imported.counts.alerts} alert record(s).`]:[]),
+    ...(deviceData.recentTopOffLiters>0?[`Imported top-off in the last 7 days: ${deviceData.recentTopOffLiters.toFixed(1)} L.`]:[]),
+    ...deviceData.issues.map(x=>x.en)
   ];
-  return {titleAr:"ذكاء المعدات والطاقة",titleEn:"Equipment & energy intelligence",summaryAr:warnings.length?"هناك أجهزة يجب فحصها قبل أن تتحول إلى مشكلة في الحوض.":"لا يوجد تحذير جهاز مباشر حالياً، ويمكن أيضاً مراقبة أثر الطاقة والتكلفة.",summaryEn:warnings.length?"Some devices need attention before they become a tank problem.":"No device is directly flagged right now; I can also track energy and cost impact.",detailsAr,detailsEn,evidenceAr:[`${energy.configured} جهاز ببيانات طاقة`],evidenceEn:[`${energy.configured} device(s) with energy data`],confidence:energy.configured>=2?"medium":"low",action:{page:"equipment",ar:"افتح إدارة المعدات",en:"Open equipment management"}};
+  const hasDeviceIssue=deviceData.issues.some(x=>x.level==="danger"||x.level==="warn");
+  return {
+    titleAr:"ذكاء المعدات والطاقة والبيانات المستوردة",titleEn:"Equipment, energy & imported-data intelligence",
+    summaryAr:hasDeviceIssue?deviceData.issues[0].ar:warnings.length?"هناك أجهزة يجب فحصها قبل أن تتحول إلى مشكلة في الحوض.":"لا يوجد تحذير جهاز مباشر حالياً؛ بيانات الأجهزة المستوردة تدخل بنفس عقل الحوض بعد اعتمادها.",
+    summaryEn:hasDeviceIssue?deviceData.issues[0].en:warnings.length?"Some devices need attention before they become a tank problem.":"No device is directly flagged right now; reviewed imported device data feeds the same Tank Brain.",
+    detailsAr,detailsEn,
+    evidenceAr:[`${energy.configured} جهاز ببيانات طاقة`,`${deviceData.recentTelemetry} Telemetry خلال 24 ساعة`,`${deviceData.recentImportedChemistry} قراءة كيمياء جهاز خلال 7 أيام`,`${deviceData.unacknowledgedAlerts} تنبيه غير مؤكد المعالجة`],
+    evidenceEn:[`${energy.configured} device(s) with energy data`,`${deviceData.recentTelemetry} telemetry row(s) in 24h`,`${deviceData.recentImportedChemistry} device chemistry reading(s) in 7d`,`${deviceData.unacknowledgedAlerts} unacknowledged device alert(s)`],
+    confidence:imported?(imported.confidence>=80?"high":imported.confidence>=55?"medium":"low"):(energy.configured>=2?"medium":"low"),
+    action:{page:"equipment",ar:"افتح إدارة المعدات والاستيراد",en:"Open equipment management & import"}
+  };
 }
 
 function reasoningAnswer(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswer{
