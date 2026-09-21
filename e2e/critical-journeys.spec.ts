@@ -519,7 +519,7 @@ test("Lighting screenshot import uses Vision analysis, fills editable values and
   await openTrainingDashboard(page);
   await goToPage(page,"lighting");
   const png=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2r0sAAAAASUVORK5CYII=","base64");
-  await page.locator('input[type="file"]').first().setInputFiles({name:"maxspect-screenshot.png",mimeType:"image/png",buffer:png});
+  await page.getByTestId("lighting-import-input").setInputFiles({name:"maxspect-screenshot.png",mimeType:"image/png",buffer:png});
   const review=page.locator(".lighting-import-review");
   await expect(review).toBeVisible({timeout:25000});
   await expect(review).toContainText("88%");
