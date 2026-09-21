@@ -73,7 +73,7 @@ export const demoMarineTank: Tank = {
   livestock: [
     { id:"l1", libraryId:"clown", name:"سمكة المهرج", nameEn:"Clownfish", category:"fish", quantity:2, health:"good", load:1.2, addedAt:"2026-01-01" },
     { id:"l2", libraryId:"chromis", name:"كروميس أخضر", nameEn:"Green Chromis", category:"fish", quantity:2, health:"good", load:1, addedAt:"2026-02-01" },
-    { id:"l3", libraryId:"torch", name:"مرجان تورش", nameEn:"Torch Coral", category:"coral", quantity:1, health:"good", load:.3, addedAt:"2026-03-01" }
+    { id:"l3", libraryId:"torch", name:"مرجان تورش", nameEn:"Torch Coral", category:"coral", quantity:1, health:"good", load:.3, addedAt:"2026-03-01", lightingDepthCm:32 }
   ],
   inventory: [
     { id:"i1", name:"ملح بحري", nameEn:"Marine Salt", category:"مياه", categoryEn:"Water", quantity:5, unit:"kg", minimum:2 },
@@ -143,8 +143,8 @@ export const demoFreshwaterTank: Tank = {
   livestock:[
    {id:"fw-l1",libraryId:"neonTetra",name:"نيون تترا",nameEn:"Neon Tetra",category:"fish",quantity:8,health:"good",load:.35,addedAt:daysAgoDate(45)},
    {id:"fw-l2",libraryId:"cherryShrimp",name:"جمبري شيري",nameEn:"Cherry Shrimp",category:"invert",quantity:6,health:"good",load:.15,addedAt:daysAgoDate(30)},
-   {id:"fw-l3",libraryId:"anubias",name:"أنوبياس",nameEn:"Anubias",category:"plant",quantity:3,health:"good",load:.05,addedAt:daysAgoDate(28)},
-   {id:"fw-l4",libraryId:"rotala",name:"روتالا",nameEn:"Rotala",category:"plant",quantity:6,health:"good",load:.05,addedAt:daysAgoDate(21)}
+   {id:"fw-l3",libraryId:"anubias",name:"أنوبياس",nameEn:"Anubias",category:"plant",quantity:3,health:"good",load:.05,addedAt:daysAgoDate(28),lightingDepthCm:45},
+   {id:"fw-l4",libraryId:"rotala",name:"روتالا",nameEn:"Rotala",category:"plant",quantity:6,health:"good",load:.05,addedAt:daysAgoDate(21),lightingDepthCm:28}
   ],
   inventory:[],
   timeline:[
