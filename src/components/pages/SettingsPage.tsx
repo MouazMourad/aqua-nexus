@@ -16,6 +16,7 @@ import { buildCompleteRecoveryBackup } from "@/lib/recoveryBackup";
 import { readDataSafetyStatus,subscribeDataSafety,type DataSafetyStatus } from "@/lib/dataSafetyStatus";
 import { deviceBackupEnabled,setDeviceBackupEnabled as persistDeviceBackup,subscribeDeviceBackupSetting } from "@/lib/deviceBackupSettings";
 import { clearLongTermHistory,longTermHistoryStats } from "@/lib/longTermHistory";
+import { FEATURE_DISCOVERY_TOTAL,readFeatureDiscovery,resetFeatureDiscovery,setFeatureDiscoveryMode,subscribeFeatureDiscovery,type FeatureDiscoveryState } from "@/lib/featureDiscovery";
 
 export function SettingsPage({tank}:{tank:Tank}) {
  const state=useAquaStore(),patch=useAquaStore(s=>s.patchTank),del=useAquaStore(s=>s.deleteTank),replace=useAquaStore(s=>s.replaceData),[name,setName]=useState(tank.name),file=useRef<HTMLInputElement>(null),lang=state.language;
@@ -25,6 +26,7 @@ export function SettingsPage({tank}:{tank:Tank}) {
  const [dataSafety,setDataSafety]=useState<DataSafetyStatus>({persistence:"ok"});
  const [deviceBackup,setDeviceBackup]=useState(false);
  const [archiveCount,setArchiveCount]=useState(0);
+ const [featureDiscovery,setFeatureDiscovery]=useState<FeatureDiscoveryState>({mode:"smart",learned:[]});
  const [vacationEnd,setVacationEnd]=useState(""),[vacationNotes,setVacationNotes]=useState("");
  const [moveFrom,setMoveFrom]=useState(""),[moveTo,setMoveTo]=useState(""),[moveNotes,setMoveNotes]=useState("");
  const [restartReason,setRestartReason]=useState(""),[archiveReason,setArchiveReason]=useState("");
@@ -41,6 +43,12 @@ export function SettingsPage({tank}:{tank:Tank}) {
    setBackupNote({kind:"danger",text:(lang==="ar"?"لم يتم إنشاء Backup ناقص. السبب: ":"Incomplete backup was blocked. Reason: ")+(e instanceof Error?e.message:String(e))});
   }
  };
+
+ useEffect(()=>{
+  setFeatureDiscovery(readFeatureDiscovery());
+  const offFeature=subscribeFeatureDiscovery(setFeatureDiscovery);
+  return offFeature;
+ },[]);
 
  useEffect(()=>{
   setDataSafety(readDataSafetyStatus());
@@ -174,6 +182,15 @@ export function SettingsPage({tank}:{tank:Tank}) {
    ].map(x=><button type="button" key={x.id} className={`experience-choice ${state.aquariumExperience===x.id?"active":""}`} onClick={()=>state.setAquariumExperience(x.id as any)}><b>{lang==="ar"?x.ar:x.en}</b><span>{lang==="ar"?x.arText:x.enText}</span></button>)}
   </div>
   <div className="inline-alert info" style={{marginTop:10}}>{bi(lang,"مهم: «مبتدئ/متوسط/متقدم» يعني خبرة في تربية الأحياء المائية، وليس خبرة بالكمبيوتر أو الواجهات.","Important: Beginner / Intermediate / Advanced refers to aquarium-keeping experience, not computer or UI skill.")}</div>
+ </div>
+
+ <div className="card panel full-span feature-discovery-settings">
+  <div className="module-head"><div><small className="eyebrow-mini">FEATURE DISCOVERY</small><h3>{bi(lang,"فقاعات تعليم الميزات","Feature discovery bubbles")}</h3><p className="note">{bi(lang,"Aqua Nexus يتذكر الميزات التي فتحتها، وما يعيد شرحها بالفقاعة. هذا الإعداد خاص بالبرنامج على هذا الجهاز، وليس بحوض واحد.","Aqua Nexus remembers features you have opened and stops repeating those tips. This preference applies to the app on this device, not one tank.")}</p></div><span className="scene-badge">{featureDiscovery.learned.length}/{FEATURE_DISCOVERY_TOTAL} {bi(lang,"تعلّمت","learned")}</span></div>
+  <div className="experience-choice-grid">
+   <button type="button" className={`experience-choice ${featureDiscovery.mode==="smart"?"active":""}`} onClick={()=>setFeatureDiscoveryMode("smart")}><b>{bi(lang,"ذكية حسب يلي تعلمته","Smart based on what I learned")}</b><span>{bi(lang,"تظهر فقط الميزات التي ما فتحتها أو ما تعرّفت عليها بعد.","Only shows features you have not opened or learned yet.")}</span></button>
+   <button type="button" className={`experience-choice ${featureDiscovery.mode==="off"?"active":""}`} onClick={()=>setFeatureDiscoveryMode("off")}><b>{bi(lang,"إخفاء الفقاعات نهائياً","Hide bubbles")}</b><span>{bi(lang,"توقف كل فقاعات التعليم، ويمكن تشغيلها لاحقاً من هون.","Stops all discovery bubbles until you enable them again here.")}</span></button>
+   <button type="button" className="experience-choice" onClick={()=>{if(window.confirm(bi(lang,"رح يعتبر Aqua Nexus كل الميزات غير متعلمة ويرجع يعرّفك عليها من البداية. متابعة؟","Aqua Nexus will mark all feature tips as unseen and start teaching them again. Continue?")))resetFeatureDiscovery()}}><b>{bi(lang,"استعادة كل التعليمات","Restore all tips")}</b><span>{bi(lang,"يمسح سجل التعلّم فقط، بدون لمس أي بيانات بالحوض.","Clears only the learned-tip history without changing tank data.")}</span></button>
+  </div>
  </div>
 
  <div className="card panel">
