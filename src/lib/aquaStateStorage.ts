@@ -1,4 +1,5 @@
 import type { StateStorage } from "zustand/middleware";
+import { markDurableWrite,markPersistenceDegraded,markPersistenceFailed } from "@/lib/dataSafetyStatus";
 
 const DB_NAME="aqua-nexus-state-v1";
 const STORE="zustand";
@@ -52,8 +53,8 @@ function localGet(name:string){
   try{return localStorage.getItem(name)}catch{return null}
 }
 function localSet(name:string,value:string){
-  if(typeof window==="undefined")return;
-  try{localStorage.setItem(name,value)}catch{}
+  if(typeof window==="undefined")return false;
+  try{localStorage.setItem(name,value);return true}catch{return false}
 }
 function localRemove(name:string){
   if(typeof window==="undefined")return;
@@ -118,7 +119,11 @@ export const aquaStateStorage:StateStorage={
     }
   },
   async setItem(name,value){
-    if(!hasIndexedDb()){localSet(name,value);return;}
+    if(!hasIndexedDb()){
+      if(localSet(name,value)){markPersistenceDegraded("IndexedDB unavailable; using localStorage fallback");return}
+      markPersistenceFailed("Both IndexedDB and localStorage are unavailable. Recent changes may not survive reload.");
+      throw new Error("No durable browser storage available");
+    }
     try{
       await writeIdb(name,value);
       const verified=await readIdb(name);
@@ -126,9 +131,16 @@ export const aquaStateStorage:StateStorage={
       // A successful verified IndexedDB write makes the fallback unnecessary.
       localRemove(name);
       localRemove(fallbackDirtyKey(name));
+      markDurableWrite();
     }catch{
-      localSet(name,value);
-      localSet(fallbackDirtyKey(name),"1");
+      const fallbackSaved=localSet(name,value);
+      const markerSaved=localSet(fallbackDirtyKey(name),"1");
+      if(fallbackSaved&&markerSaved){
+        markPersistenceDegraded("IndexedDB write failed; state is protected by localStorage fallback");
+        return;
+      }
+      markPersistenceFailed("IndexedDB and localStorage writes both failed. Recent changes may not survive reload.");
+      throw new Error("Aqua Nexus could not persist the latest state");
     }
   },
   async removeItem(name){
