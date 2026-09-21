@@ -10,6 +10,7 @@ import { today,uid,nowISO } from "@/lib/appUtils";
 import { completeMaintenanceTask,maintenanceEffectiveState } from "@/domain/maintenanceSchedule";
 import { biologicalCycleStatus,cycleRelevantMaintenanceTask } from "@/domain/biologicalCycle";
 import { BiologicalCyclePanel } from "@/components/cycle/BiologicalCyclePanel";
+import { validateAbsencePlan } from "@/domain/inputSanity";
 
 const cadences:MaintenanceTask["cadence"][]=["daily","weekly","monthly","quarterly","semiannual","annual"];
 
@@ -74,7 +75,9 @@ export function MaintenancePage({tank}:{tank:Tank}) {
 
  function generateTravelPlan(){
   if(cycle.active)return;
-  const span=Math.max(1,Math.min(60,Math.round(daysAway||1)));
+  const sanity=validateAbsencePlan({daysAway});
+  if(!sanity.ok){window.alert(lang==="ar"?sanity.issues[0]?.ar:sanity.issues[0]?.en);return}
+  const span=Math.round(daysAway);
   const who=caretaker.trim();
   const prefix="[TRAVEL]";
   const preDate=addDateDays(departure,-1);
