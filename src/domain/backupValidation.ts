@@ -1,7 +1,7 @@
 import type { AquariumExperienceLevel,Language,Tank } from "./types";
 import { validateChemistryValues } from "./chemistryDataQuality";
 
-export const CURRENT_BACKUP_SCHEMA=16;
+export const CURRENT_BACKUP_SCHEMA=17;
 
 export interface ValidBackupPayload{
   language:Language;
@@ -33,7 +33,7 @@ function validDimensions(value:unknown){
     && Number(value.length)>0&&Number(value.width)>0&&Number(value.height)>0;
 }
 function arraysAreArrays(tank:Record<string,unknown>){
-  const fields=["equipment","externalImports","deviceTelemetry","topOff","chemistry","maintenance","livestock","inventory","timeline","intelligenceEvents","guidanceActions","healthSnapshots","photos","visionAssessments","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi","rodiServiceEvents","plantCare","acclimationSessions","emergencySessions","filterMedia","livestockExits","aiActionPlans"];
+  const fields=["equipment","externalImports","deviceTelemetry","topOff","deviceAlerts","chemistry","maintenance","livestock","inventory","timeline","intelligenceEvents","guidanceActions","healthSnapshots","photos","visionAssessments","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi","rodiServiceEvents","plantCare","acclimationSessions","emergencySessions","filterMedia","livestockExits","aiActionPlans"];
   return fields.every(key=>tank[key]===undefined||(Array.isArray(tank[key])&&(tank[key] as unknown[]).length<=MAX_ROWS_PER_COLLECTION));
 }
 
@@ -50,7 +50,7 @@ function duplicateId(items:unknown[]){
   return null;
 }
 function nestedDataIssue(tank:Record<string,unknown>){
-  const arrays=["equipment","externalImports","deviceTelemetry","topOff","maintenance","livestock","inventory","timeline","photos","visionAssessments","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi","rodiServiceEvents","plantCare","acclimationSessions","emergencySessions","filterMedia","livestockExits"];
+  const arrays=["equipment","externalImports","deviceTelemetry","topOff","deviceAlerts","maintenance","livestock","inventory","timeline","photos","visionAssessments","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi","rodiServiceEvents","plantCare","acclimationSessions","emergencySessions","filterMedia","livestockExits"];
   for(const field of arrays){
     const items=(tank[field] as unknown[]|undefined)??[];
     const dup=duplicateId(items);
@@ -110,6 +110,10 @@ function nestedDataIssue(tank:Record<string,unknown>){
   }
   for(const [i,row] of (((tank.topOff as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp)||!finite(row.liters)||Number(row.liters)<0||Number(row.liters)>100000)return `topOff #${i+1} is invalid`;
+  }
+  for(const [i,row] of (((tank.deviceAlerts as unknown[])??[])).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp)||!["info","warn","danger"].includes(String(row.level))||!validText(row.message,4000))return `deviceAlerts #${i+1} is invalid`;
+    if(row.acknowledgedAt!==undefined&&!validTimestamp(row.acknowledgedAt))return `deviceAlerts #${i+1} has invalid acknowledgedAt`;
   }
 
   for(const [i,row] of (((tank.rodi as unknown[])??[])).entries()){
