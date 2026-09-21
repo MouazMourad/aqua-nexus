@@ -6,7 +6,7 @@ const INDEX="tank-domain-time";
 
 export type HistoricalDomain=
   |"timeline"|"intelligenceEvents"|"chemistry"|"healthSnapshots"|"feeding"|"dosing"
-  |"expenses"|"waterChanges"|"rodi"|"rodiServiceEvents"|"plantCare"
+  |"expenses"|"waterChanges"|"rodi"|"rodiServiceEvents"|"plantCare"|"deviceTelemetry"|"topOff"
   |"acclimationSessions"|"emergencySessions"|"livestockExits"|"aiActionPlans";
 
 export interface HistoricalRecord{
@@ -68,7 +68,7 @@ async function countDomain(tankId:string,domain:HistoricalDomain){
 
 export const historicalDomains:HistoricalDomain[]=[
   "timeline","intelligenceEvents","chemistry","healthSnapshots","feeding","dosing",
-  "expenses","waterChanges","rodi","rodiServiceEvents","plantCare",
+  "expenses","waterChanges","rodi","rodiServiceEvents","plantCare","deviceTelemetry","topOff",
   "acclimationSessions","emergencySessions","livestockExits","aiActionPlans"
 ];
 
