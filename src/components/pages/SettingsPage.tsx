@@ -4,6 +4,8 @@ import type { Tank } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { AdvancedSection } from "@/components/ui/AdvancedSection";
+import { ContextHint } from "@/components/ui/ContextHint";
 import { downloadText,today,uid,nowISO } from "@/lib/appUtils";
 import { syncPushReminders } from "@/lib/pushNotifications";
 import { validateBackupPayload } from "@/domain/backupValidation";
@@ -194,15 +196,24 @@ export function SettingsPage({tank}:{tank:Tank}) {
   </div>
  </div>
 
- <div className="card panel">
-  <h3>{bi(lang,"بروفايل الحوض والحسابات","Tank profile & calculations")}</h3>
+ <div className="card panel full-span"><AdvancedSection titleAr="بروفايل الحوض والحسابات" titleEn="Tank profile & calculations" summaryAr="إعدادات تؤثر على أهداف الكيمياء وتقييم المعدات والطاقة؛ Auto مناسب لمعظم المستخدمين." summaryEn="Settings that affect chemistry targets, equipment assessment and energy; Auto is suitable for most users." defaultOpen={false}>
+  <div style={{display:"grid",gap:10,paddingTop:10}}>
+   <ContextHint id="settings-system-profile" lang={lang} ar="اترك البروفايل Auto إذا ما عندك سبب واضح لتثبيته. التحديد اليدوي يفيد لما طبيعة الحوض معروفة وبدك أهدافاً أدق." en="Leave the profile on Auto unless you have a clear reason to pin it. Manual selection helps when the aquarium type is known and you want more specific targets."/>
+     <h3>{bi(lang,"بروفايل الحوض والحسابات","Tank profile & calculations")}</h3>
   <p className="note">{bi(lang,"البروفايل يؤثر على أهداف الكيمياء ومتطلبات الإنارة/الحركة وتقييم التجهيزات. Auto يستنتج من الكائنات.","The profile affects chemistry targets, lighting/flow requirements and equipment adequacy. Auto infers from livestock.")}</p>
   <label className="field"><span>{bi(lang,"بروفايل النظام","System profile")}</span><select value={profile} onChange={e=>patch(tank.id,t=>({...t,ecosystemProfile:e.target.value==="auto"?undefined:e.target.value as any}))}><option value="auto">Auto</option>{tank.type==="marine"?<><option value="reef">Reef</option><option value="fishOnly">Fish-only</option></>:<><option value="planted">Planted</option><option value="fishOnly">Fish-only</option></>}</select></label>
   <div className="form-grid"><label className="field"><span>{bi(lang,"سعر الكهرباء / kWh","Electricity price / kWh")}</span><input type="number" min="0" step="any" value={energy.pricePerKwh} onChange={e=>patch(tank.id,t=>{const next={pricePerKwh:sanitizeBounded(Number(e.target.value),0,1000000,t.energySettings?.pricePerKwh??0),currency:t.energySettings?.currency||"USD"};return validateEnergySettings(next).ok?{...t,energySettings:next}:t})}/></label><label className="field"><span>{tr(lang,"currency")}</span><input value={energy.currency} onChange={e=>patch(tank.id,t=>{const next={pricePerKwh:t.energySettings?.pricePerKwh??0,currency:e.target.value};return validateEnergySettings(next).ok?{...t,energySettings:next}:t})}/></label></div>
- </div>
+ 
+  </div>
+ </AdvancedSection></div>
 
  <div className="card panel full-span">
   <div className="module-head"><div><small className="eyebrow-mini">TANK LIFECYCLE</small><h3>{bi(lang,"دورة حياة الحوض","Tank lifecycle")}</h3><p className="note">{bi(lang,"السفر، نقل الحوض، إعادة التشغيل الكبرى والأرشفة تنحفظ كأحداث فعلية ويعرفها Tank Brain.","Vacation, relocation, major restart and archive are first-class events visible to Tank Brain.")}</p></div><span className={`status ${archived?"warn":relocation?"warn":"good"}`}>{archived?bi(lang,"مؤرشف","ARCHIVED"):relocation?bi(lang,"قيد النقل","MOVING"):vacation?bi(lang,"سفر","AWAY"):bi(lang,"نشط","ACTIVE")}</span></div>
+  {(vacation||relocation||archived)&&<div className={`inline-alert ${archived||relocation?"warn":"info"}`} style={{marginTop:10}}><b>{archived?bi(lang,"الحوض مؤرشف","Tank archived"):relocation?bi(lang,"نقل الحوض قيد التنفيذ","Tank relocation in progress"):bi(lang,"وضع السفر نشط","Vacation mode active")}</b><p>{archived?(tank.lifecycle?.archiveReason||bi(lang,"العمليات التشغيلية مقفلة والتاريخ محفوظ.","Operations are locked and history is preserved.")):relocation?([relocation.from,relocation.to].filter(Boolean).join(" → ")||bi(lang,"الموقع غير محدد","Location not specified")):(vacation?.plannedEndAt?`${bi(lang,"العودة المخططة","Planned return")}: ${vacation.plannedEndAt}`:vacation?.notes||"")}</p></div>}
+  <AdvancedSection titleAr="إدارة دورة حياة الحوض" titleEn="Manage tank lifecycle" summaryAr="السفر والنقل وRestart والأرشفة تغييرات كبيرة؛ افتحها فقط وقت تنفيذ حالة فعلية." summaryEn="Vacation, relocation, restart and archive are major lifecycle actions; open only for a real event." defaultOpen={false}>
+   <div style={{display:"grid",gap:10,paddingTop:10}}>
+    <ContextHint id="settings-lifecycle" lang={lang} tone="important" ar="هاي الإجراءات تدخل بتاريخ الحوض ويقرأها Tank Brain. استخدمها لتسجيل حدث فعلي، مو لتجربة الواجهة." en="These actions enter tank history and are read by Tank Brain. Use them for real lifecycle events, not interface experimentation."/>
+
   {vacation?<div className="inline-alert info"><b>{bi(lang,"وضع السفر نشط","Vacation mode active")}</b><p>{vacation.plannedEndAt?`${bi(lang,"العودة المخططة","Planned return")}: ${vacation.plannedEndAt}`:""} {vacation.notes||""}</p><button className="btn" onClick={endVacation}>{bi(lang,"إنهاء وضع السفر","End vacation mode")}</button></div>:<div className="form-grid"><label className="field"><span>{bi(lang,"عودة متوقعة (اختياري)","Planned return (optional)")}</span><input type="date" value={vacationEnd} onChange={e=>setVacationEnd(e.target.value)}/></label><label className="field"><span>{tr(lang,"notes")}</span><input value={vacationNotes} onChange={e=>setVacationNotes(e.target.value)}/></label><div className="field"><span>&nbsp;</span><button className="btn" onClick={startVacation}>{bi(lang,"بدء وضع السفر","Start vacation mode")}</button></div></div>}
   <hr/>
   {relocation?<div className="inline-alert warn"><b>{bi(lang,"نقل الحوض قيد التنفيذ","Tank relocation in progress")}</b><p>{[relocation.from,relocation.to].filter(Boolean).join(" → ")||bi(lang,"الموقع غير محدد","Location not specified")}</p><button className="btn primary" onClick={completeMove}>{bi(lang,"تأكيد اكتمال النقل","Mark relocation complete")}</button></div>:<div className="form-grid"><label className="field"><span>{bi(lang,"من","From")}</span><input value={moveFrom} onChange={e=>setMoveFrom(e.target.value)}/></label><label className="field"><span>{bi(lang,"إلى","To")}</span><input value={moveTo} onChange={e=>setMoveTo(e.target.value)}/></label><label className="field full-field"><span>{tr(lang,"notes")}</span><input value={moveNotes} onChange={e=>setMoveNotes(e.target.value)}/></label><div className="field"><span>&nbsp;</span><button className="btn" onClick={startMove}>{bi(lang,"بدء نقل الحوض","Start relocation")}</button></div></div>}
@@ -210,6 +221,8 @@ export function SettingsPage({tank}:{tank:Tank}) {
   <div className="form-grid"><label className="field"><span>{bi(lang,"سبب إعادة التشغيل الكبرى","Major restart reason")}</span><input value={restartReason} onChange={e=>setRestartReason(e.target.value)}/></label><div className="field"><span>&nbsp;</span><button className="btn danger" onClick={majorRestart}>{bi(lang,"بدء دورة جديدة بعد Restart فعلي","Start new cycle after real restart")}</button></div></div>
   <hr/>
   {archived?<div className="inline-alert info"><b>{bi(lang,"الحوض مؤرشف","Tank archived")}</b><p>{tank.lifecycle?.archiveReason||bi(lang,"التاريخ محفوظ والعمليات التشغيلية مقفلة.","History is preserved and operational workflows are locked.")}</p><button className="btn primary" onClick={restoreArchivedTank}>{bi(lang,"إعادة الحوض للعمل","Restore tank")}</button></div>:<div className="form-grid"><label className="field"><span>{bi(lang,"سبب الأرشفة (اختياري)","Archive reason (optional)")}</span><input value={archiveReason} onChange={e=>setArchiveReason(e.target.value)}/></label><div className="field"><span>&nbsp;</span><button className="btn danger" onClick={archiveTank}>{bi(lang,"أرشفة الحوض","Archive tank")}</button></div></div>}
+   </div>
+  </AdvancedSection>
  </div>
 
  <div className="card panel">
