@@ -16,11 +16,12 @@ import { biologicalMemory,proactivePredictions,tankMood } from "@/domain/tankLea
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr } from "@/i18n";
 import { maintenanceTaskDue } from "@/domain/maintenanceSchedule";
+import { estimatedParAt,formatLightMinute,lightingAtMinute } from "@/domain/lightingIntelligence";
 
-type ModuleId="chemistry"|"maintenance"|"bioload"|"forecast"|"intelligence"|"digitalTwin"|"equipment"|"predictions"|"memory"|"context"|"journey";
+type ModuleId="chemistry"|"lighting"|"maintenance"|"bioload"|"forecast"|"intelligence"|"digitalTwin"|"equipment"|"predictions"|"memory"|"context"|"journey";
 type SceneMode="tank"|"equipment"|"flow"|"empty";
 
-const DEFAULT_ORDER:ModuleId[]=["chemistry","maintenance","bioload","forecast","intelligence","digitalTwin","equipment","predictions","memory","context","journey"];
+const DEFAULT_ORDER:ModuleId[]=["chemistry","lighting","maintenance","bioload","forecast","intelligence","digitalTwin","equipment","predictions","memory","context","journey"];
 const DEFAULT_HIDDEN:ModuleId[]=[];
 const LAYOUT_KEY="aqua-dashboard-layout-v3";
 
@@ -36,6 +37,10 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
  const age=chemistryAgeDays(tank),latest=tank.chemistry[0]?.values??{};
  const activeAcclimation=(tank.acclimationSessions??[]).find(s=>s.status!=="completed");
  const equipmentWarnings=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
+ const nowLight=new Date(),lightMinute=nowLight.getHours()*60+nowLight.getMinutes(),lightProgram=core.lighting.program;
+ const currentLight=lightProgram?lightingAtMinute(lightProgram,lightMinute):null;
+ const currentLightPar=lightProgram?estimatedParAt(tank,50,50,tank.lighting?.mapDepthPct??50,lightMinute):0;
+ const lightPrimaryIssue=core.lighting.issues.find(x=>x.level==="danger")??core.lighting.issues.find(x=>x.level==="warn")??core.lighting.issues[0];
 
  const fishItems=tank.livestock.filter(x=>x.category==="fish"),invertItems=tank.livestock.filter(x=>x.category==="invert");
  const reefCategory:"coral"|"plant"=tank.type==="marine"?"coral":"plant";
@@ -81,6 +86,7 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
 
  const labels:Record<ModuleId,{icon:string;ar:string;en:string}>={
   chemistry:{icon:"⚗",ar:"الكيمياء",en:"Chemistry"},
+  lighting:{icon:"☀",ar:"الإنارة",en:"Lighting"},
   maintenance:{icon:"✓",ar:"الصيانة",en:"Maintenance"},
   bioload:{icon:"◌",ar:"الحمل الحيوي",en:"Bioload"},
   forecast:{icon:"↗",ar:"توقع 7 أيام",en:"7-day outlook"},
@@ -95,6 +101,7 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
 
  const summary:Record<ModuleId,{value:string;note:string;level?:string}>={
   chemistry:{value:ch===null?"N/A":`${ch}%`,note:ch===null?(lang==="ar"?"لا توجد قياسات كافية":"Not enough measured data"):(lang==="ar"?`آخر فحص منذ ${Math.floor(age)} يوم • ثقة ${chemistry.dataConfidence}%`:`Last test ${Math.floor(age)}d ago • confidence ${chemistry.dataConfidence}%`),level:ch===null||chemistry.critical||age>7?"warn":"good"},
+  lighting:{value:currentLight?`${Math.round(currentLight.weightedPercent)}%`:"—",note:lightProgram?(lang==="ar"?`الآن ${formatLightMinute(lightMinute)} • ≈ ${Math.round(currentLightPar)} PAR • ${lightPrimaryIssue?.ar??"لا ملاحظة حرجة"}`:`Now ${formatLightMinute(lightMinute)} • ≈ ${Math.round(currentLightPar)} PAR • ${lightPrimaryIssue?.en??"No critical note"}`):(lang==="ar"?"برنامج الإنارة غير مسجل":"Lighting program not registered"),level:core.lighting.level==="danger"?"danger":core.lighting.level==="warn"?"warn":"good"},
   maintenance:{value:`${mh}%`,note:lang==="ar"?(due.length?`${due.length} مهام مستحقة`:"لا مهام متأخرة"):(due.length?`${due.length} due task(s)`:"nothing overdue"),level:mh<70||due.length?"warn":"good"},
   bioload:{value:`${Math.round(bio.ratio*100)}%`,note:livestockSummary,level:bio.status==="danger"||bio.status==="high"?"warn":"good"},
   forecast:{value:forecast.projected7d===null?"N/A":`${forecast.projected7d}%`,note:lang==="ar"?forecast.ar:forecast.en,level:forecast.projected7d===null||forecast.direction==="declining"?"warn":"good"},
@@ -133,6 +140,8 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
 
  function detailsFor(id:ModuleId){
   if(id==="chemistry")return <div className="pd-detail"><div className={`inline-alert ${age>7?"warn":"good"}`}>{tr(lang,"chemistryFreshness")}: {Math.floor(age)} {lang==="ar"?"يوم":"days"}</div><div className="chem-mini-grid compact-chem-grid">{Object.entries(latest).slice(0,6).map(([k,v])=><span key={k}><small>{k}</small><b>{String(v)}</b></span>)}</div><button className="btn primary" onClick={()=>onNavigate("chemistry")}>{tr(lang,"openChemistry")}</button></div>;
+
+  if(id==="lighting")return <div className="pd-detail"><div className={"inline-alert "+(core.lighting.level==="danger"?"danger":core.lighting.level==="warn"?"warn":"good")}><b>{lang==="ar"?"الإنارة الآن":"Lighting now"}: {currentLight?Math.round(currentLight.weightedPercent)+"%":"—"}</b>{lightProgram&&<p>{formatLightMinute(lightMinute)} • ≈ {Math.round(currentLightPar)} PAR • {tank.type==="marine"?(lang==="ar"?"وضع بحري":"marine profile"):(lang==="ar"?"وضع نهري":"freshwater profile")}</p>}</div>{lightPrimaryIssue&&<div className={"inline-alert "+(lightPrimaryIssue.level==="danger"?"danger":lightPrimaryIssue.level==="warn"?"warn":"info")}>{lang==="ar"?lightPrimaryIssue.ar:lightPrimaryIssue.en}</div>}<button className="btn primary" onClick={()=>onNavigate("lighting")}>{lang==="ar"?"فتح صفحة الإنارة":"Open Lighting Intelligence"}</button></div>;
 
   if(id==="maintenance")return <div className="pd-detail"><div className={`inline-alert ${mh<70?"warn":"good"}`}><b>{lang==="ar"?"صحة الصيانة":"Maintenance health"}: {mh}%</b></div>{due.length?due.slice(0,4).map(x=><div className="mini-row" key={x.id}><b>{lang==="ar"?x.title:(x.titleEn||x.title)}</b><span>{x.nextDue??"—"}</span></div>):<div className="inline-alert good">{tr(lang,"good")}</div>}<button className="btn primary" onClick={()=>onNavigate("maintenance")}>{tr(lang,"openMaintenance")}</button></div>;
 
