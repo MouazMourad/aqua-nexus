@@ -17,6 +17,7 @@ import { readDataSafetyStatus,subscribeDataSafety,type DataSafetyStatus } from "
 import { deviceBackupEnabled,setDeviceBackupEnabled as persistDeviceBackup,subscribeDeviceBackupSetting } from "@/lib/deviceBackupSettings";
 import { clearLongTermHistory,longTermHistoryStats } from "@/lib/longTermHistory";
 import { FEATURE_DISCOVERY_TOTAL,readFeatureDiscovery,resetFeatureDiscovery,setFeatureDiscoveryMode,subscribeFeatureDiscovery,type FeatureDiscoveryState } from "@/lib/featureDiscovery";
+import { resetContextHints } from "@/lib/contextHints";
 
 export function SettingsPage({tank}:{tank:Tank}) {
  const state=useAquaStore(),patch=useAquaStore(s=>s.patchTank),del=useAquaStore(s=>s.deleteTank),replace=useAquaStore(s=>s.replaceData),[name,setName]=useState(tank.name),file=useRef<HTMLInputElement>(null),lang=state.language;
@@ -189,7 +190,7 @@ export function SettingsPage({tank}:{tank:Tank}) {
   <div className="experience-choice-grid">
    <button type="button" className={`experience-choice ${featureDiscovery.mode==="smart"?"active":""}`} onClick={()=>setFeatureDiscoveryMode("smart")}><b>{bi(lang,"ذكية حسب يلي تعلمته","Smart based on what I learned")}</b><span>{bi(lang,"تظهر فقط الميزات التي ما فتحتها أو ما تعرّفت عليها بعد.","Only shows features you have not opened or learned yet.")}</span></button>
    <button type="button" className={`experience-choice ${featureDiscovery.mode==="off"?"active":""}`} onClick={()=>setFeatureDiscoveryMode("off")}><b>{bi(lang,"إخفاء الفقاعات نهائياً","Hide bubbles")}</b><span>{bi(lang,"توقف كل فقاعات التعليم، ويمكن تشغيلها لاحقاً من هون.","Stops all discovery bubbles until you enable them again here.")}</span></button>
-   <button type="button" className="experience-choice" onClick={()=>{if(window.confirm(bi(lang,"رح يعتبر Aqua Nexus كل الميزات غير متعلمة ويرجع يعرّفك عليها من البداية. متابعة؟","Aqua Nexus will mark all feature tips as unseen and start teaching them again. Continue?")))resetFeatureDiscovery()}}><b>{bi(lang,"استعادة كل التعليمات","Restore all tips")}</b><span>{bi(lang,"يمسح سجل التعلّم فقط، بدون لمس أي بيانات بالحوض.","Clears only the learned-tip history without changing tank data.")}</span></button>
+   <button type="button" className="experience-choice" onClick={()=>{if(window.confirm(bi(lang,"رح يعتبر Aqua Nexus كل الميزات غير متعلمة ويرجع يعرّفك عليها من البداية. متابعة؟","Aqua Nexus will mark all feature tips as unseen and start teaching them again. Continue?")))resetFeatureDiscovery();resetContextHints()}}><b>{bi(lang,"استعادة كل التعليمات","Restore all guidance")}</b><span>{bi(lang,"يرجع فقاعات الميزات وهينات المصطلحات من البداية، بدون لمس أي بيانات بالحوض.","Restores feature bubbles and contextual hints from the beginning without changing tank data.")}</span></button>
   </div>
  </div>
 
