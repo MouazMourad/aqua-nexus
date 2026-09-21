@@ -62,7 +62,7 @@ export function DashboardFeatureBubble(){
     </div>
     <style jsx>{`
       .feature-bubble-lane{position:fixed;inset:0;z-index:2600;pointer-events:none;overflow:hidden}
-      .feature-bubble{position:absolute;inset-inline-end:clamp(12px,4vw,58px);bottom:-190px;width:min(360px,calc(100vw - 28px));pointer-events:none;animation:aquaBubbleRise 20s linear forwards;filter:drop-shadow(0 14px 28px rgba(0,0,0,.28))}
+      .feature-bubble{position:absolute;inset-inline-end:clamp(12px,4vw,58px);bottom:-190px;width:min(360px,calc(100vw - 28px));pointer-events:none;animation:aquaBubbleRise ${BUBBLE_RISE_MS}ms linear forwards;filter:drop-shadow(0 14px 28px rgba(0,0,0,.28))}
       .feature-bubble:before,.feature-bubble:after{content:"";position:absolute;border-radius:50%;border:1px solid rgba(149,235,255,.28);background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.22),rgba(91,212,239,.06) 48%,rgba(22,105,137,.035) 72%,transparent 73%);pointer-events:none}
       .feature-bubble:before{width:36px;height:36px;inset-inline-start:-18px;top:-24px}.feature-bubble:after{width:18px;height:18px;inset-inline-end:18px;bottom:-19px}
       .feature-bubble-body{width:100%;border:1px solid rgba(134,228,248,.28);border-radius:32px 32px 32px 18px;background:linear-gradient(135deg,rgba(17,75,98,.66),rgba(5,31,46,.54));backdrop-filter:blur(13px);-webkit-backdrop-filter:blur(13px);color:inherit;padding:13px 15px;display:grid;grid-template-columns:38px 1fr;gap:9px;text-align:inherit;box-shadow:inset 0 1px 0 rgba(255,255,255,.09)}
@@ -78,7 +78,7 @@ export function DashboardFeatureBubble(){
         100%{transform:translate3d(8px,-122vh,0) scale(1.52);opacity:0}
       }
       @media(max-width:620px){.feature-bubble{inset-inline-end:10px;width:min(330px,calc(100vw - 20px))}.feature-bubble-body{padding:11px 12px;grid-template-columns:32px 1fr}.feature-bubble-icon{width:32px;height:32px}.feature-bubble-body small{font-size:8.5px}}
-      @media(prefers-reduced-motion:reduce){.feature-bubble{animation:aquaBubbleFade 20s ease forwards}@keyframes aquaBubbleFade{0%,100%{opacity:0}10%,88%{opacity:.95}}}
+      @media(prefers-reduced-motion:reduce){.feature-bubble{animation:aquaBubbleFade ${BUBBLE_RISE_MS}ms ease forwards}@keyframes aquaBubbleFade{0%,100%{opacity:0}10%,88%{opacity:.95}}}
     `}</style>
   </div>;
 }
