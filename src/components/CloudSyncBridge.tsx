@@ -21,6 +21,7 @@ export function CloudSyncBridge(){
   const tanks=useAquaStore(s=>s.tanks);
   const lang=useAquaStore(s=>s.language);
   const selectedTankId=useAquaStore(s=>s.selectedTankId);
+  const aquariumExperience=useAquaStore(s=>s.aquariumExperience);
   const replaceTankSnapshot=useAquaStore(s=>s.replaceTankSnapshot);
   const [enabled,setEnabled]=useState(false);
   const [syncState,setSyncState]=useState<"idle"|"saving"|"ok"|"error">("idle");
@@ -136,7 +137,7 @@ export function CloudSyncBridge(){
   function downloadConflictBackup(id:string){
     const local=tanks.find(t=>t.id===id);if(!local)return;
     downloadText(`Aqua_Nexus_Conflict_Backup_${local.name.replace(/[^a-zA-Z0-9_-]+/g,"_")}.json`,JSON.stringify({
-      app:"Aqua Nexus",schemaVersion:CURRENT_BACKUP_SCHEMA,exportedAt:new Date().toISOString(),language:lang,selectedTankId:id,tanks:[local]
+      app:"Aqua Nexus",schemaVersion:CURRENT_BACKUP_SCHEMA,exportedAt:new Date().toISOString(),language:lang,aquariumExperience,selectedTankId:id,tanks:[local]
     },null,2));
   }
 
