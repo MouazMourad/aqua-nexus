@@ -4,6 +4,7 @@ import { systemHealth } from "./systemHealth";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
 import { biologicalCycleAlert,biologicalCycleStatus } from "./biologicalCycle";
 import { interventionDensityAlert } from "./interventionSafety";
+import { activeRelocation,activeVacation,isTankArchived } from "./tankLifecycle";
 
 export type SystemAlertLevel="info"|"warn"|"danger";
 
@@ -83,6 +84,12 @@ export function systemAlerts(tank:Tank):SystemAlert[]{
 
   const activeAcc=(tank.acclimationSessions??[]).find(x=>x.status!=="completed");
   if(activeAcc)pushUnique(out,{id:`acc-${activeAcc.id}`,level:"info",domain:"acclimation",ar:"هناك جلسة إقلمة نشطة حالياً.",en:"An acclimation session is currently active.",actionPage:"acclimation"});
+
+  const vacation=activeVacation(tank);
+  if(vacation)pushUnique(out,{id:`lifecycle-vacation-${vacation.id}`,level:"info",domain:"system",ar:`وضع السفر/الغياب نشط${vacation.plannedEndAt?` حتى ${vacation.plannedEndAt}`:""}. راقب فقط التنبيهات المهمة ولا توقف قواعد الأمان.`,en:`Vacation/away mode is active${vacation.plannedEndAt?` until ${vacation.plannedEndAt}`:""}. Critical safety alerts remain active.`,actionPage:"settings"});
+  const relocation=activeRelocation(tank);
+  if(relocation)pushUnique(out,{id:`lifecycle-relocation-${relocation.id}`,level:"warn",domain:"system",ar:"نقل الحوض قيد التنفيذ. تجنب التغييرات الكبيرة غير الضرورية حتى يستقر النظام بعد النقل.",en:"Tank relocation is in progress. Avoid unnecessary major changes until the system stabilizes after the move.",actionPage:"settings"});
+  if(isTankArchived(tank))pushUnique(out,{id:"lifecycle-archived",level:"info",domain:"system",ar:"الحوض مؤرشف؛ العمليات التشغيلية مقفلة والتاريخ والتقارير محفوظة.",en:"This tank is archived; operational workflows are locked while history and reports remain available.",actionPage:"settings"});
 
   const density=interventionDensityAlert(tank);
   if(density)pushUnique(out,{id:"intervention-density",level:density.level,domain:"system",ar:density.ar,en:density.en,actionPage:"dashboard"});
