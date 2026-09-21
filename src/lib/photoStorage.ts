@@ -2,7 +2,6 @@ import type { JournalPhoto,Tank } from "@/domain/types";
 
 const DB_NAME="aqua-nexus-media-v1";
 const STORE="photos";
-const FULL_DATA_THRESHOLD=140_000;
 
 function indexedDbAvailable(){return typeof window!=="undefined"&&"indexedDB" in window;}
 
@@ -30,7 +29,7 @@ async function withStore<T>(mode:IDBTransactionMode,fn:(store:IDBObjectStore,res
 }
 
 export async function putPhotoAsset(key:string,dataUrl:string){
-  if(!indexedDbAvailable())return false;
+  if(!indexedDbAvailable()||!dataUrl)return false;
   try{
     await withStore<boolean>("readwrite",(store,resolve,reject)=>{
       const req=store.put(dataUrl,key);
@@ -87,18 +86,35 @@ export async function createPhotoPreview(dataUrl:string,maxSide=360,quality=.72)
   }catch{return dataUrl;}
 }
 
+/**
+ * Any embedded image payload belongs in IndexedDB, not Zustand/localStorage.
+ * This also migrates the older hardening format where the full image had
+ * already moved out but a JPEG thumbnail still remained in tank.photos[].dataUrl.
+ */
 export function photoNeedsExternalization(photo:JournalPhoto){
-  return !photo.assetKey&&Boolean(photo.dataUrl?.startsWith("data:image/"))&&photo.dataUrl.length>=FULL_DATA_THRESHOLD;
+  return Boolean(photo.dataUrl?.startsWith("data:image/"));
 }
 
 export async function externalizePhoto(photo:JournalPhoto):Promise<JournalPhoto>{
-  if(photo.assetKey&&photo.fullResolutionStored)return photo;
   if(!photoNeedsExternalization(photo))return photo;
-  const key=`photo:${photo.id}`;
-  const stored=await putPhotoAsset(key,photo.dataUrl);
-  if(!stored)return photo;
+
+  const fullKey=photo.assetKey||`photo:${photo.id}:full`;
+  const previewKey=photo.previewKey||`photo:${photo.id}:preview`;
+
+  // Imported backups always carry the full image in dataUrl. Older local state
+  // may carry only a preview when assetKey already exists; preserve the existing
+  // full asset in that case instead of overwriting it with the preview.
+  const existingFull=photo.assetKey?await getPhotoAsset(photo.assetKey):null;
+  const full=existingFull||photo.dataUrl;
+  const fullStored=Boolean(existingFull)||await putPhotoAsset(fullKey,full);
+  if(!fullStored)return photo;
+
   const preview=await createPhotoPreview(photo.dataUrl);
-  return {...photo,dataUrl:preview,assetKey:key,fullResolutionStored:true};
+  const previewStored=await putPhotoAsset(previewKey,preview);
+  if(!previewStored)return {...photo,assetKey:fullKey,fullResolutionStored:true};
+
+  // No binary/thumbnail payload remains in the persisted Tank JSON.
+  return {...photo,dataUrl:"",assetKey:fullKey,previewKey,fullResolutionStored:true};
 }
 
 export async function resolveFullPhoto(photo:JournalPhoto){
@@ -106,11 +122,19 @@ export async function resolveFullPhoto(photo:JournalPhoto){
   return stored||photo.dataUrl;
 }
 
+export async function resolvePhotoPreview(photo:JournalPhoto){
+  const preview=await getPhotoAsset(photo.previewKey);
+  if(preview)return preview;
+  if(photo.dataUrl)return photo.dataUrl;
+  return await getPhotoAsset(photo.assetKey);
+}
+
 export async function externalizeTankPhotos(tank:Tank):Promise<Tank>{
   if(!tank.photos.some(photoNeedsExternalization))return tank;
   const photos:JournalPhoto[]=[];
   for(const photo of tank.photos)photos.push(await externalizePhoto(photo));
-  return {...tank,photos};
+  const changed=photos.some((photo,index)=>photo!==tank.photos[index]);
+  return changed?{...tank,photos}:tank;
 }
 
 export async function externalizeAllTankPhotos(tanks:Tank[]){
@@ -121,8 +145,8 @@ export async function externalizeAllTankPhotos(tanks:Tank[]){
 
 /**
  * JSON backup remains a full recovery artifact: full photo payloads are pulled
- * back from IndexedDB only while exporting, while normal app state keeps small
- * previews so multi-year journals do not exhaust localStorage.
+ * from IndexedDB only while exporting. Runtime tank state contains references
+ * and metadata, so years of photos do not consume localStorage.
  */
 export async function hydrateTankPhotosForBackup(tanks:Tank[]){
   const out:Tank[]=[];
@@ -130,7 +154,7 @@ export async function hydrateTankPhotosForBackup(tanks:Tank[]){
     const photos:JournalPhoto[]=[];
     for(const photo of tank.photos){
       const full=await resolveFullPhoto(photo);
-      photos.push({...photo,dataUrl:full});
+      photos.push({...photo,dataUrl:full||""});
     }
     out.push({...tank,photos});
   }
