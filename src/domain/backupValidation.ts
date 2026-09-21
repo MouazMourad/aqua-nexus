@@ -30,7 +30,7 @@ function validDimensions(value:unknown){
     && Number(value.length)>0&&Number(value.width)>0&&Number(value.height)>0;
 }
 function arraysAreArrays(tank:Record<string,unknown>){
-  const fields=["equipment","chemistry","maintenance","livestock","inventory","timeline","intelligenceEvents","guidanceActions","healthSnapshots","photos","visionAssessments","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi","rodiServiceEvents","plantCare","acclimationSessions","emergencySessions","filterMedia","livestockExits"];
+  const fields=["equipment","chemistry","maintenance","livestock","inventory","timeline","intelligenceEvents","guidanceActions","healthSnapshots","photos","visionAssessments","feeding","dosing","doserChannels","quarantine","expenses","waterChanges","rodi","rodiServiceEvents","plantCare","acclimationSessions","emergencySessions","filterMedia","livestockExits","aiActionPlans"];
   return fields.every(key=>tank[key]===undefined||Array.isArray(tank[key]));
 }
 
@@ -119,6 +119,28 @@ function nestedDataIssue(tank:Record<string,unknown>){
   }
   for(const [i,row] of (((tank.maintenance as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validText(row.title,500)||!validText(row.cadence,80))return `maintenance #${i+1} is invalid`;
+  }
+
+  if(tank.lifecycle!==undefined){
+    if(!isObject(tank.lifecycle))return "lifecycle must be an object";
+    const lifecycle=tank.lifecycle as Record<string,unknown>;
+    for(const key of ["vacations","relocations","restarts"])if(lifecycle[key]!==undefined&&!Array.isArray(lifecycle[key]))return `lifecycle.${key} must be an array`;
+    if(lifecycle.archivedAt!==undefined&&!validTimestamp(lifecycle.archivedAt))return "lifecycle archivedAt is invalid";
+    for(const [i,row] of (((lifecycle.vacations as unknown[])??[])).entries()){
+      if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.startedAt))return `lifecycle.vacations #${i+1} is invalid`;
+      if(row.plannedEndAt!==undefined&&!validTimestamp(row.plannedEndAt)&&!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(row.plannedEndAt)))return `lifecycle.vacations #${i+1} has invalid plannedEndAt`;
+      if(row.endedAt!==undefined&&!validTimestamp(row.endedAt))return `lifecycle.vacations #${i+1} has invalid endedAt`;
+    }
+    for(const [i,row] of (((lifecycle.relocations as unknown[])??[])).entries()){
+      if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.startedAt)||!["planned","in_progress","completed"].includes(String(row.status)))return `lifecycle.relocations #${i+1} is invalid`;
+      if(row.completedAt!==undefined&&!validTimestamp(row.completedAt))return `lifecycle.relocations #${i+1} has invalid completedAt`;
+    }
+    for(const [i,row] of (((lifecycle.restarts as unknown[])??[])).entries()){
+      if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp))return `lifecycle.restarts #${i+1} is invalid`;
+    }
+  }
+  for(const [i,row] of ((((tank.aiActionPlans as unknown[])??[]))).entries()){
+    if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.createdAt)||!Array.isArray(row.steps))return `aiActionPlans #${i+1} is invalid`;
   }
   for(const [i,row] of (((tank.livestockExits as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp)||!validText(row.name,300)||!finite(row.quantity)||Number(row.quantity)<=0)return `livestockExits #${i+1} is invalid`;
