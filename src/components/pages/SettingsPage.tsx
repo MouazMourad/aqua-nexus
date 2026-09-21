@@ -4,16 +4,21 @@ import type { Tank } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { downloadText,today } from "@/lib/appUtils";
+import { downloadText,today,uid,nowISO } from "@/lib/appUtils";
 import { syncPushReminders } from "@/lib/pushNotifications";
 import { CURRENT_BACKUP_SCHEMA,validateBackupPayload } from "@/domain/backupValidation";
 import { externalizeAllTankPhotos,hydrateTankPhotosForBackup } from "@/lib/photoStorage";
+import { activeRelocation,activeVacation,isTankArchived } from "@/domain/tankLifecycle";
 
 export function SettingsPage({tank}:{tank:Tank}) {
  const state=useAquaStore(),patch=useAquaStore(s=>s.patchTank),del=useAquaStore(s=>s.deleteTank),replace=useAquaStore(s=>s.replaceData),[name,setName]=useState(tank.name),file=useRef<HTMLInputElement>(null),lang=state.language;
  const [notificationState,setNotificationState]=useState<"unknown"|"enabled"|"disabled"|"unsupported"|"busy">("unknown");
  const [notificationNote,setNotificationNote]=useState("");
  const [backupNote,setBackupNote]=useState<{kind:"good"|"danger";text:string}|null>(null);
+ const [vacationEnd,setVacationEnd]=useState(""),[vacationNotes,setVacationNotes]=useState("");
+ const [moveFrom,setMoveFrom]=useState(""),[moveTo,setMoveTo]=useState(""),[moveNotes,setMoveNotes]=useState("");
+ const [restartReason,setRestartReason]=useState(""),[archiveReason,setArchiveReason]=useState("");
+ const vacation=activeVacation(tank),relocation=activeRelocation(tank),archived=isTankArchived(tank);
  const profile=tank.ecosystemProfile??"auto";
  const energy=tank.energySettings??{pricePerKwh:0,currency:"USD"};
  const exportBackup=async()=>{const tanks=await hydrateTankPhotosForBackup(state.tanks);downloadText(`Aqua_Nexus_Backup_${today()}.json`,JSON.stringify({app:"Aqua Nexus",schemaVersion:CURRENT_BACKUP_SCHEMA,exportedAt:new Date().toISOString(),language:state.language,selectedTankId:state.selectedTankId,tanks},null,2));};
@@ -79,6 +84,39 @@ export function SettingsPage({tank}:{tank:Tank}) {
  }
 
  const notificationsEnabled=notificationState==="enabled";
+
+ function startVacation(){
+  if(vacation)return;
+  const ts=nowISO(),row={id:uid("vac"),startedAt:ts,plannedEndAt:vacationEnd||undefined,notes:vacationNotes.trim()||undefined};
+  patch(tank.id,t=>({...t,lifecycle:{...(t.lifecycle??{}),vacations:[...(t.lifecycle?.vacations??[]),row]},timeline:[{id:uid("ev"),timestamp:ts,type:"lifecycle-vacation",textAr:"بدأ وضع السفر/الغياب للحوض.",textEn:"Tank vacation/away mode started."},...t.timeline]}));
+ }
+ function endVacation(){
+  if(!vacation)return; const ts=nowISO();
+  patch(tank.id,t=>({...t,lifecycle:{...(t.lifecycle??{}),vacations:(t.lifecycle?.vacations??[]).map(x=>x.id===vacation.id?{...x,endedAt:ts}:x)},timeline:[{id:uid("ev"),timestamp:ts,type:"lifecycle-vacation",textAr:"انتهى وضع السفر/الغياب للحوض.",textEn:"Tank vacation/away mode ended."},...t.timeline]}));
+ }
+ function startMove(){
+  if(relocation)return; const ts=nowISO(),row={id:uid("move"),startedAt:ts,status:"in_progress" as const,from:moveFrom.trim()||undefined,to:moveTo.trim()||undefined,notes:moveNotes.trim()||undefined};
+  patch(tank.id,t=>({...t,lifecycle:{...(t.lifecycle??{}),relocations:[...(t.lifecycle?.relocations??[]),row]},timeline:[{id:uid("ev"),timestamp:ts,type:"lifecycle-relocation",textAr:"بدأ نقل/ترحيل الحوض.",textEn:"Tank relocation started."},...t.timeline]}));
+ }
+ function completeMove(){
+  if(!relocation)return; const ts=nowISO();
+  patch(tank.id,t=>({...t,lifecycle:{...(t.lifecycle??{}),relocations:(t.lifecycle?.relocations??[]).map(x=>x.id===relocation.id?{...x,status:"completed" as const,completedAt:ts}:x)},timeline:[{id:uid("ev"),timestamp:ts,type:"lifecycle-relocation",textAr:"اكتمل نقل الحوض؛ تبدأ الآن مرحلة مراقبة الاستقرار.",textEn:"Tank relocation completed; post-move stabilization monitoring begins."},...t.timeline]}));
+ }
+ function majorRestart(){
+  if(tank.livestock.length>0){window.alert(lang==="ar"?"إعادة التشغيل الكبرى مقفلة بوجود كائنات مسجلة داخل الحوض. سجّل نقل/خروج الكائنات أولاً حتى ما يتحول الإجراء الإداري إلى مخاطرة فعلية.":"Major restart is locked while livestock are still recorded in the tank. Transfer/exit livestock first so this administrative action cannot create a real safety risk.");return}
+  if(!window.confirm(lang==="ar"?"سيبدأ Aqua Nexus دورة بيولوجية جديدة من اليوم، مع الاحتفاظ بكل التاريخ السابق. هل هذا Restart فعلي للحوض؟":"Aqua Nexus will start a new biological cycle today while preserving all prior history. Is this a real tank restart?"))return;
+  const ts=nowISO(),row={id:uid("restart"),timestamp:ts,reason:restartReason.trim()||undefined};
+  patch(tank.id,t=>({...t,status:"cycling",biologicalCycle:{startedAt:ts,method:"fishless"},lifecycle:{...(t.lifecycle??{}),restarts:[...(t.lifecycle?.restarts??[]),row]},timeline:[{id:uid("ev"),timestamp:ts,type:"lifecycle-restart",textAr:"تم تسجيل إعادة تشغيل كبرى وبدء دورة بيولوجية جديدة مع حفظ التاريخ السابق.",textEn:"Major restart recorded; a new biological cycle started while prior history was preserved."},...t.timeline]}));
+ }
+ function archiveTank(){
+  if((tank.acclimationSessions??[]).some(x=>x.status!=="completed")||(tank.emergencySessions??[]).some(x=>x.status==="active")){window.alert(lang==="ar"?"لا يمكن أرشفة الحوض أثناء إقلمة أو طوارئ نشطة. أغلق الحالة الحرجة أولاً.":"The tank cannot be archived during active acclimation or emergency work. Close the critical workflow first.");return}
+  if(!window.confirm(lang==="ar"?"الأرشفة ستقفل العمليات التشغيلية وتبقي التاريخ والتقارير. متابعة؟":"Archiving will lock operational workflows while preserving history and reports. Continue?"))return;
+  const ts=nowISO();patch(tank.id,t=>({...t,lifecycle:{...(t.lifecycle??{}),archivedAt:ts,archiveReason:archiveReason.trim()||undefined},timeline:[{id:uid("ev"),timestamp:ts,type:"lifecycle-archive",textAr:"تمت أرشفة الحوض.",textEn:"Tank archived."},...t.timeline]}));
+ }
+ function restoreArchivedTank(){
+  const ts=nowISO();patch(tank.id,t=>({...t,lifecycle:{...(t.lifecycle??{}),archivedAt:undefined,archiveReason:undefined},timeline:[{id:uid("ev"),timestamp:ts,type:"lifecycle-restore",textAr:"تمت إعادة الحوض من الأرشيف.",textEn:"Tank restored from archive."},...t.timeline]}));
+ }
+
  const notificationStatus=notificationState==="unsupported"
   ?(lang==="ar"?"غير مدعومة":"Unsupported")
   :notificationsEnabled
@@ -93,6 +131,17 @@ export function SettingsPage({tank}:{tank:Tank}) {
   <p className="note">{bi(lang,"البروفايل يؤثر على أهداف الكيمياء ومتطلبات الإنارة/الحركة وتقييم التجهيزات. Auto يستنتج من الكائنات.","The profile affects chemistry targets, lighting/flow requirements and equipment adequacy. Auto infers from livestock.")}</p>
   <label className="field"><span>{bi(lang,"بروفايل النظام","System profile")}</span><select value={profile} onChange={e=>patch(tank.id,t=>({...t,ecosystemProfile:e.target.value==="auto"?undefined:e.target.value as any}))}><option value="auto">Auto</option>{tank.type==="marine"?<><option value="reef">Reef</option><option value="fishOnly">Fish-only</option></>:<><option value="planted">Planted</option><option value="fishOnly">Fish-only</option></>}</select></label>
   <div className="form-grid"><label className="field"><span>{bi(lang,"سعر الكهرباء / kWh","Electricity price / kWh")}</span><input type="number" min="0" step="any" value={energy.pricePerKwh} onChange={e=>patch(tank.id,t=>({...t,energySettings:{pricePerKwh:Number(e.target.value),currency:t.energySettings?.currency||"USD"}}))}/></label><label className="field"><span>{tr(lang,"currency")}</span><input value={energy.currency} onChange={e=>patch(tank.id,t=>({...t,energySettings:{pricePerKwh:t.energySettings?.pricePerKwh??0,currency:e.target.value}}))}/></label></div>
+ </div>
+
+ <div className="card panel full-span">
+  <div className="module-head"><div><small className="eyebrow-mini">TANK LIFECYCLE</small><h3>{bi(lang,"دورة حياة الحوض","Tank lifecycle")}</h3><p className="note">{bi(lang,"السفر، نقل الحوض، إعادة التشغيل الكبرى والأرشفة تنحفظ كأحداث فعلية ويعرفها Tank Brain.","Vacation, relocation, major restart and archive are first-class events visible to Tank Brain.")}</p></div><span className={`status ${archived?"warn":relocation?"warn":"good"}`}>{archived?bi(lang,"مؤرشف","ARCHIVED"):relocation?bi(lang,"قيد النقل","MOVING"):vacation?bi(lang,"سفر","AWAY"):bi(lang,"نشط","ACTIVE")}</span></div>
+  {vacation?<div className="inline-alert info"><b>{bi(lang,"وضع السفر نشط","Vacation mode active")}</b><p>{vacation.plannedEndAt?`${bi(lang,"العودة المخططة","Planned return")}: ${vacation.plannedEndAt}`:""} {vacation.notes||""}</p><button className="btn" onClick={endVacation}>{bi(lang,"إنهاء وضع السفر","End vacation mode")}</button></div>:<div className="form-grid"><label className="field"><span>{bi(lang,"عودة متوقعة (اختياري)","Planned return (optional)")}</span><input type="date" value={vacationEnd} onChange={e=>setVacationEnd(e.target.value)}/></label><label className="field"><span>{tr(lang,"notes")}</span><input value={vacationNotes} onChange={e=>setVacationNotes(e.target.value)}/></label><div className="field"><span>&nbsp;</span><button className="btn" onClick={startVacation}>{bi(lang,"بدء وضع السفر","Start vacation mode")}</button></div></div>}
+  <hr/>
+  {relocation?<div className="inline-alert warn"><b>{bi(lang,"نقل الحوض قيد التنفيذ","Tank relocation in progress")}</b><p>{[relocation.from,relocation.to].filter(Boolean).join(" → ")||bi(lang,"الموقع غير محدد","Location not specified")}</p><button className="btn primary" onClick={completeMove}>{bi(lang,"تأكيد اكتمال النقل","Mark relocation complete")}</button></div>:<div className="form-grid"><label className="field"><span>{bi(lang,"من","From")}</span><input value={moveFrom} onChange={e=>setMoveFrom(e.target.value)}/></label><label className="field"><span>{bi(lang,"إلى","To")}</span><input value={moveTo} onChange={e=>setMoveTo(e.target.value)}/></label><label className="field full-field"><span>{tr(lang,"notes")}</span><input value={moveNotes} onChange={e=>setMoveNotes(e.target.value)}/></label><div className="field"><span>&nbsp;</span><button className="btn" onClick={startMove}>{bi(lang,"بدء نقل الحوض","Start relocation")}</button></div></div>}
+  <hr/>
+  <div className="form-grid"><label className="field"><span>{bi(lang,"سبب إعادة التشغيل الكبرى","Major restart reason")}</span><input value={restartReason} onChange={e=>setRestartReason(e.target.value)}/></label><div className="field"><span>&nbsp;</span><button className="btn danger" onClick={majorRestart}>{bi(lang,"بدء دورة جديدة بعد Restart فعلي","Start new cycle after real restart")}</button></div></div>
+  <hr/>
+  {archived?<div className="inline-alert info"><b>{bi(lang,"الحوض مؤرشف","Tank archived")}</b><p>{tank.lifecycle?.archiveReason||bi(lang,"التاريخ محفوظ والعمليات التشغيلية مقفلة.","History is preserved and operational workflows are locked.")}</p><button className="btn primary" onClick={restoreArchivedTank}>{bi(lang,"إعادة الحوض للعمل","Restore tank")}</button></div>:<div className="form-grid"><label className="field"><span>{bi(lang,"سبب الأرشفة (اختياري)","Archive reason (optional)")}</span><input value={archiveReason} onChange={e=>setArchiveReason(e.target.value)}/></label><div className="field"><span>&nbsp;</span><button className="btn danger" onClick={archiveTank}>{bi(lang,"أرشفة الحوض","Archive tank")}</button></div></div>}
  </div>
 
  <div className="card panel">
