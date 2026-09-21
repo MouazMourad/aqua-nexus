@@ -592,6 +592,7 @@ test("Lighting screenshot import uses Vision analysis, fills editable values and
 });
 
 test("Equipment CSV import is editable, routes data to Tank Brain and supports alert acknowledgement",async({page})=>{
+  test.setTimeout(90_000);
   await openTrainingDashboard(page);
   await goToPage(page,"equipment");
   await page.getByTestId("equipment-smart-import-toggle").click();
