@@ -22,6 +22,7 @@ interface AquaStore extends AquaState {
   patchTank: (tankId: string, updater: Partial<Tank> | ((tank: Tank) => Tank)) => void;
   addChemistryReading: (tankId: string, reading: ChemistryReading) => void;
   replaceData: (data: Pick<AquaState, "language"|"selectedTankId"|"tanks">) => void;
+  replaceTankSnapshot: (tankId:string, tank:Tank) => void;
   resetDemo: () => void;
   resetTrainingTank: (tankId: string) => void;
 }
@@ -208,6 +209,11 @@ export const useAquaStore = create<AquaStore>()(
           next={...next,guidanceActions:reconcileGuidanceActions(t.guidanceActions,core.guidanceActions,next.intelligenceEvents)};
           return withHealthSnapshot(t,next);
         })
+      })),
+
+      replaceTankSnapshot:(tankId,tank)=>set((state)=>({
+        ...state,
+        tanks:state.tanks.map(existing=>existing.id===tankId?normalize({...tank,id:tankId,isTraining:false}):existing)
       })),
 
       replaceData:(data)=>set((state)=>{
