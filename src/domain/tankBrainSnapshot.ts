@@ -54,6 +54,7 @@ export function buildTankBrainSnapshot(tank:Tank){
       expenses:tail(tank.expenses,60)
     },
     biologicalCycle:tank.biologicalCycle??null,
+    lifecycle:tank.lifecycle??null,
     acclimation:{
       active:activeAcclimation,
       recentCompleted:recentAcclimation,
@@ -86,7 +87,10 @@ export function buildTankBrainSnapshot(tank:Tank){
       rodiServiceEvents:tank.rodiServiceEvents?.length??0,
       plantCare:tank.plantCare?.length??0,
       acclimationSessions:tank.acclimationSessions?.length??0,
-      aiActionPlans:extended.aiActionPlans?.length??0
+      aiActionPlans:extended.aiActionPlans?.length??0,
+      vacations:tank.lifecycle?.vacations?.length??0,
+      relocations:tank.lifecycle?.relocations?.length??0,
+      restarts:tank.lifecycle?.restarts?.length??0
     }
   };
 }
