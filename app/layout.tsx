@@ -12,11 +12,13 @@ import { PWARegister } from "@/components/PWARegister";
 import { PushReminderSync } from "@/components/PushReminderSync";
 import { CloudSyncBridge } from "@/components/CloudSyncBridge";
 import { DashboardCommandCollapse } from "@/components/dashboard/DashboardCommandCollapse";
+import { PhotoStorageBridge } from "@/components/PhotoStorageBridge";
 
 export const metadata: Metadata = {
   title: "Aqua Nexus 3D",
   description: "Smart Aquarium Management Platform",
   manifest: "/manifest.webmanifest",
+  icons: { icon: "/aqua-nexus-icon.svg", apple: "/aqua-nexus-icon.svg" },
 };
 
 export const viewport: Viewport = {
@@ -29,7 +31,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ar" dir="rtl">
-      <body><PWARegister/><PushReminderSync/><CloudSyncBridge/><DashboardCommandCollapse/>{children}</body>
+      <body><PWARegister/><PushReminderSync/><CloudSyncBridge/><PhotoStorageBridge/><DashboardCommandCollapse/>{children}</body>
     </html>
   );
 }

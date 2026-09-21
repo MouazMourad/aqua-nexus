@@ -10,6 +10,19 @@ function root(){
   return path.resolve(dir);
 }
 
+
+function magicMatches(bytes:Buffer,mime:string){
+  if(mime==="image/jpeg")return bytes.length>=3&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff;
+  if(mime==="image/png")return bytes.length>=8&&bytes.subarray(0,8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]));
+  if(mime==="image/webp")return bytes.length>=12&&bytes.subarray(0,4).toString("ascii")==="RIFF"&&bytes.subarray(8,12).toString("ascii")==="WEBP";
+  if(mime==="image/heic"||mime==="image/heif"){
+    if(bytes.length<12)return false;
+    const brand=bytes.subarray(4,12).toString("ascii");
+    return /^ftyp(heic|heix|hevc|hevx|mif1|msf1)/.test(brand);
+  }
+  return false;
+}
+
 function extension(mime:string){
   if(mime==="image/jpeg")return ".jpg";
   if(mime==="image/png")return ".png";
@@ -29,6 +42,7 @@ export async function saveMedia(input:{workspace:string;tankId:string;livestockI
   const fileName=`${id}${extension(input.file.type)}`;
   const full=path.join(dir,fileName);
   const bytes=Buffer.from(await input.file.arrayBuffer());
+  if(!magicMatches(bytes,input.file.type))throw Object.assign(new Error("Image signature does not match the declared media type."),{status:415});
   await writeFile(full,bytes);
   try{
     await query("INSERT INTO aqua_media_assets(id,workspace_key,tank_id,livestock_id,kind,storage_path,mime_type,size_bytes) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",[

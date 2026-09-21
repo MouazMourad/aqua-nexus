@@ -10,7 +10,7 @@ import { isBiologicalCycleActive,isCyclePageAllowed } from "./biologicalCycle";
 
 export type IntelligenceDomain =
  "chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|
- "waterChange"|"rodi"|"quarantine"|"emergency"|"acclimation"|"sump"|"journal"|"expense"|"system";
+ "waterChange"|"rodi"|"plantCare"|"quarantine"|"emergency"|"acclimation"|"sump"|"journal"|"expense"|"system";
 
 export interface IntelligenceAction{
  id:string;
@@ -26,7 +26,7 @@ export interface IntelligenceAction{
 
 const pageByDomain:Record<IntelligenceDomain,string>={
  chemistry:"chemistry",dosing:"dosing",maintenance:"maintenance",equipment:"equipment",livestock:"livestock",inventory:"inventory",feeding:"feeding",
- waterChange:"water-change",rodi:"rodi",quarantine:"quarantine",emergency:"emergency",acclimation:"acclimation",sump:"sump",journal:"journal",expense:"expenses",system:"dashboard"
+ waterChange:"waterchange",rodi:"rodi",plantCare:"livestock",quarantine:"quarantine",emergency:"emergency",acclimation:"acclimation",sump:"sump",journal:"journal",expense:"expenses",system:"dashboard"
 };
 
 export interface TankIntelligenceCore{

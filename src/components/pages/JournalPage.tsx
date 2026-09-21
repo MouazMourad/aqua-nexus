@@ -1,5 +1,5 @@
 "use client";
-import { useMemo,useState } from "react";
+import { useEffect,useMemo,useState } from "react";
 import type { JournalPhoto,Tank,VisionAssessmentRecord } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
@@ -8,10 +8,23 @@ import { uid,nowISO } from "@/lib/appUtils";
 import { buildVisionTriage,captureConsistency,type VisionMetrics,type VisionSymptom } from "@/domain/visionIntelligence";
 import { visionDiseaseCandidates } from "@/domain/visionDifferential";
 import { askAquaVision } from "@/lib/aquaAIClient";
+import { externalizePhoto,resolveFullPhoto,resolvePhotoPreview } from "@/lib/photoStorage";
 
 type GrowthPhoto=JournalPhoto&{livestockId?:string;estimatedSizeCm?:number;colorIndex?:number;brightnessIndex?:number;captureScore?:number;clarityIndex?:number;greenDominancePercent?:number;palePixelPercent?:number};
 
 type PreparedImage={dataUrl:string;metrics:VisionMetrics};
+
+function StoredPhotoImage({photo,alt,className,style}:{photo:JournalPhoto;alt:string;className?:string;style?:React.CSSProperties}){
+ const [src,setSrc]=useState(photo.dataUrl||"");
+ useEffect(()=>{
+  let active=true;
+  setSrc(photo.dataUrl||"");
+  void resolvePhotoPreview(photo).then(value=>{if(active&&value)setSrc(value)});
+  return()=>{active=false};
+ },[photo.id,photo.previewKey,photo.assetKey,photo.dataUrl]);
+ if(!src)return <div className={className} style={{...style,display:"grid",placeItems:"center",background:"rgba(255,255,255,.04)",fontSize:18}} aria-label={alt}>▧</div>;
+ return <img className={className} src={src} alt={alt} style={style}/>;
+}
 
 function readFile(file:File){
  return new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=()=>reject(r.error);r.readAsDataURL(file);});
@@ -79,6 +92,7 @@ export function JournalPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
  const [caption,setCaption]=useState(""),[livestockId,setLivestockId]=useState(""),[sizeCm,setSizeCm]=useState(0);
  const [visionLivestockId,setVisionLivestockId]=useState(""),[visionSymptoms,setVisionSymptoms]=useState<VisionSymptom[]>([]),[visionNotes,setVisionNotes]=useState(""),[visionBusy,setVisionBusy]=useState(false),[visionError,setVisionError]=useState(""),[deepVisionBusyId,setDeepVisionBusyId]=useState<string|null>(null),[deepVisionError,setDeepVisionError]=useState("");
+ const [photoLimit,setPhotoLimit]=useState(60);
  const photos=tank.photos as GrowthPhoto[];
  const assessments:VisionAssessmentRecord[]=tank.visionAssessments??[];
  const trackedLivestock=tank.livestock.filter(x=>x.category==="coral"||x.category==="plant"||x.category==="other");
@@ -101,7 +115,8 @@ export function JournalPage({tank}:{tank:Tank}) {
   try{
    const prepared=await prepareImage(file),ts=nowISO(),subject=tank.livestock.find(x=>x.id===livestockId);
    const photo:any={id:uid("ph"),timestamp:ts,caption,dataUrl:prepared.dataUrl,livestockId:livestockId||undefined,estimatedSizeCm:sizeCm>0?sizeCm:undefined,...prepared.metrics};
-   patch(tank.id,t=>({...t,photos:[photo,...t.photos],timeline:subject?[{id:uid("ev"),timestamp:ts,type:"growth-photo",textAr:`تمت إضافة صورة متابعة لـ ${subject.name}${sizeCm>0?` بحجم تقديري ${sizeCm} سم`:""}.`,textEn:`Growth photo added for ${subject.nameEn||subject.name}${sizeCm>0?` with estimated size ${sizeCm} cm`:""}.`},...t.timeline]:t.timeline}));
+   const storedPhoto=await externalizePhoto(photo);
+   patch(tank.id,t=>({...t,photos:[storedPhoto,...t.photos],timeline:subject?[{id:uid("ev"),timestamp:ts,type:"growth-photo",textAr:`تمت إضافة صورة متابعة لـ ${subject.name}${sizeCm>0?` بحجم تقديري ${sizeCm} سم`:""}.`,textEn:`Growth photo added for ${subject.nameEn||subject.name}${sizeCm>0?` with estimated size ${sizeCm} cm`:""}.`},...t.timeline]:t.timeline}));
    setCaption("");setSizeCm(0);
   }catch{}
  }
@@ -117,8 +132,9 @@ export function JournalPage({tank}:{tank:Tank}) {
    const candidates=visionDiseaseCandidates(tank,visionLivestockId||undefined,selectedSymptoms);
    const photoId=uid("ph"),assessmentId=uid("vision");
    const photo:any={id:photoId,timestamp:ts,caption:`Local Best Visual Insight${subject?` • ${subject.name}`:" • Whole Tank"}`,dataUrl:prepared.dataUrl,livestockId:visionLivestockId||undefined,...prepared.metrics};
+   const storedPhoto=await externalizePhoto(photo);
    const assessment:VisionAssessmentRecord={id:assessmentId,timestamp:ts,photoId,livestockId:visionLivestockId||undefined,symptoms:selectedSymptoms,notes:visionNotes,metrics:prepared.metrics,triage,modelStatus:"local-best",engine:triage.engine,external:{status:"not_requested"},diseaseCandidateIds:candidates.map(x=>x.id)};
-   patch(tank.id,t=>({...t,photos:[photo,...t.photos],visionAssessments:[assessment,...(t.visionAssessments??[])],timeline:[{id:uid("ev"),timestamp:ts,type:"vision-assessment",textAr:`Local Best Visual Insight${subject?` لـ ${subject.name}`:" للحوض كامل"}: ${triage.summaryAr}`,textEn:`Local Best Visual Insight${subject?` for ${subject.nameEn||subject.name}`:" for the whole tank"}: ${triage.summaryEn}`},...t.timeline]}));
+   patch(tank.id,t=>({...t,photos:[storedPhoto,...t.photos],visionAssessments:[assessment,...(t.visionAssessments??[])],timeline:[{id:uid("ev"),timestamp:ts,type:"vision-assessment",textAr:`Local Best Visual Insight${subject?` لـ ${subject.name}`:" للحوض كامل"}: ${triage.summaryAr}`,textEn:`Local Best Visual Insight${subject?` for ${subject.nameEn||subject.name}`:" for the whole tank"}: ${triage.summaryEn}`},...t.timeline]}));
    setVisionSymptoms([]);setVisionNotes("");
   }catch{
    setVisionError(lang==="ar"?"ما قدرنا نحلل الصورة محلياً. جرّب صورة JPG/PNG/WEBP أو التقط صورة جديدة.":"Local image analysis failed. Try JPG/PNG/WEBP or capture a new photo.");
@@ -141,7 +157,8 @@ export function JournalPage({tank}:{tank:Tank}) {
     `Local Aqua Nexus triage: ${localSummary}`,
     candidateText?`Symptom-linked library references (not diagnoses): ${candidateText}`:""
    ].filter(Boolean).join("\n");
-   const result=await askAquaVision({tank,imageDataUrl:photo.dataUrl,question,language:lang});
+   const fullImage=await resolveFullPhoto(photo);
+   const result=await askAquaVision({tank,imageDataUrl:fullImage,question,language:lang});
    const ts=nowISO();
    if(result.mode!=="external"||!result.answer?.text){
     const message=result.answer?.messageAr&&lang==="ar"?result.answer.messageAr:result.answer?.messageEn||bi(lang,"ما في مزود AI Vision خارجي مربوط حالياً.","No external AI Vision provider is configured.");
@@ -249,7 +266,7 @@ export function JournalPage({tank}:{tank:Tank}) {
  {assessments.length>0&&<div className="card panel full-span">
   <div className="module-head"><div><h3>{bi(lang,"سجل Visual Insight","Visual Insight history")}</h3><p className="note">{bi(lang,"كل تحليل محفوظ مع الصورة والكائن والنتيجة والإجراءات المرتبطة حتى تقدر تراجع تطور الحالة.","Every assessment stays linked to its photo, organism, result and follow-up actions so you can review progression.")}</p></div><span className="scene-badge">{assessments.length}</span></div>
   <div className="history-list">{assessments.slice(0,12).map(a=>{const subject=tank.livestock.find(x=>x.id===a.livestockId),photo=photos.find(x=>x.id===a.photoId);return <div className="history-row" key={a.id} style={{alignItems:"flex-start",gap:12}}>
-   {photo&&<img src={photo.dataUrl} alt={photo.caption||"Visual assessment"} style={{width:72,height:72,objectFit:"cover",borderRadius:10,flex:"0 0 auto"}}/>}
+   {photo&&<StoredPhotoImage photo={photo} alt={photo.caption||"Visual assessment"} style={{width:72,height:72,objectFit:"cover",borderRadius:10,flex:"0 0 auto"}}/>}
    <div style={{display:"grid",gap:5,flex:1,minWidth:0}}>
     <b>{subject?(lang==="ar"?subject.name:(subject.nameEn||subject.name)):bi(lang,"الحوض كامل","Whole tank")} • {a.triage.level==="urgent"?bi(lang,"عاجل","Urgent"):a.triage.level==="attention"?bi(lang,"متابعة","Attention"):bi(lang,"مراقبة","Monitor")}</b>
     <small>{new Date(a.timestamp).toLocaleString()} • {bi(lang,"ثقة","Confidence")} {a.triage.confidenceScore}/100 • Capture {a.metrics.captureScore}/100</small>
@@ -265,6 +282,6 @@ export function JournalPage({tank}:{tank:Tank}) {
   </div>})}</div>
  </div>}
 
- <div className="photo-grid full-span">{photos.map(p=>{const subject=tank.livestock.find(x=>x.id===p.livestockId);return <article className="photo-card" key={p.id}><img src={p.dataUrl} alt={p.caption}/><div><b>{p.caption||subject&&(lang==="ar"?subject.name:(subject.nameEn||subject.name))||tr(lang,"journal")}</b><small>{new Date(p.timestamp).toLocaleString()}</small>{subject&&<small>{lang==="ar"?subject.name:(subject.nameEn||subject.name)}{p.estimatedSizeCm?` • ${p.estimatedSizeCm} cm`:""}</small>}<small>{typeof p.colorIndex==="number"?`${bi(lang,"مؤشر اللون","Color index")}: ${p.colorIndex}/100`:""}{typeof p.brightnessIndex==="number"?` • ${bi(lang,"الإضاءة","brightness")}: ${p.brightnessIndex}/100`:""}{typeof p.captureScore==="number"?` • Capture ${p.captureScore}/100`:""}</small></div></article>})}</div>
+ <div className="photo-grid full-span">{photos.slice(0,photoLimit).map(p=>{const subject=tank.livestock.find(x=>x.id===p.livestockId);return <article className="photo-card" key={p.id}><StoredPhotoImage photo={p} alt={p.caption||tr(lang,"journal")}/><div><b>{p.caption||subject&&(lang==="ar"?subject.name:(subject.nameEn||subject.name))||tr(lang,"journal")}</b><small>{new Date(p.timestamp).toLocaleString()}</small>{subject&&<small>{lang==="ar"?subject.name:(subject.nameEn||subject.name)}{p.estimatedSizeCm?` • ${p.estimatedSizeCm} cm`:""}</small>}<small>{typeof p.colorIndex==="number"?`${bi(lang,"مؤشر اللون","Color index")}: ${p.colorIndex}/100`:""}{typeof p.brightnessIndex==="number"?` • ${bi(lang,"الإضاءة","brightness")}: ${p.brightnessIndex}/100`:""}{typeof p.captureScore==="number"?` • Capture ${p.captureScore}/100`:""}</small></div></article>})}</div>{photoLimit<photos.length&&<div className="full-span" style={{display:"flex",justifyContent:"center"}}><button className="btn" onClick={()=>setPhotoLimit(n=>n+60)}>{bi(lang,`عرض 60 صورة أقدم — باقي ${photos.length-photoLimit}`,`Show 60 older photos — ${photos.length-photoLimit} remaining`)}</button></div>}
  </section>;
 }

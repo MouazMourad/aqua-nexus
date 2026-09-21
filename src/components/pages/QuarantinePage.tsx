@@ -7,6 +7,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { uid,today,nowISO } from "@/lib/appUtils";
 import { claimCriticalAction } from "@/lib/actionGuard";
 import { inventoryForConsumer } from "@/domain/inventoryIntelligence";
+import { interventionGate } from "@/domain/interventionSafety";
+import { validatePositiveQuantity,validateTreatmentSetup } from "@/domain/inputSanity";
 
 function addHoursISO(hours:number){return new Date(Date.now()+Math.max(1,hours)*3600000).toISOString();}
 function dateOnly(iso?:string){return iso?new Date(iso).toISOString().slice(0,10):today();}
@@ -23,6 +25,14 @@ export function QuarantinePage({tank}:{tank:Tank}) {
   if(!organism.trim())return;
   const ts=nowISO();
   const treatment=Boolean(product.trim()&&labelDose>0);
+  if(product.trim()&&!labelDose){window.alert(bi(lang,"إذا اخترت دواء لازم تدخل جرعة الملصق الفعلية. Aqua Nexus ما رح يخمّن الجرعة.","If you enter a medication, enter the exact label dose. Aqua Nexus will not guess it."));return}
+  if(labelDose>0&&!product.trim()){window.alert(bi(lang,"اكتب اسم المنتج المرتبط بجرعة الملصق حتى يبقى العلاج قابلاً للتدقيق.","Enter the product name associated with the label dose so treatment remains auditable."));return}
+  if(!validatePositiveQuantity(volume,"quarantineVolume").ok){window.alert(bi(lang,"حجم حوض الحجر يجب أن يكون أكبر من صفر.","Quarantine volume must be greater than zero."));return}
+  if(treatment){
+    const treatmentCheck=validateTreatmentSetup({volumeLiters:volume,labelDoseMlPer100L:labelDose,intervalHours,totalDoses});
+    const danger=treatmentCheck.issues.find(x=>x.level==="danger");
+    if(danger){window.alert(lang==="ar"?danger.ar:danger.en);return}
+  }
   const selectedMedication=medInventoryId?medicationStock.find(i=>i.id===medInventoryId):undefined;
   if(medInventoryId&&!selectedMedication){window.alert(bi(lang,"الدواء المحدد لم يعد متاحاً ضمن مخزون العلاج.","The selected medication is no longer available in treatment inventory."));return}
   if(selectedMedication&&selectedMedication.unit.toLowerCase()!=="ml"){window.alert(bi(lang,"حاسبة الحجر الحالية تعتمد mL. اختر دواء مخزون بوحدة mL أو اترك الربط فارغاً.","The current quarantine calculator uses mL. Select medication stock measured in mL or leave inventory unlinked."));return}
@@ -39,12 +49,21 @@ export function QuarantinePage({tank}:{tank:Tank}) {
  function logDose(id:string){
   const q=tank.quarantine.find(x=>x.id===id);
   if(!q||q.status!=="active"||!q.treatmentProduct||!q.labelDoseMlPer100L||!q.quarantineVolumeLiters)return;
+  const setupCheck=validateTreatmentSetup({volumeLiters:q.quarantineVolumeLiters,labelDoseMlPer100L:q.labelDoseMlPer100L,intervalHours:q.intervalHours??24,totalDoses:q.totalDoses??1});
+  const setupDanger=setupCheck.issues.find(x=>x.level==="danger");
+  if(setupDanger){window.alert(lang==="ar"?setupDanger.ar:setupDanger.en);return}
+  if(q.nextDoseAt&&Date.now()+60_000<new Date(q.nextDoseAt).getTime()){
+    window.alert(bi(lang,`الجرعة التالية ليست مستحقة بعد. الموعد المسجل: ${new Date(q.nextDoseAt).toLocaleString()}. لا تسجّل جرعة مبكرة وتكسر فاصل ملصق المنتج.`,`The next dose is not due yet. Scheduled: ${new Date(q.nextDoseAt).toLocaleString()}. Do not log an early dose that violates the product-label interval.`));return;
+  }
   const dose=q.labelDoseMlPer100L*(q.quarantineVolumeLiters/100);
   const dosesGiven=(q.dosesGiven??0)+1;
   const total=Math.max(1,q.totalDoses??1);
   const more=dosesGiven<total;
   const nextDoseAt=more?addHoursISO(q.intervalHours??24):undefined;
   const ts=nowISO();
+  const intervention=interventionGate(tank,"medication");
+  if(intervention.level==="warn"&&!window.confirm(lang==="ar"?intervention.ar+" هل جرعة العلاج مستحقة الآن حسب الخطة؟":intervention.en+" Is the treatment dose due now according to the plan?"))return;
+  if(intervention.level==="danger"&&!window.confirm(lang==="ar"?"⚠️ "+intervention.ar+" لا تكمل إلا إذا الجرعة العلاجية مطلوبة الآن فعلاً حسب الخطة/الملصق. متابعة؟":"⚠️ "+intervention.en+" Continue only if this treatment dose is genuinely due now under the plan/product label. Continue?"))return;
   if(!claimCriticalAction(`quarantine-dose:${tank.id}:${id}`))return;
   const inv=q.medicationInventoryItemId?medicationStock.find(i=>i.id===q.medicationInventoryItemId):undefined;
   const consume=q.medicationQuantityPerDose??dose;
@@ -75,11 +94,11 @@ export function QuarantinePage({tank}:{tank:Tank}) {
   <div className="form-grid">
    <label className="field"><span>{bi(lang,"ربط بكائن مسجل","Link to registered livestock")}</span><select value={subjectId} onChange={e=>{const id=e.target.value;setSubjectId(id);const s=tank.livestock.find(x=>x.id===id);if(s)setOrganism(lang==="ar"?s.name:(s.nameEn||s.name))}}><option value="">—</option>{tank.livestock.map(x=><option key={x.id} value={x.id}>{lang==="ar"?x.name:(x.nameEn||x.name)}</option>)}</select></label><label className="field"><span>{tr(lang,"organism")}</span><input value={organism} onChange={e=>setOrganism(e.target.value)}/></label>
    <label className="field"><span>{tr(lang,"reason")}</span><input value={reason} onChange={e=>setReason(e.target.value)}/></label>
-   <label className="field"><span>{bi(lang,"حجم حوض الحجر L","Quarantine volume L")}</span><input type="number" min="1" value={volume} onChange={e=>setVolume(Number(e.target.value))}/></label>
+   <label className="field"><span>{bi(lang,"حجم حوض الحجر L","Quarantine volume L")}</span><input type="number" min=".1" max="1000000" step=".1" value={volume} onChange={e=>setVolume(Number(e.target.value))}/></label>
    <label className="field"><span>{bi(lang,"اسم المنتج / الدواء","Product / medication")}</span><input value={product} onChange={e=>setProduct(e.target.value)}/></label>
-   <label className="field"><span>{bi(lang,"جرعة الملصق mL لكل 100L","Label dose mL per 100L")}</span><input type="number" min="0" step="any" value={labelDose||""} onChange={e=>setLabelDose(Number(e.target.value))}/></label>
-   <label className="field"><span>{bi(lang,"الفاصل بين الجرعات (ساعة)","Dose interval (hours)")}</span><input type="number" min="1" value={intervalHours} onChange={e=>setIntervalHours(Number(e.target.value))}/></label>
-   <label className="field"><span>{bi(lang,"عدد الجرعات المخطط","Planned doses")}</span><input type="number" min="1" max="60" value={totalDoses} onChange={e=>setTotalDoses(Number(e.target.value))}/></label><label className="field"><span>{bi(lang,"ربط الدواء بالمخزون (اختياري)","Link medication to inventory (optional)")}</span><select value={medInventoryId} onChange={e=>setMedInventoryId(e.target.value)}><option value="">—</option>{medicationStock.map(i=><option key={i.id} value={i.id}>{lang==="ar"?i.name:(i.nameEn||i.name)} • {i.quantity} {i.unit}</option>)}</select></label>
+   <label className="field"><span>{bi(lang,"جرعة الملصق mL لكل 100L","Label dose mL per 100L")}</span><input type="number" min=".000001" max="10000" step="any" value={labelDose||""} onChange={e=>setLabelDose(Number(e.target.value))}/></label>
+   <label className="field"><span>{bi(lang,"الفاصل بين الجرعات (ساعة)","Dose interval (hours)")}</span><input type="number" min=".25" max="720" step=".25" value={intervalHours} onChange={e=>setIntervalHours(Number(e.target.value))}/></label>
+   <label className="field"><span>{bi(lang,"عدد الجرعات المخطط","Planned doses")}</span><input type="number" min="1" max="100" value={totalDoses} onChange={e=>setTotalDoses(Number(e.target.value))}/></label><label className="field"><span>{bi(lang,"ربط الدواء بالمخزون (اختياري)","Link medication to inventory (optional)")}</span><select value={medInventoryId} onChange={e=>setMedInventoryId(e.target.value)}><option value="">—</option>{medicationStock.map(i=><option key={i.id} value={i.id}>{lang==="ar"?i.name:(i.nameEn||i.name)} • {i.quantity} {i.unit}</option>)}</select></label>
    <label className="field full-field"><span>{tr(lang,"plan")}</span><textarea value={plan} onChange={e=>setPlan(e.target.value)}/></label>
   </div>
   {product&&labelDose>0&&<div className="summary-strip" style={{marginTop:12}}><div className="summary"><small>{bi(lang,"الجرعة المحسوبة من الملصق","Label-scaled dose")}</small><b>{calculatedDose.toFixed(2)} mL</b></div><div className="summary"><small>{bi(lang,"حجم الحجر","Quarantine volume")}</small><b>{volume} L</b></div><div className="summary"><small>{bi(lang,"كل","Every")}</small><b>{intervalHours} h</b></div></div>}

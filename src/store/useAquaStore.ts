@@ -1,8 +1,8 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import type { AquaState, ChemistryReading, Equipment, HealthSnapshot, Language, Tank } from "@/domain/types";
+import { createJSONStorage,persist } from "zustand/middleware";
+import type { AquaState, AquariumExperienceLevel, ChemistryReading, Equipment, HealthSnapshot, Language, Tank } from "@/domain/types";
 import { demoMarineTank, demoFreshwaterTank } from "@/data/demoTank";
 import { liters, round1 } from "@/lib/units";
 import { defaultDisplayPosition } from "@/lib/displayLayout";
@@ -10,15 +10,20 @@ import { chemistryHealthAssessment, maintenanceHealth } from "@/domain/health";
 import { tankStateScore,tankStateView } from "@/domain/tankIntelligence";
 import { tankIntelligenceCore } from "@/domain/intelligenceCore";
 import { deriveIntelligenceEvents,mergeIntelligenceEvents,reconcileGuidanceActions } from "@/domain/eventIntelligence";
+import { deriveExtendedIntelligenceEvents } from "@/domain/extendedEventIntelligence";
+import { recordCloudDeleteTombstone } from "@/lib/cloudTombstones";
+import { aquaStateStorage } from "@/lib/aquaStateStorage";
 
 interface AquaStore extends AquaState {
   setLanguage: (language: Language) => void;
+  setAquariumExperience: (level:AquariumExperienceLevel) => void;
   selectTank: (tankId: string) => void;
   addTank: (tank: Tank) => void;
   deleteTank: (tankId: string) => void;
   patchTank: (tankId: string, updater: Partial<Tank> | ((tank: Tank) => Tank)) => void;
   addChemistryReading: (tankId: string, reading: ChemistryReading) => void;
-  replaceData: (data: Pick<AquaState, "language"|"selectedTankId"|"tanks">) => void;
+  replaceData: (data: Pick<AquaState, "language"|"aquariumExperience"|"selectedTankId"|"tanks">) => void;
+  replaceTankSnapshot: (tankId:string, tank:Tank) => void;
   resetDemo: () => void;
   resetTrainingTank: (tankId: string) => void;
 }
@@ -97,6 +102,10 @@ function changeReason(before:Tank,after:Tank):ChangeReason|null{
   if(after.waterChanges.length!==before.waterChanges.length)return {ar:"تم تسجيل تغيير ماء.",en:"A water change was logged."};
   if(after.dosing.length!==before.dosing.length)return {ar:"تم تسجيل جرعة جديدة.",en:"A dosing event was logged."};
   if(after.feeding.length!==before.feeding.length)return {ar:"تم تسجيل تغذية.",en:"A feeding event was logged."};
+  if((after.plantCare?.length??0)!==(before.plantCare?.length??0))return {ar:"تم تسجيل إجراء رعاية للنباتات.",en:"A plant-care action was logged."};
+  if((after.rodiServiceEvents?.length??0)!==(before.rodiServiceEvents?.length??0))return {ar:"تم تسجيل صيانة لنظام RO/DI.",en:"RO/DI service was logged."};
+  if(fingerprint(after.doserChannels.map(x=>[x.id,x.material,x.capacityMl,x.currentMl,x.consumption,x.period]))!==fingerprint(before.doserChannels.map(x=>[x.id,x.material,x.capacityMl,x.currentMl,x.consumption,x.period])))return {ar:"تغير إعداد أو مستوى إحدى قنوات الدوزر.",en:"A doser channel configuration or level changed."};
+  if(before.ecosystemProfile!==after.ecosystemProfile||before.plantedMode!==after.plantedMode||before.substrateType!==after.substrateType||before.substrateStartedAt!==after.substrateStartedAt||before.systemVolumeLiters!==after.systemVolumeLiters)return {ar:"تغيرت معلومات تشغيلية أساسية للحوض.",en:"Core tank operating information changed."};
   if(fingerprint(after.quarantine.map(x=>[x.id,x.status,x.reason,x.dosesGiven,x.nextDoseAt]))!==fingerprint(before.quarantine.map(x=>[x.id,x.status,x.reason,x.dosesGiven,x.nextDoseAt])))return {ar:"تغيرت حالة الحجر أو العلاج.",en:"Quarantine or treatment status changed."};
   if(fingerprint((after.emergencySessions??[]).map(x=>[x.id,x.status,x.completedSteps.length]))!==fingerprint((before.emergencySessions??[]).map(x=>[x.id,x.status,x.completedSteps.length])))return {ar:"تغيرت حالة بروتوكول طوارئ.",en:"Emergency protocol status changed."};
   if(fingerprint((after.acclimationSessions??[]).map(x=>[x.id,x.status,x.completedAt]))!==fingerprint((before.acclimationSessions??[]).map(x=>[x.id,x.status,x.completedAt])))return {ar:"تغيرت حالة جلسة الإقلمة.",en:"Acclimation session status changed."};
@@ -154,10 +163,12 @@ export const useAquaStore = create<AquaStore>()(
   persist(
     (set) => ({
       language:"ar",
+      aquariumExperience:"beginner",
       selectedTankId:demoMarineTank.id,
       tanks:canonicalTrainingTanks(),
 
       setLanguage:(language)=>set({language}),
+      setAquariumExperience:(aquariumExperience)=>set({aquariumExperience}),
       selectTank:(selectedTankId)=>set({selectedTankId}),
 
       addTank:(tank)=>set((state)=>({
@@ -168,6 +179,7 @@ export const useAquaStore = create<AquaStore>()(
       deleteTank:(tankId)=>set((state)=>{
         const target=state.tanks.find(t=>t.id===tankId);
         if(target?.isTraining)return state;
+        recordCloudDeleteTombstone(tankId);
         const tanks=state.tanks.filter(t=>t.id!==tankId);
         const real=tanks.filter(t=>!t.isTraining);
         return {
@@ -182,7 +194,7 @@ export const useAquaStore = create<AquaStore>()(
           if(t.id!==tankId)return t;
           const nextRaw=typeof updater==="function" ? updater(t) : {...t,...updater};
           let next=normalize(nextRaw);
-          const events=deriveIntelligenceEvents(t,next);
+          const events=[...deriveIntelligenceEvents(t,next),...deriveExtendedIntelligenceEvents(t,next)];
           if(events.length)next={...next,intelligenceEvents:mergeIntelligenceEvents(t.intelligenceEvents,events)};
           const core=tankIntelligenceCore(next);
           next={...next,guidanceActions:reconcileGuidanceActions(t.guidanceActions,core.guidanceActions,next.intelligenceEvents)};
@@ -194,12 +206,17 @@ export const useAquaStore = create<AquaStore>()(
         tanks:state.tanks.map(t=>{
           if(t.id!==tankId)return t;
           let next=normalize({...t,chemistry:[reading,...(t.chemistry??[])]});
-          const events=deriveIntelligenceEvents(t,next);
+          const events=[...deriveIntelligenceEvents(t,next),...deriveExtendedIntelligenceEvents(t,next)];
           next={...next,intelligenceEvents:mergeIntelligenceEvents(t.intelligenceEvents,events)};
           const core=tankIntelligenceCore(next);
           next={...next,guidanceActions:reconcileGuidanceActions(t.guidanceActions,core.guidanceActions,next.intelligenceEvents)};
           return withHealthSnapshot(t,next);
         })
+      })),
+
+      replaceTankSnapshot:(tankId,tank)=>set((state)=>({
+        ...state,
+        tanks:state.tanks.map(existing=>existing.id===tankId?normalize({...tank,id:tankId,isTraining:false}):existing)
       })),
 
       replaceData:(data)=>set((state)=>{
@@ -209,6 +226,7 @@ export const useAquaStore = create<AquaStore>()(
         return {
           ...state,
           language:data.language,
+          aquariumExperience:data.aquariumExperience,
           selectedTankId:requested?.id ?? firstReal?.id ?? demoMarineTank.id,
           tanks
         };
@@ -232,6 +250,7 @@ export const useAquaStore = create<AquaStore>()(
     {
       name:"aqua-nexus-3d-v1",
       version:9,
+      storage:createJSONStorage(()=>aquaStateStorage),
       migrate:(persisted:any,fromVersion:number)=>{
         const p=persisted??{};
         // Release migrations are non-destructive. Preserve real tanks and add/
@@ -245,14 +264,14 @@ export const useAquaStore = create<AquaStore>()(
         const tanks=withCanonicalTraining(Array.isArray(p.tanks)?p.tanks:[]);
         const requested=tanks.find(t=>t.id===p.selectedTankId);
         const firstReal=tanks.find(t=>!t.isTraining);
-        return {...p,tanks,selectedTankId:requested?.id??firstReal?.id??demoMarineTank.id};
+        return {...p,aquariumExperience:["beginner","intermediate","advanced"].includes(p.aquariumExperience)?p.aquariumExperience:"beginner",tanks,selectedTankId:requested?.id??firstReal?.id??demoMarineTank.id};
       },
       merge:(persisted:any,current)=>{
         const p=persisted??{};
         const tanks=withCanonicalTraining(p.tanks??current.tanks);
         const requested=tanks.find(t=>t.id===p.selectedTankId);
         const firstReal=tanks.find(t=>!t.isTraining);
-        return {...current,...p,tanks,selectedTankId:requested?.id??firstReal?.id??demoMarineTank.id};
+        return {...current,...p,aquariumExperience:["beginner","intermediate","advanced"].includes(p.aquariumExperience)?p.aquariumExperience:"beginner",tanks,selectedTankId:requested?.id??firstReal?.id??demoMarineTank.id};
       }
     }
   )

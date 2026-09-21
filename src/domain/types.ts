@@ -1,6 +1,7 @@
 export type Language = "ar" | "en";
 export type TankType = "marine" | "freshwater";
 export type TankStatus = "new" | "cycling" | "established";
+export type AquariumExperienceLevel = "beginner" | "intermediate" | "advanced";
 
 export type EquipmentKind =
   | "lighting" | "waveMaker" | "skimmer" | "returnPump" | "filterSock"
@@ -234,7 +235,7 @@ export interface InventoryItem {
 }
 
 export type IntelligenceEventKind = "fact"|"observation"|"action"|"omission"|"outcome";
-export type IntelligenceEventDomain = "chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|"waterChange"|"rodi"|"quarantine"|"emergency"|"acclimation"|"sump"|"journal"|"expense"|"system";
+export type IntelligenceEventDomain = "chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|"waterChange"|"rodi"|"plantCare"|"quarantine"|"emergency"|"acclimation"|"sump"|"journal"|"expense"|"system";
 export interface IntelligenceEvent {
   id:string;
   timestamp:string;
@@ -311,7 +312,13 @@ export interface JournalPhoto {
   id: string;
   timestamp: string;
   caption: string;
+  /** Legacy/import recovery payload only. Normal persisted tank state keeps this empty. */
   dataUrl: string;
+  /** Full-resolution compressed asset stored outside Zustand/localStorage. */
+  assetKey?: string;
+  /** Small display preview stored outside Zustand/localStorage as well. */
+  previewKey?: string;
+  fullResolutionStored?: boolean;
   livestockId?: string;
   estimatedSizeCm?: number;
   colorIndex?: number;
@@ -538,6 +545,40 @@ export interface PlantCareLog {
   notes?: string;
 }
 
+
+export interface TankVacationPeriod {
+  id:string;
+  startedAt:string;
+  plannedEndAt?:string;
+  endedAt?:string;
+  notes?:string;
+}
+
+export interface TankRelocationEvent {
+  id:string;
+  startedAt:string;
+  completedAt?:string;
+  status:"planned"|"in_progress"|"completed";
+  from?:string;
+  to?:string;
+  notes?:string;
+}
+
+export interface TankRestartEvent {
+  id:string;
+  timestamp:string;
+  reason?:string;
+  notes?:string;
+}
+
+export interface TankLifecycleState {
+  vacations?:TankVacationPeriod[];
+  relocations?:TankRelocationEvent[];
+  restarts?:TankRestartEvent[];
+  archivedAt?:string;
+  archiveReason?:string;
+}
+
 export interface BiologicalCycleState {
   startedAt: string;
   sourceAddedAt?: string;
@@ -683,12 +724,15 @@ export interface Tank {
   rodiServiceEvents?: RODIServiceEvent[];
   plantCare?: PlantCareLog[];
   biologicalCycle?: BiologicalCycleState;
+  lifecycle?: TankLifecycleState;
   acclimationSessions?: AcclimationSession[];
   createdAt: string;
 }
 
 export interface AquaState {
   language: Language;
+  /** Aquarium-hobby expertise only. It never represents software/UI skill. */
+  aquariumExperience: AquariumExperienceLevel;
   selectedTankId: string;
   tanks: Tank[];
 }

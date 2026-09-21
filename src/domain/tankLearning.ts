@@ -124,10 +124,29 @@ function significant(parameter:string,before:number,after:number){
   return delta>=(fixed[parameter]??Math.max(.1,Math.abs(before)*.15));
 }
 
+function learningEvents(tank:Tank){
+  const core=(tank.intelligenceEvents??[]).map(e=>({
+    id:`core-${e.id}`,
+    timestamp:e.timestamp,
+    type:`core:${e.domain}:${e.verb}`,
+    textAr:e.textAr,
+    textEn:e.textEn
+  }));
+  const all=[...tank.timeline,...core].filter(x=>Number.isFinite(ts(x.timestamp)));
+  const seen=new Set<string>();
+  return all
+    .sort((a,b)=>ts(b.timestamp)-ts(a.timestamp))
+    .filter(x=>{
+      const key=`${x.timestamp}|${x.textAr}|${x.textEn}`;
+      if(seen.has(key))return false;
+      seen.add(key);return true;
+    });
+}
+
 export function eventChemistryLinks(tank:Tank,maxLinks=6,eventWindow=250):EventImpact[]{
   const readings=sortedReadings(tank);
   if(readings.length<2)return [];
-  const events=[...tank.timeline].sort((a,b)=>ts(b.timestamp)-ts(a.timestamp)).slice(0,Math.max(1,eventWindow));
+  const events=learningEvents(tank).slice(0,Math.max(1,eventWindow));
   const out:EventImpact[]=[];
   for(const event of events){
     const t=ts(event.timestamp); if(!Number.isFinite(t))continue;
@@ -164,7 +183,7 @@ export function biologicalMemory(tank:Tank):EventImpact[]{
   const points=healthTimeline(tank);
   const chemistryLinks=eventChemistryLinks(tank,200,250);
   const byEvent=new Map(chemistryLinks.map(x=>[x.event.id,x]));
-  const events=[...tank.timeline].sort((a,b)=>ts(b.timestamp)-ts(a.timestamp)).slice(0,250);
+  const events=learningEvents(tank).slice(0,250);
   const out:EventImpact[]=[];
   for(const event of events){
     const t=ts(event.timestamp); if(!Number.isFinite(t))continue;

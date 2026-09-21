@@ -21,17 +21,17 @@ export interface AquaAIQueryPlan{
 
 const SOURCE_MAP:Record<AquaDomain,string[]>={
  system:["data","chemistry","trend","history","equipment","maintenance","livestock","bioload","acclimation","nutrients","learning"],
- chemistry:["data","chemistry","trend","history","nutrients","learning"],
+ chemistry:["data","chemistry","trend","history","nutrients","learning","equipment","maintenance","livestock","bioload","acclimation"],
  bioload:["bioload","livestock","nutrients"],
  livestock:["livestock","bioload","acclimation"],
  equipment:["equipment"],
  maintenance:["maintenance","equipment"],
- dosing:["chemistry","trend","history","learning"],
+ dosing:["chemistry","trend","history","learning","equipment","maintenance","data"],
  acclimation:["acclimation","livestock"],
  emergency:["equipment","chemistry","data","livestock"],
- rodi:["data","history","chemistry"],
+ rodi:["data","history","chemistry","maintenance","equipment"],
  feeding:["livestock","bioload","nutrients"],
- water:["chemistry","history","maintenance","data"],
+ water:["chemistry","history","maintenance","data","rodi","equipment"],
  inventory:["equipment","maintenance","data"],
  expenses:["data","equipment","history"],
  diseases:["livestock","chemistry","history","learning"],
@@ -118,6 +118,7 @@ export function buildAquaAIQueryPlan(intent:AquaQuestionIntent):AquaAIQueryPlan{
   operation==="canAdd"||
   operation==="whatIf"||
   operation==="waterChange"||
+  ((operation==="why"||operation==="trend"||operation==="forecast"||operation==="action")&&(primary==="chemistry"||primary==="water"||primary==="rodi"||primary==="dosing"))||
   (intent.asksForRisk&&(primary==="livestock"||primary==="bioload"));
 
  const allowedSources=crossDomain

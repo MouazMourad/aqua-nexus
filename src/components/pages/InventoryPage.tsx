@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Modal } from "@/components/ui/Modal";
 import { uid } from "@/lib/appUtils";
 import { inventoryCategoryLabel,inventoryProfile,inventorySubcategoryLabel,inventorySubcategoryOptions,unifiedInventory } from "@/domain/inventoryIntelligence";
+import { sanitizeNonNegative,validateInventoryEntry } from "@/domain/inputSanity";
 
 const consumersByCategory:Record<InventoryCategory,InventoryConsumer[]>={
  feeding:["feeding"],fertilizer:["fertilizer"],co2:["co2"],dosing:["dosing"],supplement:["dosing"],
@@ -36,6 +37,10 @@ export function InventoryPage({tank}:{tank:Tank}) {
  };
  const add=()=>{
   const name=p?.ar||custom.trim(),nameEn=p?.en||custom.trim();if(!name)return;
+  const check=validateInventoryEntry({quantity:qty,minimum:min||p?.min||0,unit:unit||p?.unit||"",name});
+  const danger=check.issues.find(x=>x.level==="danger"),warning=check.issues.find(x=>x.level==="warn");
+  if(danger){window.alert(lang==="ar"?danger.ar:danger.en);return}
+  if(warning&&!window.confirm((lang==="ar"?warning.ar:warning.en)+(lang==="ar"?" متابعة؟":" Continue?")))return;
   const base:InventoryItem={id:uid("inv"),presetId:preset||undefined,name,nameEn,category:p?.catAr,categoryEn:p?.catEn,quantity:Math.max(0,qty),unit:unit||p?.unit||"",minimum:Math.max(0,min||p?.min||0)};
   const inferred=inventoryProfile(base),finalCategory=preset?inferred.category:category;
   const finalSubcategory=preset?inferred.subcategory:(subcategory==="other"?(customSubcategory.trim()||"other"):(subcategory||inventorySubcategoryOptions(finalCategory)[0]?.value||"other"));
@@ -52,14 +57,14 @@ export function InventoryPage({tank}:{tank:Tank}) {
   }]}));
   setOpen(false);reset();
  };
- const updateGeneral=(id:string,v:number)=>patch(tank.id,t=>({...t,inventory:t.inventory.map(x=>x.id===id?{...x,quantity:Math.max(0,v)}:x)}));
- const updateConsumable=(equipmentId:string,consumableId:string,v:number)=>patch(tank.id,t=>({...t,equipment:t.equipment.map(e=>e.id===equipmentId?{...e,consumables:(e.consumables??[]).map(c=>c.id===consumableId?{...c,quantityOnHand:Math.max(0,v)}:c)}:e)}));
+ const updateGeneral=(id:string,v:number)=>patch(tank.id,t=>({...t,inventory:t.inventory.map(x=>x.id===id?{...x,quantity:sanitizeNonNegative(v,x.quantity,1_000_000_000)}:x)}));
+ const updateConsumable=(equipmentId:string,consumableId:string,v:number)=>patch(tank.id,t=>({...t,equipment:t.equipment.map(e=>e.id===equipmentId?{...e,consumables:(e.consumables??[]).map(c=>c.id===consumableId?{...c,quantityOnHand:sanitizeNonNegative(v,c.quantityOnHand??0,1_000_000_000)}:c)}:e)}));
  const remove=(id:string)=>patch(tank.id,t=>({...t,inventory:t.inventory.filter(x=>x.id!==id)}));
 
  return <section className="page-grid"><PageHeader eyebrow="UNIFIED INVENTORY" title={tr(lang,"inventory")} actions={<button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(lang,"addStock")}</button>}/>
  {stock.total===0&&<div className="inline-alert info full-span"><div><b>📦 {bi(lang,"المخزون مو مجرد قائمة كميات؛ كل مادة مرتبطة بوظيفتها.","Inventory is not just a quantity list; every item is linked to its purpose.")}</b><p>{bi(lang,"صنّف المادة مرة واحدة، وبعدها كل صفحة تشوف فقط المواد المناسبة إلها وتخصم منها بأمان.","Classify an item once; each module will then see only compatible stock and deduct from it safely.")}</p><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(lang,"addStock")}</button></div></div>}
  <div className="card panel full-span"><div className="summary-strip"><div className="summary"><small>{bi(lang,"كل المواد","All stock")}</small><b>{stock.total}</b></div><div className="summary"><small>{bi(lang,"مواد المعدات","Equipment consumables")}</small><b>{stock.consumables.length}</b></div><div className="summary"><small>{bi(lang,"مخزون منخفض","Low stock")}</small><b>{stock.low.length}</b></div></div></div>
- <div className="card panel full-span"><div className="table-wrap"><table><thead><tr><th>{tr(lang,"name")}</th><th>{tr(lang,"category")}</th><th>{bi(lang,"النوع الفرعي","Subtype")}</th><th>{tr(lang,"available")}</th><th>{tr(lang,"minimum")}</th><th>{tr(lang,"status")}</th><th></th></tr></thead><tbody>{stock.rows.map(x=><tr key={x.id}><td>{lang==="ar"?x.name:(x.nameEn||x.name)}{x.source==="equipment-consumable"&&<small style={{display:"block"}}>⚙ {bi(lang,"مستهلك مرتبط بجهاز","Equipment consumable")}</small>}</td><td>{inventoryCategoryLabel(x.inventoryCategory||"other",lang)}</td><td>{x.subcategory?inventorySubcategoryLabel(x.inventoryCategory||"other",x.subcategory,lang):"—"}</td><td><input className="table-input" type="number" value={x.quantity} onChange={e=>x.source==="inventory"?updateGeneral(x.id,Number(e.target.value)):updateConsumable(x.equipmentId!,x.consumableId!,Number(e.target.value))}/> {x.unit}</td><td>{x.minimum}</td><td><span className={`status ${x.quantity<=x.minimum?"warn":""}`}>{x.quantity<=x.minimum?tr(lang,"low"):tr(lang,"good")}</span></td><td>{x.source==="inventory"&&<button className="btn danger" onClick={()=>remove(x.id)}>×</button>}</td></tr>)}</tbody></table></div></div>
+ <div className="card panel full-span"><div className="table-wrap"><table><thead><tr><th>{tr(lang,"name")}</th><th>{tr(lang,"category")}</th><th>{bi(lang,"النوع الفرعي","Subtype")}</th><th>{tr(lang,"available")}</th><th>{tr(lang,"minimum")}</th><th>{tr(lang,"status")}</th><th></th></tr></thead><tbody>{stock.rows.map(x=><tr key={x.id}><td>{lang==="ar"?x.name:(x.nameEn||x.name)}{x.source==="equipment-consumable"&&<small style={{display:"block"}}>⚙ {bi(lang,"مستهلك مرتبط بجهاز","Equipment consumable")}</small>}</td><td>{inventoryCategoryLabel(x.inventoryCategory||"other",lang)}</td><td>{x.subcategory?inventorySubcategoryLabel(x.inventoryCategory||"other",x.subcategory,lang):"—"}</td><td><input className="table-input" type="number" min="0" max="1000000000" value={x.quantity} onChange={e=>x.source==="inventory"?updateGeneral(x.id,Number(e.target.value)):updateConsumable(x.equipmentId!,x.consumableId!,Number(e.target.value))}/> {x.unit}</td><td>{x.minimum}</td><td><span className={`status ${x.quantity<=x.minimum?"warn":""}`}>{x.quantity<=x.minimum?tr(lang,"low"):tr(lang,"good")}</span></td><td>{x.source==="inventory"&&<button className="btn danger" onClick={()=>remove(x.id)}>×</button>}</td></tr>)}</tbody></table></div></div>
 
  <Modal open={open} title={tr(lang,"addStock")} onClose={()=>{setOpen(false);reset()}}>
   <div className="form-grid">

@@ -9,6 +9,17 @@ async function openTrainingDashboard(page:Page){
   await expect(dashboard).toBeVisible({timeout:15_000});
 }
 
+
+async function goToPage(page:Page,key:string){
+  const direct=page.locator(`[data-aqua-page="${key}"]`).first();
+  if(await direct.isVisible().catch(()=>false)){await direct.click();return;}
+  const more=page.getByRole("button",{name:/كل الوحدات|All modules/}).first();
+  await more.click();
+  const target=page.locator(`[data-aqua-page="${key}"]`).first();
+  await expect(target).toBeVisible();
+  await target.click();
+}
+
 async function pointerDrag(page:Page,downSelector:string,moveSelector:string,from:{x:number;y:number},to:{x:number;y:number},pointerId:number){
   await page.evaluate(({downSelector,moveSelector,from,to,pointerId})=>{
     const down=document.querySelector(downSelector) as HTMLElement|null;
@@ -43,25 +54,25 @@ test("dashboard keeps health first and exposes state risk and next action",async
 
 test("critical pages open from the real navigation",async({page})=>{
   await openTrainingDashboard(page);
-  await page.locator('[data-aqua-page="chemistry"]').click();
+  await goToPage(page,"chemistry");
   await expect(page.locator(".page-grid")).toContainText(/شو وضع الكيمياء فعلياً|What is actually happening with chemistry/);
-  await page.locator('[data-aqua-page="maintenance"]').click();
+  await goToPage(page,"maintenance");
   await expect(page.locator(".maintenance-page")).toBeVisible();
   await expect(page.locator(".maintenance-health-card")).toBeVisible();
-  await page.locator('[data-aqua-page="livestock"]').click();
+  await goToPage(page,"livestock");
   await expect(page.locator(".page-grid")).toContainText(/توافق الكائنات الحالية|Current livestock compatibility/);
 });
 
 test("maintenance controls stay compact and disease category filters keep results",async({page})=>{
   await openTrainingDashboard(page);
-  await page.locator('[data-aqua-page="maintenance"]').click();
+  await goToPage(page,"maintenance");
   const complete=page.locator(".maintenance-complete-btn").first();
   await expect(complete).toBeVisible();
   const box=await complete.boundingBox();
   expect(box).not.toBeNull();
   if(box){expect(box.width).toBeLessThan(120);expect(box.height).toBeGreaterThanOrEqual(40);}
 
-  await page.locator('[data-aqua-page="diseases"]').click();
+  await goToPage(page,"diseases");
   const category=page.locator('.filter-bar select').nth(1);
   await expect(category.locator('option[value="fish"]')).toHaveCount(1);
   await category.selectOption("fish");
@@ -71,7 +82,7 @@ test("maintenance controls stay compact and disease category filters keep result
 
 test("equipment touch placement previews then commits on release",async({page})=>{
   await openTrainingDashboard(page);
-  await page.locator('[data-aqua-page="equipment"]').click();
+  await goToPage(page,"equipment");
   const device=page.locator(".layout-device-btn").filter({hasText:"lighting"}).first();
   await expect(device).toBeVisible();
   await device.click();
@@ -86,7 +97,7 @@ test("equipment touch placement previews then commits on release",async({page})=
 
 test("sump chamber touch editor changes geometry without page failure",async({page})=>{
   await openTrainingDashboard(page);
-  await page.locator('[data-aqua-page="sump"]').click();
+  await goToPage(page,"sump");
   const plan=page.locator(".sump-touch-plan");
   await expect(plan).toBeVisible();
   const chamber=plan.locator(".sump-touch-chamber").first();
@@ -99,7 +110,7 @@ test("sump chamber touch editor changes geometry without page failure",async({pa
 
 test("visual health intake is discoverable from diseases, analyzes locally and exposes safe AI second opinion",async({page})=>{
   await openTrainingDashboard(page);
-  await page.locator('[data-aqua-page="diseases"]').click();
+  await goToPage(page,"diseases");
   await page.getByRole("button",{name:/تحليل صورة|Analyze photo/}).first().click();
   const visual=page.locator(".card.panel").filter({hasText:/Local Best Visual Insight/}).first();
   await expect(visual).toBeVisible();
@@ -133,13 +144,81 @@ test("new wizard tank enters biological cycling and locks non-cycle workflows",a
   await expect(page.locator(".progressive-dashboard")).toHaveCount(0);
   await expect(page.locator(".pd-health-score")).toHaveCount(0);
   await expect(page.locator(".cycle-global-banner")).toHaveCount(0);
+  await page.getByRole("button",{name:/كل الوحدات|All modules/}).click();
   await expect(page.locator('[data-aqua-page="livestock"]')).toBeDisabled();
   await expect(page.locator('[data-aqua-page="feeding"]')).toBeDisabled();
   await expect(page.locator('[data-aqua-page="dosing"]')).toBeDisabled();
   await expect(page.locator('[data-aqua-page="chemistry"]')).toBeEnabled();
   await expect(page.locator('[data-aqua-page="maintenance"]')).toBeEnabled();
 
-  await page.locator('[data-aqua-page="maintenance"]').click();
+  await goToPage(page,"maintenance");
   await expect(page.locator(".maintenance-page")).toContainText(/Cycle-only mode/);
   await expect(page.locator(".maintenance-page")).toContainText(/الدورة البيولوجية|Biological cycle/);
+});
+
+
+test("progressive navigation keeps every module reachable and supports keyboard search",async({page})=>{
+  await openTrainingDashboard(page);
+  await expect(page.getByRole("button",{name:/بحث في Aqua Nexus|Search Aqua Nexus/})).toBeVisible();
+  await expect(page.locator('[data-aqua-page="chemistry"]')).toBeVisible();
+  await expect(page.locator('[data-aqua-page="diseases"]')).toHaveCount(0);
+  await page.getByRole("button",{name:/كل الوحدات|All modules/}).click();
+  await expect(page.locator('[data-aqua-page="diseases"]')).toBeVisible();
+  await page.getByRole("button",{name:"Close"}).click();
+
+  await page.keyboard.press("Control+K");
+  const dialog=page.getByRole("dialog",{name:/بحث وأدوات Aqua Nexus|Aqua Nexus search and tools/});
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('[data-quick-action="chemistry"]')).toBeVisible();
+  await dialog.locator("input").fill("lighting");
+  await expect(dialog.locator('[data-command-kind="equipment"]').first()).toBeVisible();
+  await dialog.locator("input").fill("RO/DI");
+  await dialog.locator('[data-command-page="rodi"]').first().click();
+  await expect(page.locator(".page-grid")).toContainText(/RO\/DI/);
+
+  await page.getByRole("button",{name:/إجراءات سريعة|Quick actions/}).click();
+  const quick=page.getByRole("dialog",{name:/بحث وأدوات Aqua Nexus|Aqua Nexus search and tools/});
+  await quick.locator('[data-quick-action="chemistry"]').click();
+  await expect(page.locator(".page-grid")).toContainText(/شو وضع الكيمياء فعلياً|What is actually happening with chemistry/);
+});
+
+
+test("IndexedDB persistence survives reload without keeping the tank JSON in localStorage",async({page})=>{
+  await openTrainingDashboard(page);
+  await goToPage(page,"expenses");
+  const panel=page.locator(".card.panel").first();
+  await panel.locator('input').nth(0).fill("IndexedDB Persistence Probe");
+  await panel.locator('input[type="number"]').fill("12.34");
+  await panel.getByRole("button",{name:/إضافة مصروف|Add expense/}).click();
+  await expect(page.locator(".history-list")).toContainText("IndexedDB Persistence Probe");
+  await page.waitForTimeout(500);
+  const legacy=await page.evaluate(()=>localStorage.getItem("aqua-nexus-3d-v1"));
+  expect(legacy).toBeNull();
+
+  await page.reload();
+  await openTrainingDashboard(page);
+  await goToPage(page,"expenses");
+  await expect(page.locator(".history-list")).toContainText("IndexedDB Persistence Probe");
+});
+
+test("maintenance checklist is a guided step workflow and cannot be bypassed",async({page})=>{
+  await openTrainingDashboard(page);
+  await goToPage(page,"equipment");
+  await expect(page.locator(".page-grid")).toBeVisible();
+  await page.waitForTimeout(250);
+  await goToPage(page,"maintenance");
+
+  const stepsButton=page.locator(".maintenance-checklist-btn").first();
+  await expect(stepsButton).toBeVisible();
+  await stepsButton.click();
+
+  const workflow=page.locator(".maintenance-step-workflow");
+  await expect(workflow).toBeVisible();
+  await expect(workflow.locator(".maintenance-progress-ring")).toBeVisible();
+  await expect(workflow.locator(".maintenance-step-card").first()).toBeVisible();
+  const finish=workflow.locator(".maintenance-finish-workflow");
+  await expect(finish).toBeDisabled();
+
+  await workflow.locator(".maintenance-step-card").first().click();
+  await expect(workflow.locator(".maintenance-step-card").first()).toHaveClass(/is-done/);
 });

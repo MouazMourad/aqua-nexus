@@ -4,6 +4,7 @@ import { compatibilityCheck,type CompatibilityResult } from "./compatibility";
 import { equipmentAdequacy } from "./equipmentAdequacy";
 import { latestParameterSample,parameterFreshnessDays,requiredWeeklyChemistryKeys } from "./chemistryDataQuality";
 import { biologicalCycleStatus } from "./biologicalCycle";
+import { interventionGate } from "./interventionSafety";
 
 export type StockingReadinessState="ready"|"not_now"|"insufficient_evidence";
 
@@ -70,6 +71,7 @@ export function stockingReadiness(tank:Tank,options:StockingCandidateOptions={})
  }
 
  const blockersAr:string[]=[],blockersEn:string[]=[];
+ const intervention=interventionGate(tank,"livestockAddition");
  const cycle=biologicalCycleStatus(tank);
  if(cycle.active){
   blockersAr.push(`الحوض ضمن الدورة البيولوجية (اليوم ${cycle.day})؛ إضافة الكائنات مقفلة حتى اكتمال شروط الدورة.`);
@@ -99,8 +101,16 @@ export function stockingReadiness(tank:Tank,options:StockingCandidateOptions={})
   blockersAr.push("هناك جلسة أقلمة نشطة؛ أكملها وراقب الاستقرار قبل إضافة دفعة جديدة.");
   blockersEn.push("An acclimation session is active; complete it and observe stability before another addition.");
  }
+ if(intervention.level==="danger"){
+  blockersAr.push(intervention.ar);
+  blockersEn.push(intervention.en);
+ }
 
  const cautionsAr:string[]=[],cautionsEn:string[]=[];
+ if(intervention.level==="warn"){
+  cautionsAr.push(intervention.ar);
+  cautionsEn.push(intervention.en);
+ }
  if(compatibility?.requiresConfirmation){
   cautionsAr.push(...compatibility.issues.filter(x=>x.level==="warn").map(x=>x.ar));
   cautionsEn.push(...compatibility.issues.filter(x=>x.level==="warn").map(x=>x.en));

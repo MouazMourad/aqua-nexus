@@ -12,6 +12,8 @@ import { latestParameterSample,validateChemistryValue,validateDosingTarget } fro
 import { correctiveDosingInventory,inventoryProfile,routineDosingInventory } from "@/domain/inventoryIntelligence";
 import { requiresPostDoseRetest } from "@/domain/dosingSafety";
 import { claimCriticalAction } from "@/lib/actionGuard";
+import { interventionGate } from "@/domain/interventionSafety";
+import { sanitizeBounded,validateDoserChannelEntry } from "@/domain/inputSanity";
 
 const colors=["#27c2dc","#62d48f","#f6c85f","#c877ff","#ff7e79","#4b8bff"];
 function idealTarget(tank:Tank,param:DosingParameter){const meta:any=chemistryCatalogForTank(tank)?.[param];return meta?.ideal?(Number(meta.ideal[0])+Number(meta.ideal[1]))/2:param==="KH"?8:param==="Ca"?430:1325;}
@@ -30,11 +32,24 @@ export function DosingPage({tank}:{tank:Tank}) {
  const needsPostDoseRetest=useMemo(()=>requiresPostDoseRetest(tank,param,sample?.timestamp),[tank,param,sample?.timestamp]);
  const dosingReady=current!==undefined&&readingAgeHours<=48&&sample?.confidence!=="low"&&!currentIssue&&!dataIssue&&!needsPostDoseRetest&&!targetCheck.blocked;
  const calc=useMemo(()=>calculateDose({parameter:param,current:current??Number.NaN,target,volumeLiters:tank.systemVolumeLiters,form,presetId:chosen?.id,purityPercent:purity,stockGramsPerLiter,productRaisePerMlPer100L:productRaise}),[param,current,target,tank.systemVolumeLiters,form,chosen?.id,purity,stockGramsPerLiter,productRaise]);
- function setCount(n:number){patch(tank.id,t=>{const channels=[...t.doserChannels];while(channels.length<n)channels.push({id:uid("dc"),name:`Channel ${channels.length+1}`,material:"",capacityMl:1000,currentMl:1000,consumption:0,period:"daily",color:colors[channels.length%colors.length]});return {...t,doserChannels:channels.slice(0,n)};});}
- function updateChannel(id:string,p:Partial<DoserChannel>){patch(tank.id,t=>({...t,doserChannels:t.doserChannels.map(x=>x.id===id?{...x,...p}:x)}))}
+ function setCount(n:number){const safe=Math.round(sanitizeBounded(n,0,12,tank.doserChannels.length));patch(tank.id,t=>{const channels=[...t.doserChannels];while(channels.length<safe)channels.push({id:uid("dc"),name:`Channel ${channels.length+1}`,material:"",capacityMl:1000,currentMl:1000,consumption:0,period:"daily",color:colors[channels.length%colors.length]});return {...t,doserChannels:channels.slice(0,safe)};});}
+ function updateChannel(id:string,p:Partial<DoserChannel>){patch(tank.id,t=>({...t,doserChannels:t.doserChannels.map(x=>{
+  if(x.id!==id)return x;
+  const next={...x,...p};
+  const check=validateDoserChannelEntry({capacityMl:next.capacityMl,currentMl:next.currentMl,consumption:next.consumption});
+  if(check.ok)return next;
+  const capacity=sanitizeBounded(next.capacityMl,.1,1_000_000,x.capacityMl);
+  return {...next,capacityMl:capacity,currentMl:sanitizeBounded(next.currentMl,0,capacity,Math.min(x.currentMl,capacity)),consumption:sanitizeBounded(next.consumption,0,1_000_000,x.consumption)};
+ })}))}
  function log(){
   if(!calc.valid||!dosingReady||current===undefined||targetCheck.blocked)return;
   if(targetCheck.level==="warn"&&!window.confirm(lang==="ar"?`${targetCheck.ar} هل تريد المتابعة ضمن المجال الآمن؟`:`${targetCheck.en} Continue within the safe range?`))return;
+  const intervention=interventionGate(tank,"correctiveDosing");
+  if(intervention.level==="warn"&&!window.confirm(lang==="ar"?intervention.ar+" هل تريد المتابعة بعد مراجعة السبب؟":intervention.en+" Continue after reviewing the reason?"))return;
+  if(intervention.level==="danger"){
+   if(!window.confirm(lang==="ar"?"⚠️ "+intervention.ar+" هل يوجد سبب واضح يستدعي الجرعة الآن؟":"⚠️ "+intervention.en+" Is there a clear reason this dose is needed now?"))return;
+   if(!window.confirm(lang==="ar"?"تأكيد أخير: نفّذ عامل واحد فقط قدر الإمكان، ثم أعد القياس قبل أي تدخل كبير إضافي. متابعة؟":"Final confirmation: change only one major factor when possible, then retest before another major intervention. Continue?"))return;
+  }
   const stockItem=inventoryItemId?correctiveStock.find(x=>x.id===inventoryItemId):undefined;
   if(inventoryItemId&&!stockItem){window.alert(lang==="ar"?"مادة المخزون المختارة لا تطابق نوع الجرعة الحالية. أعد اختيار المادة.":"The selected inventory item does not match the current dosing setup. Select it again.");return}
   if(stockItem&&stockItem.unit.toLowerCase()!==calc.unit.toLowerCase()){window.alert(lang==="ar"?`وحدة المخزون ${stockItem.unit} لا تطابق وحدة الجرعة ${calc.unit}.`:`Inventory unit ${stockItem.unit} does not match dose unit ${calc.unit}.`);return}
