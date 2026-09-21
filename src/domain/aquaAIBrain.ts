@@ -537,7 +537,7 @@ function metaAnswer(question:string):AquaAIAnswer|undefined{
 export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer{
   const meta=metaAnswer(question);if(meta)return meta;
   if(!isAquariumScopedQuestion(question,tank))return offTopicAquaAnswer(question);
-  const q=(question||"").trim().toLowerCase();
+  const q=normText(question);
   if(/انار|إنار|إضاءة|اضاءة|ضوء|(?:^|\s)ضو(?:\s|$)|الضو|lighting|light|photoperiod|spectrum|par\b|uv\b|royal blue/.test(q))return lightingAnswer(tank);
   const intent=parseAquaQuestion(question);
   const cycle=biologicalCycleStatus(tank);
