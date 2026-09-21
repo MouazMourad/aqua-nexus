@@ -5,6 +5,7 @@ import { query } from "./db";
 import { ensureWorkspace } from "./workspace";
 import { isAquariumScopedQuestion,offTopicAquaAnswer } from "@/domain/aquaAIScope";
 import { normalizeLightingImportCandidate,type LightingImportSourceKind } from "@/domain/lightingImport";
+import { normalizeEquipmentImportCandidate,type EquipmentImportSourceKind } from "@/domain/equipmentImport";
 
 export interface GatewayResult {
   mode:"local"|"external";
@@ -167,5 +168,66 @@ export async function runAquaLightingImport(input:{
   if(!normalized.ok)throw Object.assign(new Error(normalized.error),{status:422});
   const answer={candidate:normalized.candidate,contextSchema:context.schema};
   await audit(input.workspace,input.tank.id,"lighting-import",input.fileName,"external",cfg.model,answer);
+  return {mode:"external",provider:"configured AI provider",model:cfg.model,answer};
+}
+
+
+export async function runAquaEquipmentImport(input:{
+  workspace:string;
+  tank:Tank;
+  sourceKind:EquipmentImportSourceKind;
+  vendor?:string;
+  fileName?:string;
+  fileType?:string;
+  imageDataUrl?:string;
+  textContent?:string;
+  language?:"ar"|"en";
+}):Promise<GatewayResult>{
+  const cfg=providerConfig();
+  if(!cfg.configured){
+    const answer={providerConfigured:false,error:"Equipment import AI provider is not configured."};
+    await audit(input.workspace,input.tank.id,"equipment-import",input.fileName,"local",undefined,answer);
+    return {mode:"local",provider:"Aqua Nexus equipment import",answer};
+  }
+  const language=input.language||"ar",context=buildTankAIContext(input.tank);
+  const prompt=[
+    "You extract aquarium controller/equipment information from screenshots or exported text.",
+    "Return JSON only, no prose outside JSON.",
+    "Do not invent missing devices, measurements, doses, top-off volumes, timestamps or alerts.",
+    "If a value is visually approximate or ambiguous, preserve the closest defensible value, add a warning and lower confidence.",
+    "Use ISO 8601 timestamps when visible. If the source gives only a date/time, preserve the best supported timestamp instead of fabricating a different time.",
+    "Allowed equipment kinds: lighting,waveMaker,skimmer,returnPump,filterSock,rollerFilter,reactor,heater,doser,uv,ozone,ato,refugiumLight,turfScrubber,probe,overflow,co2,other.",
+    "Output exactly: {confidence:number,vendorDetected?:string,devices:[{sourceRecordId?:string,name:string,kind:string,brand?:string,model?:string,location?:string,status?:string,powerWatts?:number,hoursPerDay?:number,ratedVolumeLiters?:number,flowLph?:number}],measurements:[{sourceRecordId?:string,timestamp:string,parameter:string,value:number,unit?:string,deviceName?:string}],doses:[{sourceRecordId?:string,timestamp:string,parameter:string,ml:number,amount?:number,unit?:string,material?:string,deviceName?:string}],topOff:[{sourceRecordId?:string,timestamp:string,liters:number,deviceName?:string}],alerts:[{sourceRecordId?:string,timestamp:string,level?:string,message:string,deviceName?:string}],warnings:string[],evidence:string[]}.",
+    "For chemistry, preserve the source parameter name and numeric value; Aqua Nexus will map/validate it locally.",
+    "For dosing, record only doses that the export says actually occurred; do not convert schedules into executed dose logs.",
+    "For top-off, record only actual delivered volume when present.",
+    "This is extraction into an editable review draft. It must not make treatment, dosing or equipment-control decisions."
+  ].join("\n");
+  const meta="Vendor selected by user: "+(input.vendor||"generic")+"\nFilename: "+(input.fileName||"unknown")+"\nFile type: "+(input.fileType||"unknown");
+  const userContent:any[]=[{type:"text",text:prompt+"\n\n"+meta}];
+  if(input.imageDataUrl)userContent.push({type:"image_url",image_url:{url:input.imageDataUrl}});
+  else userContent[0].text+="\n\nEXPORT CONTENT:\n"+String(input.textContent||"").slice(0,220000);
+
+  const response=await fetch(`${cfg.base}/chat/completions`,{
+    method:"POST",
+    signal:AbortSignal.timeout(60_000),
+    headers:{"content-type":"application/json","authorization":`Bearer ${cfg.key}`},
+    body:JSON.stringify({
+      model:cfg.model,temperature:0,max_tokens:3000,
+      messages:[
+        {role:"system",content:aquaAISystemPrompt(language)},
+        {role:"system",content:"You are Aqua Nexus Equipment Import Extractor. Preserve provenance and uncertainty. Never infer control actions."},
+        {role:"system",content:`AQUA_NEXUS_TANK_CONTEXT\n${JSON.stringify(context)}`},
+        {role:"user",content:userContent}
+      ]
+    })
+  });
+  if(!response.ok)throw Object.assign(new Error(`Equipment import provider returned ${response.status}`),{status:502});
+  const json:any=await response.json();
+  const raw=json?.choices?.[0]?.message?.content??json?.output_text??json;
+  const normalized=normalizeEquipmentImportCandidate(typeof raw==="string"?raw:JSON.stringify(raw),input.sourceKind);
+  if(!normalized.ok)throw Object.assign(new Error(normalized.error),{status:422});
+  const answer={candidate:normalized.candidate,contextSchema:context.schema};
+  await audit(input.workspace,input.tank.id,"equipment-import",input.fileName,"external",cfg.model,answer);
   return {mode:"external",provider:"configured AI provider",model:cfg.model,answer};
 }
