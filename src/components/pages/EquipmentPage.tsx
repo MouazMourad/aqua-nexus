@@ -15,6 +15,7 @@ import { sanitizeBounded,sanitizeNonNegative,validateEnergySettings,validateEqui
 import { EquipmentAddModal } from "@/components/equipment/EquipmentAddModal";
 import { EquipmentImportWorkspace } from "@/components/equipment/EquipmentImportWorkspace";
 import { equipmentImportIntelligence } from "@/domain/equipmentImport";
+import { markFeatureLearned } from "@/lib/featureDiscovery";
 
 export function EquipmentPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
@@ -32,6 +33,7 @@ export function EquipmentPage({tank}:{tank:Tank}) {
  const reliability=useMemo(()=>equipmentReliability(tank),[tank]);
  const importedData=useMemo(()=>equipmentImportIntelligence(tank),[tank]);
  useEffect(()=>{if(typeof window==="undefined")return;const requested=sessionStorage.getItem("aqua-open-equipment-import");if(requested==="1"){sessionStorage.removeItem("aqua-open-equipment-import");setImportOpen(true);}},[]);
+ useEffect(()=>{if(importOpen)markFeatureLearned("smart-import")},[importOpen]);
  useEffect(()=>{if(open)setLocation(suggestedLocation(kind,tank.sump.chambers))},[kind,open,tank.sump.chambers]);
  useEffect(()=>{const synced=syncEquipmentSystem(tank);if(JSON.stringify(synced.equipment)!==JSON.stringify(tank.equipment)||JSON.stringify(synced.maintenance)!==JSON.stringify(tank.maintenance))patch(tank.id,t=>({...t,...synced}));},[tank.id,tank.equipment.length]);
 
