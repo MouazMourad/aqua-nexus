@@ -9,6 +9,7 @@ import { tr,bi,categoryText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DecisionGuidance } from "@/components/ui/DecisionGuidance";
 import { ContextHint } from "@/components/ui/ContextHint";
+import { AdvancedSection } from "@/components/ui/AdvancedSection";
 import { useSafetyOverrideDialog } from "@/components/ui/SafetyOverrideDialog";
 import { stockingReadiness } from "@/domain/stockingReadiness";
 import { coralDipBatchRun,coralTransferGate } from "@/domain/acclimationSafety";
@@ -31,7 +32,6 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const [exceptionPickerOpen,setExceptionPickerOpen]=useState(false);
  const [selectedExceptionIds,setSelectedExceptionIds]=useState<string[]>([]);
  const [exceptionBoxExpanded,setExceptionBoxExpanded]=useState(false);
- const [showItemAdvanced,setShowItemAdvanced]=useState(false);
  const audioCtxRef=useRef<AudioContext|null>(null);
  const notifiedTimersRef=useRef<Set<string>>(new Set());
  const wakeLockRef=useRef<any>(null);
@@ -465,8 +465,8 @@ export function AcclimationPage({tank}:{tank:Tank}) {
        <label className="field"><span>{tr(lang,"quantity")}</span><input type="number" min="1" max="10000" value={qty} onChange={e=>setQty(Number(e.target.value))}/></label>
        <label className="field"><span>{bi(lang,"الصحة عند الوصول","Arrival health")}</span><select value={health} onChange={e=>setHealth(e.target.value as any)}>{healthOptions.map(h=><option key={h} value={h}>{healthLabel(lang,h)}</option>)}</select><small>{health==="stressed"||health==="critical"?bi(lang,"رح يضل المسار الاستثنائي متاح فور بدء الجلسة.","The exception track will remain immediately available once the session starts."):bi(lang,"سجّل الحالة كما وصلت، مو كما تتوقع تصير بعد الإقلمة.","Record the actual arrival condition, not the expected post-acclimation condition.")}</small></label>
       </div>
-      <div className="acclimation-default-summary"><div><small>{bi(lang,"الإعداد المطبق حالياً","CURRENT PROFILE")}</small><b>{categoryLabel(category)} • {drip} {bi(lang,"دقيقة إقلمة","min acclimation")} • {interval} {bi(lang,"دقيقة فاصل","min release interval")}</b><span>{bi(lang,`${temperamentLabel(lang,temperament)} • ${sensitivityLabel(lang,sensitivity)}`,`${temperamentLabel(lang,temperament)} • ${sensitivityLabel(lang,sensitivity)}`)}</span></div><button className="btn" onClick={()=>setShowItemAdvanced(v=>!v)}>{showItemAdvanced?bi(lang,"إخفاء التفاصيل","Hide details"):bi(lang,"تعديل التفاصيل / Advanced","Adjust details / Advanced")}</button></div>
-      {showItemAdvanced&&<div className="acclimation-item-advanced"><ContextHint id="acclimation-manual-profile" lang={lang} tone="important" ar="عدّل أوقات الإقلمة والحساسية فقط إذا عندك سبب خاص بالكائن أو الشحنة؛ القيم الافتراضية هي نقطة البداية الآمنة." en="Adjust acclimation timing and sensitivity only for a species- or shipment-specific reason; the defaults are the safer starting point."/><div className="form-grid">
+      <div className="acclimation-default-summary"><div><small>{bi(lang,"الإعداد المطبق حالياً","CURRENT PROFILE")}</small><b>{categoryLabel(category)} • {drip} {bi(lang,"دقيقة إقلمة","min acclimation")} • {interval} {bi(lang,"دقيقة فاصل","min release interval")}</b><span>{bi(lang,`${temperamentLabel(lang,temperament)} • ${sensitivityLabel(lang,sensitivity)}`,`${temperamentLabel(lang,temperament)} • ${sensitivityLabel(lang,sensitivity)}`)}</span></div></div>
+      <AdvancedSection titleAr="تعديل بروفايل الإقلمة" titleEn="Adjust acclimation profile" summaryAr="السلوك والحساسية والأوقات والتموضع؛ افتحها فقط إذا عندك سبب خاص بالكائن أو الشحنة." summaryEn="Temperament, sensitivity, timing and placement; open only for a species- or shipment-specific reason."><div className="acclimation-item-advanced"><ContextHint id="acclimation-manual-profile" lang={lang} tone="important" ar="عدّل أوقات الإقلمة والحساسية فقط إذا عندك سبب خاص بالكائن أو الشحنة؛ القيم الافتراضية هي نقطة البداية الآمنة." en="Adjust acclimation timing and sensitivity only for a species- or shipment-specific reason; the defaults are the safer starting point."/><div className="form-grid">
        <label className="field"><span>{bi(lang,"السلوك","Temperament")}</span><select value={temperament} onChange={e=>setTemperament(e.target.value as any)}>{temperamentOptions.map(v=><option key={v} value={v}>{temperamentLabel(lang,v)}</option>)}</select></label>
        <label className="field"><span>{bi(lang,"الحساسية","Sensitivity")}</span><select value={sensitivity} onChange={e=>setSensitivity(e.target.value as any)}>{sensitivityOptions.map(v=><option key={v} value={v}>{sensitivityLabel(lang,v)}</option>)}</select></label>
        {(category==="coral"||category==="plant")&&<label className="field"><span>{bi(lang,"بروفايل العناية","Care profile")}</span><select value={subtype} onChange={e=>setSubtype(e.target.value)}><option value="">{bi(lang,"تلقائي / يدوي","Auto / Manual")}</option>{category==="coral"?<><option value="soft">Soft</option><option value="lps">LPS</option><option value="sps">SPS</option></>:<><option value="low">Low light</option><option value="medium">Medium light</option><option value="high">High light</option></>}</select></label>}
@@ -475,7 +475,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
        <label className="field full-field"><span>{tr(lang,"placement")}</span><input value={placement} onChange={e=>setPlacement(e.target.value)}/></label>
        <label className="field full-field"><span>{bi(lang,"ملاحظات","Notes")}</span><textarea value={notes} onChange={e=>setNotes(e.target.value)}/></label>
        <label className="field full-field"><span>{bi(lang,"صورة اختيارية","Optional photo")}</span><input type="file" accept="image/*" onChange={e=>readPhoto(e.target.files?.[0])}/></label>
-      </div></div>}
+      </div></div></AdvancedSection>
       <button className="btn primary acclimation-add-item" onClick={addItem} disabled={!selected&&!custom.trim()}>＋ {bi(lang,"إضافة للشحنة","Add to shipment")}</button>
       <div className="added-list">{active.items.map(i=><div className="acclimation-mini" key={i.id}>{i.imageDataUrl?<img src={i.imageDataUrl} alt=""/>:<span>{icon[i.category]}</span>}<div><b>{lang==="ar"?i.name:(i.nameEn||i.name)} ×{i.quantity}</b><small>{categoryLabel(i.category)}{i.subtype?` • ${subtypeLabel(lang,i.subtype)}`:""} • {healthLabel(lang,i.health)} • {i.dripMinutes} min</small></div><button className="btn danger" onClick={()=>removeItem(i.id)}>×</button></div>)}</div>
       <div className="wizard-nav"><button className="btn" onClick={()=>setStep(1)}>← {bi(lang,"رجوع","Back")}</button><button className="btn primary" disabled={!active.items.length} onClick={()=>setStep(3)}>{bi(lang,"مراجعة الشحنة","Review shipment")} →</button></div></>}
