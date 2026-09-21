@@ -4,20 +4,17 @@ import { runAquaVision } from "@/server/aiGateway";
 import { getTank } from "@/server/tankRepository";
 import { workspaceKey } from "@/server/workspace";
 import { sanitizeVisionQuestion,validateVisionDataUrl } from "@/domain/visionRequestSafety";
-import { enforceRateLimit,publicApiError } from "@/server/requestSafety";
+import { enforceRateLimitDistributed,publicApiError,readJsonBodyLimited } from "@/server/requestSafety";
 
 export const runtime="nodejs";
 const MAX_REQUEST_BYTES=8*1024*1024;
 
 export async function POST(request:NextRequest){
   try{
-    const declared=Number(request.headers.get("content-length")||0);
-    if(declared>MAX_REQUEST_BYTES)return NextResponse.json({ok:false,error:"Vision request exceeds the server size limit."},{status:413});
-
     const workspace=workspaceKey(request);
-    const rate=enforceRateLimit(`ai-vision:${workspace}`,10);
+    const rate=await enforceRateLimitDistributed(`ai-vision:${workspace}`,10);
     if(!rate.ok)return NextResponse.json({ok:false,error:"Too many Vision requests. Retry shortly."},{status:429,headers:{"Retry-After":String(rate.retryAfterSeconds)}});
-    const body=await request.json() as {tankId?:string;tank?:Tank;imageDataUrl?:string;question?:string;language?:"ar"|"en"};
+    const body=await readJsonBodyLimited<{tankId?:string;tank?:Tank;imageDataUrl?:string;question?:string;language?:"ar"|"en"}>(request,MAX_REQUEST_BYTES);
     const imageDataUrl=String(body.imageDataUrl||"");
     const safe=validateVisionDataUrl(imageDataUrl);
     if(!safe.ok)return NextResponse.json({ok:false,error:safe.error},{status:safe.error?.includes("size limit")?413:400});
