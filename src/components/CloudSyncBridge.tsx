@@ -8,6 +8,7 @@ import type { Tank } from "@/domain/types";
 import { downloadText } from "@/lib/appUtils";
 import { CURRENT_BACKUP_SCHEMA } from "@/domain/backupValidation";
 import { clearTankHistoryArchive,hydrateTankHistoryArchive } from "@/lib/historyArchiveStorage";
+import { hydrateTankPhotosForBackup } from "@/lib/photoStorage";
 
 function stableValue(value:unknown):unknown{
   if(Array.isArray(value))return value.map(stableValue);
@@ -135,10 +136,12 @@ export function CloudSyncBridge(){
 
   const conflictIds=useMemo(()=>[...conflictsRef.current],[error,syncState]);
 
-  function downloadConflictBackup(id:string){
+  async function downloadConflictBackup(id:string){
     const local=tanks.find(t=>t.id===id);if(!local)return;
+    const fullHistory=await hydrateTankHistoryArchive(local);
+    const [complete]=await hydrateTankPhotosForBackup([fullHistory]);
     downloadText(`Aqua_Nexus_Conflict_Backup_${local.name.replace(/[^a-zA-Z0-9_-]+/g,"_")}.json`,JSON.stringify({
-      app:"Aqua Nexus",schemaVersion:CURRENT_BACKUP_SCHEMA,exportedAt:new Date().toISOString(),language:lang,aquariumExperience,selectedTankId:id,tanks:[local]
+      app:"Aqua Nexus",schemaVersion:CURRENT_BACKUP_SCHEMA,exportedAt:new Date().toISOString(),language:lang,aquariumExperience,selectedTankId:id,tanks:[complete]
     },null,2));
   }
 
@@ -182,7 +185,7 @@ export function CloudSyncBridge(){
         ?(lang==="ar"?"في اختلاف حقيقي بين نسخة الجهاز والسحابة. ما في overwrite تلقائي: نزّل نسخة أمان، وبعدها اختر أي نسخة تعتمد لكل حوض.":"Local and cloud copies genuinely differ. Nothing is overwritten automatically: download a safety backup, then choose which copy to keep for each tank.")
         :(lang==="ar"?"بياناتك المحلية ما زالت محفوظة على هذا الجهاز، وAqua Nexus يظل يعمل Local-first.":"Your local data remains saved on this device and Aqua Nexus keeps working local-first.")}</small>
       {!conflict&&error&&<small className="cloud-sync-tech">{error}</small>}
-      {conflict&&<div className="cloud-conflict-list">{conflictIds.map(id=>{const local=tanks.find(t=>t.id===id);return <div className="cloud-conflict-row" key={id}><span><b>{local?.name||id}</b><small>{id===selectedTankId?(lang==="ar"?"الحوض المفتوح حالياً":"Currently open tank"):""}</small></span><div><button type="button" onClick={()=>downloadConflictBackup(id)}>{lang==="ar"?"نسخة أمان":"Safety backup"}</button><button type="button" disabled={Boolean(resolving)} onClick={()=>void keepLocalCopy(id)}>{resolving===id+":local"?"…":(lang==="ar"?"اعتمد هذا الجهاز":"Use this device")}</button><button type="button" disabled={Boolean(resolving)} onClick={()=>void useCloudCopy(id)}>{resolving===id+":cloud"?"…":(lang==="ar"?"استرجع السحابة":"Use cloud copy")}</button></div></div>})}</div>}
+      {conflict&&<div className="cloud-conflict-list">{conflictIds.map(id=>{const local=tanks.find(t=>t.id===id);return <div className="cloud-conflict-row" key={id}><span><b>{local?.name||id}</b><small>{id===selectedTankId?(lang==="ar"?"الحوض المفتوح حالياً":"Currently open tank"):""}</small></span><div><button type="button" onClick={()=>void downloadConflictBackup(id)}>{lang==="ar"?"نسخة أمان":"Safety backup"}</button><button type="button" disabled={Boolean(resolving)} onClick={()=>void keepLocalCopy(id)}>{resolving===id+":local"?"…":(lang==="ar"?"اعتمد هذا الجهاز":"Use this device")}</button><button type="button" disabled={Boolean(resolving)} onClick={()=>void useCloudCopy(id)}>{resolving===id+":cloud"?"…":(lang==="ar"?"استرجع السحابة":"Use cloud copy")}</button></div></div>})}</div>}
     </div>
     {!conflict&&<button type="button" onClick={()=>void runBackup()}>{lang==="ar"?"إعادة المحاولة":"Retry"}</button>}
     <style jsx>{`
