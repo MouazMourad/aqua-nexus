@@ -10,6 +10,7 @@ import { CURRENT_BACKUP_SCHEMA,validateBackupPayload } from "@/domain/backupVali
 import { externalizeAllTankPhotos,hydrateTankPhotosForBackup } from "@/lib/photoStorage";
 import { activeRelocation,activeVacation,isTankArchived } from "@/domain/tankLifecycle";
 import { sanitizeBounded,validateEnergySettings } from "@/domain/inputSanity";
+import { buildVacationTaskDrafts,vacationDays } from "@/domain/vacationPlan";
 
 export function SettingsPage({tank}:{tank:Tank}) {
  const state=useAquaStore(),patch=useAquaStore(s=>s.patchTank),del=useAquaStore(s=>s.deleteTank),replace=useAquaStore(s=>s.replaceData),[name,setName]=useState(tank.name),file=useRef<HTMLInputElement>(null),lang=state.language;
@@ -88,12 +89,22 @@ export function SettingsPage({tank}:{tank:Tank}) {
 
  function startVacation(){
   if(vacation)return;
-  const ts=nowISO(),row={id:uid("vac"),startedAt:ts,plannedEndAt:vacationEnd||undefined,notes:vacationNotes.trim()||undefined};
-  patch(tank.id,t=>({...t,lifecycle:{...(t.lifecycle??{}),vacations:[...(t.lifecycle?.vacations??[]),row]},timeline:[{id:uid("ev"),timestamp:ts,type:"lifecycle-vacation",textAr:"بدأ وضع السفر/الغياب للحوض.",textEn:"Tank vacation/away mode started."},...t.timeline]}));
+  const ts=nowISO(),start=today(),days=vacationDays(start,vacationEnd||undefined);
+  if(vacationEnd&&!days){window.alert(lang==="ar"?"تاريخ العودة يجب أن يكون اليوم أو بعده.":"Planned return must be today or later.");return}
+  const row={id:uid("vac"),startedAt:ts,plannedEndAt:vacationEnd||undefined,notes:vacationNotes.trim()||undefined};
+  patch(tank.id,t=>{
+    const generated=days?buildVacationTaskDrafts({departure:start,daysAway:days,tankType:t.type}).map(x=>({...x,id:uid("travel")})):[];
+    const keep=t.maintenance.filter(x=>!x.title.startsWith("[TRAVEL]")&&!(x.titleEn||"").startsWith("[TRAVEL]"));
+    return {...t,lifecycle:{...(t.lifecycle??{}),vacations:[...(t.lifecycle?.vacations??[]),row]},maintenance:generated.length?[...generated,...keep]:t.maintenance,timeline:[{id:uid("ev"),timestamp:ts,type:"lifecycle-vacation",textAr:generated.length?"بدأ وضع السفر/الغياب وتم إنشاء خطة متابعة تلقائياً.":"بدأ وضع السفر/الغياب للحوض.",textEn:generated.length?"Tank vacation/away mode started and an automatic care plan was created.":"Tank vacation/away mode started."},...t.timeline]};
+  });
  }
  function endVacation(){
-  if(!vacation)return; const ts=nowISO();
-  patch(tank.id,t=>({...t,lifecycle:{...(t.lifecycle??{}),vacations:(t.lifecycle?.vacations??[]).map(x=>x.id===vacation.id?{...x,endedAt:ts}:x)},timeline:[{id:uid("ev"),timestamp:ts,type:"lifecycle-vacation",textAr:"انتهى وضع السفر/الغياب للحوض.",textEn:"Tank vacation/away mode ended."},...t.timeline]}));
+  if(!vacation)return; const ts=nowISO(),due=today();
+  patch(tank.id,t=>{
+    const hasReturn=t.maintenance.some(x=>!x.done&&(/بعد العودة/.test(x.title)||/After return/i.test(x.titleEn||"")));
+    const returnTask=hasReturn?[]:[{id:uid("travel-return"),title:"[TRAVEL] بعد العودة: فحص كيمياء كامل ومقارنة الحالة مع ما قبل السفر",titleEn:"[TRAVEL] After return: run a full chemistry test and compare with the pre-travel baseline",cadence:"once" as const,done:false,nextDue:due,manual:true}];
+    return {...t,lifecycle:{...(t.lifecycle??{}),vacations:(t.lifecycle?.vacations??[]).map(x=>x.id===vacation.id?{...x,endedAt:ts}:x)},maintenance:[...returnTask,...t.maintenance],timeline:[{id:uid("ev"),timestamp:ts,type:"lifecycle-vacation",textAr:"انتهى وضع السفر/الغياب؛ أضيفت متابعة ما بعد العودة عند الحاجة.",textEn:"Tank vacation/away mode ended; a post-return follow-up was added when needed."},...t.timeline]};
+  });
  }
  function startMove(){
   if(relocation)return; const ts=nowISO(),row={id:uid("move"),startedAt:ts,status:"in_progress" as const,from:moveFrom.trim()||undefined,to:moveTo.trim()||undefined,notes:moveNotes.trim()||undefined};
