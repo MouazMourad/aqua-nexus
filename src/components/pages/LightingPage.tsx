@@ -27,13 +27,12 @@ function heatCss(value:number,max:number){
  return "hsl("+hue+" 86% "+(36+t*18)+"%)";
 }
 function levelClass(level:string){return level==="danger"?"danger":level==="warn"?"warn":"good";}
-function fileAsDataUrl(file:File){
- return new Promise<string>((resolve,reject)=>{
-  const reader=new FileReader();
-  reader.onload=()=>resolve(String(reader.result||""));
-  reader.onerror=()=>reject(reader.error??new Error("File read failed"));
-  reader.readAsDataURL(file);
- });
+async function fileAsDataUrl(file:File){
+ const bytes=new Uint8Array(await file.arrayBuffer());
+ let binary="";
+ const chunk=0x8000;
+ for(let i=0;i<bytes.length;i+=chunk)binary+=String.fromCharCode(...bytes.subarray(i,Math.min(bytes.length,i+chunk)));
+ return "data:"+(file.type||"application/octet-stream")+";base64,"+btoa(binary);
 }
 
 
