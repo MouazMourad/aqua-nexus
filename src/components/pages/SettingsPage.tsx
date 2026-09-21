@@ -9,6 +9,7 @@ import { syncPushReminders } from "@/lib/pushNotifications";
 import { CURRENT_BACKUP_SCHEMA,validateBackupPayload } from "@/domain/backupValidation";
 import { externalizeAllTankPhotos,hydrateTankPhotosForBackup } from "@/lib/photoStorage";
 import { activeRelocation,activeVacation,isTankArchived } from "@/domain/tankLifecycle";
+import { sanitizeBounded,validateEnergySettings } from "@/domain/inputSanity";
 
 export function SettingsPage({tank}:{tank:Tank}) {
  const state=useAquaStore(),patch=useAquaStore(s=>s.patchTank),del=useAquaStore(s=>s.deleteTank),replace=useAquaStore(s=>s.replaceData),[name,setName]=useState(tank.name),file=useRef<HTMLInputElement>(null),lang=state.language;
@@ -130,7 +131,7 @@ export function SettingsPage({tank}:{tank:Tank}) {
   <h3>{bi(lang,"بروفايل الحوض والحسابات","Tank profile & calculations")}</h3>
   <p className="note">{bi(lang,"البروفايل يؤثر على أهداف الكيمياء ومتطلبات الإنارة/الحركة وتقييم التجهيزات. Auto يستنتج من الكائنات.","The profile affects chemistry targets, lighting/flow requirements and equipment adequacy. Auto infers from livestock.")}</p>
   <label className="field"><span>{bi(lang,"بروفايل النظام","System profile")}</span><select value={profile} onChange={e=>patch(tank.id,t=>({...t,ecosystemProfile:e.target.value==="auto"?undefined:e.target.value as any}))}><option value="auto">Auto</option>{tank.type==="marine"?<><option value="reef">Reef</option><option value="fishOnly">Fish-only</option></>:<><option value="planted">Planted</option><option value="fishOnly">Fish-only</option></>}</select></label>
-  <div className="form-grid"><label className="field"><span>{bi(lang,"سعر الكهرباء / kWh","Electricity price / kWh")}</span><input type="number" min="0" step="any" value={energy.pricePerKwh} onChange={e=>patch(tank.id,t=>({...t,energySettings:{pricePerKwh:Number(e.target.value),currency:t.energySettings?.currency||"USD"}}))}/></label><label className="field"><span>{tr(lang,"currency")}</span><input value={energy.currency} onChange={e=>patch(tank.id,t=>({...t,energySettings:{pricePerKwh:t.energySettings?.pricePerKwh??0,currency:e.target.value}}))}/></label></div>
+  <div className="form-grid"><label className="field"><span>{bi(lang,"سعر الكهرباء / kWh","Electricity price / kWh")}</span><input type="number" min="0" step="any" value={energy.pricePerKwh} onChange={e=>patch(tank.id,t=>{const next={pricePerKwh:sanitizeBounded(Number(e.target.value),0,1000000,t.energySettings?.pricePerKwh??0),currency:t.energySettings?.currency||"USD"};return validateEnergySettings(next).ok?{...t,energySettings:next}:t})}/></label><label className="field"><span>{tr(lang,"currency")}</span><input value={energy.currency} onChange={e=>patch(tank.id,t=>{const next={pricePerKwh:t.energySettings?.pricePerKwh??0,currency:e.target.value};return validateEnergySettings(next).ok?{...t,energySettings:next}:t})}/></label></div>
  </div>
 
  <div className="card panel full-span">
