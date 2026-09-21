@@ -36,7 +36,7 @@ import { repeatedResponsePatterns,tankLearningMaturity } from "@/domain/tankPatt
 import { claimCriticalAction,releaseCriticalAction } from "@/lib/actionGuard";
 import { deriveExtendedIntelligenceEvents } from "@/domain/extendedEventIntelligence";
 import { buildTankBrainSnapshot } from "@/domain/tankBrainSnapshot";
-import { validateDoserChannelEntry,validateEquipmentEntry,validateExpenseEntry,validateInventoryEntry,validateRodiEntry,validateWaterChangeEntry } from "@/domain/inputSanity";
+import { validateAcclimationItemEntry,validateAcclimationWater,validateDoserChannelEntry,validateEquipmentEntry,validateExpenseEntry,validateInventoryEntry,validateRodiEntry,validateTreatmentSetup,validateWaterChangeEntry } from "@/domain/inputSanity";
 import { photoNeedsExternalization } from "@/lib/photoStorage";
 import { interventionDensityAlert,interventionGate } from "@/domain/interventionSafety";
 import { createActionPlan,evaluatePlanOutcome } from "@/domain/actionPlanEngine";
@@ -786,6 +786,38 @@ describe("Full audit hardening regressions",()=>{
     expect(result.outcome).toBe("improved");
   });
 
+
+  it("keeps Tank Brain bounded with multi-year operational history",()=>{
+    const t=structuredClone(demoMarineTank);
+    const base=Date.now();
+    t.chemistry=Array.from({length:6000},(_,i)=>({timestamp:new Date(base-i*86400000).toISOString(),values:{KH:8-(i%5)*.1,NO3:10+(i%7)}}));
+    t.timeline=Array.from({length:12000},(_,i)=>({id:`long-${i}`,timestamp:new Date(base-i*3600000).toISOString(),type:"history",textAr:`حدث ${i}`,textEn:`Event ${i}`}));
+    t.feeding=Array.from({length:5000},(_,i)=>({id:`feed-${i}`,timestamp:new Date(base-i*86400000).toISOString(),food:"Food",amount:"1"}));
+    t.waterChanges=Array.from({length:3000},(_,i)=>({id:`wc-${i}`,timestamp:new Date(base-i*7*86400000).toISOString(),liters:50,percent:10}));
+    const brain=buildTankBrainSnapshot(t);
+    expect(brain.chemistry.recent.length).toBeLessThanOrEqual(40);
+    expect(brain.operations.feeding.length).toBeLessThanOrEqual(60);
+    expect(brain.operations.waterChanges.length).toBeLessThanOrEqual(60);
+    expect(brain.intelligence.timeline.length).toBeLessThanOrEqual(120);
+    expect(JSON.stringify(brain).length).toBeLessThan(1_500_000);
+  });
+
+  it("rejects unsafe treatment and acclimation numeric inputs",()=>{
+    expect(validateTreatmentSetup({volumeLiters:40,labelDoseMlPer100L:5,intervalHours:24,totalDoses:4}).ok).toBe(true);
+    expect(validateTreatmentSetup({volumeLiters:40,labelDoseMlPer100L:5000,intervalHours:0,totalDoses:4}).ok).toBe(false);
+    expect(validateAcclimationItemEntry({quantity:2,dripMinutes:45,intervalMinutes:15}).ok).toBe(true);
+    expect(validateAcclimationItemEntry({quantity:2,dripMinutes:900,intervalMinutes:15}).ok).toBe(false);
+    expect(validateAcclimationWater({salinity:1.025,temperature:25,dipMinutes:10,dipQuantity:5}).ok).toBe(true);
+    expect(validateAcclimationWater({salinity:1.25,temperature:90,dipMinutes:500,dipQuantity:5}).ok).toBe(false);
+  });
+
+  it("externalizes even legacy thumbnail payloads once a full asset already exists",()=>{
+    const legacy:any={id:"photo-old",timestamp:"2026-09-20T12:00:00Z",caption:"legacy",dataUrl:"data:image/jpeg;base64,AAAA",assetKey:"photo:old:full",fullResolutionStored:true};
+    const compact:any={...legacy,dataUrl:"",previewKey:"photo:old:preview"};
+    expect(photoNeedsExternalization(legacy)).toBe(true);
+    expect(photoNeedsExternalization(compact)).toBe(false);
+  });
+
   it("moves large photo payloads out of persisted tank state",()=>{
     const large:any={id:"p1",timestamp:"2026-09-20T12:00:00Z",caption:"test",dataUrl:"data:image/jpeg;base64,"+"A".repeat(150000)};
     const small:any={...large,id:"p2",dataUrl:"data:image/jpeg;base64,"+"A".repeat(1000)};
@@ -868,5 +900,19 @@ describe("Whole-tank intervention safety",()=>{
     const gate=interventionGate(t,"correctiveDosing");
     expect(gate.blocked).toBe(false);
     expect(gate.en).toMatch(/emergency/i);
+  });
+});
+
+
+describe("Recovery torture checks",()=>{
+  it("rejects malformed lifecycle recovery payloads",()=>{
+    const bad:any={app:"Aqua Nexus",schemaVersion:2,exportedAt:new Date().toISOString(),language:"ar",selectedTankId:demoMarineTank.id,tanks:[{...structuredClone(demoMarineTank),lifecycle:{vacations:[{id:"v1",startedAt:"not-a-date"}]}}]};
+    const result=validateBackupPayload(bad);
+    expect(result.ok).toBe(false);
+  });
+  it("rejects malformed AI action-plan recovery data",()=>{
+    const bad:any={app:"Aqua Nexus",schemaVersion:2,exportedAt:new Date().toISOString(),language:"ar",selectedTankId:demoMarineTank.id,tanks:[{...structuredClone(demoMarineTank),aiActionPlans:[{id:"p1",createdAt:"bad",steps:"not-an-array"}]}]};
+    const result=validateBackupPayload(bad);
+    expect(result.ok).toBe(false);
   });
 });
