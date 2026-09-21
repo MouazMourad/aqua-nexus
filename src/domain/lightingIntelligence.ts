@@ -295,6 +295,21 @@ export function lightingIntelligence(tank:Tank){
   if(typeof ph==="number"&&typeof oldPh==="number"&&Math.abs(ph-oldPh)>=.15)links.push(`pH Δ ${(ph-oldPh).toFixed(2)}`);
   const temp=latest?.values?.temperature,oldTemp=previous?.values?.temperature;
   if(typeof temp==="number"&&typeof oldTemp==="number"&&Math.abs(temp-oldTemp)>=.7)links.push(`Temp Δ ${(temp-oldTemp).toFixed(1)}°C`);
+  const placementRecommendations=lightingPlacementRecommendations(tank);
+  const placementOutside=placementRecommendations.filter(x=>x.placementStatus==="outside");
+  const placementUnset=placementRecommendations.filter(x=>x.placementStatus==="unset");
+  if(placementOutside.length)issues.push({
+    id:"photosynthetic-placement",
+    level:"warn",
+    ar:"في "+placementOutside.length+" مرجان/نبات موقعه المسجل خارج مستوى الضوء المقترح: "+placementOutside.slice(0,3).map(x=>x.name).join("، ")+".",
+    en:placementOutside.length+" coral/plant placement(s) are outside their suggested light-depth zone: "+placementOutside.slice(0,3).map(x=>x.name).join(", ")+"."
+  });
+  if(placementUnset.length)issues.push({
+    id:"photosynthetic-depth-unset",
+    level:"info",
+    ar:"عمق "+placementUnset.length+" مرجان/نبات غير مسجل بعد؛ المخطط يعرض موقعاً مقترحاً فقط.",
+    en:placementUnset.length+" coral/plant depth(s) are not recorded yet; the diagram is showing suggested placement only."
+  });
   const calibration=tank.lighting?.calibrationPoints??[];
   const latestImport=tank.lighting?.imports?.[0];
   const confidence=Math.round(clamp(
@@ -305,7 +320,7 @@ export function lightingIntelligence(tank:Tank){
   return{
     level,fixtures:fixtures.length,program,schedule,centerPeak,depthPct:depth,
     calibrationFactor:lightingCalibrationFactor(tank),calibrationPoints:calibration.length,
-    confidence,issues,chemistrySignals:links,placementRecommendations:lightingPlacementRecommendations(tank),latestImport,
+    confidence,issues,chemistrySignals:links,placementRecommendations,latestImport,
     missingEvidence:[
       ...(calibration.length?[]:["PAR calibration points"]),
       ...((tank.equipment.some(x=>x.kind==="ato"))?["measured top-off volume history"]:[])
