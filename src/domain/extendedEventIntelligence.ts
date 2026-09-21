@@ -238,6 +238,59 @@ export function deriveExtendedIntelligenceEvents(before:Tank,after:Tank):Intelli
     });
   }
 
+
+  const beforeVacations=new Map((before.lifecycle?.vacations??[]).map(x=>[x.id,x]));
+  for(const row of after.lifecycle?.vacations??[]){
+    const old=beforeVacations.get(row.id);
+    if(!old)push({
+      timestamp:row.startedAt,kind:"action",domain:"system",verb:"vacation_started",entityType:"vacation",entityId:row.id,confidence:100,
+      sourceId:`${row.id}:start`,sourcePage:"settings",
+      textAr:"بدأ وضع السفر/الغياب للحوض",textEn:"Tank vacation/away mode started",
+      metadata:{plannedEndAt:row.plannedEndAt??null,notes:row.notes??null}
+    });
+    else if(!old.endedAt&&row.endedAt)push({
+      timestamp:row.endedAt,kind:"outcome",domain:"system",verb:"vacation_ended",entityType:"vacation",entityId:row.id,confidence:100,
+      sourceId:`${row.id}:end`,sourcePage:"settings",
+      textAr:"انتهى وضع السفر/الغياب للحوض",textEn:"Tank vacation/away mode ended"
+    });
+  }
+
+  const beforeMoves=new Map((before.lifecycle?.relocations??[]).map(x=>[x.id,x]));
+  for(const row of after.lifecycle?.relocations??[]){
+    const old=beforeMoves.get(row.id);
+    if(!old)push({
+      timestamp:row.startedAt,kind:"action",domain:"system",verb:"relocation_started",entityType:"relocation",entityId:row.id,confidence:100,
+      sourceId:`${row.id}:start`,sourcePage:"settings",
+      textAr:"بدأ نقل/ترحيل الحوض",textEn:"Tank relocation started",
+      metadata:{from:row.from??null,to:row.to??null,notes:row.notes??null}
+    });
+    else if(old.status!==row.status&&row.status==="completed")push({
+      timestamp:row.completedAt||now(),kind:"outcome",domain:"system",verb:"relocation_completed",entityType:"relocation",entityId:row.id,confidence:100,
+      sourceId:`${row.id}:completed`,sourcePage:"settings",
+      textAr:"اكتمل نقل الحوض",textEn:"Tank relocation completed",
+      metadata:{from:row.from??null,to:row.to??null}
+    });
+  }
+
+  const beforeRestarts=new Set((before.lifecycle?.restarts??[]).map(x=>x.id));
+  for(const row of after.lifecycle?.restarts??[])if(!beforeRestarts.has(row.id))push({
+    timestamp:row.timestamp,kind:"action",domain:"system",verb:"major_restart",entityType:"tank",entityId:after.id,confidence:100,
+    sourceId:row.id,sourcePage:"settings",
+    textAr:"تم تسجيل إعادة تشغيل كبرى للحوض وبدء دورة بيولوجية جديدة",textEn:"Major tank restart recorded and a new biological cycle started",
+    metadata:{reason:row.reason??null,notes:row.notes??null}
+  });
+
+  if(before.lifecycle?.archivedAt!==after.lifecycle?.archivedAt){
+    const archived=Boolean(after.lifecycle?.archivedAt);
+    push({
+      timestamp:after.lifecycle?.archivedAt||now(),kind:archived?"action":"outcome",domain:"system",verb:archived?"tank_archived":"tank_restored",entityType:"tank",entityId:after.id,confidence:100,
+      sourceId:`${after.id}:${archived?"archive":"restore"}:${Date.now()}`,sourcePage:"settings",
+      textAr:archived?"تمت أرشفة الحوض وإيقاف العمليات التشغيلية":"تمت إعادة الحوض من الأرشيف",
+      textEn:archived?"Tank archived; operational workflows are disabled":"Tank restored from archive",
+      metadata:{reason:after.lifecycle?.archiveReason??null}
+    });
+  }
+
   const beforeAcc=new Map((before.acclimationSessions??[]).map(x=>[x.id,x]));
   for(const session of after.acclimationSessions??[]){
     const old=beforeAcc.get(session.id);
