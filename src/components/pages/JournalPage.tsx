@@ -1,5 +1,5 @@
 "use client";
-import { useMemo,useState } from "react";
+import { useEffect,useMemo,useState } from "react";
 import type { JournalPhoto,Tank,VisionAssessmentRecord } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
@@ -8,11 +8,23 @@ import { uid,nowISO } from "@/lib/appUtils";
 import { buildVisionTriage,captureConsistency,type VisionMetrics,type VisionSymptom } from "@/domain/visionIntelligence";
 import { visionDiseaseCandidates } from "@/domain/visionDifferential";
 import { askAquaVision } from "@/lib/aquaAIClient";
-import { externalizePhoto,resolveFullPhoto } from "@/lib/photoStorage";
+import { externalizePhoto,resolveFullPhoto,resolvePhotoPreview } from "@/lib/photoStorage";
 
 type GrowthPhoto=JournalPhoto&{livestockId?:string;estimatedSizeCm?:number;colorIndex?:number;brightnessIndex?:number;captureScore?:number;clarityIndex?:number;greenDominancePercent?:number;palePixelPercent?:number};
 
 type PreparedImage={dataUrl:string;metrics:VisionMetrics};
+
+function StoredPhotoImage({photo,alt,className,style}:{photo:JournalPhoto;alt:string;className?:string;style?:React.CSSProperties}){
+ const [src,setSrc]=useState(photo.dataUrl||"");
+ useEffect(()=>{
+  let active=true;
+  setSrc(photo.dataUrl||"");
+  void resolvePhotoPreview(photo).then(value=>{if(active&&value)setSrc(value)});
+  return()=>{active=false};
+ },[photo.id,photo.previewKey,photo.assetKey,photo.dataUrl]);
+ if(!src)return <div className={className} style={{...style,display:"grid",placeItems:"center",background:"rgba(255,255,255,.04)",fontSize:18}} aria-label={alt}>▧</div>;
+ return <img className={className} src={src} alt={alt} style={style}/>;
+}
 
 function readFile(file:File){
  return new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=()=>reject(r.error);r.readAsDataURL(file);});
@@ -253,7 +265,7 @@ export function JournalPage({tank}:{tank:Tank}) {
  {assessments.length>0&&<div className="card panel full-span">
   <div className="module-head"><div><h3>{bi(lang,"سجل Visual Insight","Visual Insight history")}</h3><p className="note">{bi(lang,"كل تحليل محفوظ مع الصورة والكائن والنتيجة والإجراءات المرتبطة حتى تقدر تراجع تطور الحالة.","Every assessment stays linked to its photo, organism, result and follow-up actions so you can review progression.")}</p></div><span className="scene-badge">{assessments.length}</span></div>
   <div className="history-list">{assessments.slice(0,12).map(a=>{const subject=tank.livestock.find(x=>x.id===a.livestockId),photo=photos.find(x=>x.id===a.photoId);return <div className="history-row" key={a.id} style={{alignItems:"flex-start",gap:12}}>
-   {photo&&<img src={photo.dataUrl} alt={photo.caption||"Visual assessment"} style={{width:72,height:72,objectFit:"cover",borderRadius:10,flex:"0 0 auto"}}/>}
+   {photo&&<StoredPhotoImage photo={photo} alt={photo.caption||"Visual assessment"} style={{width:72,height:72,objectFit:"cover",borderRadius:10,flex:"0 0 auto"}}/>}
    <div style={{display:"grid",gap:5,flex:1,minWidth:0}}>
     <b>{subject?(lang==="ar"?subject.name:(subject.nameEn||subject.name)):bi(lang,"الحوض كامل","Whole tank")} • {a.triage.level==="urgent"?bi(lang,"عاجل","Urgent"):a.triage.level==="attention"?bi(lang,"متابعة","Attention"):bi(lang,"مراقبة","Monitor")}</b>
     <small>{new Date(a.timestamp).toLocaleString()} • {bi(lang,"ثقة","Confidence")} {a.triage.confidenceScore}/100 • Capture {a.metrics.captureScore}/100</small>
@@ -269,6 +281,6 @@ export function JournalPage({tank}:{tank:Tank}) {
   </div>})}</div>
  </div>}
 
- <div className="photo-grid full-span">{photos.map(p=>{const subject=tank.livestock.find(x=>x.id===p.livestockId);return <article className="photo-card" key={p.id}><img src={p.dataUrl} alt={p.caption}/><div><b>{p.caption||subject&&(lang==="ar"?subject.name:(subject.nameEn||subject.name))||tr(lang,"journal")}</b><small>{new Date(p.timestamp).toLocaleString()}</small>{subject&&<small>{lang==="ar"?subject.name:(subject.nameEn||subject.name)}{p.estimatedSizeCm?` • ${p.estimatedSizeCm} cm`:""}</small>}<small>{typeof p.colorIndex==="number"?`${bi(lang,"مؤشر اللون","Color index")}: ${p.colorIndex}/100`:""}{typeof p.brightnessIndex==="number"?` • ${bi(lang,"الإضاءة","brightness")}: ${p.brightnessIndex}/100`:""}{typeof p.captureScore==="number"?` • Capture ${p.captureScore}/100`:""}</small></div></article>})}</div>
+ <div className="photo-grid full-span">{photos.map(p=>{const subject=tank.livestock.find(x=>x.id===p.livestockId);return <article className="photo-card" key={p.id}><StoredPhotoImage photo={p} alt={p.caption||tr(lang,"journal")}/><div><b>{p.caption||subject&&(lang==="ar"?subject.name:(subject.nameEn||subject.name))||tr(lang,"journal")}</b><small>{new Date(p.timestamp).toLocaleString()}</small>{subject&&<small>{lang==="ar"?subject.name:(subject.nameEn||subject.name)}{p.estimatedSizeCm?` • ${p.estimatedSizeCm} cm`:""}</small>}<small>{typeof p.colorIndex==="number"?`${bi(lang,"مؤشر اللون","Color index")}: ${p.colorIndex}/100`:""}{typeof p.brightnessIndex==="number"?` • ${bi(lang,"الإضاءة","brightness")}: ${p.brightnessIndex}/100`:""}{typeof p.captureScore==="number"?` • Capture ${p.captureScore}/100`:""}</small></div></article>})}</div>
  </section>;
 }
