@@ -1,7 +1,7 @@
 import type { AquariumExperienceLevel,Language,Tank } from "./types";
 import { validateChemistryValues } from "./chemistryDataQuality";
 
-export const CURRENT_BACKUP_SCHEMA=10;
+export const CURRENT_BACKUP_SCHEMA=11;
 
 export interface ValidBackupPayload{
   language:Language;
@@ -85,6 +85,12 @@ function nestedDataIssue(tank:Record<string,unknown>){
   }
   for(const [i,row] of (((tank.equipment as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validText(row.name,300)||!validText(row.kind,80))return `equipment #${i+1} is invalid`;
+    for(const key of ["parAtTargetDepth","mountingHeightCm","parReferenceDepthCm","coverageLengthCm","coverageWidthCm"]){
+      const value=row[key];
+      if(value!==undefined&&(!finite(value)||Number(value)<0))return `equipment #${i+1} has invalid ${key}`;
+    }
+    if(row.mountingHeightCm!==undefined&&Number(row.mountingHeightCm)>150)return `equipment #${i+1} has mountingHeightCm above 150`;
+    if(row.parAtTargetDepth!==undefined&&Number(row.parAtTargetDepth)>5000)return `equipment #${i+1} has implausible parAtTargetDepth`;
   }
 
   for(const [i,row] of (((tank.rodi as unknown[])??[])).entries()){
@@ -123,6 +129,40 @@ function nestedDataIssue(tank:Record<string,unknown>){
   }
   for(const [i,row] of (((tank.maintenance as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validText(row.title,500)||!validText(row.cadence,80))return `maintenance #${i+1} is invalid`;
+  }
+
+  if(tank.lighting!==undefined){
+    if(!isObject(tank.lighting))return "lighting must be an object";
+    const lighting=tank.lighting as Record<string,unknown>;
+    if(lighting.mapDepthPct!==undefined&&(!finite(lighting.mapDepthPct)||Number(lighting.mapDepthPct)<0||Number(lighting.mapDepthPct)>100))return "lighting.mapDepthPct is invalid";
+    if(lighting.manualCalibrationFactor!==undefined&&(!finite(lighting.manualCalibrationFactor)||Number(lighting.manualCalibrationFactor)<=0||Number(lighting.manualCalibrationFactor)>4))return "lighting.manualCalibrationFactor is invalid";
+    if(lighting.calibrationPoints!==undefined){
+      if(!Array.isArray(lighting.calibrationPoints)||lighting.calibrationPoints.length>1000)return "lighting.calibrationPoints is invalid";
+      for(const [i,row] of lighting.calibrationPoints.entries()){
+        if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp)||!finite(row.xPct)||!finite(row.zPct)||!finite(row.depthPct)||!finite(row.measuredPar))return `lighting.calibrationPoints #${i+1} is invalid`;
+        if(Number(row.xPct)<0||Number(row.xPct)>100||Number(row.zPct)<0||Number(row.zPct)>100||Number(row.depthPct)<0||Number(row.depthPct)>100||Number(row.measuredPar)<=0||Number(row.measuredPar)>5000)return `lighting.calibrationPoints #${i+1} is out of range`;
+        if(row.minute!==undefined&&(!finite(row.minute)||Number(row.minute)<0||Number(row.minute)>1439))return `lighting.calibrationPoints #${i+1} has invalid minute`;
+      }
+    }
+    const program=lighting.activeProgram;
+    if(program!==undefined){
+      if(!isObject(program)||!validText(program.id,160)||!validText(program.name,300)||!validTimestamp(program.createdAt)||!validTimestamp(program.updatedAt)||!Array.isArray(program.channels)||!Array.isArray(program.points))return "lighting.activeProgram is invalid";
+      if(program.channels.length<1||program.channels.length>32||program.points.length<2||program.points.length>288)return "lighting.activeProgram has an invalid channel/time-point count";
+      const channelIds=new Set<string>();
+      for(const [i,ch] of program.channels.entries()){
+        if(!isObject(ch)||!validText(ch.id,160)||!validText(ch.name,200)||!finite(ch.parWeight)||Number(ch.parWeight)<0||Number(ch.parWeight)>2||typeof ch.enabled!=="boolean")return `lighting channel #${i+1} is invalid`;
+        if(channelIds.has(String(ch.id)))return `lighting contains duplicate channel id ${String(ch.id)}`;
+        channelIds.add(String(ch.id));
+      }
+      for(const [i,row] of program.points.entries()){
+        if(!isObject(row)||!validText(row.id,160)||!finite(row.minute)||Number(row.minute)<0||Number(row.minute)>1439||!isObject(row.values))return `lighting point #${i+1} is invalid`;
+        for(const id of channelIds){
+          const value=row.values[id];
+          if(value!==undefined&&(!finite(value)||Number(value)<0||Number(value)>100))return `lighting point #${i+1} has an invalid channel value`;
+        }
+      }
+    }
+    if(lighting.history!==undefined&&(!Array.isArray(lighting.history)||lighting.history.length>100))return "lighting.history is invalid";
   }
 
   if(tank.lifecycle!==undefined){

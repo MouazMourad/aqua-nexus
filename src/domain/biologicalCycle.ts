@@ -116,7 +116,7 @@ export function biologicalCycleStatus(tank:Tank):BiologicalCycleStatus{
 }
 
 const ALLOWED_DURING_CYCLE=new Set([
-  "dashboard","tanks","equipment","sump","chemistry","maintenance","inventory","library",
+  "dashboard","tanks","equipment","lighting","sump","chemistry","maintenance","inventory","library",
   "timeline","journal","waterchange","rodi","alerts","settings","emergency"
 ]);
 

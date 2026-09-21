@@ -45,6 +45,7 @@ import { TANK_EVENT_COVERAGE,eventedTankFields } from "@/domain/eventCoverage";
 import { domainOutcomeLearning } from "@/domain/outcomeLearning";
 import { historyPage } from "@/domain/historyPagination";
 import { buildVacationTaskDrafts,vacationDays } from "@/domain/vacationPlan";
+import { defaultLightingProgram,estimatedParAt,lightingCalibrationFactor,lightingGrid,lightingIntelligence,lightingSchedule } from "@/domain/lightingIntelligence";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -1014,6 +1015,50 @@ describe("Final hardening contracts",()=>{
     const badVacation=structuredClone(demoMarineTank) as any;
     badVacation.lifecycle={vacations:[{id:"v1",startedAt:"2026-09-21T00:00:00Z",plannedEndAt:"2026-09-20"}]};
     result=validateBackupPayload({app:"Aqua Nexus",schemaVersion:10,language:"ar",selectedTankId:badVacation.id,tanks:[badVacation]});
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe("Lighting Intelligence regression",()=>{
+  function litTank(){
+    const t=structuredClone(demoMarineTank);
+    const fixture=t.equipment.find(x=>x.kind==="lighting")??{id:"light-test",name:"Test Light",kind:"lighting" as const,location:"display" as const,status:"on" as const};
+    if(!t.equipment.some(x=>x.id===fixture.id))t.equipment.push(fixture as any);
+    Object.assign(fixture,{location:"display",status:"on",parAtTargetDepth:260,mountingHeightCm:20,parReferenceDepthCm:t.display.height*.5,coverageLengthCm:t.display.length*.72,coverageWidthCm:t.display.width*.9,displayPosition:{xPct:50,yPct:116,zPct:50,scale:1}});
+    t.lighting={activeProgram:defaultLightingProgram(t),mapDepthPct:50,calibrationPoints:[]};
+    return t;
+  }
+  it("builds a real schedule and PAR field from tank geometry and fixtures",()=>{
+    const t=litTank(),schedule=lightingSchedule(t.lighting!.activeProgram!);
+    expect(schedule.photoperiodMinutes).toBeGreaterThan(0);
+    expect(schedule.peakPercent).toBeGreaterThan(0);
+    const grid=lightingGrid(t,{minute:schedule.peakMinute,depthPct:50,cols:9,rows:5});
+    expect(grid.cells).toHaveLength(45);
+    expect(grid.max).toBeGreaterThan(grid.min);
+    expect(estimatedParAt(t,50,50,50,schedule.peakMinute)).toBeGreaterThan(0);
+  });
+  it("uses measured PAR points to calibrate the estimate instead of pretending estimates are measurements",()=>{
+    const t=litTank(),program=t.lighting!.activeProgram!,peak=lightingSchedule(program).peakMinute;
+    const raw=estimatedParAt(t,50,50,50,peak);
+    t.lighting!.calibrationPoints=[{id:"cal-1",timestamp:new Date().toISOString(),xPct:50,zPct:50,depthPct:50,measuredPar:raw*1.5,minute:peak}];
+    expect(lightingCalibrationFactor(t)).toBeGreaterThan(1.4);
+    expect(lightingCalibrationFactor(t)).toBeLessThan(1.6);
+  });
+  it("exposes lighting to Tank Brain and Local Best AI",()=>{
+    const t=litTank(),intel=lightingIntelligence(t);
+    expect(intel.fixtures).toBeGreaterThan(0);
+    const answer=aquaAIAnswer("شو وضع الإنارة والـ PAR بالحوض؟",t,"lighting");
+    expect(answer.action?.page).toBe("lighting");
+    expect(answer.detailsAr.join(" ")).toMatch(/PAR|الإنارة|البرنامج/);
+  });
+  it("keeps Lighting accessible during cycling and covered by the Tank event contract",()=>{
+    expect(isCyclePageAllowed("lighting")).toBe(true);
+    expect(TANK_EVENT_COVERAGE.lighting).toBe("evented");
+  });
+  it("rejects corrupt lighting values in recovery backups",()=>{
+    const t=litTank() as any;
+    t.lighting.activeProgram.points[0].values[t.lighting.activeProgram.channels[0].id]=999;
+    const result=validateBackupPayload({app:"Aqua Nexus",schemaVersion:11,language:"ar",selectedTankId:t.id,tanks:[t]});
     expect(result.ok).toBe(false);
   });
 });

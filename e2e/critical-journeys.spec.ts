@@ -421,3 +421,24 @@ test("persistence failure is surfaced instead of silently accepted",async({page}
   await expect(page.locator(".page-grid")).toContainText(/FAILED|recent changes may not survive reload/i);
 });
 
+test("Lighting Intelligence edits, visualizes and calibrates the tank light model",async({page})=>{
+  await openTrainingDashboard(page);
+  await goToPage(page,"lighting");
+  await expect(page.locator(".lighting-page")).toBeVisible();
+  await expect(page.locator(".lighting-3d-wrap")).toBeVisible();
+  await expect(page.locator(".lighting-heat-grid").first()).toBeVisible();
+  await expect(page.locator(".lighting-curve")).toBeVisible();
+  await expect(page.locator(".lighting-page")).toContainText(/LIGHTING INTELLIGENCE|الإنارة الذكية/);
+
+  const save=page.getByRole("button",{name:/حفظ البرنامج|Save program/}).first();
+  if(await save.isEnabled())await save.click();
+  await expect(page.locator(".lighting-page")).toContainText(/البرنامج محفوظ|Program saved|SAVED/);
+
+  const calibration=page.locator(".card.panel.full-span").filter({hasText:"PAR CALIBRATION"}).first();
+  await expect(calibration).toBeVisible();
+  const measured=calibration.locator('input[type="number"]').nth(3);
+  await measured.fill("180");
+  await calibration.getByRole("button",{name:/إضافة نقطة معايرة|Add calibration point/}).click();
+  await expect(calibration).toContainText("180 PAR");
+});
+

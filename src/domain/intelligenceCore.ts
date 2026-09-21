@@ -7,9 +7,10 @@ import { smartInsights } from "./smartInsights";
 import { healthTimeline,tankForecast,tankStateView } from "./tankIntelligence";
 import { proactivePredictions,biologicalMemory } from "./tankLearning";
 import { isBiologicalCycleActive,isCyclePageAllowed } from "./biologicalCycle";
+import { lightingIntelligence } from "./lightingIntelligence";
 
 export type IntelligenceDomain =
- "chemistry"|"dosing"|"maintenance"|"equipment"|"livestock"|"inventory"|"feeding"|
+ "chemistry"|"dosing"|"maintenance"|"equipment"|"lighting"|"livestock"|"inventory"|"feeding"|
  "waterChange"|"rodi"|"plantCare"|"quarantine"|"emergency"|"acclimation"|"sump"|"journal"|"expense"|"system";
 
 export interface IntelligenceAction{
@@ -25,7 +26,7 @@ export interface IntelligenceAction{
 
 
 const pageByDomain:Record<IntelligenceDomain,string>={
- chemistry:"chemistry",dosing:"dosing",maintenance:"maintenance",equipment:"equipment",livestock:"livestock",inventory:"inventory",feeding:"feeding",
+ chemistry:"chemistry",dosing:"dosing",maintenance:"maintenance",equipment:"equipment",lighting:"lighting",livestock:"livestock",inventory:"inventory",feeding:"feeding",
  waterChange:"waterchange",rodi:"rodi",plantCare:"livestock",quarantine:"quarantine",emergency:"emergency",acclimation:"acclimation",sump:"sump",journal:"journal",expense:"expenses",system:"dashboard"
 };
 
@@ -35,6 +36,7 @@ export interface TankIntelligenceCore{
  state:ReturnType<typeof tankStateView>;
  chemistry:ReturnType<typeof chemistryHealthAssessment>;
  maintenance:number;
+ lighting:ReturnType<typeof lightingIntelligence>;
  bioload:ReturnType<typeof bioload>;
  alerts:ReturnType<typeof systemAlerts>;
  insights:ReturnType<typeof smartInsights>;
@@ -67,6 +69,7 @@ export function tankIntelligenceCore(tank:Tank):TankIntelligenceCore{
  const memory=biologicalMemory(tank);
  const maint=maintenanceHealth(tank);
  const bio=bioload(tank);
+ const lighting=lightingIntelligence(tank);
  const guidanceActions:GuidanceAction[]=deriveGuidanceActions(tank);
  const rank={danger:0,warn:1,info:2};
  const cycling=isBiologicalCycleActive(tank);
@@ -79,6 +82,10 @@ export function tankIntelligenceCore(tank:Tank):TankIntelligenceCore{
  for(const a of alerts){
   const key=a.id.startsWith("core-")?a.id.slice(5):a.id;
   if(!actionMap.has(key))actionMap.set(key,{id:a.id,domain:a.domain,level:a.level,page:a.actionPage??pageByDomain[a.domain],ar:a.ar,en:a.en,priority:rank[a.level]});
+ }
+ const lightingPrimary=lighting.issues.find(x=>x.level==="danger")??lighting.issues.find(x=>x.level==="warn");
+ if(lightingPrimary&&!cycling){
+  actionMap.set("lighting-primary",{id:"lighting-primary",domain:"lighting",level:lightingPrimary.level,page:"lighting",ar:lightingPrimary.ar,en:lightingPrimary.en,priority:rank[lightingPrimary.level]});
  }
  const actions:IntelligenceAction[]=[...actionMap.values()].sort((a,b)=>a.priority-b.priority);
 
@@ -95,7 +102,7 @@ export function tankIntelligenceCore(tank:Tank):TankIntelligenceCore{
  )));
 
  return {
-  generatedAt:new Date().toISOString(),health,state,chemistry,maintenance:maint,bioload:bio,
+  generatedAt:new Date().toISOString(),health,state,chemistry,maintenance:maint,lighting,bioload:bio,
   alerts,insights,forecast,history,predictions,memory,actions,guidanceActions,dataConfidence,
   critical:alerts.some(x=>x.level==="danger")||health.chemistryCritical
  };

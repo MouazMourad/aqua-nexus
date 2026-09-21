@@ -6,6 +6,7 @@ import { AquaDashboardContent } from "@/components/dashboard/AquaDashboardConten
 import { CreatorContactStrip } from "@/components/CreatorContactStrip";
 import { TanksPage } from "./TanksPage";
 import { EquipmentPage } from "./EquipmentPage";
+import { LightingPage } from "./LightingPage";
 import { SumpPage } from "./SumpPage";
 import { LivestockPage } from "./LivestockPage";
 import { AcclimationPage } from "./AcclimationPage";
@@ -38,6 +39,7 @@ export function PageRouter({page,tank,tanks,selectedTankId,onSelectTank,onNaviga
  }else switch(page){
   case"tanks":content=<TanksPage tanks={tanks} selectedTankId={selectedTankId} onSelect={onSelectTank}/>;break;
   case"equipment":content=<EquipmentPage tank={tank}/>;break;
+  case"lighting":content=<LightingPage tank={tank} onEquipment={()=>onNavigate("equipment")}/>;break;
   case"sump":content=<SumpPage tank={tank}/>;break;
   case"livestock":content=<LivestockPage tank={tank} onLibrary={()=>onNavigate("library")}/>;break;
   case"acclimation":content=<AcclimationPage tank={tank}/>;break;

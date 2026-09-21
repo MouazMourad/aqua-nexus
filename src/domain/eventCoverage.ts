@@ -24,6 +24,7 @@ export const TANK_EVENT_COVERAGE={
   systemVolumeLiters:"derived",
   equipment:"evented",
   energySettings:"evented",
+  lighting:"evented",
   chemistry:"evented",
   maintenance:"evented",
   livestock:"evented",

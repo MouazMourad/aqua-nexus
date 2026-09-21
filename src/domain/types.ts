@@ -59,8 +59,12 @@ export interface Equipment {
   ratedVolumeLiters?: number;
   /** Nominal water flow in liters/hour for pumps, wavemakers, filters, etc. */
   flowLph?: number;
-  /** Measured/estimated PAR at the livestock target depth for aquarium lighting. */
+  /** Measured/estimated PAR at a known reference depth for aquarium lighting. */
   parAtTargetDepth?: number;
+  /** Physical fixture height above the water surface, used by Lighting Intelligence. */
+  mountingHeightCm?: number;
+  /** Depth below the water surface at which parAtTargetDepth was measured. */
+  parReferenceDepthCm?: number;
   /** Manufacturer or measured lighting coverage dimensions. */
   coverageLengthCm?: number;
   coverageWidthCm?: number;
@@ -677,6 +681,65 @@ export interface AcclimationSession {
   events: AcclimationEvent[];
 }
 
+export interface LightingChannel {
+  id:string;
+  name:string;
+  nameEn?:string;
+  /** Human-readable spectral family; vendor-specific names can map here later. */
+  spectrum:"uv"|"violet"|"royalBlue"|"blue"|"cyan"|"green"|"red"|"warmWhite"|"coolWhite"|"white"|"other";
+  /** Relative contribution to usable photosynthetic light in the estimator. */
+  parWeight:number;
+  enabled:boolean;
+}
+
+export interface LightingProgramPoint {
+  id:string;
+  minute:number;
+  values:Record<string,number>;
+}
+
+export interface LightingProgram {
+  id:string;
+  name:string;
+  createdAt:string;
+  updatedAt:string;
+  channels:LightingChannel[];
+  points:LightingProgramPoint[];
+  notes?:string;
+}
+
+export interface LightingProgramSnapshot {
+  id:string;
+  timestamp:string;
+  reason?:string;
+  program:LightingProgram;
+}
+
+export interface LightingCalibrationPoint {
+  id:string;
+  timestamp:string;
+  /** Horizontal position across display length. */
+  xPct:number;
+  /** Front-to-back position across display width. */
+  zPct:number;
+  /** Depth below water surface: 0 = surface, 100 = bottom. */
+  depthPct:number;
+  measuredPar:number;
+  /** Program minute when the PAR reading was taken; defaults to program peak when omitted. */
+  minute?:number;
+  notes?:string;
+}
+
+export interface TankLightingState {
+  activeProgram?:LightingProgram;
+  history?:LightingProgramSnapshot[];
+  calibrationPoints?:LightingCalibrationPoint[];
+  /** User-selected depth for the default top-view PAR map. */
+  mapDepthPct?:number;
+  /** Optional global correction after calibration; normally derived from calibration points. */
+  manualCalibrationFactor?:number;
+}
+
 export interface Tank {
   id: string;
   name: string;
@@ -701,6 +764,7 @@ export interface Tank {
   systemVolumeLiters: number;
   equipment: Equipment[];
   energySettings?: EnergySettings;
+  lighting?: TankLightingState;
   chemistry: ChemistryReading[];
   maintenance: MaintenanceTask[];
   livestock: LivestockItem[];

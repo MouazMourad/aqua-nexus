@@ -2,7 +2,7 @@
 
 ## Status
 
-**Version:** v0.2.0-rc.1  
+**Version:** v0.3.0-rc.1  
 **Stage:** Release Candidate / controlled testing  
 **Architecture:** Next.js + React + Three.js, local-first with optional PostgreSQL Device Backup
 
@@ -14,6 +14,7 @@ The current build includes:
 - Dashboard and 3D digital twin
 - Tanks / setup / biological cycle
 - Equipment and energy/lifecycle monitoring
+- Lighting Intelligence with schedule/spectrum modelling, Top/Front/3D estimated PAR maps, measured-PAR calibration, Tank Brain and Local Best AI integration
 - 2D/3D sump builder and safety audit
 - Livestock, compatibility and bioload
 - Acclimation, parallel timers, distress exceptions, Coral Dip/Rinse
@@ -66,4 +67,4 @@ The current priority is tester feedback on:
 - data safety / backup confidence
 - edge cases from real tanks
 
-Feature expansion is intentionally paused during this phase.
+Large unrelated feature expansion is intentionally paused during this phase. The next planned integration track is the vendor-neutral import layer after Lighting Intelligence is validated by testers.
