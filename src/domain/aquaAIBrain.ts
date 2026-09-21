@@ -599,6 +599,9 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   // is planned generically by domain + operation, so one signal cannot hijack unrelated topics.
   if(intent.params.length>1)return multiParameterAnswer(tank,intent.params);
   if(intent.params.length===1)return parameterAnswer(tank,intent.params[0] as Param);
+  const equipmentImportQ=normText(question);
+  const equipmentImportTokens=["equipment","device","controller","telemetry","apex","reefbeat","hydros","ghl","seneye","معدات","جهاز","اجهزه","اجهزة","استيراد جهاز","بيانات جهاز","تعويض ماء","ato"];
+  if(equipmentImportTokens.some(token=>equipmentImportQ.includes(token)))return equipmentAnswer(tank);
   if(intent.mode==="canAdd")return stockingReadinessAnswer(tank,question);
   if(intent.mode==="whatIf")return answerAquaQuery(tank,intent);
   if(intent.mode==="waterChange")return waterChangeAnswer(tank);
