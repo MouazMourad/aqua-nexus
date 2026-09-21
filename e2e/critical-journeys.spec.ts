@@ -181,3 +181,44 @@ test("progressive navigation keeps every module reachable and supports keyboard 
   await quick.locator('[data-quick-action="chemistry"]').click();
   await expect(page.locator(".page-grid")).toContainText(/شو وضع الكيمياء فعلياً|What is actually happening with chemistry/);
 });
+
+
+test("IndexedDB persistence survives reload without keeping the tank JSON in localStorage",async({page})=>{
+  await openTrainingDashboard(page);
+  await goToPage(page,"expenses");
+  const panel=page.locator(".card.panel").first();
+  await panel.locator('input').nth(0).fill("IndexedDB Persistence Probe");
+  await panel.locator('input[type="number"]').fill("12.34");
+  await panel.getByRole("button",{name:/إضافة مصروف|Add expense/}).click();
+  await expect(page.locator(".history-list")).toContainText("IndexedDB Persistence Probe");
+  await page.waitForTimeout(500);
+  const legacy=await page.evaluate(()=>localStorage.getItem("aqua-nexus-3d-v1"));
+  expect(legacy).toBeNull();
+
+  await page.reload();
+  await openTrainingDashboard(page);
+  await goToPage(page,"expenses");
+  await expect(page.locator(".history-list")).toContainText("IndexedDB Persistence Probe");
+});
+
+test("maintenance checklist is a guided step workflow and cannot be bypassed",async({page})=>{
+  await openTrainingDashboard(page);
+  await goToPage(page,"equipment");
+  await expect(page.locator(".page-grid")).toBeVisible();
+  await page.waitForTimeout(250);
+  await goToPage(page,"maintenance");
+
+  const stepsButton=page.locator(".maintenance-checklist-btn").first();
+  await expect(stepsButton).toBeVisible();
+  await stepsButton.click();
+
+  const workflow=page.locator(".maintenance-step-workflow");
+  await expect(workflow).toBeVisible();
+  await expect(workflow.locator(".maintenance-progress-ring")).toBeVisible();
+  await expect(workflow.locator(".maintenance-step-card").first()).toBeVisible();
+  const finish=workflow.locator(".maintenance-finish-workflow");
+  await expect(finish).toBeDisabled();
+
+  await workflow.locator(".maintenance-step-card").first().click();
+  await expect(workflow.locator(".maintenance-step-card").first()).toHaveClass(/is-done/);
+});
