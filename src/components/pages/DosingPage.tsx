@@ -13,6 +13,7 @@ import { correctiveDosingInventory,inventoryProfile,routineDosingInventory } fro
 import { requiresPostDoseRetest } from "@/domain/dosingSafety";
 import { claimCriticalAction } from "@/lib/actionGuard";
 import { interventionGate } from "@/domain/interventionSafety";
+import { sanitizeBounded,validateDoserChannelEntry } from "@/domain/inputSanity";
 
 const colors=["#27c2dc","#62d48f","#f6c85f","#c877ff","#ff7e79","#4b8bff"];
 function idealTarget(tank:Tank,param:DosingParameter){const meta:any=chemistryCatalogForTank(tank)?.[param];return meta?.ideal?(Number(meta.ideal[0])+Number(meta.ideal[1]))/2:param==="KH"?8:param==="Ca"?430:1325;}
@@ -31,8 +32,15 @@ export function DosingPage({tank}:{tank:Tank}) {
  const needsPostDoseRetest=useMemo(()=>requiresPostDoseRetest(tank,param,sample?.timestamp),[tank,param,sample?.timestamp]);
  const dosingReady=current!==undefined&&readingAgeHours<=48&&sample?.confidence!=="low"&&!currentIssue&&!dataIssue&&!needsPostDoseRetest&&!targetCheck.blocked;
  const calc=useMemo(()=>calculateDose({parameter:param,current:current??Number.NaN,target,volumeLiters:tank.systemVolumeLiters,form,presetId:chosen?.id,purityPercent:purity,stockGramsPerLiter,productRaisePerMlPer100L:productRaise}),[param,current,target,tank.systemVolumeLiters,form,chosen?.id,purity,stockGramsPerLiter,productRaise]);
- function setCount(n:number){patch(tank.id,t=>{const channels=[...t.doserChannels];while(channels.length<n)channels.push({id:uid("dc"),name:`Channel ${channels.length+1}`,material:"",capacityMl:1000,currentMl:1000,consumption:0,period:"daily",color:colors[channels.length%colors.length]});return {...t,doserChannels:channels.slice(0,n)};});}
- function updateChannel(id:string,p:Partial<DoserChannel>){patch(tank.id,t=>({...t,doserChannels:t.doserChannels.map(x=>x.id===id?{...x,...p}:x)}))}
+ function setCount(n:number){const safe=Math.round(sanitizeBounded(n,0,12,tank.doserChannels.length));patch(tank.id,t=>{const channels=[...t.doserChannels];while(channels.length<safe)channels.push({id:uid("dc"),name:`Channel ${channels.length+1}`,material:"",capacityMl:1000,currentMl:1000,consumption:0,period:"daily",color:colors[channels.length%colors.length]});return {...t,doserChannels:channels.slice(0,safe)};});}
+ function updateChannel(id:string,p:Partial<DoserChannel>){patch(tank.id,t=>({...t,doserChannels:t.doserChannels.map(x=>{
+  if(x.id!==id)return x;
+  const next={...x,...p};
+  const check=validateDoserChannelEntry({capacityMl:next.capacityMl,currentMl:next.currentMl,consumption:next.consumption});
+  if(check.ok)return next;
+  const capacity=sanitizeBounded(next.capacityMl,.1,1_000_000,x.capacityMl);
+  return {...next,capacityMl:capacity,currentMl:sanitizeBounded(next.currentMl,0,capacity,Math.min(x.currentMl,capacity)),consumption:sanitizeBounded(next.consumption,0,1_000_000,x.consumption)};
+ })}))}
  function log(){
   if(!calc.valid||!dosingReady||current===undefined||targetCheck.blocked)return;
   if(targetCheck.level==="warn"&&!window.confirm(lang==="ar"?`${targetCheck.ar} هل تريد المتابعة ضمن المجال الآمن؟`:`${targetCheck.en} Continue within the safe range?`))return;
