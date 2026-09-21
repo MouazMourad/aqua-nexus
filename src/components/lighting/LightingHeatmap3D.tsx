@@ -102,8 +102,9 @@ function HeatScene({tank,minute,depthPct}:{tank:Tank;minute:number;depthPct:numb
 export function LightingHeatmap3D({tank,minute,depthPct}:{tank:Tank;minute:number;depthPct:number}){
  const intel=lightingIntelligence(tank);
  const currentCenterPar=estimatedParAt(tank,50,50,depthPct,minute);
+ const visual=compositeLightColor(tank,minute);
  const mode=intel.calibrationPoints?("calibrated ×"+intel.calibrationFactor.toFixed(2)):"estimated";
- return <div className="lighting-3d-wrap">
+ return <div className="lighting-3d-wrap" data-light-color={"#"+visual.color.getHexString()} data-light-intensity={visual.weightedPercent?.toFixed(1)??"0"}>
   <Canvas camera={{position:[3.5,2.4,5.1],fov:40}} dpr={[1,1.6]} gl={{antialias:true,powerPreference:"high-performance"}} onCreated={({gl})=>{gl.toneMapping=THREE.ACESFilmicToneMapping;gl.toneMappingExposure=1.1}}>
    <HeatScene tank={tank} minute={minute} depthPct={depthPct}/>
   </Canvas>
