@@ -12,6 +12,8 @@ export type FeatureDiscoveryState={
 const KEY="aqua-nexus-feature-discovery-v1";
 const EVENT="aqua-nexus-feature-discovery-change";
 
+export const FEATURE_DISCOVERY_TOTAL=12;
+
 const DEFAULT_STATE:FeatureDiscoveryState={mode:"smart",learned:[]};
 
 function safeState(raw:unknown):FeatureDiscoveryState{
