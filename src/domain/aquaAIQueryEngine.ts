@@ -118,8 +118,8 @@ export function answerAquaQuery(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswe
  const actions=reasoned.actions.filter(x=>plan.crossDomain||actionDomain(x.page)===plan.primary||plan.secondary.includes(actionDomain(x.page)));
  const topSignal=signals[0],topAction=actions[0];
  const noLivestock=tank.livestock.length===0;
- const noChemistry=tank.chemistry.length===0;
- const latestChem=tank.chemistry[0];
+ const measuredForAnswer=measuredChemistryReadings(tank);\n const noChemistry=measuredForAnswer.length===0;
+ const latestChem=measuredForAnswer[0];
  const latestChemAgeDays=latestChem?Math.max(0,(Date.now()-new Date(latestChem.timestamp).getTime())/86400000):Infinity;
  const activeEmergency=(tank.emergencySessions??[]).some(x=>x.status==="active");
  const activeAcclimation=(tank.acclimationSessions??[]).some(x=>x.status!=="completed");
