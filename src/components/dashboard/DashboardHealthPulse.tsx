@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect,useMemo,useState } from "react";
+import { measuredChemistryReadings } from "@/domain/chemistryDataQuality";
 import { createPortal } from "react-dom";
 import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
 import { bioload,chemistryAgeDays,chemistryHealth,maintenanceHealth,parameterScore,tankHealthTrend } from "@/domain/health";
