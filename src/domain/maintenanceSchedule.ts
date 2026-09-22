@@ -1,4 +1,4 @@
-import type { MaintenanceTask } from "./types";
+import type { MaintenanceTask } from "./types";\nimport { addLocalCalendarDays,localDateKey } from "./timeSafety";
 
 const DAY=86400000;
 
@@ -10,26 +10,22 @@ export function maintenanceIntervalDays(task:MaintenanceTask){
   return Math.max(1,task.intervalDays??CADENCE_DAYS[task.cadence]??30);
 }
 
-export function datePlusDays(dateOnly:string,offset:number){
-  const [y,m,d]=dateOnly.split("-").map(Number);
-  const date=new Date(Date.UTC(y,m-1,d+offset));
-  return date.toISOString().slice(0,10);
-}
+export function datePlusDays(dateOnly:string,offset:number){\n  return addLocalCalendarDays(dateOnly,offset);\n}
 
-export function maintenanceTaskDue(task:MaintenanceTask,atDate=new Date().toISOString().slice(0,10)){
+export function maintenanceTaskDue(task:MaintenanceTask,atDate=localDateKey()){
   if(task.cadence==="once")return !task.done&&Boolean(task.nextDue&&task.nextDue<=atDate);
   if(!task.nextDue)return !task.done;
   return task.nextDue<=atDate;
 }
 
-export function maintenanceTaskCompletedForCycle(task:MaintenanceTask,atDate=new Date().toISOString().slice(0,10)){
+export function maintenanceTaskCompletedForCycle(task:MaintenanceTask,atDate=localDateKey()){
   if(task.cadence==="once")return task.done;
   // A recurring task stops counting as complete when its next cycle becomes due,
   // even if an older persisted "done" flag still exists.
   return Boolean(task.done)&&!maintenanceTaskDue(task,atDate);
 }
 
-export function completeMaintenanceTask(task:MaintenanceTask,atDate=new Date().toISOString().slice(0,10)):MaintenanceTask{
+export function completeMaintenanceTask(task:MaintenanceTask,atDate=localDateKey()):MaintenanceTask{
   if(task.cadence==="once")return {...task,done:true,lastDone:atDate,checklistDone:task.checklist?.map((_,i)=>i)??task.checklistDone};
   return {
     ...task,
@@ -40,13 +36,13 @@ export function completeMaintenanceTask(task:MaintenanceTask,atDate=new Date().t
   };
 }
 
-export function maintenanceEffectiveState(task:MaintenanceTask,atDate=new Date().toISOString().slice(0,10)){
+export function maintenanceEffectiveState(task:MaintenanceTask,atDate=localDateKey()){
   const due=maintenanceTaskDue(task,atDate);
   const completed=maintenanceTaskCompletedForCycle(task,atDate);
   return {due,completed,pending:!completed,overdue:due&&Boolean(task.nextDue&&task.nextDue<atDate)};
 }
 
-export function recurringMaintenanceHealth(tasks:MaintenanceTask[],atDate=new Date().toISOString().slice(0,10)){
+export function recurringMaintenanceHealth(tasks:MaintenanceTask[],atDate=localDateKey()){
   if(!tasks.length)return 70;
   let points=0;
   for(const task of tasks){
