@@ -4,14 +4,16 @@ import type { Language } from "@/domain/types";
 import type { AppPage } from "@/components/navigation/MainNav";
 import { ACADEMY_LESSONS } from "@/data/academy";
 import { readAcademyProgress,subscribeAcademyProgress,type AcademyProgress } from "@/lib/academyProgress";
+import { useAquaStore } from "@/store/useAquaStore";
 
 export function AcademyDashboardEntry({lang,onNavigate}:{lang:Language;onNavigate:(p:AppPage)=>void}){
+ const experience=useAquaStore(s=>s.aquariumExperience);
  const [progress,setProgress]=useState<AcademyProgress>({completed:[]});
  useEffect(()=>{setProgress(readAcademyProgress());return subscribeAcademyProgress(setProgress)},[]);
  const pct=Math.round(progress.completed.length/ACADEMY_LESSONS.length*100);
  return <section className="academy-dashboard-entry">
   <div className="academy-dashboard-mark">🎓</div>
-  <div className="academy-dashboard-copy"><small>AQUA NEXUS ACADEMY</small><h3>{lang==="ar"?"تعلّم الحوض وافهم ليش البرنامج بيطلب هالمعلومة":"Learn the aquarium and why Aqua Nexus asks for each piece of data"}</h3><p>{lang==="ar"?"دورة قصيرة + قاموس مصطلحات + ربط مباشر بين العلم وكل صفحة داخل البرنامج.":"Short course + glossary + direct links between aquarium science and each Aqua Nexus page."}</p></div>
+  <div className="academy-dashboard-copy"><small>AQUA NEXUS ACADEMY • {experience==="beginner"?(lang==="ar"?"موصى فيه إلك":"RECOMMENDED"):experience==="advanced"?(lang==="ar"?"مرجع سريع + عمق متقدم":"QUICK REFERENCE + ADVANCED"):(lang==="ar"?"مسار تعلّم اختياري":"GUIDED LEARNING")}</small><h3>{lang==="ar"?"تعلّم الحوض وافهم ليش البرنامج بيطلب هالمعلومة":"Learn the aquarium and why Aqua Nexus asks for each piece of data"}</h3><p>{experience==="beginner"?(lang==="ar"?"ابدأ بالترتيب؛ كل درس قصير وبيوصلك مباشرة للمكان العملي بالبرنامج.":"Follow the path in order; each short lesson links directly to the practical feature."):experience==="advanced"?(lang==="ar"?"استخدم القاموس والدروس كمرجع، وافتح Advanced للتفاصيل الأعمق.":"Use lessons and glossary as reference; Advanced opens the deeper detail."):(lang==="ar"?"دورة قصيرة + قاموس مصطلحات + ربط مباشر بين العلم وكل صفحة داخل البرنامج.":"Short course + glossary + direct links between aquarium science and each Aqua Nexus page.")}</p></div>
   <div className="academy-dashboard-progress"><b>{progress.completed.length}/{ACADEMY_LESSONS.length}</b><span>{lang==="ar"?"درس مكتمل":"lessons complete"}</span><i><em style={{width:`${pct}%`}}/></i></div>
   <button className="btn primary" type="button" onClick={()=>onNavigate("academy")}>{lang==="ar"?"فتح Academy":"Open Academy"} ↗</button>
   <style jsx>{`
