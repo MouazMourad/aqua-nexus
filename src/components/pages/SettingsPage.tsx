@@ -31,7 +31,7 @@ function latestActivityMs(tanks:Tank[]){
  for(const t of tanks){
   take(t.createdAt);
   for(const rows of [t.chemistry,t.timeline,t.feeding,t.dosing,t.waterChanges,t.rodi,t.rodiServiceEvents??[],t.plantCare??[],t.livestockExits??[],t.deviceTelemetry??[],t.topOff??[],t.deviceAlerts??[]] as Array<Array<{timestamp:string}>>)for(const row of rows)take(row.timestamp);
-  for(const m of t.maintenance){take(m.lastDone);take(m.nextDue)}
+  for(const m of t.maintenance)take(m.lastDone);
   for(const q of t.quarantine){take(q.lastDoseAt);take(q.responseObservedAt)}
  }
  return latest;
