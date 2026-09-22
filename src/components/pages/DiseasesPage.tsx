@@ -6,7 +6,7 @@ import { useAquaStore } from "@/store/useAquaStore";
 import { tr,categoryText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ContextHint } from "@/components/ui/ContextHint";
-import { uid,today,nowISO } from "@/lib/appUtils";
+import { daysFrom,uid,today,nowISO } from "@/lib/appUtils";
 
 export function DiseasesPage({tank,onVisualInsight}:{tank:Tank;onVisualInsight?:()=>void}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),[group,setGroup]=useState("all"),[search,setSearch]=useState(""),[added,setAdded]=useState<string|null>(null),[subjectId,setSubjectId]=useState("");
@@ -16,7 +16,7 @@ export function DiseasesPage({tank,onVisualInsight}:{tank:Tank;onVisualInsight?:
  const filtered=useMemo(()=>diseaseEntriesFor(tank.type,group,search),[tank.type,group,search]);
 
  function addTreatment(x:any){
-  const due=new Date(Date.now()+2*86400000).toISOString().slice(0,10),subject=tank.livestock.find(y=>y.id===subjectId),ts=nowISO();
+  const due=daysFrom(today(),2),subject=tank.livestock.find(y=>y.id===subjectId),ts=nowISO();
   patch(tank.id,t=>({...t,
    livestock:subject?t.livestock.map(y=>y.id===subject.id?{...y,health:"treatment" as const,lastObservedAt:ts}:y):t.livestock,
    quarantine:subject?[{id:uid("q"),livestockId:subject.id,suspectedDiseaseId:x.id,symptoms:lang==="ar"?x.symAr:x.symEn,organism:subject.name,reason:lang==="ar"?x.ar:x.en,plan:lang==="ar"?x.txAr:x.txEn,start:today(),status:"active" as const},...t.quarantine]:t.quarantine,
