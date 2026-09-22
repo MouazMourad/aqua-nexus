@@ -14,11 +14,13 @@ import { sumpIntelligence } from "./sumpIntelligence";
 import { tankIntelligenceCore } from "./intelligenceCore";
 import { biologicalCycleStatus } from "./biologicalCycle";
 import { biologicalCycleKnowledgeSnapshot } from "./biologicalCycleKnowledge";
+import { measuredChemistryReadings } from "./chemistryDataQuality";
 
 export function buildAquaAIContext(tank:Tank){
  const vision=((tank as any).visionAssessments??[]).slice(0,5);
  const plans=((tank as any).aiActionPlans??[]).slice(0,5);
  const core=tankIntelligenceCore(tank);
+ const measuredChemistry=measuredChemistryReadings(tank);
  return {
   schemaVersion:2,
   generatedAt:new Date().toISOString(),
@@ -29,7 +31,7 @@ export function buildAquaAIContext(tank:Tank){
   state:core.state,
   mood:tankMood(tank),
   forecast:core.forecast,
-  chemistry:{latest:tank.chemistry[0]??null,recent:tank.chemistry.slice(0,10),baselines:tankBaselines(tank),predictions:proactivePredictions(tank),nutrients:analyzeNutrients(tank),guidance:chemistryGuidance(tank)},
+  chemistry:{latest:measuredChemistry[0]??null,recent:measuredChemistry.slice(0,10),baselines:tankBaselines(tank),predictions:proactivePredictions(tank),nutrients:analyzeNutrients(tank),guidance:chemistryGuidance(tank)},
   systemHealth:core.health,
   intelligence:{dataConfidence:core.dataConfidence,critical:core.critical,actions:core.actions,guidanceActions:(tank.guidanceActions??core.guidanceActions).filter(x=>x.status!=="resolved"&&x.status!=="verified"),recentEvents:(tank.intelligenceEvents??[]).slice(0,50),insights:core.insights,predictions:core.predictions,memory:core.memory},
   learningMaturity:tankLearningMaturity(tank),
