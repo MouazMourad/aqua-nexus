@@ -7,6 +7,8 @@ import { chemistryCatalogForTank } from "./chemistryProfile";
 import { equipmentAdequacy } from "./equipmentAdequacy";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
 import { sumpIntelligence } from "./sumpIntelligence";
+import { latestParameterSample } from "./chemistryDataQuality";
+import { localDateKey } from "./timeSafety";
 
 export interface AquaActionStep{ id:string; titleAr:string; titleEn:string; done:boolean; completedAt?:string; }
 export type AquaPlanMetricDirection="lower"|"higher"|"ideal-range";
@@ -23,15 +25,9 @@ export interface AquaActionPlan{
 }
 
 const uid=(p:string)=>`${p}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>localDateKey();
 
-function latestChemistry(tank:Tank,param:string){
- for(const reading of [...tank.chemistry].sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime())){
-  const value=reading.values[param];
-  if(typeof value==="number"&&Number.isFinite(value))return value;
- }
- return null;
-}
+function latestChemistry(tank:Tank,param:string){return latestParameterSample(tank,param)?.value??null;}
 function maintenanceOverdue(tank:Tank){return tank.maintenance.filter(x=>maintenanceEffectiveState(x,today()).overdue).length;}
 function quarantineConcern(tank:Tank){return tank.quarantine.filter(x=>x.status==="active"&&!["improved","resolved"].includes(String(x.outcome||""))).length;}
 function latestTdsOut(tank:Tank){

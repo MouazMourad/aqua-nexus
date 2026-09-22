@@ -1,11 +1,10 @@
+import { addLocalCalendarDays,localDateKey } from "@/domain/timeSafety";
 export const uid = (p = "id") => `${p}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;
 export const nowISO = () => new Date().toISOString();
-export const today = () => nowISO().slice(0,10);
+export const today = () => localDateKey();
 
 export function daysFrom(date: string | undefined, days: number) {
-  const d = new Date(date || Date.now());
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0,10);
+  return addLocalCalendarDays(date || today(),days);
 }
 
 export function downloadText(filename: string, content: string, type = "application/json") {

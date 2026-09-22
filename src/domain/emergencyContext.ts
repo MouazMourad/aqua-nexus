@@ -1,9 +1,10 @@
 import type { Tank } from "./types";
 import { sumpIntelligence } from "./sumpIntelligence";
 import { systemHealth } from "./systemHealth";
+import { currentChemistryValues } from "./chemistryDataQuality";
 
 export function emergencyContext(tank:Tank,scenarioId:string){
-  const latest=tank.chemistry[0]?.values??{};
+  const latest=currentChemistryValues(tank);
   const equipmentKinds=scenarioId==="power"?["returnPump","waveMaker","heater","ato"]:
     scenarioId==="pump"?["returnPump","waveMaker"]:
     scenarioId==="highTemp"||scenarioId==="lowTemp"?["heater","waveMaker","returnPump"]:

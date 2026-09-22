@@ -2,7 +2,7 @@
 
 ## Status
 
-**Version:** v0.3.0-rc.2  
+**Version:** v0.3.0-rc.3  
 **Stage:** Release Candidate / controlled testing  
 **Architecture:** Next.js + React + Three.js, local-first with optional PostgreSQL Device Backup
 
@@ -19,7 +19,7 @@ The current build includes:
 - 2D/3D sump builder and safety audit
 - Livestock, compatibility and bioload
 - Acclimation, parallel timers, distress exceptions, Coral Dip/Rinse
-- Chemistry and data-quality controls with strict measured-vs-reference evidence separation
+- Chemistry and data-quality controls with strict measured-vs-reference evidence separation and future-timestamp rejection
 - Maintenance guided checklists
 - Inventory and consumption
 - Disease / quarantine / treatment
@@ -50,6 +50,10 @@ Implemented:
 - streamed body-size enforcement
 - auditable high-risk override reasons
 - auditable Product / Tank Brain / Health Model / Chemistry Evidence versions stamped into new health history
+- retest-gated multi-step dosing with context invalidation
+- Restore preview + automatic destructive-action checkpoint + Undo
+- local-calendar due-date semantics
+- single-writer multi-tab protection at UI and persistence boundaries
 - document lang/dir synchronization
 - automated accessibility smoke
 - component extraction from Acclimation, Equipment and AI

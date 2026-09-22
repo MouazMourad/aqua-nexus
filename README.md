@@ -1,10 +1,10 @@
-# Aqua Nexus 3D — v0.3.0 RC.2
+# Aqua Nexus 3D — v0.3.0 RC.3
 
 Aqua Nexus is a local-first aquarium management platform for marine and freshwater systems. It combines tank setup, chemistry, livestock, acclimation, maintenance, equipment, Lighting Intelligence, sump, dosing, feeding, water changes, RO/DI, quarantine, emergencies, inventory, reports, long-term history and deterministic aquarium intelligence.
 
 ## Current release posture
 
-**v0.3.0-rc.2** is a Release Candidate for controlled testing.
+**v0.3.0-rc.3** is a Release Candidate for controlled testing.
 
 The product is intentionally **local-first**. Full JSON Recovery Backup is the authoritative portable recovery artifact. Experimental Device Backup exists only when the user explicitly enables it from Settings; it is not an account system and not multi-device sync.
 
@@ -15,6 +15,10 @@ The product is intentionally **local-first**. Full JSON Recovery Backup is the a
 - High-risk overrides require a written reason and are logged.
 - Meaningful Tank fields are covered by compile-time and runtime event contracts.
 - Chemistry reference/default values are never treated as measured evidence, never complete weekly tests, and never feed dosing/freshness decisions as measurements.
+- Future-dated operational records are rejected beyond a small clock-skew allowance.
+- Multi-step corrective dosing cannot advance without a real post-dose retest; stale plans invalidate when volume/context changes or the target is reached.
+- Destructive restore/delete actions create a local recovery checkpoint first, and Restore uses preview + explicit confirmation.
+- Browser editing is single-writer across tabs to prevent lost updates.
 - Numeric entry is validated at save boundaries, not only through HTML controls.
 - Health history is stamped with Tank Brain, Health Model and Chemistry Evidence versions for auditability.
 
@@ -67,8 +71,8 @@ See `ARCHITECTURE.md`, `ROADMAP.md`, and `MIGRATION_STATUS.md` for the current p
 
 ## Decision model versions
 
-- Tank Brain: **1.0.0**
+- Tank Brain: **1.1.0**
 - Health Model: **2.0.0**
-- Chemistry Evidence: **1.0.0**
+- Chemistry Evidence: **1.1.0**
 
 Model versions are centralized in `src/domain/version.ts` and stamped into new Health Snapshots.

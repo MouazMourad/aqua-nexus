@@ -1,4 +1,4 @@
-# Aqua Nexus Roadmap — v0.3.0 RC.2
+# Aqua Nexus Roadmap — v0.3.0 RC.3
 
 ## Complete in the current RC
 
@@ -30,6 +30,11 @@
 - Aqua Nexus Academy and contextual learning
 - Strict measured-vs-reference chemistry evidence contract
 - Auditable Tank Brain / Health / Chemistry Evidence model versions
+- Future timestamp rejection across operational import/recovery paths
+- Retest-gated multi-step dosing with plan invalidation on changed context
+- Recovery preview/checkpoint/undo for destructive operations
+- Local calendar due-date semantics
+- Single-writer multi-tab data-loss protection
 
 ## Current product policy
 

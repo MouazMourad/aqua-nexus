@@ -1,5 +1,6 @@
 import type { StateStorage } from "zustand/middleware";
 import { markDurableWrite,markPersistenceDegraded,markPersistenceFailed } from "@/lib/dataSafetyStatus";
+import { canWriteFromThisTab,notifyWriteConflict } from "@/lib/multiTabGuard";
 
 const DB_NAME="aqua-nexus-state-v1";
 const STORE="zustand";
@@ -119,6 +120,10 @@ export const aquaStateStorage:StateStorage={
     }
   },
   async setItem(name,value){
+    if(typeof window!=="undefined"&&!canWriteFromThisTab()){
+      notifyWriteConflict();
+      throw new Error("Aqua Nexus write blocked: another tab owns the writer lease");
+    }
     if(!hasIndexedDb()){
       if(localSet(name,value)){markPersistenceDegraded("IndexedDB unavailable; using localStorage fallback");return}
       markPersistenceFailed("Both IndexedDB and localStorage are unavailable. Recent changes may not survive reload.");

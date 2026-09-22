@@ -1,5 +1,6 @@
 import type { AquariumExperienceLevel,Language,Tank } from "./types";
 import { validateChemistryValues } from "./chemistryDataQuality";
+import { isPlausibleOperationalTimestamp } from "./timeSafety";
 
 export const CURRENT_BACKUP_SCHEMA=17;
 
@@ -38,7 +39,7 @@ function arraysAreArrays(tank:Record<string,unknown>){
 }
 
 function validTimestamp(value:unknown){
-  return typeof value==="string"&&value.length<=80&&Number.isFinite(new Date(value).getTime());
+  return typeof value==="string"&&value.length<=80&&isPlausibleOperationalTimestamp(value);
 }
 function duplicateId(items:unknown[]){
   const seen=new Set<string>();
@@ -75,7 +76,8 @@ function nestedDataIssue(tank:Record<string,unknown>){
   }
   for(const [i,row] of (((tank.dosing as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp))return `dosing #${i+1} is invalid`;
-    for(const key of ["amount","ml","perStep"]){
+    if(row.status!==undefined&&!["planned","in_progress","logged","invalidated"].includes(String(row.status)))return `dosing #${i+1} has an invalid status`;
+    for(const key of ["amount","ml","perStep","lastStepAmount"]){
       const value=row[key];
       if(value!==undefined&&(!finite(value)||Number(value)<0))return `dosing #${i+1} has an invalid ${key}`;
     }

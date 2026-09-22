@@ -20,6 +20,8 @@ import { isAquariumScopedQuestion,offTopicAquaAnswer } from "./aquaAIScope";
 import { tankLearningMaturity } from "./tankPatterns";
 import { formatLightMinute,lightingIntelligence } from "./lightingIntelligence";
 import { equipmentImportIntelligence } from "./equipmentImport";
+import { measuredChemistryReadings } from "./chemistryDataQuality";
+import { localDateKey } from "./timeSafety";
 
 export type AquaAIConfidence="low"|"medium"|"high";
 export type AquaAIPage="dashboard"|"chemistry"|"maintenance"|"equipment"|"lighting"|"livestock"|"timeline"|"dosing"|"quarantine"|"emergency"|"rodi"|"journal"|"acclimation"|"inventory"|"feeding"|"waterchange"|"expenses"|"sump"|"diseases"|"alerts";
@@ -76,14 +78,14 @@ function textParam(q:string):Param|undefined{
   return undefined;
 }
 function confidence(tank:Tank):AquaAIConfidence{
-  const readings=tank.chemistry.length;
+  const readings=measuredChemistryReadings(tank).length;
   const events=tank.timeline.length;
   if(readings>=5&&events>=8)return "high";
   if(readings>=2&&events>=3)return "medium";
   return "low";
 }
-function latestValue(tank:Tank,param:Param){return n(tank.chemistry[0]?.values?.[param]);}
-function previousValue(tank:Tank,param:Param){return n(tank.chemistry[1]?.values?.[param]);}
+function latestValue(tank:Tank,param:Param){return n(measuredChemistryReadings(tank)[0]?.values?.[param]);}
+function previousValue(tank:Tank,param:Param){return n(measuredChemistryReadings(tank)[1]?.values?.[param]);}
 function recentEvents(tank:Tank,days=14){
   const cutoff=Date.now()-days*DAY;
   return tank.timeline.filter(x=>new Date(x.timestamp).getTime()>=cutoff);
@@ -151,8 +153,8 @@ function parameterAnswer(tank:Tank,param:Param):AquaAIAnswer{
     summaryAr:guidance?(guidance.suspectedFormat?`في قراءة ${param} مشكلة تنسيق محتملة ويجب تصحيح البيانات قبل تعديل الحوض.`:`${guidance.reasonAr} ${guidance.actionAr}`):(prediction?`يوجد نمط قابل للقياس لـ ${param} ويمكن استخدامه للتنبؤ المبكر.`:`يمكن وصف اتجاه ${param} حالياً، لكن التنبؤ الشخصي يتحسن مع المزيد من القراءات.`),
     summaryEn:guidance?(guidance.suspectedFormat?`The ${param} reading may be misformatted; correct the data before changing the tank.`:`${guidance.reasonEn} ${guidance.actionEn}`):(prediction?`There is a measurable ${param} pattern that can support an early forecast.`:`I can describe the current ${param} direction; personalized forecasting improves with more readings.`),
     detailsAr,detailsEn,
-    evidenceAr:[`${tank.chemistry.length} قراءة كيميائية`,`${links.length} ارتباط حدث قريب`,`${doses.length} جرعات مسجلة`],
-    evidenceEn:[`${tank.chemistry.length} chemistry readings`,`${links.length} nearby event link(s)`,`${doses.length} logged doses`],
+    evidenceAr:[`${measuredChemistryReadings(tank).length} قراءة كيميائية`,`${links.length} ارتباط حدث قريب`,`${doses.length} جرعات مسجلة`],
+    evidenceEn:[`${measuredChemistryReadings(tank).length} chemistry readings`,`${links.length} nearby event link(s)`,`${doses.length} logged doses`],
     confidence:confidence(tank),
     action:["KH","Ca","Mg"].includes(param)?{page:"dosing",ar:"افتح الجرعات والحاسبة",en:"Open dosing & calculator"}:{page:"chemistry",ar:"افتح الكيمياء",en:"Open chemistry"}
   };
@@ -181,14 +183,14 @@ function forecastAnswer(tank:Tank):AquaAIAnswer{
     summaryAr:f.ar,summaryEn:f.en,
     detailsAr:pred.length?pred.slice(0,4).map(x=>x.ar):["لا يوجد حالياً نمط استهلاك أو هبوط ثابت بما يكفي لبناء تنبؤ كيميائي شخصي موثوق."],
     detailsEn:pred.length?pred.slice(0,4).map(x=>x.en):["There is not yet a stable enough depletion pattern for a reliable personalized chemistry forecast."],
-    evidenceAr:[`${tank.healthSnapshots?.length??0} نقاط حالة محفوظة`,`${tank.chemistry.length} قراءات كيميائية`],
-    evidenceEn:[`${tank.healthSnapshots?.length??0} saved state points`,`${tank.chemistry.length} chemistry readings`],
+    evidenceAr:[`${tank.healthSnapshots?.length??0} نقاط حالة محفوظة`,`${measuredChemistryReadings(tank).length} قراءات كيميائية`],
+    evidenceEn:[`${tank.healthSnapshots?.length??0} saved state points`,`${measuredChemistryReadings(tank).length} chemistry readings`],
     confidence:f.confidence,action:nextBestAction(tank)
   };
 }
 
 function maintenanceAnswer(tank:Tank):AquaAIAnswer{
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDateKey();
   const due=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).due);
   const upcoming=tank.maintenance.filter(x=>!maintenanceEffectiveState(x,today).completed&&x.nextDue&&x.nextDue>today).sort((a,b)=>String(a.nextDue).localeCompare(String(b.nextDue))).slice(0,3);
   return {
@@ -326,7 +328,7 @@ function multiParameterAnswer(tank:Tank,params:AquaQuestionParam[]):AquaAIAnswer
     summaryAr:top?`الأولوية الآن: ${top.titleAr}. ${top.actionAr}`:"لا توجد بيانات كافية للقيم المطلوبة.",
     summaryEn:top?`Current priority: ${top.titleEn}. ${top.actionEn}`:"There is not enough data for the requested parameters.",
     detailsAr:detailsAr.length?detailsAr:["لا توجد بيانات كافية حالياً."],detailsEn:detailsEn.length?detailsEn:["There is not enough data yet."],
-    evidenceAr:[`${tank.chemistry.length} قراءات كيميائية`,`${params.length} عوامل مطلوبة`],evidenceEn:[`${tank.chemistry.length} chemistry readings`,`${params.length} requested parameters`],
+    evidenceAr:[`${measuredChemistryReadings(tank).length} قراءات كيميائية`,`${params.length} عوامل مطلوبة`],evidenceEn:[`${measuredChemistryReadings(tank).length} chemistry readings`,`${params.length} requested parameters`],
     confidence:confidence(tank),action:{page:"chemistry",ar:"افتح الكيمياء والتفاصيل",en:"Open chemistry details"}
   };
 }
@@ -447,8 +449,8 @@ function chemistryOverviewAnswer(tank:Tank):AquaAIAnswer{
       ...top.filter(x=>x!==dataIssue).slice(0,4).map(x=>`${x.reasonEn} Action: ${x.actionEn}`),
       guide.agePenalty>0?`Note: ${guide.agePenalty} points are deducted because the latest reading is old.`:""
     ].filter(Boolean),
-    evidenceAr:[`${tank.chemistry.length} قراءات كيميائية`,`صحة الكيمياء ${guide.health}%`],
-    evidenceEn:[`${tank.chemistry.length} chemistry readings`,`${guide.health}% chemistry health`],
+    evidenceAr:[`${measuredChemistryReadings(tank).length} قراءات كيميائية`,`صحة الكيمياء ${guide.health}%`],
+    evidenceEn:[`${measuredChemistryReadings(tank).length} chemistry readings`,`${guide.health}% chemistry health`],
     confidence:confidence(tank),
     action:first?{page:"chemistry",ar:first.actionAr,en:first.actionEn}:{page:"chemistry",ar:"استمر بالمراقبة وسجّل القراءة القادمة",en:"Keep monitoring and log the next reading"}
   };

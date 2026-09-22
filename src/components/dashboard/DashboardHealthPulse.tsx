@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect,useMemo,useState } from "react";
+import { measuredChemistryReadings } from "@/domain/chemistryDataQuality";
 import { createPortal } from "react-dom";
 import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
 import { bioload,chemistryAgeDays,chemistryHealth,maintenanceHealth,parameterScore,tankHealthTrend } from "@/domain/health";
@@ -8,6 +9,7 @@ import { systemHealth } from "@/domain/systemHealth";
 import { tankStateView } from "@/domain/tankIntelligence";
 import { chemistryGuidance } from "@/domain/chemistryGuidance";
 import { useAquaStore } from "@/store/useAquaStore";
+import { today } from "@/lib/appUtils";
 
 type HealthTone="excellent"|"stable"|"watch"|"stressed"|"critical";
 type FocusKind="chemistry"|"maintenance"|"equipment"|"bioload";
@@ -70,12 +72,13 @@ export function DashboardHealthPulse(){
     if(!tank||!state)return null;
 
     const catalog=CHEMISTRY_CATALOG[tank.type] as Record<string,{label:string;ideal:readonly [number,number];safe:readonly [number,number];weight:number}>;
-    const latest=tank.chemistry[0];
-    const previous=tank.chemistry[1];
+    const measuredChemistry=measuredChemistryReadings(tank);
+    const latest=measuredChemistry[0];
+    const previous=measuredChemistry[1];
     const age=chemistryAgeDays(tank);
     const bio=bioload(tank);
-    const today=new Date().toISOString().slice(0,10);
-    const overdue=tank.maintenance.filter(item=>!item.done&&item.nextDue&&item.nextDue<=today);
+    const todayKey=today();
+    const overdue=tank.maintenance.filter(item=>!item.done&&item.nextDue&&item.nextDue<=todayKey);
     const equipmentWarnings=tank.equipment.filter(item=>item.status==="warning"||item.status==="service");
     const livestockWarnings=tank.livestock.filter(item=>item.health==="watch"||item.health==="treatment");
     const activeAcclimation=(tank.acclimationSessions??[]).some(session=>session.status!=="completed");
@@ -120,7 +123,7 @@ export function DashboardHealthPulse(){
     }
 
     if(!latest)actions.push({ar:"سجّل فحص كيمياء كامل الآن؛ ما في قراءة حديثة يمكن الاعتماد عليها.",en:"Log a complete chemistry test now; there is no current reading to rely on.",focus:"chemistry",urgent:state.band==="critical"});
-    else if(age>7)actions.push({ar:`أعد فحص الكيمياء اليوم؛ آخر قراءة عمرها ${Math.floor(age)} يوم.`,en:`Retest chemistry today; the latest reading is ${Math.floor(age)} days old.`,focus:"chemistry",urgent:state.band==="critical"});
+    else if(age>7)actions.push({ar:`أعد فحص الكيمياء اليوم؛ آخر قراءة عمرها ${Math.floor(age)} يوم.`,en:`Retest chemistry todayKey; the latest reading is ${Math.floor(age)} days old.`,focus:"chemistry",urgent:state.band==="critical"});
 
     if(chemistryAdvice.dataIssues.length){
       const issue=chemistryAdvice.dataIssues[0];

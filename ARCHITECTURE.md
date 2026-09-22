@@ -1,4 +1,4 @@
-# Aqua Nexus 3D — Architecture (v0.3.0-rc.2)
+# Aqua Nexus 3D — Architecture (v0.3.0-rc.3)
 
 ## Product posture
 Aqua Nexus is a local-first Release Candidate for controlled testing. Accounts and full cloud sync are intentionally outside the current acceptance scope.
@@ -51,10 +51,10 @@ A hard chemistry safety violation overrides the descriptive band so a chemically
 Central source: `src/domain/version.ts`.
 
 Current versions:
-- Product: **0.3.0-rc.2**
-- Tank Brain: **1.0.0**
+- Product: **0.3.0-rc.3**
+- Tank Brain: **1.1.0**
 - Health Model: **2.0.0**
-- Chemistry Evidence: **1.0.0**
+- Chemistry Evidence: **1.1.0**
 
 New Health Snapshots store the model versions used at calculation time, preserving auditability when algorithms evolve.
 
@@ -70,6 +70,14 @@ The 3D scene is generated from real tank state:
 - flow/system layout.
 
 Procedural Three.js models can later be replaced by GLB/GLTF assets without changing the domain model.
+
+## Data integrity hardening
+- All decision-facing chemistry consumers use the canonical measured-chemistry evidence API instead of array position.
+- Operational timestamps beyond the allowed clock-skew window are rejected from chemistry/import/recovery paths.
+- Due-date semantics use local calendar dates; event timestamps remain ISO/UTC.
+- Multi-step corrective dosing requires a measured retest after each executed step and recalculates the next step from that evidence; changed system volume or unsafe response invalidates the plan.
+- Recovery restore uses preview, explicit confirmation, automatic pre-action checkpoint and one-step rollback.
+- Local browser persistence enforces a single-writer tab lease to prevent last-write-wins data loss.
 
 ## Data and history
 Operational state is local-first. Large media and historical overflow are stored outside the hot Tank JSON. Full Recovery Backup validates structure and fails closed rather than exporting a knowingly incomplete recovery artifact.

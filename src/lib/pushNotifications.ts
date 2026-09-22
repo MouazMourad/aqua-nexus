@@ -5,6 +5,7 @@ import { maintenanceEffectiveState } from "@/domain/maintenanceSchedule";
 import { biologicalCycleStatus } from "@/domain/biologicalCycle";
 import { aquaWorkspaceHeaders,getAquaDeviceId } from "@/lib/anonymousWorkspace";
 import { activeVacation,isTankArchived } from "@/domain/tankLifecycle";
+import { latestMeasuredChemistryReading } from "@/domain/chemistryDataQuality";
 
 const FALLBACK_VAPID_PUBLIC_KEY="BD9A5jEWZLVFsG8PGXEIZyM4OCv1H4QHOJyXTi26-AyWb8Cm-b9q0wuQZiMG4SVAdoQYsrMGu5SBPcmsxu1_c20";
 
@@ -58,7 +59,7 @@ function backgroundAlertState(t:Tank){
     .filter(x=>x.nextDoseAt)
     .sort((a,b)=>new Date(a.nextDoseAt!).getTime()-new Date(b.nextDoseAt!).getTime())[0];
   return {
-    lastChemistryAt:t.chemistry[0]?.timestamp??null,
+    lastChemistryAt:latestMeasuredChemistryReading(t)?.timestamp??null,
     maintenanceTasks:t.maintenance.filter(x=>!maintenanceEffectiveState(x).completed).slice(0,30).map(x=>({id:x.id,title:x.title,titleEn:x.titleEn??x.title,nextDue:x.nextDue??null})),
     treatmentCount:t.livestock.filter(x=>x.health==="treatment").reduce((sum,x)=>sum+Math.max(1,x.quantity),0),
     watchCount:t.livestock.filter(x=>x.health==="watch").reduce((sum,x)=>sum+Math.max(1,x.quantity),0),

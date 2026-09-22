@@ -1,10 +1,11 @@
 import type { Tank } from "./types";
 import type { AquaAIAnswer,AquaAIPage } from "./aquaAIBrain";
 import type { AquaAIQueryPlan } from "./aquaAIQueryPlan";
+import { latestMeasuredChemistryReading } from "./chemistryDataQuality";
 
 export function latestTankAnswer(tank:Tank,plan:AquaAIQueryPlan):AquaAIAnswer|undefined{
  if(plan.primary==="chemistry"){
-  const row=tank.chemistry[0];
+  const row=latestMeasuredChemistryReading(tank);
   if(!row)return {titleAr:"آخر قراءة كيميائية",titleEn:"Latest chemistry reading",summaryAr:"ما في قراءة كيميائية مسجلة لسا.",summaryEn:"No chemistry reading has been logged yet.",detailsAr:[],detailsEn:[],evidenceAr:["سجل الكيمياء فارغ"],evidenceEn:["Chemistry log is empty"],confidence:"high",action:{page:"chemistry",ar:"سجّل قراءة جديدة",en:"Log a new reading"}};
   const entries=Object.entries(row.values).filter(([,v])=>typeof v==="number");
   return {titleAr:"آخر قراءة كيميائية",titleEn:"Latest chemistry reading",summaryAr:`آخر فحص مسجل بتاريخ ${new Date(row.timestamp).toLocaleString()}.`,summaryEn:`Latest test was logged on ${new Date(row.timestamp).toLocaleString()}.`,detailsAr:entries.map(([k,v])=>`${k}: ${v}`),detailsEn:entries.map(([k,v])=>`${k}: ${v}`),evidenceAr:["من آخر سجل كيمياء بالحوض"],evidenceEn:["From the latest tank chemistry log"],confidence:"high",action:{page:"chemistry",ar:"افتح سجل الكيمياء",en:"Open chemistry log"}};

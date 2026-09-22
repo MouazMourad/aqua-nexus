@@ -6,6 +6,7 @@ import type { AppPage } from "@/components/navigation/MainNav";
 import { useAquaStore } from "@/store/useAquaStore";
 import { healthTimeline,tankStateScore } from "@/domain/tankIntelligence";
 import { TrainingChallenge } from "@/components/dashboard/TrainingChallenge";
+import { localDateKey } from "@/domain/timeSafety";
 
 type Mission={
  id:string;
@@ -25,7 +26,7 @@ export function TrainingCoach({tank,onNavigate}:{tank:Tank;onNavigate:(page:AppP
 
  const started=tank.trainingStartedAt?new Date(tank.trainingStartedAt):new Date(tank.createdAt);
  const startedMs=Number.isFinite(started.getTime())?started.getTime():Date.now();
- const startDate=new Date(startedMs).toISOString().slice(0,10);
+ const startDate=localDateKey(new Date(startedMs));
  const chemistryDone=tank.chemistry.some(r=>new Date(r.timestamp).getTime()>startedMs+1000);
  const maintenanceDone=tank.maintenance.some(m=>Boolean(m.lastDone)&&String(m.lastDone)>=startDate);
  const waterChangeDone=tank.waterChanges.some(w=>new Date(w.timestamp).getTime()>startedMs+1000);

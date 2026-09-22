@@ -718,3 +718,30 @@ test("Academy contextual shortcut deep-links from Chemistry and glossary finds P
   await expect(terms).toHaveCount(1);
   await expect(terms.first()).toContainText("PAR");
 });
+
+
+test("second browser tab is read-only while the first tab owns the writer lease",async({page})=>{
+  await openTrainingDashboard(page);
+  await page.waitForTimeout(600);
+  const second=await page.context().newPage();
+  await second.goto("/");
+  await expect(second.getByText(/Aqua Nexus مفتوح بتبويب آخر|Aqua Nexus is open in another tab/)).toBeVisible({timeout:10_000});
+  await expect(second.getByRole("button",{name:/إعادة تحميل أحدث بيانات|Reload latest data/})).toBeVisible();
+  await second.close();
+});
+
+test("recovery import shows a preview before changing data",async({page})=>{
+  await openTrainingDashboard(page);
+  await goToPage(page,"settings");
+  const downloadPromise=page.waitForEvent("download");
+  await page.getByRole("button",{name:/إنشاء Full Recovery Backup|Create Full Recovery Backup/}).click();
+  const download=await downloadPromise;
+  const path=await download.path();
+  expect(path).toBeTruthy();
+  const input=page.locator('input[type="file"][accept*="json"]').first();
+  await input.setInputFiles(path!);
+  await expect(page.getByText(/معاينة الاستعادة|Restore preview/)).toBeVisible({timeout:10_000});
+  await expect(page.getByRole("button",{name:/تأكيد الاستعادة|Confirm restore/})).toBeVisible();
+  await page.getByRole("button",{name:/إلغاء|Cancel/}).last().click();
+  await expect(page.getByText(/معاينة الاستعادة|Restore preview/)).toBeHidden();
+});

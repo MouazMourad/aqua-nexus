@@ -1,5 +1,6 @@
 import type { ChemistryReading,Tank } from "./types";
 import { chemistryCatalogForTank,resolvedAquariumProfile } from "./chemistryProfile";
+import { isPlausibleOperationalTimestamp } from "./timeSafety";
 
 const DAY=86400000;
 export interface ParameterSample{key:string;value:number;timestamp:string;ageDays:number;confidence:"high"|"medium"|"low";source:"manual"|"import"|"device";testKit?:string;}
@@ -52,13 +53,20 @@ export function isExactChemistryDuplicate(existing:ChemistryReading[],candidate:
  });
 }
 
+export function measuredChemistryReadings(tank:Tank){
+ return tank.chemistry
+  .filter(r=>!r.usingDefaults&&isPlausibleOperationalTimestamp(r.timestamp))
+  .sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime());
+}
+export function latestMeasuredChemistryReading(tank:Tank){return measuredChemistryReadings(tank)[0];}
+export function previousMeasuredChemistryReading(tank:Tank){return measuredChemistryReadings(tank)[1];}
+
 export function latestParameterSample(tank:Tank,key:string):ParameterSample|undefined{
  let best:ChemistryReading|undefined;
  // Reference/default values are never measurement evidence. This single gate
  // protects health, dosing, freshness, AI context and any caller using the
  // canonical latest-parameter helper.
- for(const r of tank.chemistry){
-  if(r.usingDefaults)continue;
+ for(const r of measuredChemistryReadings(tank)){
   const v=r.values?.[key];
   if(typeof v!=="number"||!Number.isFinite(v))continue;
   if(!best||new Date(r.timestamp).getTime()>new Date(best.timestamp).getTime())best=r;
@@ -88,7 +96,7 @@ export function requiredWeeklyChemistryKeys(tank:Tank){
 
 export function weeklyChemistryCoverage(tank:Tank,extra:ChemistryReading[]=[]){
  const required=requiredWeeklyChemistryKeys(tank),cutoff=Date.now()-7*DAY,readings=[...extra,...tank.chemistry],measured=new Set<string>();
- for(const r of readings){if(r.usingDefaults||new Date(r.timestamp).getTime()<cutoff)continue;for(const key of required){const v=r.values?.[key];if(typeof v==="number"&&Number.isFinite(v))measured.add(key);}}
+ for(const r of readings){if(r.usingDefaults||!isPlausibleOperationalTimestamp(r.timestamp)||new Date(r.timestamp).getTime()<cutoff)continue;for(const key of required){const v=r.values?.[key];if(typeof v==="number"&&Number.isFinite(v))measured.add(key);}}
  const missing=required.filter(k=>!measured.has(k));return {required,measured:[...measured],missing,complete:missing.length===0};
 }
 

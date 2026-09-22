@@ -12,9 +12,10 @@ import { inventoryForConsumer } from "@/domain/inventoryIntelligence";
 import { interventionGate } from "@/domain/interventionSafety";
 import { useSafetyOverrideDialog } from "@/components/ui/SafetyOverrideDialog";
 import { validatePositiveQuantity,validateTreatmentSetup } from "@/domain/inputSanity";
+import { localDateKey } from "@/domain/timeSafety";
 
 function addHoursISO(hours:number){return new Date(Date.now()+Math.max(1,hours)*3600000).toISOString();}
-function dateOnly(iso?:string){return iso?new Date(iso).toISOString().slice(0,10):today();}
+function dateOnly(iso?:string){return iso?localDateKey(new Date(iso)):today();}
 
 export function QuarantinePage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);

@@ -1,4 +1,5 @@
 import type { Tank } from "./types";
+import { currentChemistryValues } from "./chemistryDataQuality";
 
 export function feedingIntelligence(tank:Tank){
   const cutoff=Date.now()-7*86400000;
@@ -7,7 +8,7 @@ export function feedingIntelligence(tank:Tank){
   const inverts=tank.livestock.filter(x=>x.category==="invert").reduce((s,x)=>s+x.quantity,0);
   const corals=tank.livestock.filter(x=>x.category==="coral").reduce((s,x)=>s+x.quantity,0);
   const plants=tank.livestock.filter(x=>x.category==="plant").reduce((s,x)=>s+x.quantity,0);
-  const latest=tank.chemistry[0]?.values??{};
+  const latest=currentChemistryValues(tank);
   const no3=typeof latest.NO3==="number"?latest.NO3:null;
   const po4=typeof latest.PO4==="number"?latest.PO4:null;
   const nutrientPressure=tank.type==="marine"

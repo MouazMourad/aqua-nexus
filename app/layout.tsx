@@ -15,6 +15,7 @@ import { DashboardCommandCollapse } from "@/components/dashboard/DashboardComman
 import { PhotoStorageBridge } from "@/components/PhotoStorageBridge";
 import { DocumentLocaleSync } from "@/components/DocumentLocaleSync";
 import { DataSafetyBanner } from "@/components/DataSafetyBanner";
+import { MultiTabGuard } from "@/components/MultiTabGuard";
 
 export const metadata: Metadata = {
   title: "Aqua Nexus 3D",
@@ -33,7 +34,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ar" dir="rtl">
-      <body><DocumentLocaleSync/><DataSafetyBanner/><PWARegister/><PushReminderSync/><CloudSyncBridge/><PhotoStorageBridge/><DashboardCommandCollapse/>{children}</body>
+      <body><DocumentLocaleSync/><MultiTabGuard/><DataSafetyBanner/><PWARegister/><PushReminderSync/><CloudSyncBridge/><PhotoStorageBridge/><DashboardCommandCollapse/>{children}</body>
     </html>
   );
 }

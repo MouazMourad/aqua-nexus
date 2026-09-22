@@ -4,6 +4,7 @@ import type {
 import { autoMatchImportedDevice,type EquipmentImportCandidate } from "./equipmentImport";
 import { createDefaultConsumables } from "./equipmentLifecycle";
 import { validateChemistryValues } from "./chemistryDataQuality";
+import { isPlausibleOperationalTimestamp } from "./timeSafety";
 
 export interface EquipmentImportApplyMeta{
   importId:string;
@@ -118,6 +119,7 @@ export function prepareEquipmentImportApplication(tank:Tank,candidate:EquipmentI
   const chemistryGroups=new Map<string,Array<typeof candidate.measurements[number]>>();
   const telemetryImported:DeviceTelemetryLog[]=[];
   for(const row of candidate.measurements.filter(x=>x.enabled)){
+    if(!isPlausibleOperationalTimestamp(row.timestamp)){blockedIssues.push({ar:"تم حجب سجل جهاز لأن توقيته بالمستقبل بشكل غير منطقي.",en:"A device record was blocked because its timestamp is implausibly in the future."});continue}
     if(row.destination==="chemistry"){
       const key=row.timestamp;
       const group=chemistryGroups.get(key)??[];
@@ -156,6 +158,7 @@ export function prepareEquipmentImportApplication(tank:Tank,candidate:EquipmentI
 
   const dosingImported:DosingLog[]=[];
   for(const row of candidate.doses.filter(x=>x.enabled&&x.ml>0)){
+    if(!isPlausibleOperationalTimestamp(row.timestamp)){blockedIssues.push({ar:"تم حجب جرعة مستوردة لأن توقيتها بالمستقبل.",en:"An imported dose was blocked because its timestamp is in the future."});continue}
     const sourceRecordId=row.sourceRecordId??stableId("dose",row.timestamp,row.parameter,row.ml,row.deviceName);
     if(dosingExistingKeys.has(sourceRecordId)){skippedDuplicates++;continue}
     dosingImported.push({
@@ -168,6 +171,7 @@ export function prepareEquipmentImportApplication(tank:Tank,candidate:EquipmentI
 
   const topOffImported:TopOffLog[]=[];
   for(const row of candidate.topOff.filter(x=>x.enabled&&x.liters>0)){
+    if(!isPlausibleOperationalTimestamp(row.timestamp)){blockedIssues.push({ar:"تم حجب سجل ATO لأن توقيته بالمستقبل.",en:"An imported ATO record was blocked because its timestamp is in the future."});continue}
     const sourceRecordId=row.sourceRecordId??stableId("ato",row.timestamp,row.liters,row.deviceName);
     if(topOffExistingKeys.has(sourceRecordId)){skippedDuplicates++;continue}
     topOffImported.push({
@@ -178,6 +182,7 @@ export function prepareEquipmentImportApplication(tank:Tank,candidate:EquipmentI
 
   const alertsImported:ExternalDeviceAlert[]=[];
   for(const row of candidate.alerts.filter(x=>x.enabled)){
+    if(!isPlausibleOperationalTimestamp(row.timestamp)){blockedIssues.push({ar:"تم حجب تنبيه جهاز لأن توقيته بالمستقبل.",en:"An imported device alert was blocked because its timestamp is in the future."});continue}
     const sourceRecordId=row.sourceRecordId??stableId("alert",row.timestamp,row.message,row.deviceName);
     if(alertExistingKeys.has(sourceRecordId)){skippedDuplicates++;continue}
     alertsImported.push({

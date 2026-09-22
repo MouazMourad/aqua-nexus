@@ -5,6 +5,7 @@ import { mediaPredictions } from "./mediaPredictor";
 import { learnedTankSignals } from "./tankPatterns";
 import { proactivePredictions } from "./tankLearning";
 import { systemHealth } from "./systemHealth";
+import { measuredChemistryReadings } from "./chemistryDataQuality";
 
 export interface SmartInsight {
   level: "info"|"good"|"warn"|"danger";
@@ -14,8 +15,8 @@ export interface SmartInsight {
 
 export function smartInsights(tank: Tank): SmartInsight[] {
   const out: SmartInsight[] = [];
-  const latest = tank.chemistry[0]?.values ?? {};
-  const measuredChemistry = tank.chemistry.filter(x=>!x.usingDefaults);
+  const measuredChemistry = measuredChemistryReadings(tank);
+  const latest = measuredChemistry[0]?.values ?? {};
   const age = chemistryAgeDays(tank);
   const trend = tankHealthTrend(tank);
   const bio = bioload(tank);
@@ -43,8 +44,8 @@ export function smartInsights(tank: Tank): SmartInsight[] {
   }
   if(activePlan)out.push({level:"info",ar:`في خطة متابعة نشطة من Aqua AI: ${activePlan.titleAr} (${activePlan.steps.filter((x:any)=>x.done).length}/${activePlan.steps.length}).`,en:`An Aqua AI follow-up plan is active: ${activePlan.titleEn} (${activePlan.steps.filter((x:any)=>x.done).length}/${activePlan.steps.length}).`});
 
-  if (tank.chemistry.length >= 2) {
-    const newer=tank.chemistry[0],older=tank.chemistry[1];
+  if (measuredChemistry.length >= 2) {
+    const newer=measuredChemistry[0],older=measuredChemistry[1];
     const n0=newer.values.NO3,n1=older.values.NO3;
     const newerAt=new Date(newer.timestamp).getTime(),olderAt=new Date(older.timestamp).getTime();
     const relatedAdd=typeof n0==="number"&&typeof n1==="number"&&Number.isFinite(newerAt)&&Number.isFinite(olderAt)

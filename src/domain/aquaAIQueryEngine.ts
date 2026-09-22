@@ -15,6 +15,8 @@ import { feedingIntelligence } from "./feedingIntelligence";
 import { rodiIntelligence } from "./rodiIntelligence";
 import { sumpIntelligence } from "./sumpIntelligence";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
+import { measuredChemistryReadings } from "./chemistryDataQuality";
+import { localDateKey } from "./timeSafety";
 
 function actionDomain(page:string):AquaDomain{
  if(page==="chemistry")return "chemistry";
@@ -48,9 +50,10 @@ function domainTitle(domain:AquaDomain,lang:"ar"|"en"){
 
 function snapshot(tank:Tank,plan:AquaAIQueryPlan){
  const core=tankIntelligenceCore(tank);
+ const measuredChemistry=measuredChemistryReadings(tank);
  const guide=chemistryGuidance(tank),bio=core.bioload,state=core.state,maint=core.maintenance;
  const system=core.health;
- const today=new Date().toISOString().slice(0,10);
+ const today=localDateKey();
  const due=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).due);
  const warnings=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
  const watch=tank.livestock.filter(x=>x.health==="watch"||x.health==="treatment");
@@ -60,7 +63,7 @@ function snapshot(tank:Tank,plan:AquaAIQueryPlan){
  switch(plan.primary){
   case "chemistry":{
    const top=guide.problems.slice(0,4);
-   return {ar:`صحة الكيمياء ${guide.health}%. ${top[0]?`أهم ملاحظة: ${top[0].reasonAr}`:"ما في مشكلة رئيسية واضحة بالقراءات الحالية."}`,en:`Chemistry health is ${guide.health}%. ${top[0]?`Main note: ${top[0].reasonEn}`:"No major issue is obvious in the current readings."}`,dar:top.map(x=>`${x.reasonAr} الإجراء: ${x.actionAr}`),den:top.map(x=>`${x.reasonEn} Action: ${x.actionEn}`),ear:[`${tank.chemistry.length} قراءات كيميائية`,`صحة الكيمياء ${guide.health}%`],een:[`${tank.chemistry.length} chemistry readings`,`${guide.health}% chemistry health`]};
+   return {ar:`صحة الكيمياء ${guide.health}%. ${top[0]?`أهم ملاحظة: ${top[0].reasonAr}`:"ما في مشكلة رئيسية واضحة بالقراءات الحالية."}`,en:`Chemistry health is ${guide.health}%. ${top[0]?`Main note: ${top[0].reasonEn}`:"No major issue is obvious in the current readings."}`,dar:top.map(x=>`${x.reasonAr} الإجراء: ${x.actionAr}`),den:top.map(x=>`${x.reasonEn} Action: ${x.actionEn}`),ear:[`${measuredChemistry.length} قراءات كيميائية`,`صحة الكيمياء ${guide.health}%`],een:[`${measuredChemistry.length} chemistry readings`,`${guide.health}% chemistry health`]};
   }
   case "bioload":
    return {ar:`الحمل الحيوي الحالي حوالي ${Math.round(bio.ratio*100)}% من القدرة التقديرية، ومكوّن الحمل ضمن الصحة العامة تقييمه ${system.bioload}%.`,en:`Current bioload is about ${Math.round(bio.ratio*100)}% of estimated capacity, and the bioload component contributes ${system.bioload}% to system health.`,dar:[`الحمل المحسوب ${Number(bio.load.toFixed(1))} من قدرة تقديرية ${Number((tank.systemVolumeLiters/35).toFixed(1))} وحدة.`,`توافق الكائنات ${system.compatibility}% لأن الحمل ما بينقرأ بمعزل عن التوافق.`,`NO3/PO4: ${nutrients.signals.find(x=>x.level!=="good")?.ar||"ما في إشارة خطر واضحة من التوازن الحالي."}`],den:[`Calculated load ${Number(bio.load.toFixed(1))} of an estimated ${Number((tank.systemVolumeLiters/35).toFixed(1))} units.`,`Livestock compatibility is ${system.compatibility}% because load is not evaluated in isolation.`,`NO3/PO4: ${nutrients.signals.find(x=>x.level!=="good")?.en||"No clear risk signal from the current balance."}`],ear:[`الصحة العامة ${system.score}%`,`الحمل الحيوي ${system.bioload}%`,`التوافق ${system.compatibility}%`],een:[`Overall health ${system.score}%`,`Bioload ${system.bioload}%`,`Compatibility ${system.compatibility}%`]};
@@ -115,8 +118,9 @@ export function answerAquaQuery(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswe
  const actions=reasoned.actions.filter(x=>plan.crossDomain||actionDomain(x.page)===plan.primary||plan.secondary.includes(actionDomain(x.page)));
  const topSignal=signals[0],topAction=actions[0];
  const noLivestock=tank.livestock.length===0;
- const noChemistry=tank.chemistry.length===0;
- const latestChem=tank.chemistry[0];
+ const measuredForAnswer=measuredChemistryReadings(tank);
+ const noChemistry=measuredForAnswer.length===0;
+ const latestChem=measuredForAnswer[0];
  const latestChemAgeDays=latestChem?Math.max(0,(Date.now()-new Date(latestChem.timestamp).getTime())/86400000):Infinity;
  const activeEmergency=(tank.emergencySessions??[]).some(x=>x.status==="active");
  const activeAcclimation=(tank.acclimationSessions??[]).some(x=>x.status!=="completed");

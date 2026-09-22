@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { AdvancedSection } from "@/components/ui/AdvancedSection";
 import { ContextHint } from "@/components/ui/ContextHint";
 import { uid,nowISO } from "@/lib/appUtils";
+import { localDateKey } from "@/domain/timeSafety";
 import { buildVisionTriage,captureConsistency,type VisionMetrics,type VisionSymptom } from "@/domain/visionIntelligence";
 import { visionDiseaseCandidates } from "@/domain/visionDifferential";
 import { askAquaVision } from "@/lib/aquaAIClient";
@@ -192,7 +193,7 @@ export function JournalPage({tank}:{tank:Tank}) {
  function createVisionFollowUp(assessment:VisionAssessmentRecord){
   if(assessment.followUpTaskId)return;
   const subject=tank.livestock.find(x=>x.id===assessment.livestockId),taskId=uid("task"),ts=nowISO();
-  const due=new Date(Date.now()+(assessment.triage.level==="urgent"?12:24)*3600000).toISOString().slice(0,10);
+  const due=localDateKey(new Date(Date.now()+(assessment.triage.level==="urgent"?12:24)*3600000));
   patch(tank.id,t=>({...t,
    maintenance:[...t.maintenance,{id:taskId,title:`متابعة بصرية${subject?` — ${subject.name}`:" للحوض"}`,titleEn:`Visual follow-up${subject?` — ${subject.nameEn||subject.name}`:" for tank"}`,cadence:"once",done:false,nextDue:due,manual:true,sourceDomain:"journal",sourceId:`vision:${assessment.id}`}],
    visionAssessments:(t.visionAssessments??[]).map(x=>x.id===assessment.id?{...x,followUpTaskId:taskId}:x),

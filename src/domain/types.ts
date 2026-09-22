@@ -513,7 +513,13 @@ export interface DosingLog {
   perStep?: number;
   stepIndex?: number;
   calculatorMode?: "dry" | "stock" | "product" | "routine";
-  status?: "planned" | "in_progress" | "logged";
+  status?: "planned" | "in_progress" | "logged" | "invalidated";
+  /** Actual amount executed for the most recent step after retest-based recalculation. */
+  lastStepAmount?: number;
+  /** Measurement used to authorize/recalculate the most recent subsequent step. */
+  lastRetestTimestamp?: string;
+  invalidatedAt?: string;
+  invalidatedReason?: string;
   verifyAfter?: string;
   sourceSystem?: string;
   sourceImportId?: string;

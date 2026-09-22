@@ -10,6 +10,8 @@ import { Modal } from "@/components/ui/Modal";
 import { biologicalCycleStatus } from "@/domain/biologicalCycle";
 import { nowISO,uid } from "@/lib/appUtils";
 import { validateTankSetupEntry } from "@/domain/inputSanity";
+import { buildCompleteRecoveryBackup } from "@/lib/recoveryBackup";
+import { saveRecoveryCheckpoint } from "@/lib/recoveryCheckpoint";
 
 function SwipeTankCard({tank,selected,onSelect,onEdit,onDelete}:{tank:Tank;selected:boolean;onSelect:()=>void;onEdit:()=>void;onDelete:()=>void}){
  const lang=useAquaStore(s=>s.language);
@@ -36,7 +38,7 @@ function SwipeTankCard({tank,selected,onSelect,onEdit,onDelete}:{tank:Tank;selec
 }
 
 export function TanksPage({tanks,selectedTankId,onSelect}:{tanks:Tank[];selectedTankId:string;onSelect:(id:string)=>void}) {
- const lang=useAquaStore(s=>s.language),deleteTank=useAquaStore(s=>s.deleteTank),patchTank=useAquaStore(s=>s.patchTank);
+ const lang=useAquaStore(s=>s.language),aquariumExperience=useAquaStore(s=>s.aquariumExperience),deleteTank=useAquaStore(s=>s.deleteTank),patchTank=useAquaStore(s=>s.patchTank);
  const [deleteTarget,setDeleteTarget]=useState<Tank|null>(null),[editTarget,setEditTarget]=useState<Tank|null>(null);
  const [name,setName]=useState(""),[type,setType]=useState<TankType>("marine"),[status,setStatus]=useState<TankStatus>("established"),[ageMonths,setAgeMonths]=useState(0);
  const [l,setL]=useState(120),[w,setW]=useState(60),[h,setH]=useState(60),[loss,setLoss]=useState(15);
@@ -83,9 +85,17 @@ export function TanksPage({tanks,selectedTankId,onSelect}:{tanks:Tank[];selected
   });
   setEditTarget(null);
  }
- function confirmDelete(){
+ async function confirmDelete(){
   if(!deleteTarget||deleteTarget.isTraining){setDeleteTarget(null);return;}
-  const id=deleteTarget.id;deleteTank(id);setDeleteTarget(null);
+  const id=deleteTarget.id;
+  try{
+   const backup=await buildCompleteRecoveryBackup({tanks,language:lang,aquariumExperience,selectedTankId});
+   await saveRecoveryCheckpoint({createdAt:nowISO(),reason:"delete-tank",detail:deleteTarget.name,backup});
+  }catch(e){
+   window.alert((lang==="ar"?"تم إيقاف الحذف لأن Aqua Nexus لم يستطع إنشاء Checkpoint آمن أولاً: ":"Delete was blocked because Aqua Nexus could not create a safe recovery checkpoint first: ")+(e instanceof Error?e.message:String(e)));
+   return;
+  }
+  deleteTank(id);setDeleteTarget(null);
   if(id===selectedTankId){const remaining=tanks.find(t=>t.id!==id);if(remaining)onSelect(remaining.id)}
  }
 
@@ -95,9 +105,9 @@ export function TanksPage({tanks,selectedTankId,onSelect}:{tanks:Tank[];selected
   <Modal open={!!deleteTarget} title={lang==="ar"?"حذف الحوض نهائياً":"Delete tank permanently"} onClose={()=>setDeleteTarget(null)}>
    <div className="tank-delete-warning">
     <b>⚠️ {lang==="ar"?"تحذير":"Warning"}</b>
-    <p>{lang==="ar"?`سيتم حذف الحوض «${deleteTarget?.name??""}» وجميع بياناته المسجلة نهائياً. لا يمكن التراجع عن هذه العملية.`:`The tank “${deleteTarget?.name??""}” and all of its saved data will be permanently deleted. This cannot be undone.`}</p>
+    <p>{lang==="ar"?`سيتم حذف الحوض «${deleteTarget?.name??""}» من مساحة العمل. قبل الحذف Aqua Nexus سينشئ Checkpoint استعادة تلقائياً، ويمكن التراجع من Settings إذا احتجت.`:`The tank “${deleteTarget?.name??""}” will be removed from the workspace. Aqua Nexus creates an automatic recovery checkpoint first, and you can undo from Settings if needed.`}</p>
    </div>
-   <div className="modal-actions"><button className="btn" onClick={()=>setDeleteTarget(null)}>{lang==="ar"?"إلغاء":"Cancel"}</button><button className="btn tank-delete-confirm" onClick={confirmDelete}>{lang==="ar"?"حذف نهائي":"Delete permanently"}</button></div>
+   <div className="modal-actions"><button className="btn" onClick={()=>setDeleteTarget(null)}>{lang==="ar"?"إلغاء":"Cancel"}</button><button className="btn tank-delete-confirm" onClick={()=>void confirmDelete()}>{lang==="ar"?"حذف نهائي":"Delete permanently"}</button></div>
   </Modal>
 
   <Modal open={!!editTarget} title={lang==="ar"?"تعديل معلومات الحوض":"Edit tank setup"} onClose={()=>setEditTarget(null)}>
