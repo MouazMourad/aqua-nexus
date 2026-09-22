@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Tank } from "@/domain/types";
-import { chemistryHealth,maintenanceHealth,tankHealth } from "@/domain/health";
+import { chemistryHealth,maintenanceHealth,tankHealth } from "@/domain/health";\nimport { currentChemistryValues } from "@/domain/chemistryDataQuality";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr } from "@/i18n";
 
@@ -13,7 +13,7 @@ function healthVisual(health:number){
 }
 
 export function SystemOverview({tank}:{tank:Tank}) {
-  const lang=useAquaStore(s=>s.language),health=tankHealth(tank),chem=chemistryHealth(tank),maint=maintenanceHealth(tank),latest=tank.chemistry[0]?.values??{};
+  const lang=useAquaStore(s=>s.language),health=tankHealth(tank),chem=chemistryHealth(tank),maint=maintenanceHealth(tank),latest=currentChemistryValues(tank);
   const visual=healthVisual(health);
   const metrics=tank.type==="marine"
     ? [["temperature",latest.temperature,"°C"],["pH",latest.pH,""],["salinity",latest.salinity,"SG"],["KH",latest.KH,"dKH"]]
