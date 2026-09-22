@@ -22,7 +22,7 @@ export interface DoseStepGate{
   amount:number;
   sampleTimestamp?:string;
   sampleValue?:number;
-  code?:"missing_retest"|"low_confidence"|"volume_changed"|"target_reached"|"unexpected_response"|"invalid_plan";
+  code?:"missing_retest"|"stale_measurement"|"low_confidence"|"volume_changed"|"target_reached"|"unexpected_response"|"invalid_plan";
   ar:string;
   en:string;
 }
@@ -33,12 +33,24 @@ export function doseStepExecutionGate(tank:Tank,dose:DosingLog,step:number):Dose
   if(!Number.isFinite(step)||step<1||step>total||!Number.isFinite(baseAmount)||baseAmount<=0){
     return {ok:false,amount:0,code:"invalid_plan",ar:"خطة الجرعات غير صالحة للتنفيذ. أعد إنشاء الخطة من صفحة الجرعات.",en:"The dosing plan is not valid for execution. Recreate it from Dosing."};
   }
-  if(step===1)return {ok:true,amount:baseAmount,ar:"الخطوة الأولى تعتمد القراءة التي أنشأت الخطة.",en:"The first step uses the measurement that created the plan."};
-
-  const executedAt=new Date(dose.lastExecutedAt||"").getTime();
   const sample=latestParameterSample(tank,dose.parameter);
-  if(!sample||!Number.isFinite(executedAt)||new Date(sample.timestamp).getTime()<=executedAt){
-    return {ok:false,amount:0,code:"missing_retest",ar:`لا يمكن تنفيذ الجرعة ${step}. لازم تسجّل قياس ${dose.parameter} فعلي جديد بعد الجرعة السابقة أولاً.`,en:`Dose step ${step} is blocked. Log a new measured ${dose.parameter} result after the previous dose first.`};
+  if(!sample){
+    return {ok:false,amount:0,code:"missing_retest",ar:`لا يمكن تنفيذ الجرعة ${step}. لازم يكون في قياس ${dose.parameter} فعلي حديث أولاً.`,en:`Dose step ${step} is blocked. A recent measured ${dose.parameter} result is required first.`};
+  }
+  const sampleAt=new Date(sample.timestamp).getTime(),ageHours=Math.max(0,(Date.now()-sampleAt)/3600000);
+  if(ageHours>48){
+    return {ok:false,amount:0,code:"stale_measurement",sampleTimestamp:sample.timestamp,sampleValue:sample.value,ar:`آخر قياس ${dose.parameter} أقدم من 48 ساعة. أعد القياس قبل تنفيذ أي خطوة من الخطة.`,en:`The latest ${dose.parameter} measurement is older than 48 hours. Retest before executing any plan step.`};
+  }
+  if(step>1){
+    const executedAt=new Date(dose.lastExecutedAt||"").getTime();
+    if(!Number.isFinite(executedAt)||sampleAt<=executedAt){
+      return {ok:false,amount:0,code:"missing_retest",sampleTimestamp:sample.timestamp,sampleValue:sample.value,ar:`لا يمكن تنفيذ الجرعة ${step}. لازم تسجّل قياس ${dose.parameter} فعلي جديد بعد الجرعة السابقة أولاً.`,en:`Dose step ${step} is blocked. Log a new measured ${dose.parameter} result after the previous dose first.`};
+    }
+  }else if(dose.sourceReadingTimestamp){
+    const sourceAt=new Date(dose.sourceReadingTimestamp).getTime();
+    if(Number.isFinite(sourceAt)&&sampleAt<sourceAt){
+      return {ok:false,amount:0,code:"invalid_plan",sampleTimestamp:sample.timestamp,sampleValue:sample.value,ar:"قراءة إنشاء الخطة لم تعد موجودة كأحدث دليل صالح. أعد إنشاء الخطة قبل التنفيذ.",en:"The plan's source reading is no longer the latest valid evidence. Recreate the plan before execution."};
+    }
   }
   if(sample.confidence==="low"){
     return {ok:false,amount:0,code:"low_confidence",sampleTimestamp:sample.timestamp,sampleValue:sample.value,ar:"إعادة القياس موجودة لكن ثقتها منخفضة. أعد القياس قبل متابعة الخطة.",en:"A retest exists but confidence is low. Retest before continuing the plan."};
