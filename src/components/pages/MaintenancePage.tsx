@@ -16,12 +16,11 @@ import { ContextHint } from "@/components/ui/ContextHint";
 import { validateAbsencePlan } from "@/domain/inputSanity";
 import { buildVacationTaskDrafts } from "@/domain/vacationPlan";
 import { doseStepExecutionGate } from "@/domain/dosingSafety";
+import { addLocalCalendarDays } from "@/domain/timeSafety";
 
 const cadences:MaintenanceTask["cadence"][]=["daily","weekly","monthly","quarterly","semiannual","annual"];
 
-function addDateDays(dateOnly:string,offset:number){
- const [y,m,d]=dateOnly.split("-").map(Number);const date=new Date(Date.UTC(y,m-1,d+offset));return date.toISOString().slice(0,10);
-}
+function addDateDays(dateOnly:string,offset:number){return addLocalCalendarDays(dateOnly,offset);}
 
 export function MaintenancePage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
@@ -29,7 +28,7 @@ export function MaintenancePage({tank}:{tank:Tank}) {
  const [departure,setDeparture]=useState(()=>addDateDays(today(),1)),[daysAway,setDaysAway]=useState(7),[caretaker,setCaretaker]=useState(""),[travelGenerated,setTravelGenerated]=useState(false);
  const cycle=biologicalCycleStatus(tank);
  const hasChem=tank.maintenance.some(x=>/قياس النسب الكيميائية|Weekly chemistry|الدورة البيولوجية|Biological cycle/i.test(`${x.title} ${x.titleEn||""}`));
- const baseTasks=hasChem?tank.maintenance:[...tank.maintenance,{id:"virtual-chem",title:"قياس النسب الكيميائية الأسبوعي",titleEn:"Weekly chemistry measurement",cadence:"weekly" as const,done:false,nextDue:new Date(Date.now()+7*86400000).toISOString().slice(0,10)}];
+ const baseTasks=hasChem?tank.maintenance:[...tank.maintenance,{id:"virtual-chem",title:"قياس النسب الكيميائية الأسبوعي",titleEn:"Weekly chemistry measurement",cadence:"weekly" as const,done:false,nextDue:addDateDays(today(),7)}];
  const tasks=cycle.active?baseTasks.filter(cycleRelevantMaintenanceTask):baseTasks;
  const recurring=tasks.filter(x=>x.cadence!=="once");
  const completed=recurring.filter(x=>maintenanceEffectiveState(x).completed).length;
