@@ -9,6 +9,7 @@ import { useAquaStore } from "@/store/useAquaStore";
 import { nowISO,uid } from "@/lib/appUtils";
 import { tankIntelligenceCore } from "@/domain/intelligenceCore";
 import { maintenanceEffectiveState } from "@/domain/maintenanceSchedule";
+import { localDateKey } from "@/domain/timeSafety";
 
 type GoalKey="stability"|"chemistry"|"maintenance"|"confidence";
 type RiskItem={key:string;page:AppPage;level:"danger"|"warn";ar:string;en:string};
@@ -98,7 +99,7 @@ export function DashboardCommandLayer(){
   const core=tankIntelligenceCore(tank);
   const state=core.state,chemistry=core.chemistry,chem=chemistry.score,maint=core.maintenance,chemAge=chemistryAgeDays(tank);
   const now=Date.now();
-  const atDate=new Date(now).toISOString().slice(0,10);
+  const atDate=localDateKey(new Date(now));
   const overdue=tank.maintenance.filter(x=>maintenanceEffectiveState(x,atDate).overdue);
   const equipment=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
   const treatment=tank.livestock.filter(x=>x.health==="treatment");
