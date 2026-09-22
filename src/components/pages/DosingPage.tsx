@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { DecisionGuidance } from "@/components/ui/DecisionGuidance";
 import { ContextHint } from "@/components/ui/ContextHint";
 import { AdvancedSection } from "@/components/ui/AdvancedSection";
-import { uid,nowISO } from "@/lib/appUtils";
+import { daysFrom,uid,nowISO,today } from "@/lib/appUtils";
 import { chemistryCatalogForTank } from "@/domain/chemistryProfile";
 import { calculateDose,DOSING_PRESETS,type DosingForm,type DosingParameter } from "@/domain/dosingCalculator";
 import { chemistryGuidance } from "@/domain/chemistryGuidance";
@@ -21,7 +21,7 @@ import { useSafetyOverrideDialog } from "@/components/ui/SafetyOverrideDialog";
 
 const colors=["#27c2dc","#62d48f","#f6c85f","#c877ff","#ff7e79","#4b8bff"];
 function idealTarget(tank:Tank,param:DosingParameter){const meta:any=chemistryCatalogForTank(tank)?.[param];return meta?.ideal?(Number(meta.ideal[0])+Number(meta.ideal[1]))/2:param==="KH"?8:param==="Ca"?430:1325;}
-function datePlusDays(days:number){return new Date(Date.now()+days*86400000).toISOString().slice(0,10);}
+function datePlusDays(days:number){return daysFrom(today(),days);}
 
 export function DosingPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),availableParams:DosingParameter[]=tank.type==="marine"?["KH","Ca","Mg"]:["KH"];
