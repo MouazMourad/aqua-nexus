@@ -1,4 +1,5 @@
 import type { Equipment,LightingProgram,LightingProgramPoint,Tank } from "./types";
+import { measuredChemistryReadings } from "./chemistryDataQuality";
 
 const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
 const minute=(h:number,m=0)=>h*60+m;
@@ -302,7 +303,7 @@ export function lightingIntelligence(tank:Tank){
       if(delta>.25&&age<7*86400000)issues.push({id:"recent-jump",level:"warn",ar:"جرعة الضوء تغيّرت بأكثر من 25% خلال آخر أسبوع. ثبّت بقية العوامل وراقب الاستجابة قبل تعديل جديد.",en:"Light dose changed by more than 25% within the last week. Keep other variables stable and observe before another change."});
     }
   }
-  const latest=tank.chemistry[0],previous=tank.chemistry[1],links:string[]=[];
+  const measuredChemistry=measuredChemistryReadings(tank),latest=measuredChemistry[0],previous=measuredChemistry[1],links:string[]=[];
   const ph=latest?.values?.pH,oldPh=previous?.values?.pH;
   if(typeof ph==="number"&&typeof oldPh==="number"&&Math.abs(ph-oldPh)>=.15)links.push(`pH Δ ${(ph-oldPh).toFixed(2)}`);
   const temp=latest?.values?.temperature,oldTemp=previous?.values?.temperature;
