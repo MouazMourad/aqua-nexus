@@ -1,4 +1,4 @@
-# Aqua Nexus Roadmap — v0.3.0 RC
+# Aqua Nexus Roadmap — v0.3.0 RC.2
 
 ## Complete in the current RC
 
@@ -25,6 +25,11 @@
 - Streamed request-size enforcement
 - Arabic/English document locale synchronization
 - Desktop Chromium, Android Chromium and iPhone WebKit critical journeys
+- Unified equipment/controller import with screenshot/file review and automatic domain routing
+- Lighting screenshot/file import with editable review
+- Aqua Nexus Academy and contextual learning
+- Strict measured-vs-reference chemistry evidence contract
+- Auditable Tank Brain / Health / Chemistry Evidence model versions
 
 ## Current product policy
 
@@ -35,8 +40,7 @@ Device Backup is optional and off by default. It is not presented as an account 
 ## Next phase after tester feedback
 
 Only after controlled testing confirms the RC:
-- build the vendor-neutral import layer for exported controller/app files and screenshot-assisted lighting-program extraction
-- refine UX from real tester feedback
+- refine UX from real tester feedback, especially first-time setup and progressive disclosure
 - finish deeper component decomposition where it improves maintainability
 - tune long-term historical retention defaults
 - add an account/recovery architecture if multi-device SaaS becomes a real requirement

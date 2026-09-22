@@ -15,6 +15,7 @@ import { recordCloudDeleteTombstone } from "@/lib/cloudTombstones";
 import { aquaStateStorage } from "@/lib/aquaStateStorage";
 import { clearTankHistoryArchive } from "@/lib/historyArchiveStorage";
 import { clearLongTermHistory } from "@/lib/longTermHistory";
+import { CHEMISTRY_EVIDENCE_VERSION,HEALTH_MODEL_VERSION,TANK_BRAIN_VERSION } from "@/domain/version";
 
 interface AquaStore extends AquaState {
   setLanguage: (language: Language) => void;
@@ -132,7 +133,10 @@ function withHealthSnapshot(before:Tank,after:Tank):Tank{
     state:tankStateView(after).band,
     reasonAr:reason.ar,
     reasonEn:reason.en,
-    relatedEventId:reason.eventId
+    relatedEventId:reason.eventId,
+    tankBrainVersion:TANK_BRAIN_VERSION,
+    healthModelVersion:HEALTH_MODEL_VERSION,
+    chemistryEvidenceVersion:CHEMISTRY_EVIDENCE_VERSION
   };
   return {...after,healthSnapshots:[snapshot,...(after.healthSnapshots??[])].slice(0,365)};
 }

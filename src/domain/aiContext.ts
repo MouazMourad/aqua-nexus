@@ -18,16 +18,20 @@ import { maintenanceEffectiveState } from "./maintenanceSchedule";
 import { biologicalCycleStatus } from "./biologicalCycle";
 import { biologicalCycleKnowledgeSnapshot } from "./biologicalCycleKnowledge";
 import { equipmentImportIntelligence } from "./equipmentImport";
+import { currentChemistryValues } from "./chemistryDataQuality";
+import { AQUA_MODEL_VERSIONS,AQUA_NEXUS_VERSION } from "./version";
 
 export interface TankAIContext {
-  schema:"aqua-nexus-ai-context/v1";
+  schema:"aqua-nexus-ai-context/v2";
+  productVersion:string;
+  modelVersions:typeof AQUA_MODEL_VERSIONS;
   generatedAt:string;
   brain:ReturnType<typeof buildTankBrainSnapshot>;
   tank:{id:string;name:string;type:string;status:string;ageMonths?:number;systemVolumeLiters:number};
   biologicalCycle:ReturnType<typeof biologicalCycleStatus>;
   biologicalCycleKnowledge:ReturnType<typeof biologicalCycleKnowledgeSnapshot>;
   state:{health:number;chemistry:number;maintenance:number;bioloadPercent:number;stateScore:number;stateBand:string;mood:string;forecast7d:number|null;forecastDirection:string;forecastConfidence:string};
-  chemistry:{latest:Record<string,number|null>;readingCount:number;recent:Array<{timestamp:string;values:Record<string,number|null>}>;guidance:ReturnType<typeof chemistryGuidance>};
+  chemistry:{latest:Record<string,number|null>;readingCount:number;recent:Array<{timestamp:string;values:Record<string,number|null>}>;referenceDefaults:Array<{timestamp:string;values:Record<string,number|null>}>;guidance:ReturnType<typeof chemistryGuidance>};
   systemHealth:ReturnType<typeof systemHealth>;
   learning:{maturity:ReturnType<typeof tankLearningMaturity>;baselines:ReturnType<typeof tankBaselines>;signals:ReturnType<typeof learnedTankSignals>;predictions:ReturnType<typeof proactivePredictions>;repeatedPatterns:ReturnType<typeof repeatedResponsePatterns>;memory:ReturnType<typeof biologicalMemory>;eventLinks:ReturnType<typeof eventChemistryLinks>};
   nutrients:ReturnType<typeof analyzeNutrients>;
@@ -48,15 +52,19 @@ export function buildTankAIContext(tank:Tank):TankAIContext{
   const due=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).due).slice(0,12).map(x=>({id:x.id,title:x.title,titleEn:x.titleEn,nextDue:x.nextDue}));
   const within=(timestamp:string,days:number)=>{const t=new Date(timestamp).getTime();return Number.isFinite(t)&&now-t<=days*DAY;};
   const bio=bioload(tank);
+  const measuredChemistry=tank.chemistry.filter(x=>!x.usingDefaults);
+  const referenceChemistry=tank.chemistry.filter(x=>x.usingDefaults);
   return {
-    schema:"aqua-nexus-ai-context/v1",
+    schema:"aqua-nexus-ai-context/v2",
     generatedAt:new Date().toISOString(),
+    productVersion:AQUA_NEXUS_VERSION,
+    modelVersions:AQUA_MODEL_VERSIONS,
     brain:buildTankBrainSnapshot(tank),
     tank:{id:tank.id,name:tank.name,type:tank.type,status:tank.status,ageMonths:tank.ageMonths,systemVolumeLiters:tank.systemVolumeLiters},
     biologicalCycle:cycle,
     biologicalCycleKnowledge:cycleKnowledge,
     state:{health:system.score,chemistry:chemistryHealth(tank),maintenance:maintenanceHealth(tank),bioloadPercent:Math.round(bio.ratio*100),stateScore:state.score,stateBand:state.band,mood:mood.key,forecast7d:forecast.projected7d,forecastDirection:forecast.direction,forecastConfidence:forecast.confidence},
-    chemistry:{latest:tank.chemistry[0]?.values??{},readingCount:tank.chemistry.length,recent:tank.chemistry.slice(0,12).map(x=>({timestamp:x.timestamp,values:x.values})),guidance:chemistryGuidance(tank)},
+    chemistry:{latest:currentChemistryValues(tank),readingCount:measuredChemistry.length,recent:measuredChemistry.slice(0,12).map(x=>({timestamp:x.timestamp,values:x.values})),referenceDefaults:referenceChemistry.slice(0,3).map(x=>({timestamp:x.timestamp,values:x.values})),guidance:chemistryGuidance(tank)},
     systemHealth:system,
     learning:{maturity:tankLearningMaturity(tank),baselines:tankBaselines(tank),signals:learnedTankSignals(tank),predictions:proactivePredictions(tank),repeatedPatterns:repeatedResponsePatterns(tank),memory:biologicalMemory(tank),eventLinks:eventChemistryLinks(tank)},
     nutrients:analyzeNutrients(tank),

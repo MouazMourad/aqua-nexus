@@ -113,7 +113,6 @@ export function AquaDashboard() {
  const [maintenanceDone,setMaintenanceDone]=useState(true);
  const chemCfg:any=CHEMISTRY_CATALOG[type];
  const [chem,setChem]=useState<Record<string,number>>({});
- const [useDefaults,setUseDefaults]=useState(true);
 
  const wizardSteps=[
   tr(language,"tankIdentity"),tr(language,"dimensions"),tr(language,"sumpSetup"),
@@ -134,9 +133,12 @@ export function AquaDashboard() {
  }),[l,w,h,loss,ageMonths,hasSump,sl,sw,sh,fill]);
  const wizardValues=useMemo(()=>{
   const values:Record<string,number|null>={};
-  Object.entries(chemCfg).forEach(([k,m]:[string,any])=>values[k]=chem[k] ?? (useDefaults?m.def:null));
+  // Only values explicitly typed by the user are measurements. Catalog defaults
+  // stay visual references and never enter Tank chemistry/history as evidence.
+  Object.keys(chemCfg).forEach(k=>values[k]=typeof chem[k]==="number"&&Number.isFinite(chem[k])?chem[k]:null);
   return values;
- },[chemCfg,chem,useDefaults]);
+ },[chemCfg,chem]);
+ const hasMeasuredWizardChemistry=useMemo(()=>Object.values(wizardValues).some(v=>typeof v==="number"&&Number.isFinite(v)),[wizardValues]);
  const wizardValidationTank=useMemo(()=>({
   id:"wizard-validation",name:name||"Wizard",type,ecosystemProfile:profile==="auto"?undefined:profile,status:status==="new"?"cycling":status,ageMonths,
   display:{length:l,width:w,height:h,displacementPercent:loss,grossLiters:preview.gross,netLiters:preview.net},
@@ -149,7 +151,7 @@ export function AquaDashboard() {
  function resetWizard(){
   setStep(1);setName("");setType("marine");setProfile("auto");setStatus("new");setAgeMonths(0);
   setL(120);setW(60);setH(60);setLoss(15);setHasSump(true);setSl(100);setSw(40);setSh(35);setFill(75);setCount(3);
-  setEquipment(["lighting","waveMaker","overflow","returnPump","heater"]);setMaintenanceDone(true);setChem({});setUseDefaults(true);
+  setEquipment(["lighting","waveMaker","overflow","returnPump","heater"]);setMaintenanceDone(true);setChem({});
  }
 
  function create(){
@@ -169,7 +171,7 @@ export function AquaDashboard() {
    sump:{enabled:hasSump,dimensions:{length:sl,width:sw,height:sh},operatingFillPercent:fill,chambers:chamberRows},
    systemVolumeLiters:preview.system,
    equipment:equipment.map((kind)=>({id:uid("eq"),name:equipOptions.find(x=>x.kind===kind)?.en||kind,kind,location:kind==="lighting"||kind==="waveMaker"||kind==="overflow"?"display":hasSump&&kind==="returnPump"&&returnChamberId?`sump:${returnChamberId}`:"external",status:"on",displayPosition:undefined} as any)),
-   chemistry:[{timestamp:nowISO(),values,usingDefaults:useDefaults}],
+   chemistry:hasMeasuredWizardChemistry?[{timestamp:nowISO(),values,usingDefaults:false,source:"manual",confidence:"medium"}]:[],
    maintenance:maintenanceDone?[weeklyTask,inspectTask]:[weeklyTask],
    livestock:[],inventory:[],timeline:[{id:uid("ev"),timestamp:createdAt,type:"setup",textAr:cycleMode?"تم إنشاء الحوض وبدأت الدورة البيولوجية تلقائياً — اليوم 1.":"تم إنشاء الحوض عبر معالج الإعداد الذكي.",textEn:cycleMode?"Tank created and Biological Cycling Mode started automatically — day 1.":"Tank created using the Smart Setup Wizard."}],photos:[],feeding:[],dosing:[],doserChannels:[],quarantine:[],expenses:[],waterChanges:[],rodi:[],biologicalCycle:cycleMode?{startedAt:createdAt,method:"fishless"}:undefined,createdAt
   };
@@ -193,19 +195,19 @@ export function AquaDashboard() {
     <label className="field"><span>L cm</span><input type="number" value={l} onChange={e=>setL(Number(e.target.value))}/></label>
     <label className="field"><span>W cm</span><input type="number" value={w} onChange={e=>setW(Number(e.target.value))}/></label>
     <label className="field"><span>H cm</span><input type="number" value={h} onChange={e=>setH(Number(e.target.value))}/></label>
-    <label className="field"><span>{tr(language,"displacement")} %</span><input type="number" value={loss} onChange={e=>setLoss(Number(e.target.value))}/></label>
+    <label className="field"><span>{tr(language,"displacement")} %</span><input type="number" value={loss} onChange={e=>setLoss(Number(e.target.value))}/><small>{bi(language,"إذا ما بتعرفها، 15% تقدير بداية فقط ويمكن تعديله لاحقاً.","If unknown, 15% is only a starting estimate and can be changed later.")}</small></label>
     <div className="wizard-summary full-field">{preview.net.toFixed(1)} L net</div>
    </div>}
 
    {step===3&&<div><div className="choice-row"><button className={`btn ${hasSump?"primary":""}`} onClick={()=>setHasSump(true)}>Sump</button><button className={`btn ${!hasSump?"primary":""}`} onClick={()=>setHasSump(false)}>No Sump</button></div>
-    {hasSump&&<div className="form-grid"><label className="field"><span>Sump L</span><input type="number" value={sl} onChange={e=>setSl(Number(e.target.value))}/></label><label className="field"><span>Sump W</span><input type="number" value={sw} onChange={e=>setSw(Number(e.target.value))}/></label><label className="field"><span>Sump H</span><input type="number" value={sh} onChange={e=>setSh(Number(e.target.value))}/></label><label className="field"><span>Fill %</span><input type="number" value={fill} onChange={e=>setFill(Number(e.target.value))}/></label><label className="field"><span>{tr(language,"sumpChambers")}</span><input type="number" min="1" max="12" value={count} onChange={e=>setCount(Number(e.target.value))}/></label></div>}
+    {hasSump&&<><div className="form-grid"><label className="field"><span>Sump L</span><input type="number" value={sl} onChange={e=>setSl(Number(e.target.value))}/></label><label className="field"><span>Sump W</span><input type="number" value={sw} onChange={e=>setSw(Number(e.target.value))}/></label><label className="field"><span>Sump H</span><input type="number" value={sh} onChange={e=>setSh(Number(e.target.value))}/></label><label className="field"><span>Fill %</span><input type="number" value={fill} onChange={e=>setFill(Number(e.target.value))}/></label><label className="field"><span>{tr(language,"sumpChambers")}</span><input type="number" min="1" max="12" value={count} onChange={e=>setCount(Number(e.target.value))}/></label></div><div className="inline-alert info" style={{marginTop:10}}>{bi(language,"إذا ما بتعرف منسوب التشغيل أو عدد الحجر بدقة، استخدم تقديراً مبدئياً وعدّله لاحقاً من صفحة السامب؛ هالقيم ليست قياسات كيميائية ولا تؤثر على سجل الفحوص.","If the operating level or chamber count is not known exactly, use a starting estimate and refine it later on the Sump page; these are setup estimates, not chemistry measurements.")}</div></>}
    </div>}
 
    {step===4&&<div className="wizard-options">{equipOptions.map(x=><label className={`select-tile ${equipment.includes(x.kind)?"selected":""}`} key={x.kind}><input type="checkbox" checked={equipment.includes(x.kind)} onChange={e=>setEquipment(v=>e.target.checked?[...v,x.kind]:v.filter(k=>k!==x.kind))}/><span>{language==="ar"?x.ar:x.en}</span></label>)}</div>}
 
    {step===5&&<div className="choice-row"><button className={`btn ${maintenanceDone?"primary":""}`} onClick={()=>setMaintenanceDone(true)}>{bi(language,"نعم، مطبقة","Yes, established")}</button><button className={`btn ${!maintenanceDone?"primary":""}`} onClick={()=>setMaintenanceDone(false)}>{bi(language,"لا، سأبدأ الآن","No, start now")}</button></div>}
 
-   {step===6&&<div><div className="form-grid">{Object.entries(chemCfg).map(([k,m]:[string,any])=><label className="field" key={k}><span>{m.label}</span><input type="number" step="any" placeholder={String(m.def)} value={chem[k]??""} onChange={e=>setChem(v=>({...v,[k]:Number(e.target.value)}))}/></label>)}</div><label className="checkbox-row"><input type="checkbox" checked={useDefaults} onChange={e=>setUseDefaults(e.target.checked)}/><span>{tr(language,"useDefaults")}</span></label></div>}
+   {step===6&&<div><div className="inline-alert info" style={{marginBottom:10}}><b>{bi(language,"سجّل فقط قياسات فعلية","Enter measured values only")}</b><p>{bi(language,"إذا ما عندك فحوص الآن اترك الحقول فارغة وكمل. الأرقام الرمادية هي قيم مرجعية للمقارنة فقط ولن تُحفظ كقياسات ولن تدخل Health أو Tank Brain أو إكمال الفحص الأسبوعي.","If you have no tests now, leave the fields blank and continue. Gray numbers are reference values only; they are never saved as measurements and never count toward Health, Tank Brain, or weekly test completion.")}</p></div><div className="form-grid">{Object.entries(chemCfg).map(([k,m]:[string,any])=><label className="field" key={k}><span>{m.label}</span><input type="number" step="any" placeholder={bi(language,"مرجع "+m.def,"Reference "+m.def)} value={chem[k]??""} onChange={e=>{const raw=e.target.value;setChem(v=>{const next={...v};if(raw==="")delete next[k];else next[k]=Number(raw);return next;})}}/><small>{bi(language,"اتركه فارغاً إذا لم تقسه.","Leave blank unless you measured it.")}</small></label>)}</div><button type="button" className="btn" style={{marginTop:10}} onClick={()=>setChem({})}>{bi(language,"ما عندي قياسات الآن — متابعة بدون فحوص","I have no measurements now — continue without tests")}</button></div>}
 
    {step===7&&<div className="wizard-review">
      <div><small>{tr(language,"name")}</small><b>{name||"—"}</b></div>
@@ -214,6 +216,7 @@ export function AquaDashboard() {
      <div><small>{tr(language,"displayVolume")}</small><b>{preview.net.toFixed(1)} L</b></div>
      <div><small>{tr(language,"systemVolume")}</small><b>{preview.system.toFixed(1)} L</b></div>
      <div><small>{tr(language,"equipment")}</small><b>{equipment.length}</b></div>
+     <div><small>{bi(language,"الكيمياء","Chemistry")}</small><b>{hasMeasuredWizardChemistry?bi(language,"قياسات فعلية مدخلة","Measured values entered"):bi(language,"بدون قياسات حالياً","No measurements yet")}</b></div>
      {(status==="new"||status==="cycling")&&<div className="full-field inline-alert warn"><b>{bi(language,"الدورة البيولوجية ستبدأ تلقائياً من اليوم 1.","Biological Cycling Mode will start automatically on day 1.")}</b><br/>{bi(language,"خلالها Aqua Nexus يوقف العمليات غير المرتبطة بالدورة حتى تثبت الجاهزية من القياسات.","During cycling, Aqua Nexus locks non-cycle workflows until readiness is proven by measured tests.")}</div>}
    </div>}
 

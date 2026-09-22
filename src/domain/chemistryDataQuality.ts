@@ -54,7 +54,15 @@ export function isExactChemistryDuplicate(existing:ChemistryReading[],candidate:
 
 export function latestParameterSample(tank:Tank,key:string):ParameterSample|undefined{
  let best:ChemistryReading|undefined;
- for(const r of tank.chemistry){const v=r.values?.[key];if(typeof v!=="number"||!Number.isFinite(v))continue;if(!best||new Date(r.timestamp).getTime()>new Date(best.timestamp).getTime())best=r;}
+ // Reference/default values are never measurement evidence. This single gate
+ // protects health, dosing, freshness, AI context and any caller using the
+ // canonical latest-parameter helper.
+ for(const r of tank.chemistry){
+  if(r.usingDefaults)continue;
+  const v=r.values?.[key];
+  if(typeof v!=="number"||!Number.isFinite(v))continue;
+  if(!best||new Date(r.timestamp).getTime()>new Date(best.timestamp).getTime())best=r;
+ }
  if(!best)return undefined;
  return {key,value:best.values[key] as number,timestamp:best.timestamp,ageDays:Math.max(0,(Date.now()-new Date(best.timestamp).getTime())/DAY),confidence:best.confidence??"medium",source:best.source??"manual",testKit:best.testKit};
 }
@@ -80,7 +88,7 @@ export function requiredWeeklyChemistryKeys(tank:Tank){
 
 export function weeklyChemistryCoverage(tank:Tank,extra:ChemistryReading[]=[]){
  const required=requiredWeeklyChemistryKeys(tank),cutoff=Date.now()-7*DAY,readings=[...extra,...tank.chemistry],measured=new Set<string>();
- for(const r of readings){if(new Date(r.timestamp).getTime()<cutoff)continue;for(const key of required){const v=r.values?.[key];if(typeof v==="number"&&Number.isFinite(v))measured.add(key);}}
+ for(const r of readings){if(r.usingDefaults||new Date(r.timestamp).getTime()<cutoff)continue;for(const key of required){const v=r.values?.[key];if(typeof v==="number"&&Number.isFinite(v))measured.add(key);}}
  const missing=required.filter(k=>!measured.has(k));return {required,measured:[...measured],missing,complete:missing.length===0};
 }
 

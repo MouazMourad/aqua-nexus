@@ -1283,3 +1283,44 @@ describe("Unified equipment import regression",()=>{
   });
 });
 
+
+
+describe("RC.2 chemistry evidence and versioning closure",()=>{
+  it("never treats reference defaults as the latest measured parameter",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.chemistry=[
+      {timestamp:new Date().toISOString(),values:{KH:8.3,Ca:440},usingDefaults:true},
+      {timestamp:new Date(Date.now()-3600000).toISOString(),values:{KH:7.4},source:"manual",confidence:"high",usingDefaults:false}
+    ];
+    expect(latestParameterSample(t,"KH")?.value).toBe(7.4);
+    expect(latestParameterSample(t,"Ca")).toBeUndefined();
+  });
+
+  it("never completes weekly chemistry from reference defaults",()=>{
+    const t=structuredClone(demoMarineTank);
+    const values=Object.fromEntries(weeklyChemistryCoverage(t).required.map(key=>[key,key==="salinity"?1.025:8])) as Record<string,number>;
+    t.chemistry=[{timestamp:new Date().toISOString(),values,usingDefaults:true}];
+    const coverage=weeklyChemistryCoverage(t);
+    expect(coverage.measured).toHaveLength(0);
+    expect(coverage.complete).toBe(false);
+  });
+
+  it("separates measured chemistry from references in Tank Brain and AI context",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.chemistry=[
+      {timestamp:new Date().toISOString(),values:{KH:8},usingDefaults:true},
+      {timestamp:new Date(Date.now()-3600000).toISOString(),values:{KH:7.5},usingDefaults:false,source:"manual",confidence:"high"}
+    ];
+    const brain=buildTankBrainSnapshot(t);
+    const ai=buildTankAIContext(t);
+    expect(brain.schema).toBe("aqua-nexus-tank-brain/v2");
+    expect(brain.productVersion).toBe("0.3.0-rc.2");
+    expect(brain.chemistry.count).toBe(1);
+    expect(brain.chemistry.referenceDefaults).toHaveLength(1);
+    expect(ai.schema).toBe("aqua-nexus-ai-context/v2");
+    expect(ai.chemistry.latest.KH).toBe(7.5);
+    expect(ai.chemistry.readingCount).toBe(1);
+    expect(ai.chemistry.referenceDefaults).toHaveLength(1);
+    expect(ai.modelVersions.health).toBe("2.0.0");
+  });
+});

@@ -20,6 +20,7 @@ import { deviceBackupEnabled,setDeviceBackupEnabled as persistDeviceBackup,subsc
 import { clearLongTermHistory,longTermHistoryStats } from "@/lib/longTermHistory";
 import { FEATURE_DISCOVERY_TOTAL,readFeatureDiscovery,resetFeatureDiscovery,setFeatureDiscoveryMode,subscribeFeatureDiscovery,type FeatureDiscoveryState } from "@/lib/featureDiscovery";
 import { resetContextHints } from "@/lib/contextHints";
+import { AQUA_MODEL_VERSIONS,AQUA_NEXUS_VERSION } from "@/domain/version";
 
 export function SettingsPage({tank}:{tank:Tank}) {
  const state=useAquaStore(),patch=useAquaStore(s=>s.patchTank),del=useAquaStore(s=>s.deleteTank),replace=useAquaStore(s=>s.replaceData),[name,setName]=useState(tank.name),file=useRef<HTMLInputElement>(null),lang=state.language;
@@ -173,6 +174,7 @@ export function SettingsPage({tank}:{tank:Tank}) {
    :(lang==="ar"?"غير مفعّلة":"Disabled");
 
  return <section className="page-grid"><PageHeader eyebrow="SETTINGS" title={tr(lang,"settings")}/>
+ <div className="card panel full-span"><div className="module-head"><div><small className="eyebrow-mini">RELEASE & DECISION MODELS</small><h3>{bi(lang,"إصدار Aqua Nexus","Aqua Nexus version")}</h3><p className="note">{bi(lang,"كل قرار تاريخي جديد يُحفظ مع نسخة محركات القرار المستخدمة حتى تبقى النتائج قابلة للتدقيق بعد أي تحديث مستقبلي.","New historical decisions are stamped with the model versions used so results remain auditable after future updates.")}</p></div><span className="scene-badge">{AQUA_NEXUS_VERSION}</span></div><div className="summary-strip"><div className="summary"><small>Tank Brain</small><b>{AQUA_MODEL_VERSIONS.tankBrain}</b></div><div className="summary"><small>Health Model</small><b>{AQUA_MODEL_VERSIONS.health}</b></div><div className="summary"><small>Chemistry Evidence</small><b>{AQUA_MODEL_VERSIONS.chemistryEvidence}</b></div></div></div>
  <div className="card panel"><label className="field"><span>{tr(lang,"language")}</span><select value={lang} onChange={e=>state.setLanguage(e.target.value as any)}><option value="ar">{tr(lang,"arabic")}</option><option value="en">{tr(lang,"english")}</option></select></label><label className="field"><span>{tr(lang,"name")}</span><input value={name} onChange={e=>setName(e.target.value)}/></label><button className="btn primary" onClick={()=>patch(tank.id,{name})}>{tr(lang,"save")}</button><div className="inline-alert good">{tr(lang,"actualTranslationNote")}</div></div>
 
  <div className="card panel full-span aquarium-experience-card">
