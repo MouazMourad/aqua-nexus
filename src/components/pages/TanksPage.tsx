@@ -105,7 +105,7 @@ export function TanksPage({tanks,selectedTankId,onSelect}:{tanks:Tank[];selected
   <Modal open={!!deleteTarget} title={lang==="ar"?"حذف الحوض نهائياً":"Delete tank permanently"} onClose={()=>setDeleteTarget(null)}>
    <div className="tank-delete-warning">
     <b>⚠️ {lang==="ar"?"تحذير":"Warning"}</b>
-    <p>{lang==="ar"?`سيتم حذف الحوض «${deleteTarget?.name??""}» وجميع بياناته المسجلة نهائياً. لا يمكن التراجع عن هذه العملية.`:`The tank “${deleteTarget?.name??""}” and all of its saved data will be permanently deleted. This cannot be undone.`}</p>
+    <p>{lang==="ar"?`سيتم حذف الحوض «${deleteTarget?.name??""}» من مساحة العمل. قبل الحذف Aqua Nexus سينشئ Checkpoint استعادة تلقائياً، ويمكن التراجع من Settings إذا احتجت.`:`The tank “${deleteTarget?.name??""}” will be removed from the workspace. Aqua Nexus creates an automatic recovery checkpoint first, and you can undo from Settings if needed.`}</p>
    </div>
    <div className="modal-actions"><button className="btn" onClick={()=>setDeleteTarget(null)}>{lang==="ar"?"إلغاء":"Cancel"}</button><button className="btn tank-delete-confirm" onClick={()=>void confirmDelete()}>{lang==="ar"?"حذف نهائي":"Delete permanently"}</button></div>
   </Modal>
