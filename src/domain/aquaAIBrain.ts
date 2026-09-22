@@ -21,6 +21,7 @@ import { tankLearningMaturity } from "./tankPatterns";
 import { formatLightMinute,lightingIntelligence } from "./lightingIntelligence";
 import { equipmentImportIntelligence } from "./equipmentImport";
 import { measuredChemistryReadings } from "./chemistryDataQuality";
+import { localDateKey } from "./timeSafety";
 
 export type AquaAIConfidence="low"|"medium"|"high";
 export type AquaAIPage="dashboard"|"chemistry"|"maintenance"|"equipment"|"lighting"|"livestock"|"timeline"|"dosing"|"quarantine"|"emergency"|"rodi"|"journal"|"acclimation"|"inventory"|"feeding"|"waterchange"|"expenses"|"sump"|"diseases"|"alerts";
@@ -189,7 +190,7 @@ function forecastAnswer(tank:Tank):AquaAIAnswer{
 }
 
 function maintenanceAnswer(tank:Tank):AquaAIAnswer{
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDateKey();
   const due=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).due);
   const upcoming=tank.maintenance.filter(x=>!maintenanceEffectiveState(x,today).completed&&x.nextDue&&x.nextDue>today).sort((a,b)=>String(a.nextDue).localeCompare(String(b.nextDue))).slice(0,3);
   return {
