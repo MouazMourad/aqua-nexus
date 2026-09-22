@@ -1,68 +1,78 @@
-# Aqua Nexus 3D — Final Architecture
+# Aqua Nexus 3D — Architecture (v0.3.0-rc.2)
 
-## Decision
-The final product is no longer based on a single HTML file or CSS pseudo-3D.
+## Product posture
+Aqua Nexus is a local-first Release Candidate for controlled testing. Accounts and full cloud sync are intentionally outside the current acceptance scope.
 
-Core:
+## Core stack
 - React / Next.js
-- React Three Fiber
-- Three.js
-- Drei
-- Zustand
-- Blender -> GLB/GLTF assets
-- PostgreSQL/API in the cloud phase
-- PWA for mobile installation
+- React Three Fiber / Three.js / Drei
+- Zustand operational state
+- IndexedDB durable local persistence with verified fallback
+- PostgreSQL/API backend paths for optional server features
+- PWA/mobile browser support
+
+## Product architecture
+Pages own data-entry workflows, but they do not own separate decision logic. The canonical flow is:
+
+`Tank state -> domain validation/safety -> Tank Brain / Intelligence Core -> dashboard, alerts and AI presentation`
+
+Key domains currently include multi-tank setup, biological cycling, chemistry, maintenance, equipment, unified device import, lighting, sump, livestock, acclimation, inventory, feeding, dosing, water changes, RO/DI, quarantine, emergencies, journal/media, reports, lifecycle and long-term history.
+
+## Chemistry evidence contract
+Chemistry has a hard evidence distinction:
+- **Measured evidence:** values explicitly measured by the user or accepted from a validated import/device source.
+- **Reference/default values:** educational/setup references only.
+
+Reference/default values:
+- are never returned by the canonical latest-parameter measurement helper;
+- never count toward weekly chemistry completion;
+- never satisfy freshness or dosing-readiness requirements;
+- are separated from measured chemistry in Tank Brain and external AI context;
+- are no longer persisted as initial chemistry by Smart Setup.
+
+## Tank Brain and AI
+Deterministic aquarium logic remains authoritative for safety-sensitive decisions. External AI is an optional synthesis/explanation layer and cannot override dosing, treatment, acclimation, cycling or intervention gates.
+
+Canonical Tank Brain snapshot schema: **aqua-nexus-tank-brain/v2**.
+AI context schema: **aqua-nexus-ai-context/v2**.
+
+## Health model
+Current Health Model **2.0.0** combines only known components and normalizes active weights:
+- Chemistry: 30%
+- Maintenance: 15%
+- Bioload: 15%
+- Equipment adequacy: 20%
+- Livestock compatibility: up to 15%, scaled by verified coverage
+- Livestock condition: 5%
+
+A hard chemistry safety violation overrides the descriptive band so a chemically critical tank is never described as stable merely because the weighted average is high.
+
+## Decision model versioning
+Central source: `src/domain/version.ts`.
+
+Current versions:
+- Product: **0.3.0-rc.2**
+- Tank Brain: **1.0.0**
+- Health Model: **2.0.0**
+- Chemistry Evidence: **1.0.0**
+
+New Health Snapshots store the model versions used at calculation time, preserving auditability when algorithms evolve.
+
+## Unified import
+Equipment/controller and lighting imports support structured files, text extraction and screenshot-assisted AI extraction where configured. Every import is reviewed before apply. Provenance, confidence, source fingerprint and warnings are retained; implausible chemistry is blocked locally before entering tank state.
 
 ## 3D Digital Twin
-The 3D scene is generated from tank data:
-- Display length / width / height
-- Sump geometry
-- Chamber X/Y positions and chamber dimensions
-- Water level
-- Equipment location
-- Flow direction
+The 3D scene is generated from real tank state:
+- display dimensions and water volume;
+- sump geometry, chamber positions and water levels;
+- equipment location;
+- lighting schedule/coverage;
+- flow/system layout.
 
-Current v1 models are procedural Three.js geometry so the engine is already dynamic.
-Later, each procedural model can be replaced by a Blender GLB without changing the data model.
+Procedural Three.js models can later be replaced by GLB/GLTF assets without changing the domain model.
 
-## Modules from the current prototype
-Already represented in the target domain:
-- Multi-tank
-- Marine / Freshwater
-- Chemistry
-- Maintenance
-- Equipment
-- Sump
-- Tank Health
+## Data and history
+Operational state is local-first. Large media and historical overflow are stored outside the hot Tank JSON. Full Recovery Backup validates structure and fails closed rather than exporting a knowingly incomplete recovery artifact.
 
-Next migration batches:
-1. Inventory + alerts
-2. Livestock + library + compatibility + bioload
-3. Diseases + treatment + quarantine
-4. Dosing + doser chambers + maintenance follow-up
-5. Timeline + photos + water changes + feeding
-6. RO/DI + expenses + reports + export
-7. Smart insights / event correlation
-8. Authentication + cloud sync
-9. Subscription feature flags
-
-## Health
-Tank Health = Chemistry Health * 70% + Maintenance Health * 30%
-
-## Asset strategy
-Blender library:
-- Protein skimmer
-- Return pump
-- Filter sock / roller filter
-- Reactor
-- Heater
-- Wave maker
-- Lighting
-- Doser
-- UV
-- Ozone
-- Refugium light
-- Turf scrubber
-- Sensors / probes
-
-Each asset is exported as GLB and mapped to EquipmentKind.
+## Release acceptance
+A feature may not bypass deterministic safety, measured-data evidence rules, history/event coverage or recovery guarantees. Safety, data integrity and core usability issues take priority over net-new feature expansion.
