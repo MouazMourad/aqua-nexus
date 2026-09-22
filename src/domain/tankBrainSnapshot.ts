@@ -1,4 +1,5 @@
 import type { JournalPhoto,Tank } from "./types";
+import { AQUA_MODEL_VERSIONS,AQUA_NEXUS_VERSION } from "./version";
 
 function tail<T>(rows:T[]|undefined,limit:number){return (rows??[]).slice(0,limit);}
 function acclimationForBrain(session:any){
@@ -25,9 +26,13 @@ export function buildTankBrainSnapshot(tank:Tank){
   const extended=tank as Tank & {aiActionPlans?:unknown[]};
   const activeAcclimation=(tank.acclimationSessions??[]).filter(x=>x.status!=="completed");
   const recentAcclimation=(tank.acclimationSessions??[]).filter(x=>x.status==="completed").slice(0,8);
+  const measuredChemistry=tank.chemistry.filter(x=>!x.usingDefaults);
+  const referenceChemistry=tank.chemistry.filter(x=>x.usingDefaults);
   return {
-    schema:"aqua-nexus-tank-brain/v1",
+    schema:"aqua-nexus-tank-brain/v2",
     generatedAt:new Date().toISOString(),
+    productVersion:AQUA_NEXUS_VERSION,
+    modelVersions:AQUA_MODEL_VERSIONS,
     identity:{
       id:tank.id,name:tank.name,type:tank.type,status:tank.status,ageMonths:tank.ageMonths,
       ecosystemProfile:tank.ecosystemProfile,plantedMode:tank.plantedMode,
@@ -45,7 +50,7 @@ export function buildTankBrainSnapshot(tank:Tank){
       topOff:tail(tank.topOff,120),
       deviceAlerts:tail(tank.deviceAlerts,80)
     },
-    chemistry:{count:tank.chemistry.length,recent:tail(tank.chemistry,40)},
+    chemistry:{count:measuredChemistry.length,totalRecords:tank.chemistry.length,recent:tail(measuredChemistry,40),referenceDefaults:tail(referenceChemistry,3)},
     maintenance:{count:tank.maintenance.length,items:tail(tank.maintenance,120)},
     livestock:{
       current:tank.livestock,
@@ -82,7 +87,8 @@ export function buildTankBrainSnapshot(tank:Tank){
       assessments:tail(tank.visionAssessments,30)
     },
     coverage:{
-      chemistry:tank.chemistry.length,
+      chemistry:measuredChemistry.length,
+      chemistryReferenceDefaults:referenceChemistry.length,
       maintenance:tank.maintenance.length,
       livestock:tank.livestock.length,
       equipment:tank.equipment.length,
