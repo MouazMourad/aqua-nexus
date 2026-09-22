@@ -2,7 +2,8 @@ import type { HealthSnapshot, Tank, TimelineEvent } from "./types";
 import { bioload, chemistryAgeDays, chemistryHealthAssessment, chemistryHistoryScore, maintenanceHealth } from "./health";
 import { systemHealth } from "./systemHealth";
 import { chemistryGuidance } from "./chemistryGuidance";
-import { maintenanceEffectiveState } from "./maintenanceSchedule";\nimport { localDateKey } from "./timeSafety";
+import { maintenanceEffectiveState } from "./maintenanceSchedule";
+import { localDateKey } from "./timeSafety";
 
 export type TankStateBand = "excellent" | "stable" | "watch" | "stressed" | "critical";
 
