@@ -1,4 +1,5 @@
 import type { Tank } from "./types";
+import { measuredChemistryReadings } from "./chemistryDataQuality";
 
 export type NutrientTrend = "rising" | "stable" | "falling" | "unknown";
 export type NutrientState =
@@ -48,8 +49,9 @@ function atomicNPRatio(no3: number, po4: number) {
 }
 
 export function analyzeNutrients(tank: Tank): NutrientAnalysis {
-  const latest = tank.chemistry[0]?.values ?? {};
-  const previous = tank.chemistry[1]?.values ?? {};
+  const measured = measuredChemistryReadings(tank);
+  const latest = measured[0]?.values ?? {};
+  const previous = measured[1]?.values ?? {};
   const no3 = numeric(latest.NO3);
   const po4 = numeric(latest.PO4);
   const prevNo3 = numeric(previous.NO3);
