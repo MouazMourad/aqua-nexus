@@ -1,7 +1,18 @@
 const LEASE_KEY="aqua-nexus-writer-lease-v1";
 const LEASE_MS=12_000;
 const HEARTBEAT_MS=3_000;
-const TAB_ID=typeof crypto!=="undefined"&&"randomUUID" in crypto?crypto.randomUUID():`tab-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const TAB_SESSION_KEY="aqua-nexus-tab-id-v1";
+function resolveTabId(){
+  if(typeof window==="undefined")return "server";
+  try{
+    const existing=sessionStorage.getItem(TAB_SESSION_KEY);if(existing)return existing;
+    const id=typeof crypto!=="undefined"&&"randomUUID" in crypto?crypto.randomUUID():`tab-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    sessionStorage.setItem(TAB_SESSION_KEY,id);return id;
+  }catch{
+    return typeof crypto!=="undefined"&&"randomUUID" in crypto?crypto.randomUUID():`tab-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+}
+const TAB_ID=resolveTabId();
 
 interface Lease{owner:string;heartbeat:number}
 
