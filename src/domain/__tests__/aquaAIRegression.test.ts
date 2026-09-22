@@ -1345,6 +1345,15 @@ describe("RC.3 safety and data-integrity hardening",()=>{
     expect(latestParameterSample(t,"KH")?.value).toBe(7.6);
   });
 
+  it("blocks even the first dose step when its chemistry evidence is stale",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.systemVolumeLiters=500;
+    const old=new Date(Date.now()-72*3600000).toISOString();
+    t.chemistry=[{timestamp:old,values:{KH:7},usingDefaults:false,source:"manual",confidence:"high"}];
+    const dose={id:"dose-plan",timestamp:old,parameter:"KH",current:7,target:9,ml:100,amount:100,unit:"mL",material:"test",steps:2,perStep:50,stepIndex:0,status:"planned" as const,calculatorMode:"product" as const,sourceReadingTimestamp:old,systemVolumeLiters:500};
+    expect(doseStepExecutionGate(t,dose,1).code).toBe("stale_measurement");
+  });
+
   it("blocks multi-step dosing until a real post-dose retest exists",()=>{
     const t=structuredClone(demoMarineTank);
     const executedAt=new Date(Date.now()-3600000).toISOString();
