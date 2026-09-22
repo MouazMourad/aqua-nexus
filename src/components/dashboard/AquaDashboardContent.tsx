@@ -20,6 +20,7 @@ import { estimatedParAt,formatLightMinute,lightingAtMinute } from "@/domain/ligh
 import { DashboardFeatureBubble } from "@/components/dashboard/DashboardFeatureBubble";
 import { markFeatureLearned } from "@/lib/featureDiscovery";
 import { AcademyDashboardEntry } from "@/components/academy/AcademyDashboardEntry";
+import { today } from "@/lib/appUtils";
 
 type ModuleId="chemistry"|"lighting"|"maintenance"|"bioload"|"forecast"|"intelligence"|"digitalTwin"|"equipment"|"predictions"|"memory"|"context"|"journey";
 type SceneMode="tank"|"equipment"|"flow"|"empty";
@@ -35,8 +36,8 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
  const system=core.health,th=system.score;
  const insights=core.insights,state=core.state,forecast=core.forecast,context=tankContextStats(tank);
  const mood=tankMood(tank),predictions=core.predictions,memory=core.memory;
- const today=new Date().toISOString().slice(0,10);
- const due=tank.maintenance.filter(x=>maintenanceTaskDue(x,today)).slice(0,5);
+ const todayKey=today();
+ const due=tank.maintenance.filter(x=>maintenanceTaskDue(x,todayKey)).slice(0,5);
  const age=chemistryAgeDays(tank),latest=tank.chemistry[0]?.values??{};
  const activeAcclimation=(tank.acclimationSessions??[]).find(s=>s.status!=="completed");
  const equipmentWarnings=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
