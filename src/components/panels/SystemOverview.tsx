@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Tank } from "@/domain/types";
-import { chemistryHealth,maintenanceHealth,tankHealth } from "@/domain/health";\nimport { currentChemistryValues } from "@/domain/chemistryDataQuality";
+import { chemistryHealth,maintenanceHealth,tankHealth } from "@/domain/health";
+import { currentChemistryValues } from "@/domain/chemistryDataQuality";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr } from "@/i18n";
 
