@@ -8,6 +8,7 @@ import { EquipmentPanel } from "@/components/panels/EquipmentPanel";
 import { TankHealthShareCard } from "@/components/dashboard/TankHealthShareCard";
 import { TankJourney } from "@/components/dashboard/TankJourney";
 import { bioload,chemistryAgeDays,chemistryHealthAssessment,maintenanceHealth } from "@/domain/health";
+import { currentChemistryValues } from "@/domain/chemistryDataQuality";
 import { systemHealthTrend } from "@/domain/systemHealth";
 import { tankIntelligenceCore } from "@/domain/intelligenceCore";
 import { smartInsights } from "@/domain/smartInsights";
@@ -38,7 +39,7 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
  const mood=tankMood(tank),predictions=core.predictions,memory=core.memory;
  const todayKey=today();
  const due=tank.maintenance.filter(x=>maintenanceTaskDue(x,todayKey)).slice(0,5);
- const age=chemistryAgeDays(tank),latest=tank.chemistry[0]?.values??{};
+ const age=chemistryAgeDays(tank),latest=currentChemistryValues(tank);
  const activeAcclimation=(tank.acclimationSessions??[]).find(s=>s.status!=="completed");
  const equipmentWarnings=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
  const nowLight=new Date(),lightMinute=nowLight.getHours()*60+nowLight.getMinutes(),lightProgram=core.lighting.program;
