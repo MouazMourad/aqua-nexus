@@ -4,6 +4,7 @@ import { useAquaStore } from "@/store/useAquaStore";
 import { syncPushReminders } from "@/lib/pushNotifications";
 import { bioload,chemistryHealth,maintenanceHealth,tankHealth,tankHealthTrend } from "@/domain/health";
 import { activeVacation,isTankArchived } from "@/domain/tankLifecycle";
+import { today } from "@/lib/appUtils";
 
 const PROMPT_KEY="aqua-nexus-notification-prompt-v1";
 
@@ -61,7 +62,7 @@ export function PushReminderSync(){
     });
     if(!unstable.length)return;
     const signature=unstable.map(t=>`${t.id}:${tankHealth(t)}:${chemistryHealth(t)}:${maintenanceHealth(t)}:${tankHealthTrend(t)}`).join("|");
-    const key=`aqua-nexus-unstable:${new Date().toISOString().slice(0,10)}`;
+    const key=`aqua-nexus-unstable:${today()}`;
     if(localStorage.getItem(key)===signature)return;
     const names=unstable.map(t=>t.name).join(language==="ar"?"، ":", ");
     navigator.serviceWorker?.ready.then(reg=>reg.active?.postMessage({
