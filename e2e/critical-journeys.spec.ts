@@ -61,6 +61,34 @@ test("dashboard keeps health first and exposes state risk and next action",async
   await expect(hero).toContainText(/شو أعمل هلا|What should I do now/);
 });
 
+test("Academy teaches concepts, tracks progress, searches glossary and deep-links to real pages",async({page})=>{
+  await openTrainingDashboard(page);
+  const entry=page.locator(".academy-dashboard-entry");
+  await expect(entry).toBeVisible();
+  await entry.getByRole("button",{name:/فتح Academy|Open Academy/}).click();
+  const academy=page.locator(".academy-page");
+  await expect(academy).toBeVisible();
+  await expect(page.locator(".academy-lesson")).toContainText(/الحوض نظام حي|living system/i);
+
+  await page.getByRole("button",{name:/فهمت الدرس|Mark understood/}).click();
+  await expect(page.locator(".academy-progress")).toContainText("1/12");
+
+  await page.getByRole("button",{name:/قاموس المصطلحات|Glossary/}).click();
+  await page.locator(".academy-search input").fill("PAR");
+  const par=page.locator(".academy-term").filter({hasText:"PAR"}).first();
+  await expect(par).toBeVisible();
+  await par.click();
+  await expect(page.locator(".academy-lesson")).toContainText(/الإنارة وPAR|Lighting & PAR/i);
+
+  await page.locator(".academy-page-links").getByRole("button",{name:/الإنارة|Lighting/}).click();
+  await expect(page.locator(".lighting-page")).toBeVisible();
+  const shortcut=page.locator(".academy-context-shortcut");
+  await expect(shortcut).toBeVisible();
+  await shortcut.getByRole("button",{name:/تعلّم|Learn/}).click();
+  await expect(page.locator(".academy-page")).toBeVisible();
+  await expect(page.locator(".academy-lesson")).toContainText(/الإنارة وPAR|Lighting & PAR/i);
+});
+
 test("critical pages open from the real navigation",async({page})=>{
   await openTrainingDashboard(page);
   await goToPage(page,"chemistry");
@@ -653,3 +681,40 @@ test("Equipment screenshot import uses Vision analysis and applies edited device
   await expect(page.locator(".card.panel").filter({hasText:/IMPORTED DEVICE DATA/})).toContainText(/HYDROS|91%/);
 });
 
+
+
+test("Aqua Nexus Academy opens from Dashboard, teaches 12 lessons and persists progress",async({page})=>{
+  await openTrainingDashboard(page);
+  const entry=page.locator(".academy-dashboard-entry");
+  await expect(entry).toBeVisible();
+  await entry.getByRole("button",{name:/فتح Academy|Open Academy/}).click();
+  await expect(page.locator(".academy-page")).toBeVisible();
+  await expect(page.locator(".academy-lesson-nav")).toHaveCount(12);
+  await expect(page.locator(".academy-brain-use")).toBeVisible();
+  await page.getByRole("button",{name:/فهمت الدرس|Mark understood/}).click();
+  await expect(page.locator(".academy-progress")).toContainText("1/12");
+  await page.reload();
+  await openTrainingDashboard(page);
+  await page.locator(".academy-dashboard-entry").getByRole("button",{name:/فتح Academy|Open Academy/}).click();
+  await expect(page.locator(".academy-progress")).toContainText("1/12");
+  const finalLesson=page.locator(".academy-lesson-nav").filter({hasText:/Tank Brain/}).last();
+  await finalLesson.click();
+  await expect(page.locator(".academy-brain-flow")).toBeVisible();
+  await expect(page.locator(".academy-lesson")).toContainText(/Input|Validation|Confidence|Next Action/);
+});
+
+test("Academy contextual shortcut deep-links from Chemistry and glossary finds PAR",async({page})=>{
+  await openTrainingDashboard(page);
+  await goToPage(page,"chemistry");
+  const shortcut=page.locator(".academy-context-shortcut");
+  await expect(shortcut).toBeVisible();
+  await shortcut.getByRole("button",{name:/تعلّم|Learn/}).click();
+  await expect(page.locator(".academy-page")).toBeVisible();
+  await expect(page.locator(".academy-lesson")).toContainText(/كيمياء الحوض|Aquarium chemistry/);
+  await page.getByRole("button",{name:/قاموس المصطلحات|Glossary/}).click();
+  const search=page.locator(".academy-search input");
+  await search.fill("PAR");
+  const terms=page.locator(".academy-term");
+  await expect(terms).toHaveCount(1);
+  await expect(terms.first()).toContainText("PAR");
+});

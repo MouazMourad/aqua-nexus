@@ -27,6 +27,8 @@ import { ExpensesPage } from "./ExpensesPage";
 import { AlertsPage } from "./AlertsPage";
 import { ReportsPage } from "./ReportsPage";
 import { SettingsPage } from "./SettingsPage";
+import { AcademyPage } from "./AcademyPage";
+import { AcademyShortcut } from "@/components/academy/AcademyShortcut";
 import { biologicalCycleStatus,isCyclePageAllowed } from "@/domain/biologicalCycle";
 import { useAquaStore } from "@/store/useAquaStore";
 import { bi } from "@/i18n";
@@ -36,7 +38,7 @@ export function PageRouter({page,tank,tanks,selectedTankId,onSelectTank,onNaviga
  const lang=useAquaStore(s=>s.language),cycle=biologicalCycleStatus(tank);
  useEffect(()=>{markPageFeaturesLearned(page)},[page]);
  let content:ReactNode;
- if(cycle.active&&!isCyclePageAllowed(page)){
+ if(cycle.active&&page!=="academy"&&!isCyclePageAllowed(page)){
   content=<section className="page-grid"><div className="card panel full-span"><div className="inline-alert warn"><b>🔒 {bi(lang,"هالوحدة مقفلة خلال الدورة البيولوجية.","This module is locked during biological cycling.")}</b><p>{bi(lang,"Aqua Nexus عم يوقف العمليات غير المرتبطة بالدورة لحماية الحوض. كمّل خطوات الدورة والقياسات أولاً.","Aqua Nexus pauses non-cycle workflows to protect the tank. Complete cycling steps and measured tests first.")}</p><button className="btn primary" onClick={()=>onNavigate("dashboard")}>{bi(lang,"العودة لمتابعة الدورة","Back to cycle tracking")}</button></div></div></section>;
  }else switch(page){
   case"tanks":content=<TanksPage tanks={tanks} selectedTankId={selectedTankId} onSelect={onSelectTank}/>;break;
@@ -62,10 +64,12 @@ export function PageRouter({page,tank,tanks,selectedTankId,onSelectTank,onNaviga
   case"alerts":content=<AlertsPage tank={tank}/>;break;
   case"reports":content=<ReportsPage tank={tank}/>;break;
   case"settings":content=<SettingsPage tank={tank}/>;break;
+  case"academy":content=<AcademyPage onNavigate={onNavigate}/>;break;
   default:content=<AquaDashboardContent tank={tank} onNavigate={onNavigate}/>;
  }
  return <div className="page-help-wrap">
   {page==="dashboard"&&<CreatorContactStrip/>}
+  {page!=="dashboard"&&page!=="academy"&&<AcademyShortcut page={page}/>}
   {content}
  </div>;
 }

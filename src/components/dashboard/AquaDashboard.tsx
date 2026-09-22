@@ -17,6 +17,8 @@ import { syncPushReminders } from "@/lib/pushNotifications";
 import { validateTankSetupEntry } from "@/domain/inputSanity";
 import { validateChemistryValues } from "@/domain/chemistryDataQuality";
 import { archivedPageAllowed,isTankArchived } from "@/domain/tankLifecycle";
+import { AcademyWizardHelp } from "@/components/academy/AcademyWizardHelp";
+import type { AcademyLessonId } from "@/data/academy";
 
 const equipOptions: {kind:EquipmentKind;ar:string;en:string}[] = [
  {kind:"lighting",ar:"إضاءة",en:"Lighting"},
@@ -39,20 +41,28 @@ export function AquaDashboard() {
  const showOnboarding=realTanks.length===0&&!trainingPreviewId;
  const cycle=tank?biologicalCycleStatus(tank):null;
  const archived=Boolean(tank&&isTankArchived(tank));
- const allPages:AppPage[]=["dashboard","tanks","equipment","lighting","sump","livestock","acclimation","library","chemistry","maintenance","inventory","diseases","timeline","journal","waterchange","feeding","dosing","quarantine","emergency","rodi","expenses","alerts","reports","settings"];
+ const allPages:AppPage[]=["dashboard","tanks","equipment","lighting","sump","livestock","acclimation","library","chemistry","maintenance","inventory","diseases","timeline","journal","waterchange","feeding","dosing","quarantine","emergency","rodi","expenses","alerts","reports","settings","academy"];
  const lockedPages:AppPage[]=archived
-  ?allPages.filter(p=>!archivedPageAllowed(p))
-  :(cycle?.active?allPages.filter(p=>!isCyclePageAllowed(p)):[]);
+  ?allPages.filter(p=>p!=="academy"&&!archivedPageAllowed(p))
+  :(cycle?.active?allPages.filter(p=>p!=="academy"&&!isCyclePageAllowed(p)):[]);
  const navigatePage=(next:AppPage)=>{
+  if(next==="academy"){setPage("academy");return;}
   if(archived&&!archivedPageAllowed(next)){setPage("dashboard");return;}
   if(cycle?.active&&!isCyclePageAllowed(next)){setPage("dashboard");return;}
   setPage(next);
  };
 
  useEffect(()=>{
+  if(page==="academy")return;
   if(archived&&!archivedPageAllowed(page)){setPage("dashboard");return;}
   if(cycle?.active&&!isCyclePageAllowed(page))setPage("dashboard");
  },[archived,cycle?.active,page,tank?.id]);
+
+ useEffect(()=>{
+  const handler=(event:Event)=>{const next=(event as CustomEvent<AppPage>).detail;if(next)navigatePage(next)};
+  window.addEventListener("aqua:navigate",handler);
+  return()=>window.removeEventListener("aqua:navigate",handler);
+ },[archived,cycle?.active]);
 
  useEffect(()=>{
   if(typeof window==="undefined"||!("Notification" in window)||Notification.permission!=="granted")return;
@@ -109,6 +119,9 @@ export function AquaDashboard() {
   tr(language,"tankIdentity"),tr(language,"dimensions"),tr(language,"sumpSetup"),
   tr(language,"coreEquipment"),tr(language,"routineMaintenance"),tr(language,"initialChemistry"),tr(language,"review")
  ];
+ const wizardAcademyLesson:AcademyLessonId=([
+  "aquarium-system","aquarium-system","filtration-sump","filtration-sump","maintenance-waterchanges","chemistry","tank-brain-ai"
+ ] as AcademyLessonId[])[step-1]??"aquarium-system";
 
  const preview=useMemo(()=>{
    const gross=l*w*h/1000,net=gross*(1-loss/100),sumpNet=hasSump?sl*sw*sh/1000*fill/100:0;
@@ -167,6 +180,7 @@ export function AquaDashboard() {
   <Modal open={open} title={tr(language,"smartSetup")} onClose={()=>setOpen(false)}>
    <div className="wizard-step-label"><b>{step}. {wizardSteps[step-1]}</b><span>{step}/7</span></div>
    <div className="wizard-progress"><i style={{width:`${step/7*100}%`}}/></div>
+   <AcademyWizardHelp lessonId={wizardAcademyLesson} lang={language}/>
 
    {step===1&&<div className="form-grid">
     <label className="field"><span>{tr(language,"name")}</span><input value={name} onChange={e=>setName(e.target.value)}/></label>

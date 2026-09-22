@@ -19,6 +19,7 @@ import { maintenanceTaskDue } from "@/domain/maintenanceSchedule";
 import { estimatedParAt,formatLightMinute,lightingAtMinute } from "@/domain/lightingIntelligence";
 import { DashboardFeatureBubble } from "@/components/dashboard/DashboardFeatureBubble";
 import { markFeatureLearned } from "@/lib/featureDiscovery";
+import { AcademyDashboardEntry } from "@/components/academy/AcademyDashboardEntry";
 
 type ModuleId="chemistry"|"lighting"|"maintenance"|"bioload"|"forecast"|"intelligence"|"digitalTwin"|"equipment"|"predictions"|"memory"|"context"|"journey";
 type SceneMode="tank"|"equipment"|"flow"|"empty";
@@ -204,6 +205,8 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
 
 
   {customizing&&<section className="card panel pd-customizer"><div className="module-head"><div><small className="eyebrow-mini">DASHBOARD LAYOUT</small><h3>{lang==="ar"?"اختار شو يظهر ورتّب صناديق التحليل":"Choose and arrange analysis cards"}</h3><p className="note">{lang==="ar"?"الحالة والخطر والإجراء المطلوب اليوم تبقى ظاهرة دائماً؛ التخصيص يغيّر طبقة التفاصيل فقط حتى ما تضيع المعلومة الأساسية.":"Tank state, risk and today’s action always stay visible. Customization changes only the deeper analysis layer."}</p></div><button className="btn" onClick={resetLayout}>{lang==="ar"?"إعادة الافتراضي":"Reset"}</button></div><div className="pd-custom-list">{order.map((id,i)=><div className="pd-custom-row" key={id}><label><input type="checkbox" checked={!hidden.includes(id)} onChange={()=>toggleModule(id)}/><span>{labels[id].icon} {lang==="ar"?labels[id].ar:labels[id].en}</span></label><div><button className="icon-btn" disabled={i===0} onClick={()=>moveModule(id,-1)}>↑</button><button className="icon-btn" disabled={i===order.length-1} onClick={()=>moveModule(id,1)}>↓</button></div></div>)}</div></section>}
+
+  <AcademyDashboardEntry lang={lang} onNavigate={onNavigate}/>
 
   <div className="pd-module-grid">
    <section data-dashboard-module="smart-import" className="card panel pd-module">
