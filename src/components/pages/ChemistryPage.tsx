@@ -5,7 +5,7 @@ import type { ChemistryReading,MaintenanceTask,Tank } from "@/domain/types";
 import { chemistryCatalogForTank,profileLabel,resolvedAquariumProfile } from "@/domain/chemistryProfile";
 import { chemistryHealthAssessment,parameterScore } from "@/domain/health";
 import { chemistryGuidance } from "@/domain/chemistryGuidance";
-import { findNearDuplicateChemistryReading,isExactChemistryDuplicate,latestParameterSamples,validateChemistryValue,weeklyChemistryCoverage } from "@/domain/chemistryDataQuality";
+import { findNearDuplicateChemistryReading,isExactChemistryDuplicate,latestParameterSample,latestParameterSamples,measuredChemistryReadings,validateChemistryValue,weeklyChemistryCoverage } from "@/domain/chemistryDataQuality";
 import { completeMaintenanceTask } from "@/domain/maintenanceSchedule";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
@@ -13,10 +13,10 @@ import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ContextHint } from "@/components/ui/ContextHint";
 import { AdvancedSection } from "@/components/ui/AdvancedSection";
-import { nowISO,uid } from "@/lib/appUtils";
+import { nowISO,today,uid } from "@/lib/appUtils";
+import { isMeaningfullyFutureTimestamp } from "@/domain/timeSafety";
 import { buildDelimitedText,downloadDelimitedFile,field,numberField,parseDelimitedText } from "@/lib/tabularImport";
 
-function today(){return new Date().toISOString().slice(0,10);}
 function isWeeklyChemistryTask(m:MaintenanceTask){return /قياس النسب الكيميائية|Weekly chemistry/i.test(`${m.title} ${m.titleEn||""}`);}
 
 export function ChemistryPage({tank}:{tank:Tank}) {
@@ -25,11 +25,23 @@ export function ChemistryPage({tank}:{tank:Tank}) {
  const [selected,setSelected]=useState(keys[0]),[open,setOpen]=useState(false),[values,setValues]=useState<Record<string,string>>(()=>Object.fromEntries(keys.map(k=>[k,""])));
  const [notes,setNotes]=useState(""),[testKit,setTestKit]=useState(""),[confidence,setConfidence]=useState<"high"|"medium"|"low">("high"),[importNote,setImportNote]=useState(""),[formNote,setFormNote]=useState("");
  const guidance=useMemo(()=>chemistryGuidance(tank),[tank]),assessment=useMemo(()=>chemistryHealthAssessment(tank),[tank]),weekly=useMemo(()=>weeklyChemistryCoverage(tank),[tank]);
- const chart=useMemo(()=>tank.chemistry.map(r=>({timestamp:new Date(r.timestamp).getTime(),date:new Date(r.timestamp).toLocaleDateString(),value:r.values[selected]})).filter(x=>typeof x.value==="number"&&Number.isFinite(x.value as number)).sort((a,b)=>a.timestamp-b.timestamp).slice(-30),[tank.chemistry,selected]);
+ const chart=useMemo(()=>measuredChemistryReadings(tank).map(r=>({timestamp:new Date(r.timestamp).getTime(),date:new Date(r.timestamp).toLocaleDateString(),value:r.values[selected]})).filter(x=>typeof x.value==="number"&&Number.isFinite(x.value as number)).sort((a,b)=>a.timestamp-b.timestamp).slice(-30),[tank.chemistry,selected]);
  const topProblems=guidance.problems.slice(0,6),actionItems=topProblems.slice(0,5),selectedMeta:any=cfg[selected];
 
  function openReading(){setValues(Object.fromEntries(keys.map(k=>[k,""])));setNotes("");setTestKit("");setConfidence("high");setFormNote("");setOpen(true);}
- function maybeCompleteWeekly(t:Tank,extra:ChemistryReading[]){const merged={...t,chemistry:[...extra,...t.chemistry]} as Tank;if(!weeklyChemistryCoverage(merged).complete)return t.maintenance;return t.maintenance.map(m=>isWeeklyChemistryTask(m)?completeMaintenanceTask(m,today()):m);}
+ function maintenanceAfterChemistry(t:Tank,extra:ChemistryReading[]){
+  const merged={...t,chemistry:[...extra,...t.chemistry]} as Tank;
+  const weeklyComplete=weeklyChemistryCoverage(merged).complete;
+  return t.maintenance.map(m=>{
+    if(weeklyComplete&&isWeeklyChemistryTask(m))return completeMaintenanceTask(m,today());
+    if(m.sourceDomain!=="dosing"||!m.sourceId?.startsWith("dose-retest:"))return m;
+    const [,doseId,stepRaw]=m.sourceId.split(":"),step=Number(stepRaw),dose=t.dosing.find(x=>x.id===doseId);
+    if(!dose||!Number.isFinite(step)||(dose.stepIndex??0)!==step||!dose.lastExecutedAt)return m;
+    const sample=latestParameterSample(merged,dose.parameter);
+    if(!sample||sample.confidence==="low"||new Date(sample.timestamp).getTime()<=new Date(dose.lastExecutedAt).getTime())return m;
+    return completeMaintenanceTask(m,today());
+  });
+ }
  function save(){
   const measured:Record<string,number|null>={},issues:string[]=[];
   for(const key of keys){const raw=(values[key]??"").trim();if(!raw)continue;const n=Number(raw);if(!Number.isFinite(n)){issues.push(`${key}: ${bi(lang,"رقم غير صالح","invalid number")}`);continue;}const issue=validateChemistryValue(tank,key,n);if(issue)issues.push(lang==="ar"?issue.ar:issue.en);else measured[key]=n;}
@@ -38,7 +50,7 @@ export function ChemistryPage({tank}:{tank:Tank}) {
   const duplicate=findNearDuplicateChemistryReading(tank,measured,10);
   if(duplicate&&!window.confirm(bi(lang,"نفس مجموعة القيم مسجلة تقريباً خلال آخر 10 دقائق. إذا هاي إعادة قياس فعلية اضغط متابعة؛ إذا كبسة مكررة اختار إلغاء.","The same set of values was already logged within about 10 minutes. Continue only if this is a real retest; cancel if it was an accidental duplicate.")))return;
   const reading:ChemistryReading={timestamp:nowISO(),values:measured,notes:notes||undefined,source:"manual",testKit:testKit.trim()||undefined,confidence};
-  patch(tank.id,t=>({...t,chemistry:[reading,...t.chemistry],maintenance:maybeCompleteWeekly(t,[reading]),timeline:[{id:uid("ev"),timestamp:reading.timestamp,type:"chemistry",textAr:`تم تسجيل قياسات فعلية: ${Object.keys(measured).join("، ")}.`,textEn:`Recorded measured chemistry values: ${Object.keys(measured).join(", ")}.`},...t.timeline]}));
+  patch(tank.id,t=>({...t,chemistry:[reading,...t.chemistry],maintenance:maintenanceAfterChemistry(t,[reading]),timeline:[{id:uid("ev"),timestamp:reading.timestamp,type:"chemistry",textAr:`تم تسجيل قياسات فعلية: ${Object.keys(measured).join("، ")}.`,textEn:`Recorded measured chemistry values: ${Object.keys(measured).join(", ")}.`},...t.timeline]}));
   setOpen(false);
  }
  function downloadTemplate(kind:"csv"|"txt"){const headers=["timestamp",...keys,"testKit","confidence","notes"],example:Record<string,unknown>={timestamp:new Date().toISOString(),testKit:"",confidence:"high",notes:""};keys.forEach(k=>example[k]="");const delimiter=kind==="txt"?"\t":",";downloadDelimitedFile(`Aqua_Nexus_${tank.type}_Chemistry_Template.${kind}`,buildDelimitedText(headers,[example],delimiter),kind==="txt"?"text/plain;charset=utf-8":"text/csv;charset=utf-8");}
@@ -46,10 +58,10 @@ export function ChemistryPage({tank}:{tank:Tank}) {
   if(!file)return;
   try{
    const {rows}=parseDelimitedText(await file.text()),readings:ChemistryReading[]=[],rejected:string[]=[];
-   rows.forEach((row,rowIndex)=>{const vals:Record<string,number|null>={},rowErrors:string[]=[];let hasValue=false;for(const key of keys){const raw=field(row,key).trim();if(!raw)continue;const n=numberField(row,key);if(n===null){rowErrors.push(`${key}: ${bi(lang,"ليس رقماً","not a number")}`);continue;}const issue=validateChemistryValue(tank,key,n);if(issue)rowErrors.push(lang==="ar"?issue.ar:issue.en);else{vals[key]=n;hasValue=true;}}const rawTimestamp=field(row,"timestamp").trim(),parsed=rawTimestamp?new Date(rawTimestamp):new Date();if(rawTimestamp&&Number.isNaN(parsed.getTime()))rowErrors.push(bi(lang,"timestamp غير صالح","invalid timestamp"));if(rowErrors.length){rejected.push(`#${rowIndex+2}: ${rowErrors.join("; ")}`);return;}if(!hasValue)return;const candidate:ChemistryReading={timestamp:parsed.toISOString(),values:vals,notes:field(row,"notes")||undefined,source:"import",testKit:field(row,"testKit")||undefined,confidence:(["high","medium","low"].includes(field(row,"confidence").toLowerCase())?field(row,"confidence").toLowerCase():"medium") as "high"|"medium"|"low",usingDefaults:false};if(isExactChemistryDuplicate([...tank.chemistry,...readings],candidate)){rejected.push(`#${rowIndex+2}: ${bi(lang,"قراءة مكررة","duplicate reading")}`);return;}readings.push(candidate);});
+   rows.forEach((row,rowIndex)=>{const vals:Record<string,number|null>={},rowErrors:string[]=[];let hasValue=false;for(const key of keys){const raw=field(row,key).trim();if(!raw)continue;const n=numberField(row,key);if(n===null){rowErrors.push(`${key}: ${bi(lang,"ليس رقماً","not a number")}`);continue;}const issue=validateChemistryValue(tank,key,n);if(issue)rowErrors.push(lang==="ar"?issue.ar:issue.en);else{vals[key]=n;hasValue=true;}}const rawTimestamp=field(row,"timestamp").trim(),parsed=rawTimestamp?new Date(rawTimestamp):new Date();if(rawTimestamp&&Number.isNaN(parsed.getTime()))rowErrors.push(bi(lang,"timestamp غير صالح","invalid timestamp"));if(rawTimestamp&&!Number.isNaN(parsed.getTime())&&isMeaningfullyFutureTimestamp(parsed.toISOString()))rowErrors.push(bi(lang,"timestamp بالمستقبل بشكل غير منطقي","timestamp is too far in the future"));if(rowErrors.length){rejected.push(`#${rowIndex+2}: ${rowErrors.join("; ")}`);return;}if(!hasValue)return;const candidate:ChemistryReading={timestamp:parsed.toISOString(),values:vals,notes:field(row,"notes")||undefined,source:"import",testKit:field(row,"testKit")||undefined,confidence:(["high","medium","low"].includes(field(row,"confidence").toLowerCase())?field(row,"confidence").toLowerCase():"medium") as "high"|"medium"|"low",usingDefaults:false};if(isExactChemistryDuplicate([...tank.chemistry,...readings],candidate)){rejected.push(`#${rowIndex+2}: ${bi(lang,"قراءة مكررة","duplicate reading")}`);return;}readings.push(candidate);});
    if(!readings.length){setImportNote(bi(lang,`لم يتم استيراد أي قراءة صالحة.${rejected.length?` مرفوض: ${rejected.slice(0,3).join(" | ")}`:""}`,`No valid readings were imported.${rejected.length?` Rejected: ${rejected.slice(0,3).join(" | ")}`:""}`));return;}
    readings.sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime());
-   patch(tank.id,t=>{const merged=[...readings,...t.chemistry].sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime());const draft={...t,chemistry:merged} as Tank;return {...t,chemistry:merged,maintenance:weeklyChemistryCoverage(draft).complete?t.maintenance.map(m=>isWeeklyChemistryTask(m)?completeMaintenanceTask(m,today()):m):t.maintenance,timeline:[{id:uid("ev"),timestamp:nowISO(),type:"chemistry-import",textAr:`تم استيراد ${readings.length} قراءة فعلية؛ رُفض ${rejected.length} صف.`,textEn:`Imported ${readings.length} measured reading(s); ${rejected.length} row(s) rejected.`},...t.timeline]};});
+   patch(tank.id,t=>{const merged=[...readings,...t.chemistry].sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime());return {...t,chemistry:merged,maintenance:maintenanceAfterChemistry(t,readings),timeline:[{id:uid("ev"),timestamp:nowISO(),type:"chemistry-import",textAr:`تم استيراد ${readings.length} قراءة فعلية؛ رُفض ${rejected.length} صف.`,textEn:`Imported ${readings.length} measured reading(s); ${rejected.length} row(s) rejected.`},...t.timeline]};});
    setImportNote(bi(lang,`تم استيراد ${readings.length} قراءة. الصفوف المرفوضة: ${rejected.length}.${rejected.length?` أول سبب: ${rejected[0]}`:""}`,`Imported ${readings.length} reading(s). Rejected rows: ${rejected.length}.${rejected.length?` First reason: ${rejected[0]}`:""}`));
   }catch{setImportNote(bi(lang,"تعذر قراءة الملف. استخدم قالب Aqua Nexus بصيغة CSV أو TXT.","Could not read the file. Use the Aqua Nexus CSV or TXT template."));}
  }
