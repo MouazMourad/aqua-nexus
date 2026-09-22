@@ -37,6 +37,8 @@ export function AcademyPage({onNavigate}:{onNavigate:(page:AppPage)=>void}){
  const filteredTerms=useMemo(()=>{
   const q=query.trim().toLowerCase();
   if(!q)return ACADEMY_TERMS;
+  const exact=ACADEMY_TERMS.filter(x=>x.term.toLowerCase()===q);
+  if(exact.length)return exact;
   return ACADEMY_TERMS.filter(x=>`${x.term} ${x.ar} ${x.en}`.toLowerCase().includes(q));
  },[query]);
 
