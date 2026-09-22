@@ -20,6 +20,7 @@ import { biologicalCycleKnowledgeSnapshot } from "./biologicalCycleKnowledge";
 import { equipmentImportIntelligence } from "./equipmentImport";
 import { currentChemistryValues } from "./chemistryDataQuality";
 import { AQUA_MODEL_VERSIONS,AQUA_NEXUS_VERSION } from "./version";
+import { localDateKey } from "./timeSafety";
 
 export interface TankAIContext {
   schema:"aqua-nexus-ai-context/v2";
@@ -45,7 +46,7 @@ export interface TankAIContext {
 
 const DAY=86400000;
 export function buildTankAIContext(tank:Tank):TankAIContext{
-  const today=new Date().toISOString().slice(0,10),now=Date.now();
+  const today=localDateKey(),now=Date.now();
   const state=tankStateView(tank),forecast=tankForecast(tank),mood=tankMood(tank),energy=tankEnergy(tank);
   const deviceData=equipmentImportIntelligence(tank);
   const system=systemHealth(tank),cycle=biologicalCycleStatus(tank),cycleKnowledge=biologicalCycleKnowledgeSnapshot(tank);
