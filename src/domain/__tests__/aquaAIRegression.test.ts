@@ -1352,11 +1352,20 @@ describe("RC.3 safety and data-integrity hardening",()=>{
     t.chemistry=[{timestamp:new Date(Date.now()-7200000).toISOString(),values:{KH:7},usingDefaults:false,source:"manual",confidence:"high"}];
     const dose={id:"dose-plan",timestamp:new Date(Date.now()-10800000).toISOString(),parameter:"KH",current:7,target:9,ml:100,amount:100,unit:"mL",material:"test",steps:2,perStep:50,stepIndex:1,status:"in_progress" as const,calculatorMode:"product" as const,sourceReadingTimestamp:t.chemistry[0].timestamp,systemVolumeLiters:500,lastExecutedAt:executedAt};
     expect(doseStepExecutionGate(t,dose,2).code).toBe("missing_retest");
-    t.chemistry.unshift({timestamp:new Date().toISOString(),values:{KH:7.8},usingDefaults:false,source:"manual",confidence:"high"});
+    t.chemistry.unshift({timestamp:new Date().toISOString(),values:{KH:8.1},usingDefaults:false,source:"manual",confidence:"high"});
     const gate=doseStepExecutionGate(t,dose,2);
     expect(gate.ok).toBe(true);
     expect(gate.amount).toBeLessThanOrEqual(50);
-    expect(gate.sampleValue).toBe(7.8);
+    expect(gate.sampleValue).toBe(8.1);
+  });
+
+  it("stops a plan when the retest response would require a larger-than-original next step",()=>{
+    const t=structuredClone(demoMarineTank);
+    const executedAt=new Date(Date.now()-3600000).toISOString();
+    t.systemVolumeLiters=500;
+    t.chemistry=[{timestamp:new Date().toISOString(),values:{KH:7.8},usingDefaults:false,source:"manual",confidence:"high"}];
+    const dose={id:"dose-plan",timestamp:new Date(Date.now()-10800000).toISOString(),parameter:"KH",current:7,target:9,ml:100,amount:100,unit:"mL",material:"test",steps:2,perStep:50,stepIndex:1,status:"in_progress" as const,calculatorMode:"product" as const,systemVolumeLiters:500,lastExecutedAt:executedAt};
+    expect(doseStepExecutionGate(t,dose,2).code).toBe("unexpected_response");
   });
 
   it("invalidates continuation when system volume changed after a dose plan",()=>{
