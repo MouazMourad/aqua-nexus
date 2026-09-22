@@ -15,6 +15,7 @@ import { AdvancedSection } from "@/components/ui/AdvancedSection";
 import { ContextHint } from "@/components/ui/ContextHint";
 import { validateAbsencePlan } from "@/domain/inputSanity";
 import { buildVacationTaskDrafts } from "@/domain/vacationPlan";
+import { doseStepExecutionGate } from "@/domain/dosingSafety";
 
 const cadences:MaintenanceTask["cadence"][]=["daily","weekly","monthly","quarterly","semiannual","annual"];
 
@@ -50,26 +51,40 @@ export function MaintenancePage({tank}:{tank:Tank}) {
     setTaskDetails(task.id);
     return;
   }
+  if(task?.sourceDomain==="dosing"&&task.sourceId?.startsWith("dose-retest:")){
+    window.alert(bi(lang,"مهمة إعادة القياس ما بتنغلق يدوياً. سجّل قراءة فعلية جديدة من صفحة الكيمياء، وAqua Nexus بيسكرها تلقائياً.","A dose retest cannot be completed manually. Log a new measured value in Chemistry and Aqua Nexus will complete it automatically."));
+    return;
+  }
   if(task?.sourceDomain==="dosing"&&task.sourceId?.startsWith("dose-step:")){
     const parts=task.sourceId.split(":"),doseId=parts[1],step=Number(parts[2]);
     const dose=tank.dosing.find(x=>x.id===doseId);
     if(!dose||!dose.steps||!dose.perStep||!Number.isFinite(step)){window.alert(bi(lang,"تعذر ربط مهمة الجرعة بخطة الجرعات. افتح صفحة الجرعات وراجع الخطة.","This dose task is no longer linked correctly. Open Dosing and review the plan."));return}
-    const totalSteps=dose.steps,perStep=dose.perStep;
+    const totalSteps=dose.steps;
     const expected=(dose.stepIndex??0)+1;
     if(step!==expected){window.alert(bi(lang,`يجب تنفيذ الجرعات بالترتيب. الخطوة التالية المطلوبة هي ${expected}.`,`Dose steps must be executed in order. The next required step is ${expected}.`));return}
-    if(step>1){
-      const previousRetest=tank.maintenance.find(x=>x.sourceDomain==="dosing"&&x.sourceId===`dose-retest:${doseId}:${step-1}`);
-      if(previousRetest&&!maintenanceEffectiveState(previousRetest).completed){window.alert(bi(lang,"لا تنفذ الجرعة التالية قبل إكمال مهمة إعادة القياس للخطوة السابقة.","Do not execute the next dose until the previous retest task is completed."));return}
+    const gate=doseStepExecutionGate(tank,dose,step);
+    if(!gate.ok){
+      const stop=["volume_changed","target_reached","unexpected_response","invalid_plan"].includes(String(gate.code));
+      if(stop){
+        const ts=nowISO();
+        patch(tank.id,t=>({...t,
+          dosing:t.dosing.map(x=>x.id===doseId?{...x,status:"invalidated" as const,invalidatedAt:ts,invalidatedReason:lang==="ar"?gate.ar:gate.en}:x),
+          maintenance:t.maintenance.filter(m=>!(m.sourceDomain==="dosing"&&m.sourceId?.includes(`:${doseId}:`)&&!maintenanceEffectiveState(m).completed)),
+          timeline:[{id:uid("ev"),timestamp:ts,type:"dosing-plan-invalidated",textAr:`تم إيقاف خطة ${dose.parameter}: ${gate.ar}`,textEn:`Stopped ${dose.parameter} dosing plan: ${gate.en}`},...t.timeline]
+        }));
+      }
+      window.alert(lang==="ar"?gate.ar:gate.en);return;
     }
+    const perStep=gate.amount;
     const inv=dose.inventoryItemId?tank.inventory.find(x=>x.id===dose.inventoryItemId):undefined;
     if(dose.inventoryItemId&&!inv){window.alert(bi(lang,"مادة المخزون المرتبطة بخطة الجرعات غير موجودة. راجع المخزون قبل التنفيذ.","The inventory item linked to this dosing plan is missing. Review inventory before execution."));return}
     if(inv&&inv.quantity<perStep){window.alert(bi(lang,`المخزون غير كافٍ لهذه الخطوة. المطلوب ${perStep.toFixed(2)} ${dose.unit||inv.unit} والمتوفر ${inv.quantity} ${inv.unit}.`,`Insufficient stock for this step. Required ${perStep.toFixed(2)} ${dose.unit||inv.unit}; available ${inv.quantity} ${inv.unit}.`));return}
     const ts=nowISO(),last=step>=totalSteps;
     patch(tank.id,t=>({...t,
       inventory:inv?t.inventory.map(x=>x.id===inv.id?{...x,quantity:Math.max(0,x.quantity-(perStep||0))}:x):t.inventory,
-      dosing:t.dosing.map(x=>x.id===doseId?{...x,stepIndex:step,status:last?"logged" as const:"in_progress" as const,lastExecutedAt:ts,systemVolumeLiters:x.systemVolumeLiters??t.systemVolumeLiters}:x),
+      dosing:t.dosing.map(x=>x.id===doseId?{...x,stepIndex:step,status:last?"logged" as const:"in_progress" as const,lastExecutedAt:ts,lastStepAmount:perStep,lastRetestTimestamp:gate.sampleTimestamp,systemVolumeLiters:x.systemVolumeLiters??t.systemVolumeLiters}:x),
       maintenance:t.maintenance.map(x=>x.id===id?completeMaintenanceTask(x,today()):x),
-      timeline:[{id:uid("ev"),timestamp:ts,type:"dosing-step",textAr:`تم تنفيذ الجرعة ${step}/${totalSteps}: ${perStep.toFixed(2)} ${dose.unit||""} من ${dose.material||dose.parameter}${inv?` • المتبقي بالمخزون ${Math.max(0,inv.quantity-perStep)} ${inv.unit}`:""}.`,textEn:`Executed dose step ${step}/${totalSteps}: ${perStep.toFixed(2)} ${dose.unit||""} of ${dose.material||dose.parameter}${inv?` • inventory remaining ${Math.max(0,inv.quantity-perStep)} ${inv.unit}`:""}.`},...t.timeline]
+      timeline:[{id:uid("ev"),timestamp:ts,type:"dosing-step",textAr:`تم تنفيذ الجرعة ${step}/${totalSteps}: ${perStep.toFixed(2)} ${dose.unit||""} من ${dose.material||dose.parameter}${gate.sampleValue!==undefined?` • أعيد الحساب على قراءة ${gate.sampleValue}`:""}${inv?` • المتبقي بالمخزون ${Math.max(0,inv.quantity-perStep)} ${inv.unit}`:""}.`,textEn:`Executed dose step ${step}/${totalSteps}: ${perStep.toFixed(2)} ${dose.unit||""} of ${dose.material||dose.parameter}${gate.sampleValue!==undefined?` • recalculated from reading ${gate.sampleValue}`:""}${inv?` • inventory remaining ${Math.max(0,inv.quantity-perStep)} ${inv.unit}`:""}.`},...t.timeline]
     }));
     return;
   }
