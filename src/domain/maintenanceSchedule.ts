@@ -1,4 +1,5 @@
-import type { MaintenanceTask } from "./types";\nimport { addLocalCalendarDays,localDateKey } from "./timeSafety";
+import type { MaintenanceTask } from "./types";
+import { addLocalCalendarDays,localDateKey } from "./timeSafety";
 
 const DAY=86400000;
 
@@ -10,7 +11,9 @@ export function maintenanceIntervalDays(task:MaintenanceTask){
   return Math.max(1,task.intervalDays??CADENCE_DAYS[task.cadence]??30);
 }
 
-export function datePlusDays(dateOnly:string,offset:number){\n  return addLocalCalendarDays(dateOnly,offset);\n}
+export function datePlusDays(dateOnly:string,offset:number){
+  return addLocalCalendarDays(dateOnly,offset);
+}
 
 export function maintenanceTaskDue(task:MaintenanceTask,atDate=localDateKey()){
   if(task.cadence==="once")return !task.done&&Boolean(task.nextDue&&task.nextDue<=atDate);
