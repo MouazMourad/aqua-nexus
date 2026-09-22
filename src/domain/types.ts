@@ -388,6 +388,10 @@ export interface HealthSnapshot {
   reasonAr: string;
   reasonEn: string;
   relatedEventId?: string;
+  /** Decision-model versions used when this snapshot was calculated. */
+  tankBrainVersion?: string;
+  healthModelVersion?: string;
+  chemistryEvidenceVersion?: string;
 }
 
 export interface JournalPhoto {
