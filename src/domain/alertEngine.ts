@@ -6,6 +6,7 @@ import { biologicalCycleAlert,biologicalCycleStatus } from "./biologicalCycle";
 import { interventionDensityAlert } from "./interventionSafety";
 import { activeRelocation,activeVacation,isTankArchived } from "./tankLifecycle";
 import { equipmentImportIntelligence } from "./equipmentImport";
+import { localDateKey } from "./timeSafety";
 
 export type SystemAlertLevel="info"|"warn"|"danger";
 
@@ -26,7 +27,7 @@ export function systemAlerts(tank:Tank):SystemAlert[]{
   const out:SystemAlert[]=[];
   const guide=chemistryGuidance(tank);
   const system=systemHealth(tank);
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDateKey();
   const cycle=biologicalCycleStatus(tank);
   const deviceData=equipmentImportIntelligence(tank);
   if(cycle.active){
