@@ -8,6 +8,7 @@ import { latestTankAnswer } from "./aquaAILatestAnswer";
 import { answerWhatIf } from "./aquaAIWhatIf";
 import { unifiedInventory } from "./inventoryIntelligence";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
+import { localDateKey } from "./timeSafety";
 
 function dateOnly(value?:string){
  if(!value)return undefined;
@@ -48,7 +49,7 @@ function procedureAnswer(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswer|undef
  const p=maintenanceProcedure(kind);
  const interval=equipment?.serviceIntervalDays??p.suggestedIntervalDays;
  const last=equipment?.lastServiceAt;
- const next=last&&interval?new Date(new Date(last).getTime()+interval*86400000).toISOString().slice(0,10):undefined;
+ const next=last&&interval?localDateKey(new Date(new Date(last).getTime()+interval*86400000)):undefined;
  return {
   titleAr:p.titleAr,titleEn:p.titleEn,
   summaryAr:`هاي صيانة عملية لـ ${equipment?.name||equipmentKindLabel(kind,"ar")}. نفذها بالترتيب، والأهم افصل الكهرباء قبل فك أي جزء كهربائي.`,
