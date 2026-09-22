@@ -8,7 +8,7 @@ import { AdvancedSection } from "@/components/ui/AdvancedSection";
 import { ContextHint } from "@/components/ui/ContextHint";
 import { downloadText,today,uid,nowISO } from "@/lib/appUtils";
 import { syncPushReminders } from "@/lib/pushNotifications";
-import { validateBackupPayload } from "@/domain/backupValidation";
+import { validateBackupPayload,type ValidBackupPayload } from "@/domain/backupValidation";
 import { externalizeAllTankPhotos } from "@/lib/photoStorage";
 import { activeRelocation,activeVacation,isTankArchived } from "@/domain/tankLifecycle";
 import { sanitizeBounded,validateEnergySettings } from "@/domain/inputSanity";
@@ -21,12 +21,29 @@ import { clearLongTermHistory,longTermHistoryStats } from "@/lib/longTermHistory
 import { FEATURE_DISCOVERY_TOTAL,readFeatureDiscovery,resetFeatureDiscovery,setFeatureDiscoveryMode,subscribeFeatureDiscovery,type FeatureDiscoveryState } from "@/lib/featureDiscovery";
 import { resetContextHints } from "@/lib/contextHints";
 import { AQUA_MODEL_VERSIONS,AQUA_NEXUS_VERSION } from "@/domain/version";
+import { clearRecoveryCheckpoint,readRecoveryCheckpoint,saveRecoveryCheckpoint } from "@/lib/recoveryCheckpoint";
+
+type RestorePreview={fileName:string;tankCount:number;exportedAt?:string;olderThanCurrent:boolean;names:string[]};
+
+function latestActivityMs(tanks:Tank[]){
+ let latest=0;
+ const take=(value?:string)=>{if(!value)return;const ms=new Date(value).getTime();if(Number.isFinite(ms))latest=Math.max(latest,ms)};
+ for(const t of tanks){
+  take(t.createdAt);
+  for(const rows of [t.chemistry,t.timeline,t.feeding,t.dosing,t.waterChanges,t.rodi,t.rodiServiceEvents??[],t.plantCare??[],t.livestockExits??[],t.deviceTelemetry??[],t.topOff??[],t.deviceAlerts??[]] as Array<Array<{timestamp:string}>>)for(const row of rows)take(row.timestamp);
+  for(const m of t.maintenance){take(m.lastDone);take(m.nextDue)}
+  for(const q of t.quarantine){take(q.lastDoseAt);take(q.responseObservedAt)}
+ }
+ return latest;
+}
 
 export function SettingsPage({tank}:{tank:Tank}) {
  const state=useAquaStore(),patch=useAquaStore(s=>s.patchTank),del=useAquaStore(s=>s.deleteTank),replace=useAquaStore(s=>s.replaceData),[name,setName]=useState(tank.name),file=useRef<HTMLInputElement>(null),lang=state.language;
  const [notificationState,setNotificationState]=useState<"unknown"|"enabled"|"disabled"|"unsupported"|"busy">("unknown");
  const [notificationNote,setNotificationNote]=useState("");
  const [backupNote,setBackupNote]=useState<{kind:"good"|"danger";text:string}|null>(null);
+ const pendingRestore=useRef<ValidBackupPayload|null>(null);
+ const [restorePreview,setRestorePreview]=useState<RestorePreview|null>(null),[checkpointAvailable,setCheckpointAvailable]=useState(false);
  const [dataSafety,setDataSafety]=useState<DataSafetyStatus>({persistence:"ok"});
  const [deviceBackup,setDeviceBackup]=useState(false);
  const [archiveCount,setArchiveCount]=useState(0);
@@ -50,6 +67,7 @@ export function SettingsPage({tank}:{tank:Tank}) {
 
  useEffect(()=>{
   setFeatureDiscovery(readFeatureDiscovery());
+  void readRecoveryCheckpoint().then(x=>setCheckpointAvailable(Boolean(x))).catch(()=>setCheckpointAvailable(false));
   const offFeature=subscribeFeatureDiscovery(setFeatureDiscovery);
   return offFeature;
  },[]);
@@ -68,26 +86,78 @@ export function SettingsPage({tank}:{tank:Tank}) {
   setNotificationState(Notification.permission==="granted"?"enabled":"disabled");
  },[]);
 
+ async function checkpointCurrent(reason:"restore"|"delete-tank",detail?:string){
+  const backup=await buildCompleteRecoveryBackup({tanks:state.tanks,language:state.language,aquariumExperience:state.aquariumExperience,selectedTankId:state.selectedTankId});
+  await saveRecoveryCheckpoint({createdAt:nowISO(),reason,detail,backup});
+  setCheckpointAvailable(true);
+  return backup;
+ }
+
  function importFile(f?:File){
   if(!f)return;
-  setBackupNote(null);
+  setBackupNote(null);setRestorePreview(null);pendingRestore.current=null;
   if(f.size>100*1024*1024){setBackupNote({kind:"danger",text:lang==="ar"?"ملف النسخة الاحتياطية أكبر من 100 MB. أوقف الاستيراد للتحقق من الملف.":"Backup file is larger than 100 MB. Import was stopped so the file can be reviewed."});return}
   const r=new FileReader();
-  r.onload=async()=>{
+  r.onload=()=>{
    try{
     const parsed=JSON.parse(String(r.result));
     const validated=validateBackupPayload(parsed);
     if(!validated.ok){setBackupNote({kind:"danger",text:(lang==="ar"?"النسخة الاحتياطية غير صالحة: ":"Invalid backup: ")+validated.error});return}
-    const tanks=await externalizeAllTankPhotos(validated.data.tanks);
-    for(const imported of tanks){await clearTankHistoryArchive(imported.id);await clearLongTermHistory(imported.id);}
-    replace({...validated.data,tanks});
-    setBackupNote({kind:"good",text:lang==="ar"?`تم التحقق من النسخة واستيراد ${tanks.length} حوض بأمان، مع نقل الصور الكبيرة إلى مخزن الوسائط المحلي.`:`Backup validated and ${tanks.length} tank(s) imported safely; large images were moved to local media storage.`});
+    pendingRestore.current=validated.data;
+    const exportedAt=typeof parsed.exportedAt==="string"&&Number.isFinite(new Date(parsed.exportedAt).getTime())?parsed.exportedAt:undefined;
+    const currentLatest=latestActivityMs(state.tanks.filter(t=>!t.isTraining));
+    const olderThanCurrent=Boolean(exportedAt&&currentLatest&&new Date(exportedAt).getTime()<currentLatest);
+    setRestorePreview({fileName:f.name,tankCount:validated.data.tanks.filter(t=>!t.isTraining).length,exportedAt,olderThanCurrent,names:validated.data.tanks.filter(t=>!t.isTraining).slice(0,5).map(t=>t.name)});
    }catch{
     setBackupNote({kind:"danger",text:lang==="ar"?"ملف JSON غير صالح أو تالف. لم يتم تغيير بياناتك.":"The JSON file is invalid or corrupted. Your current data was not changed."});
    }
   };
   r.onerror=()=>setBackupNote({kind:"danger",text:lang==="ar"?"تعذر قراءة الملف. لم يتم تغيير بياناتك.":"The file could not be read. Your current data was not changed."});
   r.readAsText(f);
+ }
+
+ async function confirmRestore(){
+  const data=pendingRestore.current;if(!data)return;
+  setBackupNote(null);
+  try{
+   await checkpointCurrent("restore",restorePreview?.fileName);
+   const tanks=await externalizeAllTankPhotos(data.tanks);
+   const ids=new Set([...state.tanks.map(t=>t.id),...tanks.map(t=>t.id)]);
+   for(const id of ids){await clearTankHistoryArchive(id);await clearLongTermHistory(id);}
+   replace({...data,tanks});
+   pendingRestore.current=null;setRestorePreview(null);
+   setBackupNote({kind:"good",text:lang==="ar"?`تمت الاستعادة بعد إنشاء Checkpoint تلقائي. يمكنك التراجع من زر Undo Restore.`:`Restore completed after an automatic checkpoint. You can revert with Undo Restore.`});
+  }catch(e){
+   setBackupNote({kind:"danger",text:(lang==="ar"?"تم إيقاف الاستعادة لأن Aqua Nexus لم يستطع ضمان نقطة رجوع آمنة: ":"Restore was blocked because Aqua Nexus could not guarantee a safe rollback point: ")+(e instanceof Error?e.message:String(e))});
+  }
+ }
+
+ async function undoLastDestructiveAction(){
+  setBackupNote(null);
+  try{
+   const checkpoint=await readRecoveryCheckpoint();
+   if(!checkpoint){setCheckpointAvailable(false);setBackupNote({kind:"danger",text:lang==="ar"?"ما في Checkpoint متاح للتراجع.":"No recovery checkpoint is available."});return}
+   const validated=validateBackupPayload(checkpoint.backup);
+   if(!validated.ok)throw new Error(validated.error);
+   const tanks=await externalizeAllTankPhotos(validated.data.tanks);
+   const ids=new Set([...state.tanks.map(t=>t.id),...tanks.map(t=>t.id)]);
+   for(const id of ids){await clearTankHistoryArchive(id);await clearLongTermHistory(id);}
+   replace({...validated.data,tanks});
+   await clearRecoveryCheckpoint();setCheckpointAvailable(false);pendingRestore.current=null;setRestorePreview(null);
+   setBackupNote({kind:"good",text:lang==="ar"?"تم التراجع واستعادة الحالة السابقة من الـCheckpoint.":"Previous state restored from the recovery checkpoint."});
+  }catch(e){
+   setBackupNote({kind:"danger",text:(lang==="ar"?"تعذر التراجع بأمان: ":"Safe rollback failed: ")+(e instanceof Error?e.message:String(e))});
+  }
+ }
+
+ async function deleteCurrentTank(){
+  if(!confirm(tr(lang,"confirmDeleteTank")))return;
+  try{
+   await checkpointCurrent("delete-tank",tank.name);
+   del(tank.id);
+  }catch(e){
+   window.alert((lang==="ar"?"تم إيقاف الحذف لأن إنشاء Checkpoint آمن فشل: ":"Delete was blocked because a safe checkpoint could not be created: ")+(e instanceof Error?e.message:String(e)));
+  }
  }
 
  async function enableNotifications(){
@@ -239,10 +309,11 @@ export function SettingsPage({tank}:{tank:Tank}) {
   {dataSafety.lastFailure&&<div className={`inline-alert ${dataSafety.persistence==="failed"?"danger":"warn"}`}>{dataSafety.lastFailure}</div>}
   <div className="inline-alert info">{bi(lang,"Aqua Nexus يعمل Local-first. لا يتم رفع بيانات الحوض إلى الـbackend إلا إذا فعّلت Device Backup بنفسك. هذا ليس حساباً سحابياً ولا مزامنة متعددة الأجهزة.","Aqua Nexus is local-first. Tank data is not sent to the backend unless you explicitly enable Device Backup. This is not a cloud account or multi-device sync.")}</div>
   <label className="checkbox-row"><input type="checkbox" checked={deviceBackup} onChange={e=>{persistDeviceBackup(e.target.checked);setDeviceBackup(e.target.checked)}}/><span>{bi(lang,"تفعيل Device Backup التجريبي لهذا المتصفح","Enable experimental Device Backup for this browser")}</span></label>
-  <div className="actions"><button className="btn primary" onClick={()=>void exportBackup()}>{bi(lang,"إنشاء Full Recovery Backup","Create Full Recovery Backup")} JSON</button><button className="btn" onClick={()=>file.current?.click()}>{tr(lang,"import")}</button></div>
+  <div className="actions"><button className="btn primary" onClick={()=>void exportBackup()}>{bi(lang,"إنشاء Full Recovery Backup","Create Full Recovery Backup")} JSON</button><button className="btn" onClick={()=>file.current?.click()}>{tr(lang,"import")}</button>{checkpointAvailable&&<button className="btn" onClick={()=>void undoLastDestructiveAction()}>↶ {bi(lang,"Undo آخر Restore/Delete","Undo last Restore/Delete")}</button>}</div>
   <input ref={file} type="file" accept=".json,application/json" hidden onChange={e=>{importFile(e.target.files?.[0]);e.currentTarget.value=""}}/>
+  {restorePreview&&<div className={`inline-alert ${restorePreview.olderThanCurrent?"warn":"info"}`} style={{marginTop:10}}><b>{bi(lang,"معاينة الاستعادة — لم يتم تغيير أي بيانات بعد","Restore preview — no data has changed yet")}</b><p>{restorePreview.fileName} • {restorePreview.tankCount} {bi(lang,"حوض","tank(s)")}{restorePreview.exportedAt?` • ${new Date(restorePreview.exportedAt).toLocaleString()}`:""}</p>{restorePreview.names.length>0&&<p>{restorePreview.names.join(" • ")}</p>}{restorePreview.olderThanCurrent&&<p><b>⚠ {bi(lang,"هذه النسخة أقدم من نشاط موجود حالياً. الاستعادة سترجع البيانات للخلف، لكن Aqua Nexus سينشئ Checkpoint تلقائياً قبل التنفيذ.","This backup is older than current activity. Restore will roll data back, but Aqua Nexus will create an automatic checkpoint first.")}</b></p>}<div className="actions"><button className="btn danger" onClick={()=>void confirmRestore()}>{bi(lang,"تأكيد الاستعادة","Confirm restore")}</button><button className="btn" onClick={()=>{pendingRestore.current=null;setRestorePreview(null)}}>{bi(lang,"إلغاء","Cancel")}</button></div></div>}
   {backupNote&&<div className={`inline-alert ${backupNote.kind}`} style={{marginTop:10}}>{backupNote.text}</div>}
-  <hr/><button className="btn danger" onClick={()=>{if(confirm(tr(lang,"confirmDeleteTank")))del(tank.id)}}>{tr(lang,"deleteTank")}</button>
+  <hr/><button className="btn danger" onClick={()=>void deleteCurrentTank()}>{tr(lang,"deleteTank")}</button>
  </div>
  <style jsx>{`\n  .experience-choice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.experience-choice{border:1px solid rgba(86,181,205,.18);background:rgba(255,255,255,.025);color:inherit;border-radius:14px;padding:12px;text-align:inherit;display:grid;gap:5px}.experience-choice b{font-size:13px}.experience-choice span{font-size:10px;line-height:1.55;opacity:.7}.experience-choice.active{border-color:rgba(82,218,173,.5);background:rgba(43,151,118,.12);box-shadow:0 0 0 1px rgba(82,218,173,.08)}@media(max-width:680px){.experience-choice-grid{grid-template-columns:1fr}}\n `}</style>\n </section>;
 }
