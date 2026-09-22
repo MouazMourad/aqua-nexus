@@ -9,7 +9,7 @@ import { TrainingCoach } from "@/components/dashboard/TrainingCoach";
 import type { EquipmentKind,Tank,TankStatus,TankType } from "@/domain/types";
 import { CHEMISTRY_CATALOG } from "@/data/legacyCatalogs";
 import { tr,bi } from "@/i18n";
-import { uid,nowISO } from "@/lib/appUtils";
+import { daysFrom,uid,nowISO,today } from "@/lib/appUtils";
 import { systemHealth } from "@/domain/systemHealth";
 import { biologicalCycleStatus,isCyclePageAllowed } from "@/domain/biologicalCycle";
 import { BiologicalCyclePanel } from "@/components/cycle/BiologicalCyclePanel";
@@ -82,7 +82,7 @@ export function AquaDashboard() {
   });
   setAttention(stale.map(t=>t.name));
   if(stale.length&&"Notification" in window&&Notification.permission==="granted"){
-   const key=`${new Date().toISOString().slice(0,10)}:${stale.map(x=>x.id).join(",")}`;
+   const key=`${today()}:${stale.map(x=>x.id).join(",")}`;
    if(localStorage.getItem("aqua-nexus-last-reminder")!==key){
     navigator.serviceWorker?.ready.then(reg=>reg.active?.postMessage({type:"SHOW_NOTIFICATION",title:language==="ar"?"Aqua Nexus • متابعة الحوض":"Aqua Nexus • Tank follow-up",body:language==="ar"?`الحوض ${stale.map(x=>x.name).join("، ")} بحاجة متابعة بعد أكثر من أسبوع.`:`${stale.map(x=>x.name).join(", ")} needs attention after more than a week.`,tag:"aqua-weekly-followup",url:"/"})).catch(()=>{});
     localStorage.setItem("aqua-nexus-last-reminder",key);
@@ -163,7 +163,7 @@ export function AquaDashboard() {
   const chamberRows=hasSump?Array.from({length:count},(_,i)=>({id:uid("ch"),name:`حجرة ${i+1}`,nameEn:`Chamber ${i+1}`,x:i*each,y:0,length:each,width:sw,height:sh,waterHeight:sh*fill/100,media:[]})):[];
   const returnChamberId=chamberRows[chamberRows.length-1]?.id;
   const values:Record<string,number|null>={...wizardValues};
-  const weeklyTask = {id:uid("task"),title:cycleMode?"فحص كيمياء الدورة البيولوجية":"قياس النسب الكيميائية الأسبوعي",titleEn:cycleMode?"Biological cycle chemistry test":"Weekly chemistry measurement",cadence:"weekly" as const,done:false,nextDue:new Date(Date.now()+(cycleMode?1:7)*86400000).toISOString().slice(0,10),manual:false,sourceDomain:cycleMode?"system" as const:undefined,sourceId:cycleMode?"cycle:chemistry":undefined};
+  const weeklyTask = {id:uid("task"),title:cycleMode?"فحص كيمياء الدورة البيولوجية":"قياس النسب الكيميائية الأسبوعي",titleEn:cycleMode?"Biological cycle chemistry test":"Weekly chemistry measurement",cadence:"weekly" as const,done:false,nextDue:daysFrom(today(),cycleMode?1:7),manual:false,sourceDomain:cycleMode?"system" as const:undefined,sourceId:cycleMode?"cycle:chemistry":undefined};
   const inspectTask = {id:uid("task"),title:cycleMode?"فحص تشغيل الفلترة والمضخات أثناء الدورة":"تنظيف وفحص النظام",titleEn:cycleMode?"Check filtration and pumps during cycling":"Inspect and clean system",cadence:"weekly" as const,done:false,nextDue:new Date(Date.now()+(cycleMode?1:7)*86400000).toISOString().slice(0,10),manual:false,sourceDomain:cycleMode?"system" as const:undefined,sourceId:cycleMode?"cycle:equipment":undefined};
   const newTank:Tank={
    id,name:name||tr(language,"addTank"),type,ecosystemProfile:profile==="auto"?undefined:profile,status:cycleMode?"cycling":status,ageMonths,
