@@ -13,6 +13,7 @@ import { sumpIntelligence } from "./sumpIntelligence";
 import { feedingIntelligence } from "./feedingIntelligence";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
 import { measuredChemistryReadings } from "./chemistryDataQuality";
+import { localDateKey } from "./timeSafety";
 
 export type LocalReasoningLevel="good"|"info"|"warn"|"danger";
 export type LocalReasoningConfidence="low"|"medium"|"high";
@@ -75,7 +76,7 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
  const system=core.health;
  const allAlerts=core.alerts,stock=unifiedInventory(tank),rodiState=rodiIntelligence(tank),sumpState=sumpIntelligence(tank),feedingState=feedingIntelligence(tank);
  const age=chemistryAgeDays(tank);
- const today=new Date().toISOString().slice(0,10);
+ const today=localDateKey();
  const signals:LocalReasoningSignal[]=[];
  const actions:LocalReasoningAction[]=[];
  const explicitTopics=intent.topics.filter(x=>x!=="general");
