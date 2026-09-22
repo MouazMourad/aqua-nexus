@@ -296,8 +296,8 @@ export function reasonLocally(tank:Tank,intent:AquaQuestionIntent):LocalReasonin
   pushSignal({id:`nutrient-${i}`,level:s.level==="danger"?"danger":s.level==="warn"?"warn":"info",confidence:"high",source:"nutrients",score:55,ar:s.ar,en:s.en});
  }
 
- if(chemistryRelevant&&intent.mode==="compare"&&tank.chemistry.length>=2){
-  const a=tank.chemistry[0],b=tank.chemistry[1];
+ if(chemistryRelevant&&intent.mode==="compare"&&measuredChemistry.length>=2){
+  const a=measuredChemistry[0],b=measuredChemistry[1];
   const keys=[...new Set([...Object.keys(a.values),...Object.keys(b.values)])];
   for(const key of keys){
    const now=a.values[key],before=b.values[key];
