@@ -7,7 +7,7 @@ import { completeMaintenanceTask,maintenanceEffectiveState } from "@/domain/main
 import { systemAlerts } from "@/domain/alertEngine";
 import { chemistryGuidance } from "@/domain/chemistryGuidance";
 import { chemistryHealthAssessment } from "@/domain/health";
-import { findNearDuplicateChemistryReading,latestParameterSample,validateChemistryValue,validateDosingTarget,weeklyChemistryCoverage } from "@/domain/chemistryDataQuality";
+import { findNearDuplicateChemistryReading,latestParameterSample,measuredChemistryReadings,validateChemistryValue,validateDosingTarget,weeklyChemistryCoverage } from "@/domain/chemistryDataQuality";
 import { rodiIntelligence } from "@/domain/rodiIntelligence";
 import { sumpIntelligence } from "@/domain/sumpIntelligence";
 import { stockingReadiness } from "@/domain/stockingReadiness";
@@ -30,7 +30,7 @@ import { biologicalCycleStatus,cycleRelevantMaintenanceTask,isCyclePageAllowed }
 import { biologicalCycleKnowledgeSnapshot } from "@/domain/biologicalCycleKnowledge";
 import { isAquariumScopedQuestion } from "@/domain/aquaAIScope";
 import { diseaseEntriesFor,diseaseGroupCounts } from "@/domain/diseaseCatalog";
-import { requiresPostDoseRetest } from "@/domain/dosingSafety";
+import { doseStepExecutionGate,requiresPostDoseRetest } from "@/domain/dosingSafety";
 import { waterChangeIntelligence } from "@/domain/waterChangeIntelligence";
 import { biologicalMemory,eventChemistryLinks } from "@/domain/tankLearning";
 import { repeatedResponsePatterns,tankLearningMaturity } from "@/domain/tankPatterns";
@@ -51,6 +51,7 @@ import { defaultLightingProgram,estimatedParAt,lightingCalibrationFactor,lightin
 import { lightingCandidateToProgram,normalizeLightingImportCandidate } from "@/domain/lightingImport";
 import { equipmentImportIntelligence,normalizeEquipmentImportCandidate,parseGenericEquipmentExport } from "@/domain/equipmentImport";
 import { prepareEquipmentImportApplication } from "@/domain/equipmentImportApply";
+import { addLocalCalendarDays,isMeaningfullyFutureTimestamp } from "@/domain/timeSafety";
 
 const tank=structuredClone(demoMarineTank);
 
@@ -1314,7 +1315,7 @@ describe("RC.2 chemistry evidence and versioning closure",()=>{
     const brain=buildTankBrainSnapshot(t);
     const ai=buildTankAIContext(t);
     expect(brain.schema).toBe("aqua-nexus-tank-brain/v2");
-    expect(brain.productVersion).toBe("0.3.0-rc.2");
+    expect(brain.productVersion).toBe("0.3.0-rc.3");
     expect(brain.chemistry.count).toBe(1);
     expect(brain.chemistry.referenceDefaults).toHaveLength(1);
     expect(ai.schema).toBe("aqua-nexus-ai-context/v2");
@@ -1322,5 +1323,74 @@ describe("RC.2 chemistry evidence and versioning closure",()=>{
     expect(ai.chemistry.readingCount).toBe(1);
     expect(ai.chemistry.referenceDefaults).toHaveLength(1);
     expect(ai.modelVersions.health).toBe("2.0.0");
+    expect(ai.modelVersions.tankBrain).toBe("1.1.0");
+    expect(ai.modelVersions.chemistryEvidence).toBe("1.1.0");
+  });
+});
+
+
+describe("RC.3 safety and data-integrity hardening",()=>{
+  it("sorts measured chemistry by timestamp and ignores defaults and future rows",()=>{
+    const t=structuredClone(demoMarineTank);
+    const now=Date.now();
+    t.chemistry=[
+      {timestamp:new Date(now+86400000).toISOString(),values:{KH:99},usingDefaults:false,source:"manual",confidence:"high"},
+      {timestamp:new Date(now-7200000).toISOString(),values:{KH:7.1},usingDefaults:false,source:"manual",confidence:"high"},
+      {timestamp:new Date(now-3600000).toISOString(),values:{KH:7.6},usingDefaults:false,source:"manual",confidence:"high"},
+      {timestamp:new Date(now-1000).toISOString(),values:{KH:8.3},usingDefaults:true}
+    ];
+    const rows=measuredChemistryReadings(t);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].values.KH).toBe(7.6);
+    expect(latestParameterSample(t,"KH")?.value).toBe(7.6);
+  });
+
+  it("blocks multi-step dosing until a real post-dose retest exists",()=>{
+    const t=structuredClone(demoMarineTank);
+    const executedAt=new Date(Date.now()-3600000).toISOString();
+    t.systemVolumeLiters=500;
+    t.chemistry=[{timestamp:new Date(Date.now()-7200000).toISOString(),values:{KH:7},usingDefaults:false,source:"manual",confidence:"high"}];
+    const dose={id:"dose-plan",timestamp:new Date(Date.now()-10800000).toISOString(),parameter:"KH",current:7,target:9,ml:100,amount:100,unit:"mL",material:"test",steps:2,perStep:50,stepIndex:1,status:"in_progress" as const,calculatorMode:"product" as const,sourceReadingTimestamp:t.chemistry[0].timestamp,systemVolumeLiters:500,lastExecutedAt:executedAt};
+    expect(doseStepExecutionGate(t,dose,2).code).toBe("missing_retest");
+    t.chemistry.unshift({timestamp:new Date().toISOString(),values:{KH:7.8},usingDefaults:false,source:"manual",confidence:"high"});
+    const gate=doseStepExecutionGate(t,dose,2);
+    expect(gate.ok).toBe(true);
+    expect(gate.amount).toBeLessThanOrEqual(50);
+    expect(gate.sampleValue).toBe(7.8);
+  });
+
+  it("invalidates continuation when system volume changed after a dose plan",()=>{
+    const t=structuredClone(demoMarineTank);
+    const executedAt=new Date(Date.now()-3600000).toISOString();
+    t.systemVolumeLiters=550;
+    t.chemistry=[{timestamp:new Date().toISOString(),values:{KH:7.5},usingDefaults:false,source:"manual",confidence:"high"}];
+    const dose={id:"dose-plan",timestamp:new Date(Date.now()-10800000).toISOString(),parameter:"KH",current:7,target:9,ml:100,amount:100,unit:"mL",material:"test",steps:2,perStep:50,stepIndex:1,status:"in_progress" as const,calculatorMode:"product" as const,systemVolumeLiters:500,lastExecutedAt:executedAt};
+    expect(doseStepExecutionGate(t,dose,2).code).toBe("volume_changed");
+  });
+
+  it("rejects far-future timestamps in recovery backup validation",()=>{
+    const t=structuredClone(demoMarineTank);
+    t.chemistry=[{timestamp:new Date(Date.now()+86400000).toISOString(),values:{KH:8},usingDefaults:false,source:"manual",confidence:"high"}];
+    const result=validateBackupPayload({app:"Aqua Nexus",schemaVersion:17,language:"ar",selectedTankId:t.id,tanks:[t]});
+    expect(result.ok).toBe(false);
+  });
+
+  it("blocks future device/import records before they enter hot tank state",()=>{
+    const t=structuredClone(demoMarineTank);
+    const normalized=normalizeEquipmentImportCandidate({
+      confidence:90,
+      measurements:[{timestamp:new Date(Date.now()+86400000).toISOString(),parameter:"KH",value:8,destination:"chemistry"}]
+    },"structured");
+    expect(normalized.ok).toBe(true);
+    if(!normalized.ok)return;
+    const applied=prepareEquipmentImportApplication(t,normalized.candidate,{importId:"future-import",importedAt:new Date().toISOString(),vendor:"generic",sourceName:"future.csv",sourceType:"csv",fingerprint:"future",analysisMode:"structured-file"});
+    expect(applied.importRecord.counts.chemistry).toBe(0);
+    expect(applied.blockedIssues.length).toBeGreaterThan(0);
+  });
+
+  it("keeps calendar-day arithmetic independent from UTC timestamp slicing",()=>{
+    expect(addLocalCalendarDays("2026-03-28",1)).toBe("2026-03-29");
+    expect(addLocalCalendarDays("2026-12-31",1)).toBe("2027-01-01");
+    expect(isMeaningfullyFutureTimestamp(new Date(Date.now()+86400000).toISOString())).toBe(true);
   });
 });
