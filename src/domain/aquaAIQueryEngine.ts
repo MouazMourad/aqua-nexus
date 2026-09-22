@@ -16,6 +16,7 @@ import { rodiIntelligence } from "./rodiIntelligence";
 import { sumpIntelligence } from "./sumpIntelligence";
 import { maintenanceEffectiveState } from "./maintenanceSchedule";
 import { measuredChemistryReadings } from "./chemistryDataQuality";
+import { localDateKey } from "./timeSafety";
 
 function actionDomain(page:string):AquaDomain{
  if(page==="chemistry")return "chemistry";
@@ -52,7 +53,7 @@ function snapshot(tank:Tank,plan:AquaAIQueryPlan){
  const core=tankIntelligenceCore(tank);
  const guide=chemistryGuidance(tank),bio=core.bioload,state=core.state,maint=core.maintenance;
  const system=core.health;
- const today=new Date().toISOString().slice(0,10);
+ const today=localDateKey();
  const due=tank.maintenance.filter(x=>maintenanceEffectiveState(x,today).due);
  const warnings=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
  const watch=tank.livestock.filter(x=>x.health==="watch"||x.health==="treatment");
