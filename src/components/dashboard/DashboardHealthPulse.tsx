@@ -72,7 +72,8 @@ export function DashboardHealthPulse(){
     if(!tank||!state)return null;
 
     const catalog=CHEMISTRY_CATALOG[tank.type] as Record<string,{label:string;ideal:readonly [number,number];safe:readonly [number,number];weight:number}>;
-    const measuredChemistry=measuredChemistryReadings(tank);\n    const latest=measuredChemistry[0];
+    const measuredChemistry=measuredChemistryReadings(tank);
+    const latest=measuredChemistry[0];
     const previous=measuredChemistry[1];
     const age=chemistryAgeDays(tank);
     const bio=bioload(tank);
