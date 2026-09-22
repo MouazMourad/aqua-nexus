@@ -11,7 +11,7 @@ export type AppPage =
   | "dashboard" | "tanks" | "equipment" | "lighting" | "sump" | "livestock" | "acclimation" | "library"
   | "chemistry" | "maintenance" | "inventory" | "diseases" | "timeline"
   | "journal" | "waterchange" | "feeding" | "dosing" | "quarantine"
-  | "emergency" | "rodi" | "expenses" | "alerts" | "reports" | "settings";
+  | "emergency" | "rodi" | "expenses" | "alerts" | "reports" | "settings" | "academy";
 
 type NavItem={key:AppPage;label:string;icon:string;color:string;group:"core"|"care"|"operations"|"history"|"system"};
 type SearchEntry={
@@ -58,6 +58,7 @@ const PAGE_ALIAS:Record<string,AppPage>={"water-change":"waterchange","waterChan
 
 function asPage(raw:string):AppPage{
   const mapped=PAGE_ALIAS[raw]??raw;
+  if(mapped==="academy")return "academy";
   return PAGE_SET.has(mapped as AppPage)?mapped as AppPage:"dashboard";
 }
 function dockScale(index:number,hoverIndex:number|null){
@@ -100,6 +101,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
       id:`module:${item.key}`,page:item.key,title:tr(lang,item.label),subtitle:item.group,
       keywords:`${item.key} ${item.group} ${tr(lang,item.label)}`,icon:item.icon,color:item.color,kind:"module"
     }));
+    entries.push({id:"module:academy",page:"academy",title:lang==="ar"?"Aqua Nexus Academy • تعلم الحوض":"Aqua Nexus Academy",subtitle:lang==="ar"?"دورة + قاموس مصطلحات":"Course + glossary",keywords:"academy learn تعليم دورة قاموس glossary chemistry cycling tank brain",icon:"🎓",color:"#aa88ff",kind:"module"});
     const push=(entry:SearchEntry)=>entries.push(entry);
     for(const x of tank.livestock){
       const p=itemFor("livestock");
