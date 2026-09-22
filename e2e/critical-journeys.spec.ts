@@ -653,3 +653,40 @@ test("Equipment screenshot import uses Vision analysis and applies edited device
   await expect(page.locator(".card.panel").filter({hasText:/IMPORTED DEVICE DATA/})).toContainText(/HYDROS|91%/);
 });
 
+
+
+test("Aqua Nexus Academy opens from Dashboard, teaches 12 lessons and persists progress",async({page})=>{
+  await openTrainingDashboard(page);
+  const entry=page.locator(".academy-dashboard-entry");
+  await expect(entry).toBeVisible();
+  await entry.getByRole("button",{name:/فتح Academy|Open Academy/}).click();
+  await expect(page.locator(".academy-page")).toBeVisible();
+  await expect(page.locator(".academy-lesson-nav")).toHaveCount(12);
+  await expect(page.locator(".academy-brain-use")).toBeVisible();
+  await page.getByRole("button",{name:/فهمت الدرس|Mark understood/}).click();
+  await expect(page.locator(".academy-progress")).toContainText("1/12");
+  await page.reload();
+  await openTrainingDashboard(page);
+  await page.locator(".academy-dashboard-entry").getByRole("button",{name:/فتح Academy|Open Academy/}).click();
+  await expect(page.locator(".academy-progress")).toContainText("1/12");
+  const finalLesson=page.locator(".academy-lesson-nav").filter({hasText:/Tank Brain/}).last();
+  await finalLesson.click();
+  await expect(page.locator(".academy-brain-flow")).toBeVisible();
+  await expect(page.locator(".academy-lesson")).toContainText(/Input|Validation|Confidence|Next Action/);
+});
+
+test("Academy contextual shortcut deep-links from Chemistry and glossary finds PAR",async({page})=>{
+  await openTrainingDashboard(page);
+  await goToPage(page,"chemistry");
+  const shortcut=page.locator(".academy-context-shortcut");
+  await expect(shortcut).toBeVisible();
+  await shortcut.getByRole("button",{name:/تعلّم|Learn/}).click();
+  await expect(page.locator(".academy-page")).toBeVisible();
+  await expect(page.locator(".academy-lesson")).toContainText(/كيمياء الحوض|Aquarium chemistry/);
+  await page.getByRole("button",{name:/قاموس المصطلحات|Glossary/}).click();
+  const search=page.locator(".academy-search input");
+  await search.fill("PAR");
+  const terms=page.locator(".academy-term");
+  await expect(terms).toHaveCount(1);
+  await expect(terms.first()).toContainText("PAR");
+});
