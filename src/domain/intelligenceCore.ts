@@ -9,6 +9,7 @@ import { proactivePredictions,biologicalMemory } from "./tankLearning";
 import { isBiologicalCycleActive,isCyclePageAllowed } from "./biologicalCycle";
 import { lightingIntelligence } from "./lightingIntelligence";
 import { equipmentImportIntelligence } from "./equipmentImport";
+import { AQUA_MODEL_VERSIONS,AQUA_NEXUS_VERSION } from "./version";
 
 export type IntelligenceDomain =
  "chemistry"|"dosing"|"maintenance"|"equipment"|"lighting"|"livestock"|"inventory"|"feeding"|
@@ -33,6 +34,8 @@ const pageByDomain:Record<IntelligenceDomain,string>={
 
 export interface TankIntelligenceCore{
  generatedAt:string;
+ productVersion:string;
+ modelVersions:typeof AQUA_MODEL_VERSIONS;
  health:ReturnType<typeof systemHealth>;
  state:ReturnType<typeof tankStateView>;
  chemistry:ReturnType<typeof chemistryHealthAssessment>;
@@ -109,7 +112,7 @@ export function tankIntelligenceCore(tank:Tank):TankIntelligenceCore{
  )));
 
  return {
-  generatedAt:new Date().toISOString(),health,state,chemistry,maintenance:maint,deviceData,lighting,bioload:bio,
+  generatedAt:new Date().toISOString(),productVersion:AQUA_NEXUS_VERSION,modelVersions:AQUA_MODEL_VERSIONS,health,state,chemistry,maintenance:maint,deviceData,lighting,bioload:bio,
   alerts,insights,forecast,history,predictions,memory,actions,guidanceActions,dataConfidence,
   critical:alerts.some(x=>x.level==="danger")||health.chemistryCritical
  };
