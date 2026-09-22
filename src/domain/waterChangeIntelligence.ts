@@ -1,9 +1,10 @@
 import type { Tank } from "./types";
+import { currentChemistryValues } from "./chemistryDataQuality";
 
 export type WaterChangeRisk="normal"|"warn"|"danger";
 
 export function waterChangeIntelligence(tank:Tank,percent:number,replacementSalinity?:number,replacementTemperature?:number){
-  const latest=tank.chemistry[0]?.values??{};
+  const latest=currentChemistryValues(tank);
   const no3=typeof latest.NO3==="number"?latest.NO3:null;
   const po4=typeof latest.PO4==="number"?latest.PO4:null;
   const tankSal=typeof latest.salinity==="number"?latest.salinity:null;
