@@ -39,7 +39,6 @@ function actionDomain(page:string):AquaDomain{
 
 function coreHasCritical(tank:Tank){
  const core=tankIntelligenceCore(tank);
- const measuredChemistry=measuredChemistryReadings(tank);
  return core.actions.some(x=>x.level==="danger");
 }
 
@@ -51,6 +50,7 @@ function domainTitle(domain:AquaDomain,lang:"ar"|"en"){
 
 function snapshot(tank:Tank,plan:AquaAIQueryPlan){
  const core=tankIntelligenceCore(tank);
+ const measuredChemistry=measuredChemistryReadings(tank);
  const guide=chemistryGuidance(tank),bio=core.bioload,state=core.state,maint=core.maintenance;
  const system=core.health;
  const today=localDateKey();
