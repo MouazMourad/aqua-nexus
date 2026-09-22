@@ -1,8 +1,9 @@
 import type { Equipment,EquipmentConsumable,EquipmentKind,MaintenanceTask,Tank } from "./types";
+import { addLocalCalendarDays,localDateKey } from "./timeSafety";
 
 const DAY=86400000;
-const nowDate=()=>new Date().toISOString().slice(0,10);
-const addDays=(date:string,days:number)=>{const d=new Date(date+"T00:00:00Z");d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10);};
+const nowDate=()=>localDateKey();
+const addDays=(date:string,days:number)=>addLocalCalendarDays(date,days);
 const ageDays=(date?:string)=>date?Math.max(0,Math.floor((Date.now()-new Date(date).getTime())/DAY)):0;
 
 type Cadence=MaintenanceTask["cadence"];
