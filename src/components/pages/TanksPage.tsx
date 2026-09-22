@@ -4,6 +4,8 @@ import type { Tank,TankStatus,TankType } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,statusText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { AdvancedSection } from "@/components/ui/AdvancedSection";
+import { ContextHint } from "@/components/ui/ContextHint";
 import { Modal } from "@/components/ui/Modal";
 import { biologicalCycleStatus } from "@/domain/biologicalCycle";
 import { nowISO,uid } from "@/lib/appUtils";
@@ -104,14 +106,20 @@ export function TanksPage({tanks,selectedTankId,onSelect}:{tanks:Tank[];selected
      <label className="field"><span>{lang==="ar"?"اسم الحوض":"Tank name"}</span><input value={name} onChange={e=>setName(e.target.value)}/></label>
      <label className="field"><span>{lang==="ar"?"النوع":"Type"}</span><select value={type} disabled={typeLocked} onChange={e=>setType(e.target.value as TankType)}><option value="marine">{tr(lang,"marine")}</option><option value="freshwater">{tr(lang,"freshwater")}</option></select></label>
      <label className="field"><span>{lang==="ar"?"الحالة":"Status"}</span><select value={status} onChange={e=>setStatus(e.target.value as TankStatus)}><option value="new">{statusText(lang,"new")}</option><option value="cycling">{statusText(lang,"cycling")}</option><option value="established" disabled={Boolean(editCycle?.active&&!editCycle.ready)}>{statusText(lang,"established")}</option></select>{editCycle?.active&&!editCycle.ready&&<small>{lang==="ar"?`🔒 Established مقفول — الدورة يوم ${editCycle.day} ولسا شروط الجاهزية ناقصة.`:`🔒 Established is locked — cycle day ${editCycle.day} is not ready yet.`}</small>}</label>
-     <label className="field"><span>{lang==="ar"?"عمر الحوض / شهر":"Age / months"}</span><input type="number" min="0" value={ageMonths} onChange={e=>setAgeMonths(Number(e.target.value))}/></label>
+     
     </div>{typeLocked&&<div className="inline-alert warn">{lang==="ar"?"نوع الحوض مقفول لأن فيه بيانات/كائنات فعلية. لتجنب خلط Marine وFreshwater أنشئ حوضاً جديداً بدل تحويل هذا الحوض.":"Tank type is locked because real data/livestock exists. Create a new tank instead of converting this one between Marine and Freshwater."}</div>}</div>
     <div className="tank-edit-section"><h4>{lang==="ar"?"أبعاد الحوض":"Display dimensions"}</h4><div className="form-grid">
-     <label className="field"><span>L cm</span><input type="number" min="1" value={l} onChange={e=>setL(Number(e.target.value))}/></label><label className="field"><span>W cm</span><input type="number" min="1" value={w} onChange={e=>setW(Number(e.target.value))}/></label><label className="field"><span>H cm</span><input type="number" min="1" value={h} onChange={e=>setH(Number(e.target.value))}/></label><label className="field"><span>{lang==="ar"?"نسبة الإزاحة %":"Displacement %"}</span><input type="number" min="0" max="90" value={loss} onChange={e=>setLoss(Number(e.target.value))}/></label>
+     <label className="field"><span>L cm</span><input type="number" min="1" value={l} onChange={e=>setL(Number(e.target.value))}/></label><label className="field"><span>W cm</span><input type="number" min="1" value={w} onChange={e=>setW(Number(e.target.value))}/></label><label className="field"><span>H cm</span><input type="number" min="1" value={h} onChange={e=>setH(Number(e.target.value))}/></label>
     </div></div>
     <div className="tank-edit-section"><div className="tank-edit-section-head"><h4>{lang==="ar"?"السامب":"Sump"}</h4><label className="tank-switch"><input type="checkbox" checked={hasSump} onChange={e=>setHasSump(e.target.checked)}/><span>{hasSump?(lang==="ar"?"مفعّل":"Enabled"):(lang==="ar"?"بدون سامب":"No sump")}</span></label></div>
-     {hasSump&&<div className="form-grid"><label className="field"><span>Sump L</span><input type="number" min="1" value={sl} onChange={e=>setSl(Number(e.target.value))}/></label><label className="field"><span>Sump W</span><input type="number" min="1" value={sw} onChange={e=>setSw(Number(e.target.value))}/></label><label className="field"><span>Sump H</span><input type="number" min="1" value={sh} onChange={e=>setSh(Number(e.target.value))}/></label><label className="field"><span>Fill %</span><input type="number" min="1" max="100" value={fill} onChange={e=>setFill(Number(e.target.value))}/></label></div>}
+     {hasSump&&<div className="form-grid"><label className="field"><span>Sump L</span><input type="number" min="1" value={sl} onChange={e=>setSl(Number(e.target.value))}/></label><label className="field"><span>Sump W</span><input type="number" min="1" value={sw} onChange={e=>setSw(Number(e.target.value))}/></label><label className="field"><span>Sump H</span><input type="number" min="1" value={sh} onChange={e=>setSh(Number(e.target.value))}/></label></div>}
     </div>
+    <AdvancedSection titleAr="حسابات الحجم المتقدمة" titleEn="Advanced volume calculations" summaryAr="العمر والإزاحة ومنسوب تشغيل السامب؛ Aqua Nexus يستخدمها لتحسين الحجم الفعلي والحسابات." summaryEn="Age, displacement and sump operating fill; Aqua Nexus uses them to improve effective volume and calculations.">
+     <div style={{display:"grid",gap:9,paddingTop:10}}>
+      <ContextHint id="tank-displacement" lang={lang} ar="نسبة الإزاحة تقدّر الحجم الذي تشغله الصخور والرمل والديكور، لذلك تؤثر مباشرة على حجم الماء المستخدم بالجرعات والحسابات." en="Displacement estimates volume occupied by rock, substrate and decor, so it directly affects dosing and water-volume calculations."/>
+      <div className="form-grid"><label className="field"><span>{lang==="ar"?"عمر الحوض / شهر":"Age / months"}</span><input type="number" min="0" value={ageMonths} onChange={e=>setAgeMonths(Number(e.target.value))}/></label><label className="field"><span>{lang==="ar"?"نسبة الإزاحة %":"Displacement %"}</span><input type="number" min="0" max="90" value={loss} onChange={e=>setLoss(Number(e.target.value))}/></label>{hasSump&&<label className="field"><span>{lang==="ar"?"منسوب تشغيل السامب %":"Sump operating fill %"}</span><input type="number" min="1" max="100" value={fill} onChange={e=>setFill(Number(e.target.value))}/></label>}</div>
+     </div>
+    </AdvancedSection>
    </div>
    <div className="modal-actions"><button className="btn" onClick={()=>setEditTarget(null)}>{lang==="ar"?"إلغاء":"Cancel"}</button><button className="btn primary" onClick={saveEdit}>{lang==="ar"?"حفظ التعديلات":"Save changes"}</button></div>
   </Modal>

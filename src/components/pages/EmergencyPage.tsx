@@ -5,6 +5,7 @@ import { EMERGENCY_SCENARIOS } from "@/data/legacyCatalogs";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ContextHint } from "@/components/ui/ContextHint";
 import { today,uid,nowISO } from "@/lib/appUtils";
 import { emergencyContext } from "@/domain/emergencyContext";
 
@@ -58,6 +59,7 @@ export function EmergencyPage({tank}:{tank:Tank}) {
 
  return <section className="page-grid"><PageHeader eyebrow="EMERGENCY RESPONSE" title={tr(lang,"emergency")}/>
  <div className="card panel">
+  <ContextHint id="emergency-sequence" lang={lang} tone="safety" dismissible={false} ar="بالطوارئ اتبع الخطوات بالترتيب ولا تجمع تدخلات كبيرة من أكثر من بروتوكول بنفس الوقت إلا إذا الحالة نفسها تتطلب ذلك." en="During an emergency, follow steps in order and avoid stacking major interventions from multiple protocols unless the situation itself requires it."/>
   {activeAny&&<div className="inline-alert warn" style={{marginBottom:12}}>{bi(lang,`يوجد بروتوكول طوارئ نشط: ${activeAny.titleAr}`,`Active emergency protocol: ${activeAny.titleEn}`)}</div>}
   <div className="emergency-list">{entries.map(([k,x]:any)=><button type="button" className={`emergency-card ${selected===k?"selected":""}`} key={k} onClick={()=>setSelected(k)}><b>{lang==="ar"?x.ar:x.en}</b><span className={`status ${x.priority==="critical"?"warn":""}`}>{x.priority}</span><small>{lang==="ar"?x.summaryAr:x.summaryEn}</small></button>)}</div>
  </div>

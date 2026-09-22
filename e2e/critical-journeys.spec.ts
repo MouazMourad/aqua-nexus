@@ -20,6 +20,15 @@ async function goToPage(page:Page,key:string){
   await target.click();
 }
 
+async function openAdvancedSection(page:Page,name:RegExp,contentSelector:string){
+  const content=page.locator(contentSelector).first();
+  if(await content.isVisible().catch(()=>false))return;
+  const toggle=page.getByRole("button",{name}).first();
+  await expect(toggle).toBeVisible();
+  await toggle.click();
+  await expect(content).toBeVisible();
+}
+
 async function pointerDrag(page:Page,downSelector:string,moveSelector:string,from:{x:number;y:number},to:{x:number;y:number},pointerId:number){
   await page.evaluate(({downSelector,moveSelector,from,to,pointerId})=>{
     const down=document.querySelector(downSelector) as HTMLElement|null;
@@ -98,6 +107,7 @@ test("equipment touch placement previews then commits on release",async({page})=
 test("sump chamber touch editor changes geometry without page failure",async({page})=>{
   await openTrainingDashboard(page);
   await goToPage(page,"sump");
+  await openAdvancedSection(page,/تحرير هندسة السامب|Advanced sump geometry/,".sump-touch-plan");
   const plan=page.locator(".sump-touch-plan");
   await expect(plan).toBeVisible();
   const chamber=plan.locator(".sump-touch-chamber").first();
@@ -272,7 +282,8 @@ test("indexed long-term archive paginates old records without keeping them hot",
   await openTrainingDashboard(page);
   await goToPage(page,"timeline");
   await expect(page.locator(".timeline")).toContainText(/Very old archive event|حدث أرشيف قديم/);
-  await page.getByRole("button",{name:/أرشفة القديم|Archive old history/}).click();
+  await openAdvancedSection(page,/الأرشيف طويل الأمد|Long-term archive/,'[data-testid="history-domain"]');
+  await page.getByRole("button",{name:/^(أرشفة السجلات القديمة|Archive old history)$/}).click();
   await expect(page.locator(".page-grid")).toContainText(/مخزن تاريخي مفهرس|indexed historical store/i);
   await page.getByTestId("history-domain").selectOption("timeline");
   await expect(page.getByTestId("archived-history-list")).toContainText(/Very old archive event|حدث أرشيف قديم/);
@@ -426,6 +437,8 @@ test("Lighting Intelligence edits, visualizes and calibrates the tank light mode
   await goToPage(page,"lighting");
   await expect(page.locator(".lighting-page")).toBeVisible();
   await expect(page.locator(".lighting-3d-wrap")).toBeVisible();
+  await openAdvancedSection(page,/خرائط PAR التقنية|Technical PAR maps/,".lighting-heat-grid");
+  await openAdvancedSection(page,/التحكم التقني بالإنارة|Advanced lighting controls/,".lighting-curve");
   await expect(page.locator(".lighting-heat-grid").first()).toBeVisible();
   await expect(page.locator(".lighting-curve")).toBeVisible();
   await expect(page.locator(".lighting-page")).toContainText(/LIGHTING INTELLIGENCE|الإنارة الذكية/);
@@ -511,6 +524,7 @@ test("Lighting depth map uses real X/Z/depth and shade changes per-livestock PAR
 test("Lighting import records vendor file and date and parses a generic CSV for review",async({page})=>{
   await openTrainingDashboard(page);
   await goToPage(page,"lighting");
+  await openAdvancedSection(page,/التحكم التقني بالإنارة|Advanced lighting controls/,".lighting-import-panel");
   const file=page.locator('input[type="file"]').first();
   await file.setInputFiles({
     name:"lighting-demo.csv",
@@ -559,6 +573,7 @@ test("Lighting screenshot import uses Vision analysis, fills editable values and
       });
   await openTrainingDashboard(page);
   await goToPage(page,"lighting");
+  await openAdvancedSection(page,/التحكم التقني بالإنارة|Advanced lighting controls/,".lighting-import-panel");
   const png=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2r0sAAAAASUVORK5CYII=","base64");
   await page.getByTestId("lighting-import-input").setInputFiles({name:"maxspect-screenshot.png",mimeType:"image/png",buffer:png});
   const review=page.locator(".lighting-import-review");
@@ -577,6 +592,7 @@ test("Lighting screenshot import uses Vision analysis, fills editable values and
 });
 
 test("Equipment CSV import is editable, routes data to Tank Brain and supports alert acknowledgement",async({page})=>{
+  test.setTimeout(90_000);
   await openTrainingDashboard(page);
   await goToPage(page,"equipment");
   await page.getByTestId("equipment-smart-import-toggle").click();

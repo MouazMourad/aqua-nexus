@@ -3,6 +3,8 @@ import { useEffect,useMemo,useRef,useState } from "react";
 import type { Equipment,LightingChannel,LightingImportRecord,LightingProgram,Tank } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { AdvancedSection } from "@/components/ui/AdvancedSection";
+import { ContextHint } from "@/components/ui/ContextHint";
 import { DecisionGuidance } from "@/components/ui/DecisionGuidance";
 import { LightingHeatmap3D } from "@/components/lighting/LightingHeatmap3D";
 import { defaultLightingProgram,formatLightMinute,lightingAtMinute,lightingFrontGrid,lightingGrid,lightingIntelligence,lightingSchedule,LIGHTING_SPECTRA } from "@/domain/lightingIntelligence";
@@ -350,10 +352,10 @@ export function LightingPage({tank,onEquipment}:{tank:Tank;onEquipment:()=>void}
    <LightingHeatmap3D tank={previewTank} minute={viewMinute} depthPct={depthPct}/>
   </section>
 
-  <section className="lighting-map-pair full-span">
+  <div className="full-span"><AdvancedSection titleAr="خرائط PAR التقنية" titleEn="Technical PAR maps" summaryAr="Top/Front Views للتدقيق الفني؛ مخطط تموضع المرجان أو النبات يبقى ظاهر بالواجهة الأساسية." summaryEn="Top/Front views for technical inspection; coral/plant placement remains visible in the basic view."><div style={{paddingTop:10}}><section className="lighting-map-pair full-span">
    <div className="card panel"><div className="module-head"><div><h3>{bi(lang,"Top View — توزيع PAR","Top View — PAR distribution")}</h3><p className="note">{bi(lang,"من الأعلى عند العمق المختار.","From above at the selected depth.")}</p></div><span className="status">{Math.round(top.min)}–{Math.round(top.max)}</span></div><HeatGrid cells={top.cells} cols={top.cols} max={top.max}/></div>
    <div className="card panel"><div className="module-head"><div><h3>{bi(lang,"Front View — اختراق الضوء","Front View — light penetration")}</h3><p className="note">{bi(lang,"مقطع أمامي بمنتصف عرض الحوض؛ الأعلى سطح الماء والأسفل القاع.","Front section at mid-width; surface is at the top, bottom at the base.")}</p></div><span className="status">{Math.round(front.min)}–{Math.round(front.max)}</span></div><HeatGrid cells={front.cells} cols={front.cols} max={front.max} front/></div>
-  </section>
+  </section></div></AdvancedSection></div>
 
   <section className="card panel full-span lighting-placement-panel">
    <div className="module-head"><div><small className="eyebrow-mini">{tank.type==="marine"?"CORAL DEPTH MAP":"PLANT DEPTH MAP"}</small><h3>{tank.type==="marine"?bi(lang,"مخطط مستويات المرجان داخل الحوض","Coral depth-level map"):bi(lang,"مخطط مستويات النباتات داخل الحوض","Plant depth-level map")}</h3><p className="note">{bi(lang,"المخطط مقسوم حسب المسافة الحقيقية تحت سطح الماء. الكائن الموجود بالحوض يظهر بمستواه الفعلي إذا سجلت عمقه؛ وإذا ما تسجل بعد، يظهر بالمستوى المقترح بوضوح.","The diagram is divided by real distance below the water surface. Existing livestock appears at its actual level once depth is recorded; otherwise it is clearly shown in the suggested level.")}</p></div><span className="scene-badge">{Math.round(tank.display.height)} cm</span></div>
@@ -406,7 +408,10 @@ export function LightingPage({tank,onEquipment}:{tank:Tank;onEquipment:()=>void}
    {intel.placementRecommendations.length===0&&<div className="inline-alert info">{tank.type==="marine"?bi(lang,"سجّل المرجان بالحوض حتى يظهر داخل مخطط المستويات.","Register corals so they can appear inside the depth map."):bi(lang,"سجّل النباتات بالحوض حتى تظهر داخل مخطط المستويات.","Register plants so they can appear inside the depth map.")}</div>}
   </section>
 
-  <section className="card panel full-span">
+  <div className="full-span"><AdvancedSection titleAr="التحكم التقني بالإنارة" titleEn="Advanced lighting controls" summaryAr="تحرير القنوات والنقاط الزمنية والاستيراد والنموذج البصري ومعايرة PAR. الديمو والتموضع يضلوا ظاهرين فوق." summaryEn="Channel/time-point editing, import, optical model and PAR calibration. The demo and placement map stay visible above.">
+   <div style={{display:"grid",gap:14,paddingTop:10}}>
+    <ContextHint id="lighting-advanced-model" lang={lang} tone="important" ar="قيم PAR قبل المعايرة تقديرية. عدّل المواصفات أو المعايرة فقط من بيانات حقيقية للجهاز أو PAR Meter." en="PAR remains estimated until calibrated. Change model specifications or calibration only from real fixture data or a PAR meter."/>
+    <section className="card panel full-span">
    <div className="module-head"><div><small className="eyebrow-mini">PROGRAM</small><h3>{bi(lang,"البرنامج الزمني والطيف","Schedule & spectrum")}</h3><p className="note">{bi(lang,"أي تغيير هون يظهر فوراً بالمنحنى والـ3D قبل الحفظ. الحفظ ينشئ نسخة تاريخية من البرنامج السابق.","Changes preview instantly in the curve and 3D before saving. Saving stores a historical version of the previous program.")}</p></div><span className={dirty?"status warn":"status good"}>{dirty?bi(lang,"تعديلات غير محفوظة","UNSAVED"):bi(lang,"محفوظ","SAVED")}</span></div>
    <div className="form-grid compact-fields"><label className="field"><span>{bi(lang,"اسم البرنامج","Program name")}</span><input value={draft.name} onChange={e=>mutateProgram(p=>{p.name=e.target.value})}/></label><label className="field full-field"><span>{tr(lang,"notes")}</span><input value={draft.notes??""} onChange={e=>mutateProgram(p=>{p.notes=e.target.value})}/></label></div>
    <ProgramCurve program={draft}/>
@@ -480,6 +485,8 @@ export function LightingPage({tank,onEquipment}:{tank:Tank;onEquipment:()=>void}
    <button className="btn primary" onClick={addCalibration}>+ {bi(lang,"إضافة نقطة معايرة","Add calibration point")}</button>
    <div className="history-list" style={{marginTop:12}}>{(tank.lighting?.calibrationPoints??[]).map(x=><div className="history-row" key={x.id}><div><b>{Math.round(x.measuredPar)} PAR</b><small>X {Math.round(x.xPct)}% • Z {Math.round(x.zPct)}% • {bi(lang,"عمق","depth")} {Math.round(x.depthPct)}% • {formatLightMinute(x.minute??schedule.peakMinute)}</small></div><button className="icon-btn" onClick={()=>removeCalibration(x.id)}>×</button></div>)}</div>
   </section>
+   </div>
+  </AdvancedSection></div>
 
   <section className="card panel full-span">
    <div className="module-head"><div><small className="eyebrow-mini">TANK BRAIN CONNECTIONS</small><h3>{bi(lang,"شو شايف عقل الحوض من الإنارة؟","What does Tank Brain see from lighting?")}</h3></div><span className={"status "+levelClass(intel.level)}>{intel.confidence}%</span></div>
@@ -491,6 +498,6 @@ export function LightingPage({tank,onEquipment}:{tank:Tank;onEquipment:()=>void}
    </div>
   </section>
 
-  {(tank.lighting?.history??[]).length>0&&<section className="card panel full-span"><div className="module-head"><div><small className="eyebrow-mini">PROGRAM HISTORY</small><h3>{bi(lang,"نسخ البرامج السابقة","Previous program versions")}</h3></div><span className="status">{tank.lighting?.history?.length}</span></div><div className="history-list">{(tank.lighting?.history??[]).slice(0,10).map(x=>{const s=lightingSchedule(x.program);return <div className="history-row" key={x.id}><div><b>{x.program.name}</b><small>{new Date(x.timestamp).toLocaleString()} • {(s.photoperiodMinutes/60).toFixed(1)} h • dose {s.relativeDoseHours.toFixed(1)}</small></div></div>})}</div></section>}
+  {(tank.lighting?.history??[]).length>0&&<div className="full-span"><AdvancedSection titleAr="سجل برامج الإنارة السابقة" titleEn="Previous lighting programs" summaryAr="مرجع تاريخي للرجوع للتغييرات القديمة عند الحاجة." summaryEn="Historical reference for reviewing prior lighting changes." defaultOpen={false}><div style={{paddingTop:10}}><section className="card panel full-span"><div className="module-head"><div><small className="eyebrow-mini">PROGRAM HISTORY</small><h3>{bi(lang,"نسخ البرامج السابقة","Previous program versions")}</h3></div><span className="status">{tank.lighting?.history?.length}</span></div><div className="history-list">{(tank.lighting?.history??[]).slice(0,10).map(x=>{const s=lightingSchedule(x.program);return <div className="history-row" key={x.id}><div><b>{x.program.name}</b><small>{new Date(x.timestamp).toLocaleString()} • {(s.photoperiodMinutes/60).toFixed(1)} h • dose {s.relativeDoseHours.toFixed(1)}</small></div></div>})}</div></section></div></AdvancedSection></div>}
  </section>;
 }

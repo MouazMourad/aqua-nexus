@@ -5,6 +5,8 @@ import { chemistryAgeDays } from "@/domain/health";
 import { maintenanceEffectiveState } from "@/domain/maintenanceSchedule";
 import { tr } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { AdvancedSection } from "@/components/ui/AdvancedSection";
+import { ContextHint } from "@/components/ui/ContextHint";
 import { downloadText,today } from "@/lib/appUtils";
 import { unifiedInventory } from "@/domain/inventoryIntelligence";
 import { tankIntelligenceCore } from "@/domain/intelligenceCore";
@@ -24,14 +26,20 @@ export function ReportsPage({tank}:{tank:Tank}) {
  <article className="card panel"><h3>{tr(lang,"chemistryFreshness")}</h3><b className="big-number">{chemAge}d</b><div className={`inline-alert ${chemAge>7?"warn":"good"}`}>{chemAge>7?tr(lang,"chemistryOverdue"):tr(lang,"good")}</div></article>
 
  <article className="card panel full-span report-preview"><h2>{tr(lang,"reportSummary")}</h2><div className="report-kpis"><span>{tr(lang,"tankHealth")} <b>{sys.score}%</b></span><span>{tr(lang,"chemistryHealth")} <b>{sys.chemistry}%</b></span><span>{tr(lang,"maintenanceHealth")} <b>{sys.maintenance}%</b></span><span>{lang==="ar"?"التجهيزات":"Equipment"} <b>{sys.equipment}%</b></span><span>{lang==="ar"?"التوافق":"Compatibility"} <b>{sys.compatibility}%</b></span><span>{tr(lang,"systemVolume")} <b>{tank.systemVolumeLiters} L</b></span></div></article>
-
- <article className="card panel full-span"><h2>{lang==="ar"?"ملخص صحة النظام":"System health breakdown"}</h2><div className="summary-strip">{sys.components.map(x=><div className="summary" key={x.key}><small>{lang==="ar"?x.ar:x.en} • {x.weight}%</small><b>{x.score}%</b></div>)}</div></article>
  <article className="card panel full-span"><h2>{lang==="ar"?"أهم التنبيهات":"Top alerts"} ({alerts.length})</h2>{alerts.length?alerts.slice(0,10).map(x=><div className={`inline-alert ${x.level}`} key={x.id}><b>{lang==="ar"?x.ar:x.en}</b><small style={{display:"block"}}>{x.domain}</small></div>):<div className="inline-alert good">{lang==="ar"?"لا يوجد تنبيه حالي":"No active alert"}</div>}</article>
+
+ <div className="full-span"><AdvancedSection titleAr="تفاصيل التقرير الكاملة" titleEn="Full report details" summaryAr="تفصيل مكونات الصحة والتجهيزات والتوافق والمخزون والصيانة؛ الملخص وأهم التنبيهات يضلوا ظاهرين أولاً." summaryEn="Detailed health components, equipment, compatibility, inventory and maintenance; summary and key alerts stay first.">
+  <div style={{display:"grid",gap:14,paddingTop:10}}>
+   <ContextHint id="reports-health-breakdown" lang={lang} ar="النسب التفصيلية تساعد تعرف من وين جاي تقييم الصحة؛ ما لازم تنقرأ كنقاط منفصلة عن حالة الحوض والتنبيهات." en="Detailed scores explain where health status comes from; they should not be read separately from current tank state and alerts."/>
+    <article className="card panel full-span"><h2>{lang==="ar"?"ملخص صحة النظام":"System health breakdown"}</h2><div className="summary-strip">{sys.components.map(x=><div className="summary" key={x.key}><small>{lang==="ar"?x.ar:x.en} • {x.weight}%</small><b>{x.score}%</b></div>)}</div></article>
+ 
  <article className="card panel full-span"><h2>{lang==="ar"?"التجهيزات والتوافق":"Equipment & compatibility"}</h2><div className="maintenance-report-grid"><div><h3>{lang==="ar"?"مشاكل التجهيزات":"Equipment issues"} ({sys.equipmentAudit.issues.length})</h3>{sys.equipmentAudit.issues.slice(0,8).map(x=><div className="mini-row" key={x.id}><b>{lang==="ar"?x.ar:x.en}</b></div>)}</div><div><h3>{lang==="ar"?"تعارضات الكائنات":"Compatibility issues"} ({sys.compatibilityAudit.issues.length})</h3>{sys.compatibilityAudit.issues.slice(0,8).map((x,i)=><div className="mini-row" key={i}><b>{lang==="ar"?x.ar:x.en}</b></div>)}</div></div></article>
  <article className="card panel full-span"><h2>{lang==="ar"?"المخزون":"Inventory"} • {lang==="ar"?"منخفض":"Low"} {stock.low.length}</h2>{stock.low.slice(0,10).map(x=><div className="mini-row" key={x.id}><b>{lang==="ar"?x.name:(x.nameEn||x.name)}</b><span>{x.quantity} {x.unit} / min {x.minimum}</span></div>)}</article>
  <article className="card panel full-span"><h2>{tr(lang,"maintenanceReport")}</h2>
   <div className="maintenance-report-grid"><div><h3>{tr(lang,"overdue")} ({overdue.length})</h3>{overdue.map(x=><div className="mini-row" key={x.id}><b>{lang==="ar"?x.title:(x.titleEn||x.title)}</b><span>{x.nextDue}</span></div>)}</div>
   <div><h3>{tr(lang,"upcoming")} ({upcoming.length})</h3>{upcoming.map(x=><div className="mini-row" key={x.id}><b>{lang==="ar"?x.title:(x.titleEn||x.title)}</b><span>{x.nextDue??"—"}</span></div>)}</div></div>
  </article>
+  </div>
+ </AdvancedSection></div>
  </section>;
 }

@@ -4,6 +4,8 @@ import type { JournalPhoto,Tank,VisionAssessmentRecord } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { AdvancedSection } from "@/components/ui/AdvancedSection";
+import { ContextHint } from "@/components/ui/ContextHint";
 import { uid,nowISO } from "@/lib/appUtils";
 import { buildVisionTriage,captureConsistency,type VisionMetrics,type VisionSymptom } from "@/domain/visionIntelligence";
 import { visionDiseaseCandidates } from "@/domain/visionDifferential";
@@ -219,6 +221,7 @@ export function JournalPage({tank}:{tank:Tank}) {
 
  <div className="card panel full-span">
   <div className="module-head"><div><h3>{bi(lang,"Local Best Visual Insight","Local Best Visual Insight")}</h3><p className="note">{bi(lang,"الطبقة الأولى محلية على جهازك ولا ترسل الصورة للخارج. بعد ظهور النتيجة فيك تطلب AI Vision Second Opinion بشكل صريح؛ فقط عندها، وإذا في مزود خارجي مربوط، بتنرسل الصورة وسياق الحوض للمزود.","The first layer runs locally on your device and does not send the image externally. After the result appears, you can explicitly request an AI Vision second opinion; only then, and only if an external provider is configured, the image and tank context are sent to that provider.")}</p></div><span className="scene-badge">LOCAL BEST AI</span></div>
+  <ContextHint id="visual-insight-not-diagnosis" lang={lang} tone="safety" dismissible={false} ar="Visual Insight يعطي ملاحظات واحتمالات وخطوة فحص تالية، مو تشخيص مرض مؤكد ولا وصفة علاج تلقائية." en="Visual Insight provides observations, possibilities and a next check; it is not a confirmed diagnosis or automatic treatment prescription."/>
   <div className="form-grid"><label className="field"><span>{bi(lang,"نطاق الصورة","Image scope")}</span><select value={visionLivestockId} onChange={e=>setVisionLivestockId(e.target.value)}><option value="">{bi(lang,"الحوض كامل","Whole tank")}</option>{visionLivestock.map(x=><option key={x.id} value={x.id}>{lang==="ar"?x.name:(x.nameEn||x.name)}</option>)}</select></label><label className="field full-field"><span>{bi(lang,"ملاحظات السلوك/التطور","Behavior / progression notes")}</span><input value={visionNotes} onChange={e=>setVisionNotes(e.target.value)} placeholder={bi(lang,"من إمتى بلشت؟ في شهية؟ عم تنتشر؟","When did it start? appetite? spreading?")}/></label></div>
   <div className="vision-symptoms" style={{display:"flex",flexWrap:"wrap",gap:7,margin:"12px 0"}}>{(Object.keys(symptomLabels) as VisionSymptom[]).map(s=><button type="button" key={s} className={`btn ${visionSymptoms.includes(s)?"primary":""}`} onClick={()=>toggleSymptom(s)}>{lang==="ar"?symptomLabels[s].ar:symptomLabels[s].en}</button>)}</div>
   <label className="btn primary file-button">{visionBusy?bi(lang,"عم يتم التحليل محلياً...","Analyzing locally..."):bi(lang,"📷 حلل الصورة محلياً","📷 Analyze locally")}<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" disabled={visionBusy} onChange={e=>void runVision(e.target.files?.[0])}/></label>
@@ -252,13 +255,15 @@ export function JournalPage({tank}:{tank:Tank}) {
   </div>}
  </div>
 
- {assessmentHistory.length>0&&<div className="card panel full-span">
+ {assessmentHistory.length>0&&<div className="full-span"><AdvancedSection titleAr="سجل تحليلات Visual Insight" titleEn="Visual Insight analysis history" summaryAr="السجل التفصيلي للمراجعة الزمنية؛ آخر نتيجة تضل ظاهرة فوق." summaryEn="Detailed longitudinal history; the latest result remains visible above." defaultOpen={false}><div style={{paddingTop:10}}><div className="card panel full-span">
   <div className="module-head"><div><h3>{bi(lang,"سجل Visual Insight","Visual Insight history")}</h3><p className="note">{bi(lang,"كل تحليل محفوظ مع الصورة والسياق والإجراءات الناتجة عنه حتى تقدر تراجع تطور الحالة زمنياً.","Each assessment stays linked to its image, context and resulting actions so progression remains auditable over time.")}</p></div><span className="scene-badge">{assessments.length}</span></div>
   <div className="history-list">{assessmentHistory.map(a=>{const subject=tank.livestock.find(x=>x.id===a.livestockId),candidate=visionDiseaseCandidates(tank,a.livestockId,a.symptoms as VisionSymptom[])[0];return <div className="history-row" key={a.id} style={{alignItems:"flex-start",gap:10}}>
    <div style={{flex:1,display:"grid",gap:4}}><b>{subject?(lang==="ar"?subject.name:(subject.nameEn||subject.name)):bi(lang,"الحوض كامل","Whole tank")} • {a.triage.level}</b><small>{new Date(a.timestamp).toLocaleString()} • {bi(lang,"ثقة","confidence")} {a.triage.confidenceScore}/100 • Capture {a.metrics.captureScore}/100</small><span>{lang==="ar"?a.triage.summaryAr:a.triage.summaryEn}</span>{candidate&&<small>{bi(lang,"أقرب مرجع أعراض:","Top symptom reference:")} {lang==="ar"?candidate.ar:candidate.en}</small>}</div>
    <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}><button className="btn" disabled={deepVisionBusyId===a.id} onClick={()=>void runDeepVision(a)}>{a.external?.status==="completed"?bi(lang,"إعادة الرأي الثاني","Repeat second opinion"):bi(lang,"AI رأي ثانٍ","AI second opinion")}</button>{a.livestockId&&<button className="btn" onClick={()=>markVisionWatch(a)}>👁</button>}<button className="btn" disabled={Boolean(a.followUpTaskId)} onClick={()=>createVisionFollowUp(a)}>{a.followUpTaskId?"✓":"＋24h"}</button>{a.livestockId&&<button className="btn" disabled={Boolean(a.quarantineCaseId)} onClick={()=>createVisionQuarantine(a)}>{a.quarantineCaseId?"✓ Q":"＋ Q"}</button>}</div>
   </div>})}</div>
- </div>}
+ </div>
+
+</div></AdvancedSection></div>}
 
  <div className="card panel full-span"><div className="module-head"><div><h3>{bi(lang,"بروتوكول تصوير ثابت","Consistent capture protocol")}</h3><p className="note">{bi(lang,"لحتى مقارنة اللون والنمو يكون إلها معنى: نفس الكائن، نفس الزاوية والمسافة، نفس برنامج الإضاءة تقريباً، نظف الزجاج، وتجنب انعكاس الفلاش. اعتبر أول صورة واضحة Reference للمقارنات التالية.","For meaningful color/growth comparison: use the same subject, angle and distance, similar light schedule, clean glass, and avoid flash reflections. Treat the first clear capture as the reference.")}</p></div><span className="scene-badge">{photos.length?bi(lang,"Reference موجود","Reference available"):bi(lang,"بانتظار أول صورة","Awaiting first capture")}</span></div>{photos[photos.length-1]&&<div className="inline-alert info"><b>{bi(lang,"مرجع أقدم صورة محفوظة:","Oldest saved reference:")}</b> {new Date(photos[photos.length-1].timestamp).toLocaleString()} • Capture {photos[photos.length-1].captureScore??"—"}/100</div>}</div>
 

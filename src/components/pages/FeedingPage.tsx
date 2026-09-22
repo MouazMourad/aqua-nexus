@@ -4,13 +4,14 @@ import type { Tank } from "@/domain/types";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { AdvancedSection } from "@/components/ui/AdvancedSection";
 import { uid,nowISO } from "@/lib/appUtils";
 import { feedingIntelligence } from "@/domain/feedingIntelligence";
 import { inventoryForConsumer } from "@/domain/inventoryIntelligence";
 import { claimCriticalAction } from "@/lib/actionGuard";
 
 export function FeedingPage({tank}:{tank:Tank}) {
- const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),[food,setFood]=useState(""),[amount,setAmount]=useState(""),[notes,setNotes]=useState(""),[inventoryItemId,setInventoryItemId]=useState(""),[used,setUsed]=useState(""),[showDetails,setShowDetails]=useState(false),[showHistory,setShowHistory]=useState(false),[historyLimit,setHistoryLimit]=useState(100);
+ const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),[food,setFood]=useState(""),[amount,setAmount]=useState(""),[notes,setNotes]=useState(""),[inventoryItemId,setInventoryItemId]=useState(""),[used,setUsed]=useState(""),[showHistory,setShowHistory]=useState(false),[historyLimit,setHistoryLimit]=useState(100);
  const plan=useMemo(()=>feedingIntelligence(tank),[tank]);
  const feedingStock=useMemo(()=>inventoryForConsumer(tank,"feeding"),[tank]);
  const todayKey=new Date().toDateString();
@@ -62,7 +63,7 @@ export function FeedingPage({tank}:{tank:Tank}) {
  </section>
 
  <section className="card panel full-span">
-  <div className="module-head"><div><small className="eyebrow-mini">{bi(lang,"تسجيل سريع","QUICK LOG")}</small><h3>{bi(lang,"سجّل شو صار فعلياً","Log what actually happened")}</h3><p className="note">{bi(lang,"كل تغذية تُخصم مباشرة من المخزون. اختر مادة الطعام وسجّل الكمية المستهلكة؛ الملاحظات فقط اختيارية.","Every feeding deducts directly from inventory. Select the food item and enter the consumed quantity; only notes are optional.")}</p></div><button className="btn" onClick={()=>setShowDetails(v=>!v)}>{showDetails?bi(lang,"إخفاء الملاحظات","Hide notes"):bi(lang,"ملاحظات","Notes")}</button></div>
+  <div className="module-head"><div><small className="eyebrow-mini">{bi(lang,"تسجيل سريع","QUICK LOG")}</small><h3>{bi(lang,"سجّل شو صار فعلياً","Log what actually happened")}</h3><p className="note">{bi(lang,"كل تغذية تُخصم مباشرة من المخزون. اختر مادة الطعام وسجّل الكمية المستهلكة؛ الملاحظات اختيارية.","Every feeding deducts directly from inventory. Select the food item and enter the consumed quantity; notes are optional.")}</p></div></div>
   <div className="feeding-guided-grid">
    <label className="field"><span>{tr(lang,"food")}</span><input value={selectedInventory?(lang==="ar"?selectedInventory.name:(selectedInventory.nameEn||selectedInventory.name)):""} readOnly placeholder={bi(lang,"اختَر الطعام من المخزون","Select food from inventory")}/></label>
    <label className="field"><span>{tr(lang,"feedAmount")}</span><input value={amount} onChange={e=>setAmount(e.target.value)} placeholder={bi(lang,"مثال: مكعب واحد / رشة صغيرة","e.g. 1 cube / small pinch")}/></label>
@@ -70,11 +71,7 @@ export function FeedingPage({tank}:{tank:Tank}) {
    <label className="field"><span>{bi(lang,"الكمية التي ستُخصم","Quantity to deduct")}</span><input type="number" min="0" step="any" value={used} onChange={e=>setUsed(e.target.value)} disabled={!selectedInventory} placeholder={selectedInventory?selectedInventory.unit:bi(lang,"اختر المادة أولاً","Select item first")}/></label>
   </div>
 
-  {showDetails&&<div className="feeding-details">
-   <div className="form-grid">
-    <label className="field full-field"><span>{tr(lang,"notes")}</span><textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder={bi(lang,"ملاحظات اختيارية عن الشهية أو الاستجابة","Optional notes about appetite or response")}/></label>
-   </div>
-  </div>}
+  <AdvancedSection titleAr="ملاحظات التغذية" titleEn="Feeding notes" summaryAr="اختيارية؛ افتحها إذا بدك تسجل الشهية أو استجابة الكائنات." summaryEn="Optional; open when you want to record appetite or livestock response."><div className="form-grid" style={{paddingTop:10}}><label className="field full-field"><span>{tr(lang,"notes")}</span><textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder={bi(lang,"ملاحظات اختيارية عن الشهية أو الاستجابة","Optional notes about appetite or response")}/></label></div></AdvancedSection>
 
   <div className="feeding-primary-action">
    <div><small>{bi(lang,"الإجراء الحالي","CURRENT ACTION")}</small><b>{!selectedInventory?bi(lang,"اختر مادة الطعام من المخزون","Select the food item from inventory"):!Number.isFinite(usedQty)||usedQty<=0?bi(lang,"أدخل الكمية المستهلكة","Enter the consumed quantity"):usedQty>selectedInventory.quantity?bi(lang,"الكمية أكبر من المخزون المتوفر","Quantity exceeds available inventory"):bi(lang,`سيُخصم ${usedQty} ${selectedInventory.unit} من المخزون عند الحفظ`,`${usedQty} ${selectedInventory.unit} will be deducted from inventory when saved`)}</b></div>

@@ -5,6 +5,8 @@ import { useAquaStore } from "@/store/useAquaStore";
 import { tr,bi } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DecisionGuidance } from "@/components/ui/DecisionGuidance";
+import { ContextHint } from "@/components/ui/ContextHint";
+import { AdvancedSection } from "@/components/ui/AdvancedSection";
 import { uid,nowISO } from "@/lib/appUtils";
 import { chemistryCatalogForTank } from "@/domain/chemistryProfile";
 import { calculateDose,DOSING_PRESETS,type DosingForm,type DosingParameter } from "@/domain/dosingCalculator";
@@ -24,7 +26,7 @@ function datePlusDays(days:number){return new Date(Date.now()+days*86400000).toI
 export function DosingPage({tank}:{tank:Tank}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank),availableParams:DosingParameter[]=tank.type==="marine"?["KH","Ca","Mg"]:["KH"];
  const {requestOverride,overrideDialog}=useSafetyOverrideDialog(lang);
- const [param,setParam]=useState<DosingParameter>("KH"),[target,setTarget]=useState(()=>idealTarget(tank,"KH")),[form,setForm]=useState<DosingForm>("dry"),[presetId,setPresetId]=useState("nahco3"),[purity,setPurity]=useState(100),[stockGramsPerLiter,setStockGramsPerLiter]=useState(84),[productRaise,setProductRaise]=useState(0),[productName,setProductName]=useState(""),[inventoryItemId,setInventoryItemId]=useState(""),[routineItemId,setRoutineItemId]=useState(""),[routineAmount,setRoutineAmount]=useState(""),[showAdvanced,setShowAdvanced]=useState(false),[showDoser,setShowDoser]=useState(false);
+ const [param,setParam]=useState<DosingParameter>("KH"),[target,setTarget]=useState(()=>idealTarget(tank,"KH")),[form,setForm]=useState<DosingForm>("dry"),[presetId,setPresetId]=useState("nahco3"),[purity,setPurity]=useState(100),[stockGramsPerLiter,setStockGramsPerLiter]=useState(84),[productRaise,setProductRaise]=useState(0),[productName,setProductName]=useState(""),[inventoryItemId,setInventoryItemId]=useState(""),[routineItemId,setRoutineItemId]=useState(""),[routineAmount,setRoutineAmount]=useState(""),[showDoser,setShowDoser]=useState(false);
  useEffect(()=>{setTarget(idealTarget(tank,param));const first=DOSING_PRESETS.find(x=>x.parameter===param);if(first)setPresetId(first.id);},[param,tank.id]);
  const presets=DOSING_PRESETS.filter(x=>x.parameter===param),chosen=presets.find(x=>x.id===presetId)??presets[0],guide=useMemo(()=>chemistryGuidance(tank),[tank]),sample=useMemo(()=>latestParameterSample(tank,param),[tank,param]);
  const correctiveStock=useMemo(()=>correctiveDosingInventory(tank,param,form,chosen?.id),[tank,param,form,chosen?.id]);
@@ -143,7 +145,7 @@ export function DosingPage({tank}:{tank:Tank}) {
  </section>
 
  <section className="card panel full-span">
-  <div className="module-head"><div><small className="eyebrow-mini">{lang==="ar"?"إعداد موجّه":"GUIDED SETUP"}</small><h3>{lang==="ar"?"اختار المادة والهدف، والباقي على النظام":"Choose the target and material; the system handles the rest"}</h3><p className="note">{lang==="ar"?"القيم الحساسة مخفية عن الواجهة الأساسية. القراءة الحالية تؤخذ فقط من Chemistry ولا يمكن تعديلها من هون.":"Sensitive technical values stay out of the primary flow. The current reading comes only from Chemistry and cannot be overridden here."}</p></div><button className="btn" onClick={()=>setShowAdvanced(v=>!v)}>{showAdvanced?(lang==="ar"?"إخفاء Advanced":"Hide Advanced"):(lang==="ar"?"Advanced":"Advanced")}</button></div>
+  <div className="module-head"><div><small className="eyebrow-mini">{lang==="ar"?"إعداد موجّه":"GUIDED SETUP"}</small><h3>{lang==="ar"?"اختار المادة والهدف، والباقي على النظام":"Choose the target and material; the system handles the rest"}</h3><p className="note">{lang==="ar"?"القراءة الحالية تؤخذ فقط من Chemistry ولا يمكن تعديلها من هون. الضبط التقني الاختياري موجود تحت Advanced.":"The current reading comes only from Chemistry and cannot be overridden here. Optional technical tuning is under Advanced."}</p></div></div>
 
   <div className="dosing-guided-grid">
    <label className="field"><span>{lang==="ar"?"شو بدك تصحح؟":"What are you correcting?"}</span><select value={param} onChange={e=>setParam(e.target.value as DosingParameter)}>{availableParams.map(p=><option key={p} value={p}>{p}</option>)}</select></label>
@@ -156,7 +158,8 @@ export function DosingPage({tank}:{tank:Tank}) {
   {form!=="product"&&<div className="form-grid" style={{marginTop:12}}><label className="field"><span>{lang==="ar"?"اسم المادة":"Material"}</span><select value={chosen?.id||""} onChange={e=>setPresetId(e.target.value)}>{presets.map(x=><option value={x.id} key={x.id}>{lang==="ar"?x.ar:x.en} — {x.formula}</option>)}</select></label>{form==="stock"&&<label className="field"><span>{lang==="ar"?"كم غرام حطيت بكل لتر من المحلول؟":"How many grams are in each liter?"}</span><input type="number" min="0" step="any" value={stockGramsPerLiter||""} onChange={e=>setStockGramsPerLiter(Number(e.target.value))}/><small>{lang==="ar"?"هاي المعلومة ضرورية لأن تركيز المحلول بيغيّر كمية الـmL المطلوبة.":"This is required because solution strength changes the required mL."}</small></label>}</div>}
   {form==="product"&&<div className="form-grid" style={{marginTop:12}}><label className="field"><span>{lang==="ar"?"اسم المنتج التجاري":"Commercial product name"}</span><input value={productName} onChange={e=>setProductName(e.target.value)} placeholder={lang==="ar"?"مثال: منتج KH محدد":"e.g. a specific KH product"}/></label><label className="field"><span>{lang==="ar"?`من العبوة: 1 mL لكل 100 L بيرفع ${param} قديش؟`:`From the label: how much does 1 mL per 100 L raise ${param}?`}</span><input type="number" min="0" step="any" value={productRaise||""} onChange={e=>setProductRaise(Number(e.target.value))} placeholder={lang==="ar"?"اكتب الرقم الموجود على الملصق":"Enter the label value"}/></label></div>}
 
-  {showAdvanced&&<div className="dosing-advanced">
+  <AdvancedSection titleAr="حسابات الجرعة المتقدمة" titleEn="Advanced dose calculation" summaryAr="النقاوة والتفاصيل الحسابية للمادة غير القياسية؛ Safety Gates والجرعة الحالية يضلوا ظاهرين دائماً." summaryEn="Purity and calculation detail for non-standard material; safety gates and the current dose decision always remain visible."><div className="dosing-advanced">
+   <ContextHint id="dosing-purity" lang={lang} tone="important" ar="غيّر النقاوة فقط إذا عندك قيمة موثقة للمادة. تركها 100% أفضل من إدخال تخمين يغيّر كمية الجرعة المحسوبة." en="Change purity only when you have a verified material value. Leaving it at 100% is safer than entering a guess that changes the calculated dose."/>
    <div className="module-head"><div><h4>{lang==="ar"?"ضبط دقيق وحسابات متقدمة":"Fine tuning & advanced calculation"}</h4><p className="note">{lang==="ar"?"هاي التفاصيل مو مطلوبة لمعظم الاستخدام اليومي، لكنها موجودة للمستخدم الخبير وللمواد غير القياسية.":"These details are not needed for most daily use, but remain available for expert and non-standard setups."}</p></div></div>
    <div className="form-grid">
     {form!=="product"&&<label className="field"><span>{lang==="ar"?"النقاوة الفعلية للمادة %":"Actual material purity %"}</span><input type="number" min="1" max="100" step="1" value={purity} onChange={e=>setPurity(Number(e.target.value))}/></label>}
@@ -168,7 +171,7 @@ export function DosingPage({tank}:{tank:Tank}) {
     <div className="summary"><small>{lang==="ar"?"كل خطوة":"Per step"}</small><b>{stepLabel}</b></div>
     <div className="summary"><small>{lang==="ar"?"حد الأمان اليومي":"Daily safety limit"}</small><b>{safetyLimit}</b></div>
    </div>
-  </div>}
+  </div></AdvancedSection>
 
   <div className={`inline-alert ${targetCheck.level==="danger"?"danger":targetCheck.level==="warn"?"warn":"good"}`} style={{marginTop:12}}>{lang==="ar"?targetCheck.ar:targetCheck.en}</div>
   {doseState==="blocked"&&<div className="inline-alert danger" style={{marginTop:10}}><b>{lang==="ar"?"ليش الجرعة موقوفة؟":"Why is dosing blocked?"}</b><p>{gateReason}</p></div>}
