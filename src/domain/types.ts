@@ -169,6 +169,18 @@ export interface SumpChamber {
   items?: string[];
   contents?: string;
   notes?: string;
+  /** Optional ecosystem role; keeps the sump as a placement layer rather than a duplicate inventory. */
+  refugium?: {
+    mode: "filtration" | "display";
+    substrate: "bare" | "sand" | "mud" | "mixed";
+    substrateDepthCm?: number;
+    liveRockKg?: number;
+    flow: "low" | "medium" | "high";
+    livestockIds: string[];
+    equipmentIds: string[];
+    pods?: "low" | "established" | "strong";
+    hitchingStructures?: boolean;
+  };
 }
 
 export interface Sump {
@@ -240,6 +252,8 @@ export interface LivestockItem {
   lightingXPct?: number;
   /** Front-to-back placement across display width: 0 = front, 100 = back. */
   lightingZPct?: number;
+  /** Optional physical location. Sump/refugium assignment references the same livestock record; it never duplicates it. */
+  location?: "display" | "external" | `sump:${string}`;
   /** Local hardscape/canopy exposure correction when full 3D occlusion is not modeled. */
   lightingExposure?: "open"|"partialShade"|"shade";
 }
