@@ -71,6 +71,19 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   return()=>window.clearInterval(timer);
  },[criticalTimerRunning]);
  useEffect(()=>{
+  if(!active)return;
+  if(active.floatStatus==="running"&&active.floatEndAt&&now>=active.floatEndAt){
+   saveSession({...active,floatStatus:"ready",floatRemainingMs:0,floatEndAt:null,events:[ev("انتهى عداد موازنة الحرارة. بانتظار تأكيد المستخدم للانتقال إلى نقل الكائنات للأوعية.","Temperature equalization timer finished. Waiting for user confirmation before container transfer."),...active.events]});
+   pushTimerAlert("float",undefined,bi(lang,"انتهت موازنة الحرارة — أكد الانتقال للمرحلة الثانية","Temperature equalization complete — confirm stage 2"));
+   return;
+  }
+  if(active.bucketStatus==="running"&&active.bucketEndAt&&now>=active.bucketEndAt){
+   saveSession({...active,bucketStatus:"ready",bucketRemainingMs:0,bucketEndAt:null,events:[ev("انتهى عداد النقل إلى الأوعية. بانتظار تأكيد المستخدم.","Container-transfer timer finished. Waiting for user confirmation."),...active.events]});
+   pushTimerAlert("bucket",undefined,bi(lang,"انتهى عداد النقل إلى الأوعية — أكد الإكمال","Container transfer timer complete — confirm completion"));
+  }
+ },[now,active?.id,active?.floatStatus,active?.floatEndAt,active?.bucketStatus,active?.bucketEndAt]);
+
+ useEffect(()=>{
   if(!criticalTimerRunning||typeof navigator==="undefined"||!("wakeLock" in navigator))return;
   let cancelled=false;
   const acquire=async()=>{
