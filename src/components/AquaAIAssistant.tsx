@@ -16,7 +16,17 @@ import { uid,nowISO } from "@/lib/appUtils";
 import { askAquaAI } from "@/lib/aquaAIClient";
 
 function FishMascot({state}:{state:"normal"|"alert"|"critical"}){
- return <span className={`aqua-fish aqua-fish-${state}`} aria-hidden="true"><i className="aqua-fish-tail"/><i className="aqua-fish-body"><i className="aqua-fish-core"/><i className="aqua-fish-eye"/><i className="aqua-fish-line l1"/><i className="aqua-fish-line l2"/></i><i className="aqua-fish-fin"/></span>;
+ return <span className={`aqua-fish aqua-fish-${state}`} aria-hidden="true">
+  <svg className="aqua-ai-fish-svg" viewBox="0 0 120 72" fill="none">
+   <path className="ai-tail" d="M28 36 6 18v36l22-18Z"/>
+   <path className="ai-body" d="M25 36C39 13 75 9 103 30c5 4 5 8 0 12C75 63 39 59 25 36Z"/>
+   <path className="ai-fin" d="M55 20 68 5l5 19M58 52l11 14 5-17"/>
+   <circle className="ai-eye-ring" cx="91" cy="30" r="6"/><circle className="ai-eye" cx="91" cy="30" r="2.5"/>
+   <path className="ai-circuit" d="M38 36h9l5-10 8 21 7-15 5 7h13"/>
+   <circle className="ai-node" cx="38" cy="36" r="2"/><circle className="ai-node" cx="85" cy="39" r="2"/>
+   <path className="ai-gill" d="M82 23c-5 7-5 18 0 25"/>
+  </svg>
+ </span>;
 }
 
 type InsightView={id:string;labelAr:string;labelEn:string;promptAr:string;promptEn:string};
@@ -164,6 +174,14 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
   </section>}
   <button className={`aqua-ai-fish-button aqua-ai-swimmer tone-${visualTone} ${editingOverlay?"temporarily-hidden":""}`} onClick={()=>{setGreeting(false);setOpen(v=>!v)}} aria-label="Local Best AI"><FishMascot state={state}/><span className="aqua-ai-fish-label">Local Best AI</span>{state!=="normal"&&<i className="aqua-ai-alert-dot"/>}</button>
   <style jsx global>{`
+   .aqua-ai-fish-svg{width:100%;height:100%;overflow:visible;display:block}
+   .aqua-ai-fish-svg .ai-body{fill:color-mix(in srgb,var(--ai-fish,#54dfff) 15%,#061c2a);stroke:var(--ai-fish,#54dfff);stroke-width:2.4}
+   .aqua-ai-fish-svg .ai-tail,.aqua-ai-fish-svg .ai-fin{fill:color-mix(in srgb,var(--ai-fish,#54dfff) 20%,transparent);stroke:var(--ai-fish,#54dfff);stroke-width:2.2;stroke-linejoin:round}
+   .aqua-ai-fish-svg .ai-circuit,.aqua-ai-fish-svg .ai-gill{stroke:var(--ai-fish,#54dfff);stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
+   .aqua-ai-fish-svg .ai-eye-ring{fill:#071923;stroke:var(--ai-fish,#54dfff);stroke-width:2}.aqua-ai-fish-svg .ai-eye,.aqua-ai-fish-svg .ai-node{fill:var(--ai-fish,#54dfff)}
+   .aqua-ai-swimmer .ai-circuit{animation:aquaPulse 1.35s ease-in-out infinite}.aqua-ai-swimmer .ai-tail{transform-origin:28px 36px;animation:aquaTail .55s ease-in-out infinite alternate}
+   @keyframes aquaPulse{0%,100%{opacity:.45;filter:drop-shadow(0 0 1px var(--ai-fish))}50%{opacity:1;filter:drop-shadow(0 0 5px var(--ai-fish))}}
+   @keyframes aquaTail{from{transform:rotate(-5deg)}to{transform:rotate(5deg)}}
    .aqua-ai-swimmer{--ai-fish:#54dfff;--ai-glow:rgba(84,223,255,.48);transition:opacity .18s ease,transform .18s ease,visibility .18s ease}
    .aqua-ai-swimmer.tone-excellent{--ai-fish:#49ef9b;--ai-glow:rgba(73,239,155,.5)}
    .aqua-ai-swimmer.tone-good{--ai-fish:#54dfff;--ai-glow:rgba(84,223,255,.5)}
