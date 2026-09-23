@@ -3,7 +3,7 @@ import type { AcclimationCategory,LivestockItem,TankType } from "./types";
 const aliases:Record<string,AcclimationCategory>={
   fish:"fish",fishes:"fish",
   coral:"coral",corals:"coral",
-  invert:"invert",invertebrate:"invert",invertebrates:"invert",shrimp:"invert",
+  invert:"invert",invertebrate:"invert",invertebrates:"invert",shrimp:"invert",crustacean:"invert",crustaceans:"invert",snail:"invert",snails:"invert",echinoderm:"invert",echinoderms:"invert",urchin:"invert",urchins:"invert",starfish:"invert",worm:"invert",worms:"invert","tube worm":"invert","tube worms":"invert",
   plant:"plant",plants:"plant",
   macroalgae:"macroalgae","macro algae":"macroalgae",macro_algae:"macroalgae",algae:"macroalgae",
   other:"other"
