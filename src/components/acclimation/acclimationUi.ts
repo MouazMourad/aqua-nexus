@@ -30,7 +30,7 @@ export function buildAcclimationGuide(active:AcclimationSession|undefined,lang:"
   if(!active)return{stage:1,title:"",detail:"",tone:"info" as const};
   if(!active.floatConfirmed){
     if(active.floatStatus==="ready")return{stage:1,title:bi(lang,"أكد انتهاء موازنة الحرارة","Confirm temperature equalization"),detail:bi(lang,"العداد انتهى. تأكد أن حرارة الأكياس قريبة من حرارة الحوض ثم أكد المرحلة.","Timer finished. Confirm bag temperature is close to tank temperature, then confirm the stage."),tone:"ready" as const};
-    return{stage:1,title:bi(lang,"موازنة حرارة كل الشحنة","Temperature equalization for the whole shipment"),detail:bi(lang,"اترك جميع الأكياس مغلقة حتى ينتهي العداد.","Keep all bags sealed until the timer finishes."),tone:"info" as const};
+    return{stage:1,title:bi(lang,"ضع الأكياس المغلقة على سطح الحوض","Float the sealed bags on the aquarium surface"),detail:bi(lang,"ضع جميع أكياس الشحنة وهي مغلقة على سطح الحوض واتركها تطفو حتى ينتهي عداد موازنة الحرارة. لا تفتح الأكياس في هذه المرحلة.","Place all shipment bags, still sealed, on the aquarium surface and let them float until the temperature-equalization timer finishes. Do not open the bags during this stage."),tone:"info" as const};
   }
   if(active.bucketStatus!=="done"){
     if(active.bucketStatus==="ready")return{stage:2,title:bi(lang,"انتهى وقت النقل إلى الأوعية","Container-transfer time is complete"),detail:bi(lang,"تأكد أن كل الكائنات نُقلت إلى أوعيتها ثم أكد المرحلة.","Confirm all livestock has moved to dedicated containers, then confirm the stage."),tone:"ready" as const};

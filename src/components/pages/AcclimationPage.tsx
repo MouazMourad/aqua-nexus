@@ -65,6 +65,12 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const releasePlan=useMemo(()=>releaseLanes.flatMap(x=>x.entries),[releaseLanes]);
  const criticalTimerRunning=Boolean(active&&(active.floatStatus==="running"||active.bucketStatus==="running"||(active.items??[]).some(i=>i.status==="acclimating"&&Boolean(i.endAt))||(active.coralDipRuns??[]).some(r=>r.status==="running")));
  useEffect(()=>{
+  if(!criticalTimerRunning)return;
+  setNow(Date.now());
+  const timer=window.setInterval(()=>setNow(Date.now()),250);
+  return()=>window.clearInterval(timer);
+ },[criticalTimerRunning]);
+ useEffect(()=>{
   if(!criticalTimerRunning||typeof navigator==="undefined"||!("wakeLock" in navigator))return;
   let cancelled=false;
   const acquire=async()=>{
@@ -387,7 +393,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
     const libraryId=field(row,"libraryId");
     const catalog:any=libraryId?lib.find((x:any)=>x.id===libraryId):undefined;
     const cat=importedCategory(field(row,"category"),catalog);
-    if(!cat)return;
+    if(!cat){rejected++;return;}
     const ar=field(row,"name")||catalog?.ar||field(row,"nameEn");
     const en=field(row,"nameEn")||catalog?.en||ar;
     if(!ar&&!en)return;
@@ -414,7 +420,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
      health:importedHealth,
      temperament:importedTemperament,
      sensitivity:importedSensitivity,
-     subtype:cat==="macroalgae"?"macroalgae":field(row,"subtype"),
+     subtype:cat==="macroalgae"?"macroalgae":field(row,"subtype")||(["crustacean","snail","echinoderm","worm"].includes(field(row,"category").trim().toLowerCase())?field(row,"category").trim().toLowerCase():""),
      dripMinutes:dripValue,
      intervalMinutes:intervalValue,
      placement:field(row,"placement")||catalog?.care||"",
@@ -582,6 +588,10 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    .acclimation-session-details{padding:0;overflow:hidden}.acclimation-session-details>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px}.acclimation-session-details>summary::-webkit-details-marker{display:none}
    .acclimation-session-details>summary>div{display:grid;gap:2px}.acclimation-session-details>summary small{font-size:7px;color:var(--accent);font-weight:900}.acclimation-session-details>summary b{font-size:12px}.acclimation-session-details>summary span{font-size:8px;color:var(--muted)}.acclimation-session-details>summary em{font-style:normal;color:var(--accent);font-size:18px;transition:transform .2s}.acclimation-session-details[open]>summary em{transform:rotate(180deg)}
    .acclimation-session-detail-body{display:grid;gap:14px;padding:0 14px 14px;border-top:1px solid rgba(255,255,255,.05)}.acclimation-session-detail-body>.acclimation-metrics{margin-top:12px}
+   .acclimation-session-detail-body .history-list{min-width:0;overflow:hidden}
+   .acclimation-session-detail-body .history-row{min-width:0;max-width:100%;overflow:hidden}
+   .acclimation-session-detail-body .history-row b{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:normal;line-height:1.55}
+   .acclimation-session-detail-body .history-row span{white-space:normal;overflow-wrap:anywhere}
    @media(max-width:900px){.acclimation-essential-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.acclimation-live-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
    @media(max-width:620px){.acclimation-essential-grid,.acclimation-live-summary{grid-template-columns:1fr}.acclimation-default-summary{align-items:stretch;flex-direction:column}.acclimation-default-summary .btn{width:100%}}
   `}</style>
