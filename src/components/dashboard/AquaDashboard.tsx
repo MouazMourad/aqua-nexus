@@ -34,11 +34,13 @@ export function AquaDashboard() {
  const state=useAquaStore(),{tanks,selectedTankId,selectTank,language,setLanguage,addTank}=state,[page,setPage]=useState<AppPage>("dashboard"),[open,setOpen]=useState(false),[attention,setAttention]=useState<string[]>([]),[reminderNote,setReminderNote]=useState(""),[trainingPreviewId,setTrainingPreviewId]=useState<string|null>(null);
  const reminderChecked=useRef(false);
  const [storeHydrated,setStoreHydrated]=useState(()=>useAquaStore.persist.hasHydrated());
+ const [introDone,setIntroDone]=useState(false);
 
  useEffect(()=>{
-  if(useAquaStore.persist.hasHydrated()){setStoreHydrated(true);return;}
+  if(useAquaStore.persist.hasHydrated())setStoreHydrated(true);
   const unsub=useAquaStore.persist.onFinishHydration(()=>setStoreHydrated(true));
-  return unsub;
+  const timer=window.setTimeout(()=>setIntroDone(true),1600);
+  return()=>{unsub();window.clearTimeout(timer);};
  },[]);
  const trainingTanks=tanks.filter(t=>t.isTraining);
  const realTanks=tanks.filter(t=>!t.isTraining);
@@ -233,7 +235,7 @@ export function AquaDashboard() {
   </Modal>
  );
 
- if(!storeHydrated) return <main className="aqua-local-boot" aria-label="Aqua Nexus loading">
+ if(!storeHydrated||!introDone) return <main className="aqua-local-boot" aria-label="Aqua Nexus loading">
   <div className="aqua-local-boot-glow" aria-hidden="true"/>
   <div className="aqua-local-boot-card">
    <img src="/aqua-nexus-icon-192.png" alt="" width="116" height="116"/>
