@@ -21,7 +21,15 @@ export const metadata: Metadata = {
   title: "Aqua Nexus 3D",
   description: "Smart Aquarium Management Platform",
   manifest: "/manifest.webmanifest",
-  icons: {\n    icon: [\n      { url: "/aqua-nexus-icon-192.png", sizes: "192x192", type: "image/png" },\n      { url: "/aqua-nexus-icon-512.png", sizes: "512x512", type: "image/png" },\n    ],\n    apple: [{ url: "/aqua-nexus-icon-180.png", sizes: "180x180", type: "image/png" }],\n  },
+  icons: {
+    icon: [
+      { url: "/aqua-nexus-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/aqua-nexus-icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/aqua-nexus-icon-180.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 export const viewport: Viewport = {
