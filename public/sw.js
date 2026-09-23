@@ -31,6 +31,7 @@ function show(data={}){
 
 self.addEventListener("message",event=>{
   const data=event.data||{};
+  if(data.type==="SKIP_WAITING"){self.skipWaiting();return;}
   if(data.type!=="SHOW_NOTIFICATION") return;
   event.waitUntil(show(data));
 });
