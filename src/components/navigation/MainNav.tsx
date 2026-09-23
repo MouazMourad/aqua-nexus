@@ -13,7 +13,7 @@ export type AppPage =
   | "journal" | "waterchange" | "feeding" | "dosing" | "quarantine"
   | "emergency" | "rodi" | "expenses" | "alerts" | "reports" | "settings" | "academy";
 
-type NavItem={key:AppPage;label:string;icon:string;color:string;group:"core"|"care"|"operations"|"history"|"system"};
+type NavItem={key:AppPage;label:string;icon:string;color:string;glyph:string;group:"core"|"care"|"operations"|"history"|"system"};
 type SearchEntry={
   id:string;
   page:AppPage;
@@ -26,35 +26,64 @@ type SearchEntry={
 };
 
 const items:NavItem[]=[
-  {key:"dashboard",label:"dashboard",icon:"💧",color:"#55e8ff",group:"core"},
-  {key:"tanks",label:"tanks",icon:"▣",color:"#55b8ff",group:"system"},
-  {key:"equipment",label:"equipment",icon:"⚙",color:"#8b8cff",group:"core"},
-  {key:"lighting",label:"lighting",icon:"◉",color:"#7bb8ff",group:"core"},
-  {key:"sump",label:"sump",icon:"▤",color:"#3ed2c0",group:"system"},
-  {key:"livestock",label:"livestock",icon:"🐟",color:"#55dfff",group:"core"},
-  {key:"acclimation",label:"acclimation",icon:"⇢",color:"#66e0ff",group:"core"},
-  {key:"library",label:"library",icon:"◇",color:"#b68cff",group:"care"},
-  {key:"chemistry",label:"chemistry",icon:"⚗",color:"#54e5d4",group:"core"},
-  {key:"maintenance",label:"maintenance",icon:"🔧",color:"#77da68",group:"core"},
-  {key:"inventory",label:"inventory",icon:"▦",color:"#7edcf3",group:"operations"},
-  {key:"diseases",label:"diseases",icon:"⊕",color:"#ff7777",group:"care"},
-  {key:"timeline",label:"timeline",icon:"↺",color:"#76b8ff",group:"history"},
-  {key:"journal",label:"journal",icon:"▧",color:"#8ecfff",group:"history"},
-  {key:"waterchange",label:"waterChange",icon:"≋",color:"#4ddaf3",group:"operations"},
-  {key:"feeding",label:"feeding",icon:"•••",color:"#ffb35f",group:"operations"},
-  {key:"dosing",label:"dosing",icon:"💧",color:"#56d7ff",group:"operations"},
-  {key:"quarantine",label:"quarantine",icon:"⊞",color:"#f0cf5b",group:"care"},
-  {key:"emergency",label:"emergency",icon:"!",color:"#ff5f6d",group:"care"},
-  {key:"rodi",label:"rodi",icon:"◫",color:"#75f2e0",group:"operations"},
-  {key:"expenses",label:"expenses",icon:"$",color:"#8ee56d",group:"history"},
-  {key:"alerts",label:"alerts",icon:"△",color:"#ff8c57",group:"core"},
-  {key:"reports",label:"reports",icon:"▥",color:"#76cfff",group:"history"},
-  {key:"settings",label:"settings",icon:"⚙",color:"#c0d5df",group:"system"}
+  {key:"dashboard",label:"dashboard",icon:"💧",color:"#55e8ff",glyph:"dropPulse",group:"core"},
+  {key:"tanks",label:"tanks",icon:"▣",color:"#55b8ff",glyph:"tanks",group:"system"},
+  {key:"equipment",label:"equipment",icon:"⚙",color:"#8b8cff",glyph:"pump",group:"core"},
+  {key:"lighting",label:"lighting",icon:"◉",color:"#7bb8ff",glyph:"light",group:"core"},
+  {key:"sump",label:"sump",icon:"▤",color:"#3ed2c0",glyph:"sump",group:"system"},
+  {key:"livestock",label:"livestock",icon:"🐟",color:"#55dfff",glyph:"fish",group:"core"},
+  {key:"acclimation",label:"acclimation",icon:"⇢",color:"#66e0ff",glyph:"acclimation",group:"core"},
+  {key:"library",label:"library",icon:"◇",color:"#b68cff",glyph:"coral",group:"care"},
+  {key:"chemistry",label:"chemistry",icon:"⚗",color:"#54e5d4",glyph:"flask",group:"core"},
+  {key:"maintenance",label:"maintenance",icon:"🔧",color:"#77da68",glyph:"tools",group:"core"},
+  {key:"inventory",label:"inventory",icon:"▦",color:"#7edcf3",glyph:"box",group:"operations"},
+  {key:"diseases",label:"diseases",icon:"⊕",color:"#ff7777",glyph:"disease",group:"care"},
+  {key:"timeline",label:"timeline",icon:"↺",color:"#76b8ff",glyph:"chart",group:"history"},
+  {key:"journal",label:"journal",icon:"▧",color:"#8ecfff",glyph:"journal",group:"history"},
+  {key:"waterchange",label:"waterChange",icon:"≋",color:"#4ddaf3",glyph:"waves",group:"operations"},
+  {key:"feeding",label:"feeding",icon:"•••",color:"#ffb35f",glyph:"feed",group:"operations"},
+  {key:"dosing",label:"dosing",icon:"💧",color:"#56d7ff",glyph:"dose",group:"operations"},
+  {key:"quarantine",label:"quarantine",icon:"⊞",color:"#f0cf5b",glyph:"quarantine",group:"care"},
+  {key:"emergency",label:"emergency",icon:"!",color:"#ff5f6d",glyph:"warning",group:"care"},
+  {key:"rodi",label:"rodi",icon:"◫",color:"#75f2e0",glyph:"filter",group:"operations"},
+  {key:"expenses",label:"expenses",icon:"$",color:"#8ee56d",glyph:"money",group:"history"},
+  {key:"alerts",label:"alerts",icon:"△",color:"#ff8c57",glyph:"warning",group:"core"},
+  {key:"reports",label:"reports",icon:"▥",color:"#76cfff",glyph:"chart",group:"history"},
+  {key:"settings",label:"settings",icon:"⚙",color:"#c0d5df",glyph:"gear",group:"system"}
 ];
 
 const PRIMARY:AppPage[]=["dashboard","chemistry","livestock","maintenance","equipment","lighting","acclimation","alerts"];
 const PAGE_SET=new Set<AppPage>(items.map(x=>x.key));
 const PAGE_ALIAS:Record<string,AppPage>={"water-change":"waterchange","waterChange":"waterchange"};
+
+function AquaModuleGlyph({kind}:{kind:string}){
+ const common={viewBox:"0 0 48 48",fill:"none",stroke:"currentColor",strokeWidth:2.6,strokeLinecap:"round" as const,strokeLinejoin:"round" as const};
+ const map:Record<string,React.ReactNode>={
+  dropPulse:<><path d="M24 5C17 15 12 21 12 29a12 12 0 0 0 24 0C36 21 31 15 24 5Z"/><path d="m16 29 5-1 3-6 4 12 3-6 3 1"/></>,
+  flask:<><path d="M19 6h10M21 6v11L12 34a5 5 0 0 0 4 8h16a5 5 0 0 0 4-8l-9-17V6"/><path d="M16 31h16"/></>,
+  fish:<><path d="M9 24c7-10 20-10 28 0-8 10-21 10-28 0Z"/><path d="m9 24-6-6v12l6-6Z"/><circle cx="31" cy="21" r="1"/></>,
+  coral:<><path d="M24 41V17m0 8-8-8m8 3 8-8m-8 17 10-7M16 41V28m0 5-6-5m22 13V31m0 4 6-5"/></>,
+  pump:<><rect x="9" y="14" width="27" height="22" rx="7"/><circle cx="22" cy="25" r="7"/><path d="M36 20h6v10h-6M22 18v14m-7-7h14"/></>,
+  sump:<><rect x="5" y="12" width="38" height="27" rx="3"/><path d="M17 12v27m14-27v27M7 27c5-4 7 4 12 0s7 4 12 0 7 4 10 0"/></>,
+  light:<><path d="M10 15h28l-5-8H15l-5 8Z"/><path d="M16 19 12 36m12-17v19m8-19 4 17"/><path d="M9 41c7-5 13 5 20 0s10 1 12 0"/></>,
+  acclimation:<><path d="M8 9h14l-2 17H10L8 9Z"/><path d="M15 26v7m0 0h24m-6-6 6 6-6 6"/><path d="M12 17c3-3 5 3 8 0"/></>,
+  tools:<><path d="m8 39 17-17m-9-9 6 6M11 8l8 8-5 5-8-8 5-5Z"/><path d="M27 27 40 40M34 9a8 8 0 0 0-7 11l5-5 4 4-5 5A8 8 0 0 0 42 17"/></>,
+  box:<><path d="m8 15 16-7 16 7-16 7-16-7Zm0 0v20l16 7 16-7V15M24 22v20"/></>,
+  disease:<><path d="M8 25c7-9 20-9 28 0-8 9-21 9-28 0Z"/><circle cx="24" cy="25" r="5"/><path d="m37 36 6 6"/></>,
+  chart:<><path d="M8 39V10m0 29h34"/><path d="m12 33 8-9 7 4 12-15"/></>,
+  journal:<><rect x="10" y="7" width="28" height="34" rx="3"/><path d="M16 15h16M16 22h16M16 29h10"/></>,
+  waves:<><path d="M5 18c6-5 9 5 15 0s9 5 15 0 7 1 8 1M5 30c6-5 9 5 15 0s9 5 15 0 7 1 8 1"/></>,
+  feed:<><path d="M7 30c7-8 17-8 24 0-7 8-17 8-24 0Z"/><path d="m7 30-5-5v10l5-5Z"/><circle cx="34" cy="11" r="2"/><circle cx="40" cy="17" r="2"/><circle cx="34" cy="21" r="1.5"/></>,
+  dose:<><path d="M24 5C17 15 13 21 13 29a11 11 0 0 0 22 0C35 21 31 15 24 5Z"/><path d="M20 27h8m-8 5h8"/></>,
+  quarantine:<><rect x="7" y="8" width="34" height="32" rx="4"/><path d="M14 24h20M24 14v20"/></>,
+  warning:<><path d="M24 6 44 41H4L24 6Z"/><path d="M24 18v11m0 6h.01"/></>,
+  filter:<><path d="M10 8h28l-10 15v14l-8 4V23L10 8Z"/><path d="M16 14h16"/></>,
+  money:<><circle cx="24" cy="24" r="17"/><path d="M29 17c-2-2-10-2-10 3 0 6 11 2 11 8 0 5-8 6-12 3M24 12v24"/></>,
+  gear:<><circle cx="24" cy="24" r="7"/><path d="M24 5v6m0 26v6M5 24h6m26 0h6M10.5 10.5l4.5 4.5m18 18 4.5 4.5m0-27-4.5 4.5m-18 18-4.5 4.5"/></>,
+  tanks:<><rect x="6" y="10" width="16" height="28" rx="3"/><rect x="26" y="10" width="16" height="28" rx="3"/><path d="M8 26c4-3 7 3 12 0m8 0c4-3 7 3 12 0"/></>
+ };
+ return <svg className="aqua-glyph" {...common}>{map[kind]??map.dropPulse}</svg>;
+}
 
 function asPage(raw:string):AppPage{
   const mapped=PAGE_ALIAS[raw]??raw;
@@ -185,7 +214,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
       style={{"--dock-scale":scale,"--dock-color":item.color} as React.CSSProperties}
       onMouseEnter={()=>!locked&&setHoverIndex(index)} onFocus={()=>!locked&&setHoverIndex(index)} onBlur={()=>setHoverIndex(null)}
       onClick={(e)=>{e.preventDefault();e.stopPropagation();go(item.key)}}>
-      <span className={`nav-icon aqua-module-icon icon-${item.key}`}>{locked?"🔒":item.icon}</span>
+      <span className={`nav-icon aqua-module-icon icon-${item.key}`}>{locked?"🔒":<AquaModuleGlyph kind={item.glyph}/>}</span>
       <span className="dock-label" dir={lang==="ar"?"rtl":"ltr"}>{tr(lang,item.label)}</span>
     </button>;
   };
@@ -242,6 +271,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
       .nav-search-trigger,.nav-quick-trigger{min-height:34px;border:1px solid rgba(92,205,230,.22);border-radius:11px;background:rgba(8,38,52,.72);color:#c9edf4;padding:6px 9px;display:flex;align-items:center;gap:6px;font-size:10px}
       .nav-quick-trigger{margin-inline-start:auto;border-color:rgba(92,230,180,.2);background:rgba(22,75,62,.42)}
       .command-search kbd{font:inherit;font-size:8px;padding:2px 5px;border:1px solid rgba(255,255,255,.13);border-radius:6px;opacity:.7}
+      .aqua-glyph{width:27px;height:27px;display:block;color:var(--dock-color);filter:drop-shadow(0 0 5px color-mix(in srgb,var(--dock-color) 55%,transparent))}
       .aqua-module-icon{position:relative;overflow:hidden;border:1px solid color-mix(in srgb,var(--dock-color) 38%,transparent);background:radial-gradient(circle at 50% 25%,color-mix(in srgb,var(--dock-color) 25%,transparent),rgba(4,25,38,.72) 70%);box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 0 16px color-mix(in srgb,var(--dock-color) 13%,transparent);text-shadow:0 0 12px var(--dock-color)}\n      .icon-livestock{filter:saturate(.75) hue-rotate(155deg)}\n      .primary-modules-nav{min-width:0!important;justify-content:flex-start!important;padding:3px 0}
       .primary-modules-nav .nav-item{min-width:78px;flex:0 0 auto}
       .nav-more{border-inline-start:1px solid rgba(255,255,255,.08)!important}
