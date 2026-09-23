@@ -63,7 +63,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   });
  },[active?.items]);
  const releasePlan=useMemo(()=>releaseLanes.flatMap(x=>x.entries),[releaseLanes]);
- const criticalTimerRunning=Boolean(active&&(active.floatStatus==="running"||active.bucketStatus==="running"||(active.items??[]).some(i=>i.status==="acclimating"&&Boolean(i.endAt))||(active.coralDipRuns??[]).some(r=>r.status==="running")));
+ const criticalTimerRunning=Boolean(active&&(active.floatStatus==="running"||active.bucketStatus==="running"||(active.items??[]).some(i=>(i.status==="acclimating"||i.status==="emergency")&&Boolean(i.endAt))||(active.coralDipRuns??[]).some(r=>r.status==="running")));
  useEffect(()=>{
   if(!criticalTimerRunning)return;
   setNow(Date.now());
@@ -82,6 +82,16 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    pushTimerAlert("bucket",undefined,bi(lang,"انتهى عداد النقل إلى الأوعية — أكد الإكمال","Container transfer timer complete — confirm completion"));
   }
  },[now,active?.id,active?.floatStatus,active?.floatEndAt,active?.bucketStatus,active?.bucketEndAt]);
+
+ useEffect(()=>{
+  if(!active)return;
+  const expired=active.items.filter(i=>(i.status==="acclimating"||i.status==="emergency")&&Boolean(i.endAt)&&Number(i.endAt)<=now);
+  if(!expired.length)return;
+  const expiredIds=new Set(expired.map(i=>i.id));
+  const nextItems=active.items.map(i=>expiredIds.has(i.id)?{...i,status:"ready" as const,remainingMs:0,endAt:null,readyAt:nowISO()}:i);
+  saveSession({...active,items:nextItems,events:[...expired.map(i=>ev(`انتهى عداد ${i.emergency?"المسار الاستثنائي":"الإقلمة"} لـ ${i.name}. بانتظار الفحص والإجراء.`,`${i.emergency?"Exception":"Acclimation"} timer finished for ${i.nameEn||i.name}. Waiting for inspection and action.`)),...active.events]});
+  expired.forEach(i=>pushTimerAlert(i.emergency?"emergency":i.category,undefined,lang==="ar"?i.name:(i.nameEn||i.name)));
+ },[now,active?.id,active?.items]);
 
  useEffect(()=>{
   if(!criticalTimerRunning||typeof navigator==="undefined"||!("wakeLock" in navigator))return;
@@ -157,8 +167,9 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    ?bi(lang,`انتهى عداد الإقلمة الاستثنائية لـ ${emergencyName} — جاهز للفحص النهائي.`,`Rapid exception timer finished for ${emergencyName} — ready for final check.`)
    :bi(lang,`انتهى عداد ${name}${batch?` — الدفعة ${batch}`:""} وأصبحت جاهزة للفحص.`,`${name}${batch?` — Batch ${batch}`:""} timer finished and is ready for inspection.`);
   setTimerAlerts(prev=>[{id:uid("alert"),lane,batch,message},...prev].slice(0,5));
+  setAlarm({key:`${lane}-${batch??emergencyName??"timer"}-${Date.now()}`,lane,batch,message});
   playTimerSound(lane);
-  try{if("vibrate" in navigator)(navigator as any).vibrate(lane==="emergency"?[220,90,220,90,300]:[160,80,160]);}catch{}
+  try{if("vibrate" in navigator)(navigator as any).vibrate(lane==="emergency"?[500,150,500,150,700]:[300,120,300]);}catch{}
   void showCriticalAquariumNotification("Aqua Nexus",message,`acclimation-${active?.id||"session"}-${lane}-${batch??emergencyName??"timer"}`);
  }
  function laneRuntime(lane:any){
