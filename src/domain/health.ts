@@ -78,8 +78,18 @@ export function tankHealthTrend(tank: Tank): "improving"|"stable"|"declining"|"u
   return delta >= 5 ? "improving" : delta <= -5 ? "declining" : "stable";
 }
 
+export function livestockBioloadContribution(x:Tank["livestock"][number]) {
+  // Catalog load is fish-oriented. Do not let cleanup-crew invertebrates count like fish.
+  // Plants/macroalgae and corals are not treated as fish-equivalent metabolic load here.
+  const raw=Math.max(0,Number(x.load ?? 1));
+  const perAnimal=x.category==="invert"?Math.min(.35,Math.max(.05,raw*.15))
+    :x.category==="coral"||x.category==="plant"?0
+    :raw;
+  return perAnimal*Math.max(0,Number(x.quantity||0));
+}
+
 export function bioload(tank: Tank) {
-  const load = tank.livestock.reduce((s,x)=>s+(x.load ?? 1)*x.quantity,0);
+  const load = tank.livestock.reduce((s,x)=>s+livestockBioloadContribution(x),0);
   const capacity = Math.max(1, tank.systemVolumeLiters / 35);
   const ratio = load / capacity;
   return {
