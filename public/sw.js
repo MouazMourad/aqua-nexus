@@ -1,5 +1,5 @@
-const CACHE_NAME="aqua-nexus-pwa-v7";
-const APP_SHELL=["/","/manifest.webmanifest"];
+const CACHE_NAME="aqua-nexus-pwa-v8";
+const APP_SHELL=["/","/manifest.webmanifest","/aqua-nexus-icon-180.png","/aqua-nexus-icon-192.png","/aqua-nexus-icon-512.png"];
 
 self.addEventListener("install",event=>{
   event.waitUntil((async()=>{
