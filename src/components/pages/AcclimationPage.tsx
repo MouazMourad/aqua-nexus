@@ -654,9 +654,12 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    .acclimation-registry .records th:nth-child(5),.acclimation-registry .records td:nth-child(5){width:13%!important}
    .acclimation-registry .records th:nth-child(6),.acclimation-registry .records td:nth-child(6){width:17%!important}
    @media(max-width:430px){
-    .acclimation-registry .record-wrap{margin-inline:0!important}
-    .acclimation-registry .records{font-size:11px!important}
-    .acclimation-registry .records th,.acclimation-registry .records td{padding:8px 7px!important;line-height:1.35!important}
+    .acclimation-registry{height:auto!important;min-height:0!important}
+    .acclimation-registry .record-wrap{margin-inline:0!important;height:auto!important;min-height:0!important;max-height:320px!important;overflow:auto!important}
+    .acclimation-registry .records{font-size:10px!important;line-height:1.2!important}
+    .acclimation-registry .records th,.acclimation-registry .records td{padding:5px 6px!important;line-height:1.25!important}
+    .acclimation-registry .records tr{height:auto!important;min-height:0!important}
+    .acclimation-registry .records p,.acclimation-registry .records small{margin-block:1px!important;line-height:1.2!important}
    }
    .acclimation-event-log{width:100%;min-width:0;max-width:100%;overflow:visible;padding-inline:0}
    .acclimation-event-log .history-list{width:100%;min-width:0;max-width:100%;overflow:visible!important}
