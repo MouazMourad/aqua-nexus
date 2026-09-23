@@ -140,10 +140,15 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    emergency:[[980,0,.12],[620,.16,.12],[980,.32,.12],[620,.48,.16]],
    global:[[740,0,.14],[920,.20,.14],[1120,.40,.20]]
   };
-  const gain=ctx.createGain();gain.connect(ctx.destination);gain.gain.setValueAtTime(.0001,ctx.currentTime);
+  const master=ctx.createGain();master.gain.setValueAtTime(.9,ctx.currentTime);master.connect(ctx.destination);
+  // Alarm-grade layered signal: two oscillators per pulse make it much harder to miss on a phone speaker.
   for(const [freq,delay,dur] of patterns[family]){
-   const osc=ctx.createOscillator();osc.type=family==="invert"?"square":family==="coral"?"sine":"triangle";osc.frequency.value=freq;osc.connect(gain);
-   const t=ctx.currentTime+delay;gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(.12,t+.015);gain.gain.exponentialRampToValueAtTime(.0001,t+dur);osc.start(t);osc.stop(t+dur+.02);
+   const pulse=ctx.createGain();pulse.gain.setValueAtTime(.0001,ctx.currentTime);pulse.connect(master);
+   const t=ctx.currentTime+delay;
+   pulse.gain.setValueAtTime(.0001,t);pulse.gain.exponentialRampToValueAtTime(.78,t+.012);pulse.gain.setValueAtTime(.78,t+Math.max(.02,dur-.035));pulse.gain.exponentialRampToValueAtTime(.0001,t+dur);
+   for(const [ratio,type] of [[1,"square"],[1.5,"sawtooth"]] as const){
+    const osc=ctx.createOscillator();osc.type=type;osc.frequency.value=freq*ratio;osc.connect(pulse);osc.start(t);osc.stop(t+dur+.025);
+   }
   }
  }
  function pushTimerAlert(lane:string,batch?:number,emergencyName?:string){
