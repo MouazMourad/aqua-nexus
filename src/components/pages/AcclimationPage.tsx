@@ -1,6 +1,6 @@
 "use client";
 import { interventionGate } from "@/domain/interventionSafety";
-import { showCriticalAquariumNotification } from "@/lib/criticalNotifications";
+import { showCriticalAquariumNotification,scheduleNativeLocalAlarm,cancelNativeLocalAlarm } from "@/lib/criticalNotifications";
 import { useEffect,useMemo,useRef,useState } from "react";
 import type { AcclimationItem,AcclimationSession,CoralDipRun,LivestockItem,Tank } from "@/domain/types";
 import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
@@ -35,6 +35,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  const audioCtxRef=useRef<AudioContext|null>(null);
  const notifiedTimersRef=useRef<Set<string>>(new Set());
  const wakeLockRef=useRef<any>(null);
+ const nativeScheduledRef=useRef<Set<string>>(new Set());
  const lib:any[]=LIVESTOCK_LIBRARY.filter((x:any)=>x.type===tank.type);
  const acclimationStock=useMemo(()=>inventoryForConsumer(tank,"acclimation"),[tank]);
  const allowedCats:Cat[]=allowedAcclimationCategories(tank.type);
@@ -64,6 +65,21 @@ export function AcclimationPage({tank}:{tank:Tank}) {
  },[active?.items]);
  const releasePlan=useMemo(()=>releaseLanes.flatMap(x=>x.entries),[releaseLanes]);
  const criticalTimerRunning=Boolean(active&&(active.floatStatus==="running"||active.bucketStatus==="running"||(active.items??[]).some(i=>(i.status==="acclimating"||i.status==="emergency")&&Boolean(i.endAt))||(active.coralDipRuns??[]).some(r=>r.status==="running")));
+
+ useEffect(()=>{
+  if(!active)return;
+  const live=active.items.filter(i=>(i.status==="acclimating"||i.status==="emergency")&&Boolean(i.endAt)&&Number(i.endAt)>Date.now());
+  const liveIds=new Set(live.map(i=>`acclimation-${active.id}-${i.id}`));
+  for(const item of live){
+    const id=`acclimation-${active.id}-${item.id}`;
+    if(nativeScheduledRef.current.has(id))continue;
+    nativeScheduledRef.current.add(id);
+    void scheduleNativeLocalAlarm({id,fireAt:Number(item.endAt),title:"Aqua Nexus Alarm",body:lang==="ar"?`انتهت مرحلة الإقلمة لـ ${item.name}. افتح Aqua Nexus الآن.`:`Acclimation stage finished for ${item.nameEn||item.name}. Open Aqua Nexus now.`,url:"/"});
+  }
+  for(const id of [...nativeScheduledRef.current]){
+    if(!liveIds.has(id)){nativeScheduledRef.current.delete(id);void cancelNativeLocalAlarm(id);}
+  }
+ },[active?.id,active?.items,lang]);
  useEffect(()=>{
   if(!criticalTimerRunning)return;
   setNow(Date.now());
