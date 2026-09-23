@@ -26,29 +26,29 @@ type SearchEntry={
 };
 
 const items:NavItem[]=[
-  {key:"dashboard",label:"dashboard",icon:"⌂",color:"#55e8ff",group:"core"},
+  {key:"dashboard",label:"dashboard",icon:"💧",color:"#55e8ff",group:"core"},
   {key:"tanks",label:"tanks",icon:"▣",color:"#55b8ff",group:"system"},
   {key:"equipment",label:"equipment",icon:"⚙",color:"#8b8cff",group:"core"},
-  {key:"lighting",label:"lighting",icon:"☀",color:"#7bb8ff",group:"core"},
+  {key:"lighting",label:"lighting",icon:"◉",color:"#7bb8ff",group:"core"},
   {key:"sump",label:"sump",icon:"▤",color:"#3ed2c0",group:"system"},
-  {key:"livestock",label:"livestock",icon:"◉",color:"#ffb44d",group:"core"},
-  {key:"acclimation",label:"acclimation",icon:"⇄",color:"#ff7fc5",group:"core"},
+  {key:"livestock",label:"livestock",icon:"🐟",color:"#55dfff",group:"core"},
+  {key:"acclimation",label:"acclimation",icon:"⇢",color:"#66e0ff",group:"core"},
   {key:"library",label:"library",icon:"◇",color:"#b68cff",group:"care"},
-  {key:"chemistry",label:"chemistry",icon:"◌",color:"#54e5a9",group:"core"},
-  {key:"maintenance",label:"maintenance",icon:"✓",color:"#77da68",group:"core"},
-  {key:"inventory",label:"inventory",icon:"▦",color:"#dfc857",group:"operations"},
-  {key:"diseases",label:"diseases",icon:"✚",color:"#ff7777",group:"care"},
+  {key:"chemistry",label:"chemistry",icon:"⚗",color:"#54e5d4",group:"core"},
+  {key:"maintenance",label:"maintenance",icon:"🔧",color:"#77da68",group:"core"},
+  {key:"inventory",label:"inventory",icon:"▦",color:"#7edcf3",group:"operations"},
+  {key:"diseases",label:"diseases",icon:"⊕",color:"#ff7777",group:"care"},
   {key:"timeline",label:"timeline",icon:"↺",color:"#76b8ff",group:"history"},
-  {key:"journal",label:"journal",icon:"▧",color:"#ec8cff",group:"history"},
-  {key:"waterchange",label:"waterChange",icon:"≈",color:"#4ddaf3",group:"operations"},
-  {key:"feeding",label:"feeding",icon:"⋯",color:"#ffac6e",group:"operations"},
-  {key:"dosing",label:"dosing",icon:"滴",color:"#56d7ff",group:"operations"},
+  {key:"journal",label:"journal",icon:"▧",color:"#8ecfff",group:"history"},
+  {key:"waterchange",label:"waterChange",icon:"≋",color:"#4ddaf3",group:"operations"},
+  {key:"feeding",label:"feeding",icon:"•••",color:"#ffb35f",group:"operations"},
+  {key:"dosing",label:"dosing",icon:"💧",color:"#56d7ff",group:"operations"},
   {key:"quarantine",label:"quarantine",icon:"⊞",color:"#f0cf5b",group:"care"},
   {key:"emergency",label:"emergency",icon:"!",color:"#ff5f6d",group:"care"},
   {key:"rodi",label:"rodi",icon:"◫",color:"#75f2e0",group:"operations"},
   {key:"expenses",label:"expenses",icon:"$",color:"#8ee56d",group:"history"},
   {key:"alerts",label:"alerts",icon:"△",color:"#ff8c57",group:"core"},
-  {key:"reports",label:"reports",icon:"▥",color:"#9da6ff",group:"history"},
+  {key:"reports",label:"reports",icon:"▥",color:"#76cfff",group:"history"},
   {key:"settings",label:"settings",icon:"⚙",color:"#c0d5df",group:"system"}
 ];
 
@@ -185,7 +185,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
       style={{"--dock-scale":scale,"--dock-color":item.color} as React.CSSProperties}
       onMouseEnter={()=>!locked&&setHoverIndex(index)} onFocus={()=>!locked&&setHoverIndex(index)} onBlur={()=>setHoverIndex(null)}
       onClick={(e)=>{e.preventDefault();e.stopPropagation();go(item.key)}}>
-      <span className="nav-icon">{locked?"🔒":item.icon}</span>
+      <span className={`nav-icon aqua-module-icon icon-${item.key}`}>{locked?"🔒":item.icon}</span>
       <span className="dock-label" dir={lang==="ar"?"rtl":"ltr"}>{tr(lang,item.label)}</span>
     </button>;
   };
@@ -242,7 +242,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
       .nav-search-trigger,.nav-quick-trigger{min-height:34px;border:1px solid rgba(92,205,230,.22);border-radius:11px;background:rgba(8,38,52,.72);color:#c9edf4;padding:6px 9px;display:flex;align-items:center;gap:6px;font-size:10px}
       .nav-quick-trigger{margin-inline-start:auto;border-color:rgba(92,230,180,.2);background:rgba(22,75,62,.42)}
       .command-search kbd{font:inherit;font-size:8px;padding:2px 5px;border:1px solid rgba(255,255,255,.13);border-radius:6px;opacity:.7}
-      .primary-modules-nav{min-width:0!important;justify-content:flex-start!important;padding:3px 0}
+      .aqua-module-icon{position:relative;overflow:hidden;border:1px solid color-mix(in srgb,var(--dock-color) 38%,transparent);background:radial-gradient(circle at 50% 25%,color-mix(in srgb,var(--dock-color) 25%,transparent),rgba(4,25,38,.72) 70%);box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 0 16px color-mix(in srgb,var(--dock-color) 13%,transparent);text-shadow:0 0 12px var(--dock-color)}\n      .icon-livestock{filter:saturate(.75) hue-rotate(155deg)}\n      .primary-modules-nav{min-width:0!important;justify-content:flex-start!important;padding:3px 0}
       .primary-modules-nav .nav-item{min-width:78px;flex:0 0 auto}
       .nav-more{border-inline-start:1px solid rgba(255,255,255,.08)!important}
       .all-modules-sheet{margin-top:7px;border:1px solid rgba(74,190,218,.2);border-radius:17px;padding:12px;background:linear-gradient(180deg,rgba(8,34,47,.98),rgba(5,25,36,.98));box-shadow:0 18px 44px rgba(0,0,0,.28)}
