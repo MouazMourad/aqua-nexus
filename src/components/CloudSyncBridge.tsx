@@ -44,6 +44,7 @@ export function CloudSyncBridge(){
   useEffect(()=>{
     let cancelled=false;
     if(!optedIn){setEnabled(false);initializedRef.current=false;return()=>{}}
+    if(typeof navigator!=="undefined"&&!navigator.onLine){setEnabled(false);return()=>{}}
     (async()=>{
       try{
         const health=await backendHealth();
@@ -99,6 +100,7 @@ export function CloudSyncBridge(){
 
   const runBackup=useCallback(async()=>{
     if(!enabled||!initializedRef.current)return;
+    if(typeof navigator!=="undefined"&&!navigator.onLine)return;
     for(const deletedId of cloudDeleteTombstones()){
       const result=await deleteCloudTank(deletedId,versionsRef.current[deletedId]);
       if(result.conflict){conflictsRef.current.add(deletedId);setSyncState("error");setError("CONFLICT:"+deletedId);return;}
@@ -141,6 +143,29 @@ export function CloudSyncBridge(){
     const timer=window.setTimeout(()=>{void runBackup()},2500);
     return()=>window.clearTimeout(timer);
   },[enabled,tanks,runBackup]);
+
+
+  useEffect(()=>{
+    if(!optedIn||typeof window==="undefined")return;
+    const reconnect=async()=>{
+      if(!navigator.onLine)return;
+      try{
+        const health=await backendHealth();
+        if(health.database!=="ready")return;
+        // Re-enable the existing versioned sync engine. Local IndexedDB state
+        // stayed authoritative while offline; the normal backup pass now
+        // flushes every local change and still applies conflict protection.
+        setEnabled(true);
+      }catch{
+        setEnabled(false);
+      }
+    };
+    const offline=()=>setEnabled(false);
+    window.addEventListener("online",reconnect);
+    window.addEventListener("offline",offline);
+    if(navigator.onLine)void reconnect();
+    return()=>{window.removeEventListener("online",reconnect);window.removeEventListener("offline",offline);};
+  },[optedIn]);
 
 
   const conflictIds=useMemo(()=>[...conflictsRef.current],[error,syncState]);
