@@ -387,7 +387,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
     const libraryId=field(row,"libraryId");
     const catalog:any=libraryId?lib.find((x:any)=>x.id===libraryId):undefined;
     const cat=importedCategory(field(row,"category"),catalog);
-    if(!cat)return;
+    if(!cat){rejected++;return;}
     const ar=field(row,"name")||catalog?.ar||field(row,"nameEn");
     const en=field(row,"nameEn")||catalog?.en||ar;
     if(!ar&&!en)return;
