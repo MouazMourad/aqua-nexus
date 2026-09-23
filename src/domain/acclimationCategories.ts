@@ -5,7 +5,7 @@ const aliases:Record<string,AcclimationCategory>={
   coral:"coral",corals:"coral",
   invert:"invert",invertebrate:"invert",invertebrates:"invert",shrimp:"invert",crustacean:"invert",crustaceans:"invert",snail:"invert",snails:"invert",echinoderm:"invert",echinoderms:"invert",urchin:"invert",urchins:"invert",starfish:"invert",worm:"invert",worms:"invert","tube worm":"invert","tube worms":"invert",
   plant:"plant",plants:"plant",
-  macroalgae:"macroalgae","macro algae":"macroalgae",macro_algae:"macroalgae",algae:"macroalgae",
+  macroalgae:"macroalgae","macro algae":"macroalgae",macro_algae:"macroalgae","macro-algae":"macroalgae",algae:"macroalgae","marine algae":"macroalgae",seaweed:"macroalgae",alga:"macroalgae",
   other:"other"
 };
 
@@ -14,8 +14,9 @@ export function allowedAcclimationCategories(tankType:TankType):AcclimationCateg
 }
 
 export function normalizeAcclimationCategory(tankType:TankType,raw:string,catalogCategory?:string):AcclimationCategory|null{
-  const rawValue=(raw||"").trim().toLowerCase();
-  const catalogValue=(catalogCategory||"").trim().toLowerCase();
+  const clean=(value:string)=>(value||"").trim().toLowerCase().replace(/[_-]+/g," ").replace(/\s+/g," ");
+  const rawValue=clean(raw);
+  const catalogValue=clean(catalogCategory);
   const rawCategory=aliases[rawValue];
   const catalog=aliases[catalogValue];
 
