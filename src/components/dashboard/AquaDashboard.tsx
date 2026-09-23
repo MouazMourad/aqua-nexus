@@ -33,6 +33,13 @@ const equipOptions: {kind:EquipmentKind;ar:string;en:string}[] = [
 export function AquaDashboard() {
  const state=useAquaStore(),{tanks,selectedTankId,selectTank,language,setLanguage,addTank}=state,[page,setPage]=useState<AppPage>("dashboard"),[open,setOpen]=useState(false),[attention,setAttention]=useState<string[]>([]),[reminderNote,setReminderNote]=useState(""),[trainingPreviewId,setTrainingPreviewId]=useState<string|null>(null);
  const reminderChecked=useRef(false);
+ const [storeHydrated,setStoreHydrated]=useState(()=>useAquaStore.persist.hasHydrated());
+
+ useEffect(()=>{
+  if(useAquaStore.persist.hasHydrated()){setStoreHydrated(true);return;}
+  const unsub=useAquaStore.persist.onFinishHydration(()=>setStoreHydrated(true));
+  return unsub;
+ },[]);
  const trainingTanks=tanks.filter(t=>t.isTraining);
  const realTanks=tanks.filter(t=>!t.isTraining);
  const selectedTank=tanks.find(t=>t.id===selectedTankId)??realTanks[0]??trainingTanks[0];
@@ -225,6 +232,21 @@ export function AquaDashboard() {
    <div className="modal-actions">{step>1&&<button className="btn" onClick={()=>setStep(step-1)}>{tr(language,"back")}</button>}{step<7?<button className="btn primary" disabled={Boolean(wizardStepIssue)||(step===3&&(!Number.isFinite(count)||count<1||count>12))} onClick={()=>setStep(step+1)}>{tr(language,"next")}</button>:<button className="btn primary" disabled={!setupCheck.ok||wizardChemIssues.length>0||!Number.isFinite(count)||count<1||count>12} onClick={create}>{tr(language,"finish")}</button>}</div>
   </Modal>
  );
+
+ if(!storeHydrated) return <main className="aqua-local-boot" aria-label="Aqua Nexus loading">
+  <div className="aqua-local-boot-card">
+   <img src="/aqua-nexus-icon-192.png" alt="" width="96" height="96"/>
+   <strong>Aqua Nexus</strong>
+   <small>{language==="ar"?"جاري فتح بيانات الحوض المحلية…":"Opening local aquarium data…"}</small>
+  </div>
+  <style>{`
+   .aqua-local-boot{min-height:100dvh;display:grid;place-items:center;background:#03121c;color:#ecfbff;padding:24px}
+   .aqua-local-boot-card{display:grid;justify-items:center;gap:10px;text-align:center}
+   .aqua-local-boot-card img{border-radius:24px;box-shadow:0 14px 42px rgba(0,0,0,.28)}
+   .aqua-local-boot-card strong{font-size:22px;letter-spacing:.03em}
+   .aqua-local-boot-card small{color:#86aebe;font-size:12px}
+  `}</style>
+ </main>;
 
  if(showOnboarding||!tank) return <main className="app-shell empty-tank-shell" dir={language==="ar"?"rtl":"ltr"}>
   <header className="empty-tank-topbar">
