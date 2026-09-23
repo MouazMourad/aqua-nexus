@@ -240,7 +240,7 @@ export function AquaDashboard() {
   <div className="aqua-local-boot-card">
    <img src="/aqua-nexus-icon-192.png" alt="" width="116" height="116"/>
    <strong>AQUA NEXUS</strong>
-   <small>{language==="ar"?"جاري فتح بيانات الحوض المحلية…":"Opening local aquarium data…"}</small>
+   <small className="aqua-loading-label">LOADING<span className="aqua-loading-dots" aria-hidden="true">...</span></small>
   </div>
   <style>{`
    .aqua-local-boot{position:relative;overflow:hidden;min-height:100dvh;display:grid;place-items:center;background:radial-gradient(circle at 50% 45%,#0a3b52 0,#052432 28%,#03121c 62%);color:#ecfbff;padding:24px}
@@ -248,7 +248,7 @@ export function AquaDashboard() {
    .aqua-local-boot-card{position:relative;z-index:1;display:grid;justify-items:center;gap:12px;text-align:center;animation:aquaBootCard .72s cubic-bezier(.2,.8,.2,1) both}
    .aqua-local-boot-card img{border-radius:27px;box-shadow:0 18px 55px rgba(0,0,0,.34),0 0 32px rgba(62,219,255,.22);animation:aquaBootIcon 1.15s cubic-bezier(.18,.82,.22,1) both}
    .aqua-local-boot-card strong{font-size:22px;letter-spacing:.16em;opacity:0;animation:aquaBootText .45s ease .38s forwards}
-   .aqua-local-boot-card small{color:#9cc7d5;font-size:12px;opacity:0;animation:aquaBootText .4s ease .55s forwards}
+   .aqua-local-boot-card small{color:#9cc7d5;font-size:12px;letter-spacing:.16em;opacity:0;animation:aquaBootText .4s ease .55s forwards}\n   .aqua-loading-dots{display:inline-block;width:1.55em;text-align:left;overflow:hidden;vertical-align:bottom;animation:aquaLoadingDots 1.15s steps(4,end) infinite}\n   @keyframes aquaLoadingDots{0%{width:0}100%{width:1.55em}}
    @keyframes aquaBootIcon{0%{opacity:0;transform:translateY(22px) scale(.42)}55%{opacity:1;transform:translateY(-3px) scale(1.08)}100%{opacity:1;transform:translateY(0) scale(1)}}
    @keyframes aquaBootCard{0%{opacity:.3;transform:scale(.94)}100%{opacity:1;transform:scale(1)}}
    @keyframes aquaBootText{to{opacity:1;transform:translateY(0)}from{opacity:0;transform:translateY(7px)}}
