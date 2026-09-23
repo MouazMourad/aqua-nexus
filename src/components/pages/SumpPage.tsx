@@ -122,7 +122,7 @@ export function SumpPage({tank}:{tank:Tank}) {
  {tank.sump.enabled&&<div className="chamber-grid sump-chamber-grid full-span">{tank.sump.chambers.map((x,i)=>{
   const chamberVolume=x.length*x.width*Math.min(x.waterHeight,x.height)/1000;
   const liveContents=sumpChamberContents(tank,x);
-  const contentParts=[...(x.media??[]).map(m=>mediaLabel(lang,m)),...liveContents.equipment,...liveContents.filterMedia,...liveContents.manual].filter(Boolean);
+  const contentParts=[...(x.media??[]).map(m=>mediaLabel(lang,m)),...liveContents.equipment,...liveContents.filterMedia,...liveContents.livestock,...liveContents.refugium,...liveContents.manual].filter(Boolean);
   return <button type="button" className="chamber-card clickable sump-chamber-card" key={x.id} onClick={()=>open(x)}><span className="chamber-number">{i+1}</span><h3>{lang==="ar"?x.name:(x.nameEn||x.name)}</h3>{x.refugium&&<span className="status good">{x.refugium.mode==="display"?"DISPLAY REFUGIUM":tank.type==="freshwater"?"PLANTED":"REFUGIUM"}</span>}<div className="chamber-stats"><span><small>{bi(lang,"الأبعاد","Geometry")}</small><b>{cleanNumber(x.length)} × {cleanNumber(x.width)} × {cleanNumber(x.height)} cm</b></span><span><small>{bi(lang,"ماء التشغيل","Operating water")}</small><b>{cleanNumber(x.waterHeight)} cm • {cleanNumber(chamberVolume)} L</b></span><span><small>{bi(lang,"الموقع","Position")}</small><b>X {cleanNumber(x.x)} • Y {cleanNumber(x.y)}</b></span><span><small>{bi(lang,"المحتويات","Contents")}</small><b>{contentParts.length?contentParts.join(" • "):bi(lang,"فارغة / غير محددة","Empty / not assigned")}</b></span></div>{x.notes&&<p className="chamber-note">{x.notes}</p>}</button>;
  })}</div>}
 
