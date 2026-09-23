@@ -8,7 +8,9 @@
     "start": "next start",
     "test": "vitest run src/domain/__tests__",
     "test:e2e": "playwright test",
-    "test:backend": "node scripts/api-integration.mjs"
+    "test:backend": "node scripts/api-integration.mjs",
+    "native:sync": "npx cap sync",
+    "native:ios": "npx cap open ios"
   },
   "dependencies": {
     "@react-three/drei": "10.7.8",
@@ -20,7 +22,10 @@
     "recharts": "3.2.1",
     "three": "0.180.0",
     "web-push": "3.6.7",
-    "zustand": "5.0.8"
+    "zustand": "5.0.8",
+    "@capacitor/core": "8.0.2",
+    "@capacitor/ios": "8.0.2",
+    "@capacitor/local-notifications": "8.0.2"
   },
   "devDependencies": {
     "@types/node": "24.0.0",
@@ -31,6 +36,7 @@
     "@types/web-push": "3.6.4",
     "typescript": "5.9.3",
     "vitest": "3.2.4",
-    "@playwright/test": "1.55.0"
+    "@playwright/test": "1.55.0",
+    "@capacitor/cli": "8.0.2"
   }
 }
