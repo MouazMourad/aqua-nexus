@@ -616,6 +616,21 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    .acclimation-session-detail-body .history-row b{display:block!important;width:100%!important;min-width:0;max-width:100%;white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-word!important;line-height:1.55;text-align:start!important}
    .acclimation-session-detail-body .history-row span{display:block!important;width:100%!important;min-width:0;white-space:normal!important;overflow-wrap:anywhere!important;text-align:start!important}
    .acclimation-session-detail-body .history-row span{white-space:normal;overflow-wrap:anywhere}
+   .acclimation-registry{min-width:0!important;max-width:100%!important;overflow:hidden!important}
+   .acclimation-registry .record-wrap{width:100%!important;max-width:100%!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;box-sizing:border-box!important}
+   .acclimation-registry .records{width:100%!important;min-width:760px!important;table-layout:fixed!important;border-collapse:collapse!important}
+   .acclimation-registry .records th,.acclimation-registry .records td{white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-word!important;vertical-align:top!important}
+   .acclimation-registry .records th:nth-child(1),.acclimation-registry .records td:nth-child(1){width:7%!important}
+   .acclimation-registry .records th:nth-child(2),.acclimation-registry .records td:nth-child(2){width:34%!important}
+   .acclimation-registry .records th:nth-child(3),.acclimation-registry .records td:nth-child(3){width:16%!important}
+   .acclimation-registry .records th:nth-child(4),.acclimation-registry .records td:nth-child(4){width:13%!important}
+   .acclimation-registry .records th:nth-child(5),.acclimation-registry .records td:nth-child(5){width:13%!important}
+   .acclimation-registry .records th:nth-child(6),.acclimation-registry .records td:nth-child(6){width:17%!important}
+   @media(max-width:430px){
+    .acclimation-registry .record-wrap{margin-inline:0!important}
+    .acclimation-registry .records{font-size:11px!important}
+    .acclimation-registry .records th,.acclimation-registry .records td{padding:8px 7px!important;line-height:1.35!important}
+   }
    .acclimation-event-log{width:100%;min-width:0;max-width:100%;overflow:visible;padding-inline:0}
    .acclimation-event-log .history-list{width:100%;min-width:0;max-width:100%;overflow:visible!important}
    .acclimation-event-log .history-row{width:100%!important;min-width:0!important;max-width:100%!important;overflow:visible!important;padding:10px 8px!important;box-sizing:border-box!important}
