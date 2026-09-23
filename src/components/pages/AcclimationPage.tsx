@@ -414,7 +414,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
      health:importedHealth,
      temperament:importedTemperament,
      sensitivity:importedSensitivity,
-     subtype:cat==="macroalgae"?"macroalgae":field(row,"subtype"),
+     subtype:cat==="macroalgae"?"macroalgae":field(row,"subtype")||(["crustacean","snail","echinoderm","worm"].includes(field(row,"category").trim().toLowerCase())?field(row,"category").trim().toLowerCase():""),
      dripMinutes:dripValue,
      intervalMinutes:intervalValue,
      placement:field(row,"placement")||catalog?.care||"",
