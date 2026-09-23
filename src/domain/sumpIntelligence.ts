@@ -28,8 +28,8 @@ export function sumpIntelligence(tank:Tank){
       const equipment=tank.equipment.filter(x=>x.location===`sump:${c.id}`);
       const calmResidents=residents.filter(x=>isSeahorse(x)||isPipefish(x));
       const macro=residents.filter(isMacro);
-      const lights=equipment.filter(e=>e.kind==="light");
-      const pumps=equipment.filter(e=>e.kind==="returnPump"||e.kind==="wavemaker"||e.kind==="filter");
+      const lights=equipment.filter(e=>(e.kind==="lighting"||e.kind==="refugiumLight"));
+      const pumps=equipment.filter(e=>e.kind==="returnPump"||e.kind==="waveMaker"||e.kind==="filterSock"||e.kind==="rollerFilter");
       const chamberLiters=liters(c.length,c.width,Math.min(c.waterHeight,c.height));
       const nominalFlow=pumps.reduce((sum,e)=>sum+Math.max(0,Number(e.flowLph||0)),0);
       const turnover=chamberLiters>0&&nominalFlow>0?nominalFlow/chamberLiters:0;
