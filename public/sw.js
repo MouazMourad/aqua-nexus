@@ -1,4 +1,4 @@
-const CACHE_NAME="aqua-nexus-pwa-v6";
+const CACHE_NAME="aqua-nexus-pwa-v7";
 const APP_SHELL=["/","/manifest.webmanifest"];
 
 self.addEventListener("install",event=>{
@@ -31,6 +31,7 @@ function show(data={}){
 
 self.addEventListener("message",event=>{
   const data=event.data||{};
+  if(data.type==="SKIP_WAITING"){self.skipWaiting();return;}
   if(data.type!=="SHOW_NOTIFICATION") return;
   event.waitUntil(show(data));
 });
@@ -65,17 +66,20 @@ self.addEventListener("fetch",event=>{
   if(url.pathname.startsWith("/api/"))return;
 
   if(request.mode==="navigate"){
+    // App-shell first: an installed iOS PWA must paint immediately instead of
+    // waiting on a slow/captive/VPN network before showing anything. Refresh
+    // the shell in the background so the next launch gets the newest deploy.
     event.respondWith((async()=>{
-      try{
-        const response=await fetch(request);
+      const cached=(await caches.match(request))||(await caches.match("/"));
+      const refresh=fetch(request,{cache:"no-store"}).then(async response=>{
         if(response&&response.ok){
           const cache=await caches.open(CACHE_NAME);
-          cache.put("/",response.clone()).catch(()=>{});
+          await cache.put("/",response.clone());
         }
         return response;
-      }catch{
-        return (await caches.match(request))||(await caches.match("/"))||Response.error();
-      }
+      }).catch(()=>null);
+      if(cached){event.waitUntil(refresh);return cached;}
+      return (await refresh)||Response.error();
     })());
     return;
   }
