@@ -673,7 +673,13 @@ export function AcclimationPage({tank}:{tank:Tank}) {
     .acclimation-event-log .history-row span{font-size:9.5px!important}
    }
    @media(max-width:900px){.acclimation-essential-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.acclimation-live-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
-   @media(max-width:620px){.acclimation-essential-grid,.acclimation-live-summary{grid-template-columns:1fr}.acclimation-default-summary{align-items:stretch;flex-direction:column}.acclimation-default-summary .btn{width:100%}}
+   @media(max-width:620px){
+    .acclimation-essential-grid,.acclimation-live-summary{grid-template-columns:1fr}
+    .acclimation-default-summary{align-items:stretch;flex-direction:column}
+    .acclimation-default-summary .btn{width:100%}
+    /* iOS Safari auto-zooms focused controls below 16px and can leave the whole workflow enlarged after transfer/override dialogs. */
+    input,select,textarea{font-size:16px!important}
+   }
   `}</style>
  </section>;
 }
