@@ -392,7 +392,11 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    rows.forEach(row=>{
     const libraryId=field(row,"libraryId");
     const catalog:any=libraryId?lib.find((x:any)=>x.id===libraryId):undefined;
-    const cat=importedCategory(field(row,"category"),catalog);
+    const rawCategory=field(row,"category");
+    const rawSubtype=field(row,"subtype");
+    const rawName=[field(row,"name"),field(row,"nameEn")].join(" ").toLowerCase();
+    const macroHint=/macro\s*[-_ ]?algae|marine\s+algae|seaweed|halimeda|amphiroa|caulerpa|chaetomorpha|gracilaria/.test([rawCategory,rawSubtype,rawName].join(" ").toLowerCase());
+    const cat=importedCategory(rawCategory,catalog)??(tank.type==="marine"&&macroHint?"macroalgae":null);
     if(!cat){rejected++;return;}
     const ar=field(row,"name")||catalog?.ar||field(row,"nameEn");
     const en=field(row,"nameEn")||catalog?.en||ar;
@@ -590,7 +594,9 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    .acclimation-session-detail-body{display:grid;gap:14px;padding:0 14px 14px;border-top:1px solid rgba(255,255,255,.05)}.acclimation-session-detail-body>.acclimation-metrics{margin-top:12px}
    .acclimation-session-detail-body .history-list{min-width:0;overflow:hidden}
    .acclimation-session-detail-body .history-row{min-width:0;max-width:100%;overflow:hidden}
-   .acclimation-session-detail-body .history-row b{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:normal;line-height:1.55}
+   .acclimation-session-detail-body .history-row{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:4px!important;width:100%!important;box-sizing:border-box!important;text-align:start!important}
+   .acclimation-session-detail-body .history-row b{display:block!important;width:100%!important;min-width:0;max-width:100%;white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-word!important;line-height:1.55;text-align:start!important}
+   .acclimation-session-detail-body .history-row span{display:block!important;width:100%!important;min-width:0;white-space:normal!important;overflow-wrap:anywhere!important;text-align:start!important}
    .acclimation-session-detail-body .history-row span{white-space:normal;overflow-wrap:anywhere}
    @media(max-width:900px){.acclimation-essential-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.acclimation-live-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
    @media(max-width:620px){.acclimation-essential-grid,.acclimation-live-summary{grid-template-columns:1fr}.acclimation-default-summary{align-items:stretch;flex-direction:column}.acclimation-default-summary .btn{width:100%}}
