@@ -18,6 +18,13 @@ export function fitChamberToSump(chamber:SumpChamber,dimensions:DimensionsCm):Su
 export function sumpChamberContents(tank:Tank,chamber:SumpChamber){
   const equipment=tank.equipment.filter(e=>e.location===`sump:${chamber.id}`).map(e=>e.name);
   const filterMedia=(tank.filterMedia??[]).filter(m=>m.chamberId===chamber.id).map(m=>m.name);
+  const livestock=tank.livestock.filter(x=>x.location===`sump:${chamber.id}`).map(x=>x.name);
   const manual=[...(chamber.items??[]),chamber.contents].filter((x):x is string=>Boolean(x?.trim()));
-  return{equipment,filterMedia,manual};
+  const refugium=chamber.refugium?[
+    chamber.refugium.mode==="display"?"Display Refugium":tank.type==="freshwater"?"Planted chamber":"Refugium",
+    chamber.refugium.substrate!=="bare"?chamber.refugium.substrate:undefined,
+    chamber.refugium.liveRockKg? `Live rock ${chamber.refugium.liveRockKg} kg`:undefined,
+    chamber.refugium.pods? `Pods: ${chamber.refugium.pods}`:undefined
+  ].filter((x):x is string=>Boolean(x)):[];
+  return{equipment,filterMedia,livestock,refugium,manual};
 }
