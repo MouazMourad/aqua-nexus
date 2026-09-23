@@ -234,17 +234,24 @@ export function AquaDashboard() {
  );
 
  if(!storeHydrated) return <main className="aqua-local-boot" aria-label="Aqua Nexus loading">
+  <div className="aqua-local-boot-glow" aria-hidden="true"/>
   <div className="aqua-local-boot-card">
-   <img src="/aqua-nexus-icon-192.png" alt="" width="96" height="96"/>
-   <strong>Aqua Nexus</strong>
+   <img src="/aqua-nexus-icon-192.png" alt="" width="116" height="116"/>
+   <strong>AQUA NEXUS</strong>
    <small>{language==="ar"?"جاري فتح بيانات الحوض المحلية…":"Opening local aquarium data…"}</small>
   </div>
   <style>{`
-   .aqua-local-boot{min-height:100dvh;display:grid;place-items:center;background:#03121c;color:#ecfbff;padding:24px}
-   .aqua-local-boot-card{display:grid;justify-items:center;gap:10px;text-align:center}
-   .aqua-local-boot-card img{border-radius:24px;box-shadow:0 14px 42px rgba(0,0,0,.28)}
-   .aqua-local-boot-card strong{font-size:22px;letter-spacing:.03em}
-   .aqua-local-boot-card small{color:#86aebe;font-size:12px}
+   .aqua-local-boot{position:relative;overflow:hidden;min-height:100dvh;display:grid;place-items:center;background:radial-gradient(circle at 50% 45%,#0a3b52 0,#052432 28%,#03121c 62%);color:#ecfbff;padding:24px}
+   .aqua-local-boot-glow{position:absolute;width:210px;height:210px;border-radius:50%;background:rgba(45,215,244,.16);filter:blur(32px);animation:aquaBootGlow 1.35s ease-in-out infinite alternate}
+   .aqua-local-boot-card{position:relative;z-index:1;display:grid;justify-items:center;gap:12px;text-align:center;animation:aquaBootCard .72s cubic-bezier(.2,.8,.2,1) both}
+   .aqua-local-boot-card img{border-radius:27px;box-shadow:0 18px 55px rgba(0,0,0,.34),0 0 32px rgba(62,219,255,.22);animation:aquaBootIcon 1.15s cubic-bezier(.18,.82,.22,1) both}
+   .aqua-local-boot-card strong{font-size:22px;letter-spacing:.16em;opacity:0;animation:aquaBootText .45s ease .38s forwards}
+   .aqua-local-boot-card small{color:#9cc7d5;font-size:12px;opacity:0;animation:aquaBootText .4s ease .55s forwards}
+   @keyframes aquaBootIcon{0%{opacity:0;transform:translateY(22px) scale(.42)}55%{opacity:1;transform:translateY(-3px) scale(1.08)}100%{opacity:1;transform:translateY(0) scale(1)}}
+   @keyframes aquaBootCard{0%{opacity:.3;transform:scale(.94)}100%{opacity:1;transform:scale(1)}}
+   @keyframes aquaBootText{to{opacity:1;transform:translateY(0)}from{opacity:0;transform:translateY(7px)}}
+   @keyframes aquaBootGlow{from{transform:scale(.82);opacity:.55}to{transform:scale(1.12);opacity:1}}
+   @media (prefers-reduced-motion:reduce){.aqua-local-boot-card,.aqua-local-boot-card img,.aqua-local-boot-card strong,.aqua-local-boot-card small,.aqua-local-boot-glow{animation:none;opacity:1}}
   `}</style>
  </main>;
 
