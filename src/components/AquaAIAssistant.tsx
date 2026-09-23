@@ -23,13 +23,14 @@ type InsightView={id:string;labelAr:string;labelEn:string;promptAr:string;prompt
 
 export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;onNavigate?:(page:AppPage)=>void}){
  const lang=useAquaStore(s=>s.language),experience=useAquaStore(s=>s.aquariumExperience),patch=useAquaStore(s=>s.patchTank);
- const [open,setOpen]=useState(false),[selected,setSelected]=useState<string|null>(null),[question,setQuestion]=useState(""),[askedQuestion,setAskedQuestion]=useState(""),[resolvedQuestion,setResolvedQuestion]=useState(""),[conversationContext,setConversationContext]=useState(""),[conversationHistory,setConversationHistory]=useState<AquaConversationTurn[]>([]),[stage,setStage]=useState(0),[scopeBlocked,setScopeBlocked]=useState(false),[greeting,setGreeting]=useState(false),[planNote,setPlanNote]=useState("");
+ const [open,setOpen]=useState(false),[editingOverlay,setEditingOverlay]=useState(false),[selected,setSelected]=useState<string|null>(null),[question,setQuestion]=useState(""),[askedQuestion,setAskedQuestion]=useState(""),[resolvedQuestion,setResolvedQuestion]=useState(""),[conversationContext,setConversationContext]=useState(""),[conversationHistory,setConversationHistory]=useState<AquaConversationTurn[]>([]),[stage,setStage]=useState(0),[scopeBlocked,setScopeBlocked]=useState(false),[greeting,setGreeting]=useState(false),[planNote,setPlanNote]=useState("");
  const [deepAI,setDeepAI]=useState<{status:"idle"|"loading"|"external"|"local"|"error";text?:string;provider?:string;model?:string}>({status:"idle"});
  const deepRequestRef=useRef(0);
  const core=useMemo(()=>tankIntelligenceCore(tank),[tank]);
  const health=core.health,trend=systemHealthTrend(tank),alerts=core.alerts,mood=tankMood(tank);
  const hasDanger=alerts.some(x=>x.level==="danger"),hasWarning=alerts.some(x=>x.level==="warn");
  const state:"normal"|"alert"|"critical"=(health.score<60||hasDanger)?"critical":(health.score<80||trend==="declining"||hasWarning)?"alert":"normal";
+ const visualTone:"excellent"|"good"|"moderate"|"critical"=(health.score<60||hasDanger)?"critical":(health.score<80||trend==="declining"||hasWarning)?"moderate":health.score>=90?"excellent":"good";
  const learned=useMemo(()=>[...domainOutcomeLearning(tank),...learnedTankSignals(tank)].slice(0,8),[tank]);
  const plans:AquaActionPlan[]=((tank as any).aiActionPlans??[]),currentPlan=plans.find(x=>x.status==="active");
  const views:InsightView[]=[
@@ -39,6 +40,19 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
   {id:"action",labelAr:"شو أعمل هلق؟",labelEn:"What should I do?",promptAr:"شو أعمل هلق بالحوض؟",promptEn:"What should I do with the tank now?"}
  ];
  const active=useMemo(()=>askedQuestion&&!scopeBlocked?aquaAIAnswer(resolvedQuestion||askedQuestion,tank,page):null,[askedQuestion,resolvedQuestion,scopeBlocked,tank,page]);
+
+ useEffect(()=>{
+  if(typeof document==="undefined")return;
+  const syncEditingOverlay=()=>{
+   const candidates=Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"],dialog[open],.modal-backdrop,.modal-overlay,.sheet-backdrop'));
+   const active=candidates.some(el=>!el.closest(".aqua-ai-shell")&&getComputedStyle(el).display!=="none"&&getComputedStyle(el).visibility!=="hidden");
+   setEditingOverlay(active);
+  };
+  syncEditingOverlay();
+  const observer=new MutationObserver(syncEditingOverlay);
+  observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["class","style","open","aria-hidden"]});
+  return()=>observer.disconnect();
+ },[]);
 
  useEffect(()=>{deepRequestRef.current+=1;setSelected(null);setQuestion("");setAskedQuestion("");setResolvedQuestion("");setConversationContext("");setConversationHistory([]);setStage(0);setScopeBlocked(false);setPlanNote("");setDeepAI({status:"idle"})},[tank.id]);
  useEffect(()=>{if(typeof window==="undefined")return;const key="tank-intelligence-session-greeting-v2";if(sessionStorage.getItem(key))return;const timer=window.setTimeout(()=>{setGreeting(true);sessionStorage.setItem(key,"1")},650);const hide=window.setTimeout(()=>setGreeting(false),8000);return()=>{window.clearTimeout(timer);window.clearTimeout(hide)}},[]);
@@ -148,8 +162,21 @@ export function AquaAIAssistant({tank,page,onNavigate}:{tank:Tank;page:AppPage;o
    {currentPlan&&visibleStage>=3&&<AquaAIActionPlanCard plan={currentPlan} lang={lang} onToggle={stepId=>toggleStep(currentPlan.id,stepId)} onReview={()=>reviewPlan(currentPlan)}/>}
    {planNote&&<div className="inline-alert info">{planNote}</div>}
   </section>}
-  <button className="aqua-ai-fish-button" onClick={()=>{setGreeting(false);setOpen(v=>!v)}} aria-label="Local Best AI"><FishMascot state={state}/><span className="aqua-ai-fish-label">Local Best AI</span>{state!=="normal"&&<i className="aqua-ai-alert-dot"/>}</button>
+  <button className={`aqua-ai-fish-button aqua-ai-swimmer tone-${visualTone} ${editingOverlay?"temporarily-hidden":""}`} onClick={()=>{setGreeting(false);setOpen(v=>!v)}} aria-label="Local Best AI"><FishMascot state={state}/><span className="aqua-ai-fish-label">Local Best AI</span>{state!=="normal"&&<i className="aqua-ai-alert-dot"/>}</button>
   <style jsx global>{`
+   .aqua-ai-swimmer{--ai-fish:#54dfff;--ai-glow:rgba(84,223,255,.48);transition:opacity .18s ease,transform .18s ease,visibility .18s ease}
+   .aqua-ai-swimmer.tone-excellent{--ai-fish:#49ef9b;--ai-glow:rgba(73,239,155,.5)}
+   .aqua-ai-swimmer.tone-good{--ai-fish:#54dfff;--ai-glow:rgba(84,223,255,.5)}
+   .aqua-ai-swimmer.tone-moderate{--ai-fish:#ffc84f;--ai-glow:rgba(255,200,79,.5)}
+   .aqua-ai-swimmer.tone-critical{--ai-fish:#ff5f6d;--ai-glow:rgba(255,95,109,.58)}
+   .aqua-ai-swimmer .aqua-fish{filter:drop-shadow(0 0 9px var(--ai-glow));animation:aquaAISwim 3.2s ease-in-out infinite}
+   .aqua-ai-swimmer .aqua-fish-body{border-color:var(--ai-fish)!important;box-shadow:inset 0 0 14px var(--ai-glow),0 0 10px var(--ai-glow)}
+   .aqua-ai-swimmer .aqua-fish-tail,.aqua-ai-swimmer .aqua-fish-fin{border-color:var(--ai-fish)!important}
+   .aqua-ai-swimmer .aqua-fish-core,.aqua-ai-swimmer .aqua-fish-line{background:var(--ai-fish)!important;box-shadow:0 0 7px var(--ai-glow)}
+   .aqua-ai-swimmer.temporarily-hidden{opacity:0!important;visibility:hidden!important;pointer-events:none!important;transform:translateY(12px) scale(.88)!important}
+   @keyframes aquaAISwim{0%,100%{transform:translate3d(-3px,1px,0) rotate(-1.5deg)}25%{transform:translate3d(2px,-3px,0) rotate(1deg)}50%{transform:translate3d(5px,0,0) rotate(-.5deg)}75%{transform:translate3d(0,3px,0) rotate(1.2deg)}}
+   @media(prefers-reduced-motion:reduce){.aqua-ai-swimmer .aqua-fish{animation:none}}
+
    .conversational-ai{display:flex;flex-direction:column;gap:10px}.ai-conversation-home,.ai-conversation-flow{display:grid;gap:10px}.ai-followup-input{margin-top:2px}.ai-chat-bubble{border:1px solid rgba(255,255,255,.08);border-radius:17px;padding:12px 13px;display:grid;gap:7px;line-height:1.5}.ai-chat-bubble.assistant{background:linear-gradient(145deg,rgba(45,184,226,.08),rgba(255,255,255,.025));margin-inline-end:24px}.ai-chat-bubble.user{background:rgba(255,255,255,.07);margin-inline-start:34px;justify-items:end}.ai-chat-bubble small{font-size:10px;letter-spacing:.08em;opacity:.62;font-weight:900}.ai-chat-bubble h3,.ai-chat-bubble p{margin:0}.ai-chat-bubble>span{opacity:.78}.ai-choice-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.ai-choice-grid button{min-height:46px;text-align:center}.ai-chat-input{display:grid;grid-template-columns:1fr auto;gap:7px}.ai-chat-input input{min-width:0;border:1px solid rgba(255,255,255,.1);background:rgba(2,15,24,.76);color:inherit;border-radius:13px;padding:11px 12px;outline:none}.ai-chat-input input:focus{border-color:rgba(66,211,255,.5);box-shadow:0 0 0 3px rgba(66,211,255,.08)}.ai-summary-bubble .aqua-ai-answer-head{align-items:flex-start}.ai-summary-bubble .aqua-ai-answer-head h3{font-size:17px}.ai-followups{display:flex;gap:7px;flex-wrap:wrap}.ai-followups .btn{flex:1 1 140px}.ai-new-question{justify-self:start}.conversational-ai .aqua-ai-action{margin-top:4px}.conversational-ai .aqua-ai-evidence{margin:0}.conversational-ai .aqua-ai-learned-block{margin-top:8px}.ai-deep-synthesis{border-color:rgba(129,108,255,.18)!important;background:linear-gradient(145deg,rgba(106,89,255,.09),rgba(45,184,226,.04))!important}.ai-deep-text{white-space:pre-wrap;font-size:12px;line-height:1.65;opacity:.9}
    @media(max-width:560px){.ai-chat-bubble.assistant{margin-inline-end:10px}.ai-chat-bubble.user{margin-inline-start:20px}.ai-choice-grid{grid-template-columns:1fr 1fr}.ai-chat-input{grid-template-columns:1fr}.ai-chat-input .btn{width:100%}.ai-followups{display:grid;grid-template-columns:1fr}.ai-followups .btn{width:100%}}
   `}</style>
