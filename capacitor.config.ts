@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: "com.aquanexus.app",
   appName: "Aqua Nexus",
   webDir: "out",
-  bundledWebRuntime: false,
   ios: {
     contentInset: "automatic"
   }
