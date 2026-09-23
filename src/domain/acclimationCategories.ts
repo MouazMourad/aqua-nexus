@@ -14,7 +14,7 @@ export function allowedAcclimationCategories(tankType:TankType):AcclimationCateg
 }
 
 export function normalizeAcclimationCategory(tankType:TankType,raw:string,catalogCategory?:string):AcclimationCategory|null{
-  const clean=(value:string)=>(value||"").trim().toLowerCase().replace(/[_-]+/g," ").replace(/\s+/g," ");
+  const clean=(value?:string)=>(value||"").trim().toLowerCase().replace(/[_-]+/g," ").replace(/\s+/g," ");
   const rawValue=clean(raw);
   const catalogValue=clean(catalogCategory);
   const rawCategory=aliases[rawValue];
