@@ -620,8 +620,14 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    .acclimation-event-log .history-list{width:100%;min-width:0;max-width:100%;overflow:visible!important}
    .acclimation-event-log .history-row{width:100%!important;min-width:0!important;max-width:100%!important;overflow:visible!important;padding:10px 8px!important;box-sizing:border-box!important}
    .acclimation-event-log .history-row b,.acclimation-event-log .history-row span{width:auto!important;max-width:100%!important;min-width:0!important;margin:0!important;padding:0!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere!important;word-break:normal!important;box-sizing:border-box!important}
-   .acclimation-event-log .history-row b{font-size:clamp(13px,3.8vw,18px)!important;line-height:1.7!important}
-   .acclimation-event-log .history-row span{font-size:11px!important;line-height:1.5!important;margin-top:4px!important}
+   .acclimation-event-log .history-row b{display:block!important;font-size:14px!important;line-height:1.55!important;font-weight:700!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-word!important;max-width:100%!important}
+   .acclimation-event-log .history-row span{display:block!important;font-size:10px!important;line-height:1.4!important;margin-top:4px!important;white-space:normal!important;max-width:100%!important}
+   @media(max-width:430px){
+    .acclimation-event-log .history-list{padding-inline:10px!important;box-sizing:border-box!important}
+    .acclimation-event-log .history-row{padding:10px 6px!important}
+    .acclimation-event-log .history-row b{font-size:12.5px!important;line-height:1.5!important;letter-spacing:0!important}
+    .acclimation-event-log .history-row span{font-size:9.5px!important}
+   }
    @media(max-width:900px){.acclimation-essential-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.acclimation-live-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
    @media(max-width:620px){.acclimation-essential-grid,.acclimation-live-summary{grid-template-columns:1fr}.acclimation-default-summary{align-items:stretch;flex-direction:column}.acclimation-default-summary .btn{width:100%}}
   `}</style>
