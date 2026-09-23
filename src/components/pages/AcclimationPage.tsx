@@ -183,7 +183,6 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    ?bi(lang,`انتهى عداد الإقلمة الاستثنائية لـ ${emergencyName} — جاهز للفحص النهائي.`,`Rapid exception timer finished for ${emergencyName} — ready for final check.`)
    :bi(lang,`انتهى عداد ${name}${batch?` — الدفعة ${batch}`:""} وأصبحت جاهزة للفحص.`,`${name}${batch?` — Batch ${batch}`:""} timer finished and is ready for inspection.`);
   setTimerAlerts(prev=>[{id:uid("alert"),lane,batch,message},...prev].slice(0,5));
-  setAlarm({key:`${lane}-${batch??emergencyName??"timer"}-${Date.now()}`,lane,batch,message});
   playTimerSound(lane);
   try{if("vibrate" in navigator)(navigator as any).vibrate(lane==="emergency"?[500,150,500,150,700]:[300,120,300]);}catch{}
   void showCriticalAquariumNotification("Aqua Nexus",message,`acclimation-${active?.id||"session"}-${lane}-${batch??emergencyName??"timer"}`);
