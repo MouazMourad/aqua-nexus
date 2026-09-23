@@ -103,12 +103,33 @@ export function EquipmentModel({ kind, scale = 1 }: { kind: EquipmentKind; scale
   }
 
   if (kind === "doser") {
+    // Deliberately channel-agnostic: the 3D twin only communicates that a doser exists here.
     return (
       <group scale={scale}>
-        <mesh position={[0,.14,0]}><boxGeometry args={[.42,.28,.18]} /><Mat color="#182d3a" /></mesh>
-        {[-.11,.11].map(x => <mesh key={x} position={[x,.14,.1]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[.055,.055,.03,20]} /><meshStandardMaterial color="#49d7d5" /></mesh>)}
+        <mesh position={[0,.14,0]}><boxGeometry args={[.38,.27,.18]} /><Mat color="#182d3a" /></mesh>
+        <mesh position={[0,.14,.101]}><circleGeometry args={[.055,24]} /><meshStandardMaterial color="#49d7d5" emissive="#176f73" emissiveIntensity={.45} /></mesh>
+        <mesh position={[0,.02,0]}><boxGeometry args={[.22,.025,.13]} /><Mat color="#203b46" /></mesh>
       </group>
     );
+  }
+
+  if (kind === "uv") {
+    return <group scale={scale}><mesh position={[0,.18,0]} rotation={[0,0,Math.PI/2]}><cylinderGeometry args={[.055,.055,.46,20]}/><Mat color="#263946"/></mesh><mesh position={[-.18,.25,0]}><cylinderGeometry args={[.025,.025,.15,14]}/><Mat/></mesh><mesh position={[.18,.25,0]}><cylinderGeometry args={[.025,.025,.15,14]}/><Mat/></mesh></group>;
+  }
+  if (kind === "probe") {
+    return <group scale={scale}><mesh position={[0,.20,0]}><cylinderGeometry args={[.018,.018,.40,12]}/><meshStandardMaterial color="#b8d8de" metalness={.55} roughness={.22}/></mesh><mesh position={[0,.42,0]}><cylinderGeometry args={[.035,.035,.08,12]}/><Mat color="#1d3440"/></mesh></group>;
+  }
+  if (kind === "ato") {
+    return <group scale={scale}><mesh position={[-.06,.10,0]}><boxGeometry args={[.16,.18,.14]}/><Mat color="#172b34"/></mesh><mesh position={[.08,.26,0]}><boxGeometry args={[.035,.30,.035]}/><meshStandardMaterial color="#59d7e2" emissive="#1b6970" emissiveIntensity={.3}/></mesh></group>;
+  }
+  if (kind === "rollerFilter") {
+    return <group scale={scale}><mesh position={[0,.20,0]}><boxGeometry args={[.30,.38,.22]}/><Mat color="#172b34"/></mesh>{[-.09,.09].map(x=><mesh key={x} position={[x,.43,0]} rotation={[0,0,Math.PI/2]}><cylinderGeometry args={[.055,.055,.08,18]}/><meshStandardMaterial color="#d7ecec" roughness={.65}/></mesh>)}</group>;
+  }
+  if (kind === "co2") {
+    return <group scale={scale}><mesh position={[0,.22,0]}><cylinderGeometry args={[.08,.08,.42,18]}/><meshStandardMaterial color="#697b80" metalness={.7} roughness={.22}/></mesh><mesh position={[0,.46,0]}><cylinderGeometry args={[.035,.035,.07,14]}/><Mat color="#182d3a"/></mesh></group>;
+  }
+  if (kind === "ozone") {
+    return <group scale={scale}><mesh position={[0,.16,0]}><boxGeometry args={[.30,.30,.16]}/><Mat color="#1b3040"/></mesh><mesh position={[0,.16,.085]}><torusGeometry args={[.055,.012,10,22]}/><meshStandardMaterial color="#72b7ff" emissive="#2861a0" emissiveIntensity={.5}/></mesh></group>;
   }
 
   return (
