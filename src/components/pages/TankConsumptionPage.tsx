@@ -25,9 +25,12 @@ export function TankConsumptionPage({tank}:{tank:Tank}){
   return{dose:[...dose.entries()],stock:[...stock.entries()],remaining,feedingCount:feeding.length,growth30,kh:trend("KH"),ca:trend("Ca"),mg:trend("Mg"),no3:trend("NO3"),po4:trend("PO4")};
  },[tank,now]);
  const correlation=tank.type==="marine"
-  ?stats.growth30&&stats.dose.length?bi(lang,"تم تسجيل نمو مع استخدام جرعات خلال آخر 30 يوم. عقل الحوض سيعاملها كعلاقة تستحق المراقبة، وليس كسبب مثبت أو أمراً لرفع الجرعة.","Growth and dosing were both logged in the last 30 days. Tank Brain treats this as a correlation to watch, not proof of causation or an instruction to increase dosing.")
-  :stats.growth30&&(tank.plantCare??[]).length?bi(lang,"تم تسجيل نمو نباتي مع عناية/تسميد. راقب الكيمياء وCO₂ قبل أي تعديل؛ الارتباط لا يعني أن التسميد هو السبب وحده.","Plant growth and care/fertilization were both logged. Review chemistry and CO₂ before changing anything; correlation does not prove causation.")
-  :bi(lang,"مع تراكم بيانات النمو والتغذية والجرعات سيظهر هنا الربط بين الطلب الحيوي واتجاهات الحوض.","As growth, feeding and dosing evidence accumulates, biological demand correlations will appear here.");
+  ?(stats.growth30&&stats.dose.length
+    ?bi(lang,"تم تسجيل نمو مع استخدام جرعات خلال آخر 30 يوم. عقل الحوض سيعاملها كعلاقة تستحق المراقبة، وليس كسبب مثبت أو أمراً لرفع الجرعة.","Growth and dosing were both logged in the last 30 days. Tank Brain treats this as a correlation to watch, not proof of causation or an instruction to increase dosing.")
+    :bi(lang,"مع تراكم بيانات النمو والتغذية والجرعات سيظهر هنا الربط بين الطلب الحيوي واتجاهات الحوض.","As growth, feeding and dosing evidence accumulates, biological demand correlations will appear here."))
+  :(stats.growth30&&(tank.plantCare??[]).length
+    ?bi(lang,"تم تسجيل نمو نباتي مع عناية/تسميد. راقب الكيمياء وCO₂ قبل أي تعديل؛ الارتباط لا يعني أن التسميد هو السبب وحده.","Plant growth and care/fertilization were both logged. Review chemistry and CO₂ before changing anything; correlation does not prove causation.")
+    :bi(lang,"مع تراكم بيانات النمو والتغذية والجرعات سيظهر هنا الربط بين الطلب الحيوي واتجاهات الحوض.","As growth, feeding and dosing evidence accumulates, biological demand correlations will appear here."));
  return <section className="page-grid"><PageHeader eyebrow="TANK CONSUMPTION" title={bi(lang,"استهلاك الحوض","Tank Consumption")}/>
  <section className="card panel full-span"><h3>{bi(lang,"الاستهلاك المثبت • آخر 30 يوم","Evidence-backed consumption • last 30 days")}</h3><p className="note">{bi(lang,"لا نجمع وحدات مختلفة مع بعضها ولا نسمي تغير الكيمياء استهلاكاً إذا لم يكن لدينا دليل كافٍ.","Different units are never mixed, and chemistry drift is not labeled biological consumption without enough evidence.")}</p>
  <div className="feeding-first-look"><div><small>{bi(lang,"مرات التغذية","Feedings")}</small><b>{stats.feedingCount}</b></div><div><small>{bi(lang,"أحداث نمو","Growth events")}</small><b>{stats.growth30}</b></div><div><small>{bi(lang,"مواد جرعات","Dosing materials")}</small><b>{stats.dose.length}</b></div></div></section>
