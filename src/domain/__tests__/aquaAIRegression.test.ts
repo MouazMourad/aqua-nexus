@@ -83,6 +83,16 @@ describe("Life Journey / Propagation / Consumption Tank Brain regression",()=>{
   });
 });
 
+describe("Acclimation lifecycle readiness",()=>{
+  it("blocks a second active acclimation session but can evaluate the current release without self-blocking",()=>{
+    const t=structuredClone(demoMarineTank);const now=new Date().toISOString();
+    t.acclimationSessions=[{id:"current",startedAt:now,status:"release",wizardStep:5,categories:["fish"],floatConfirmed:true,floatStatus:"done",bucketStatus:"done",preflight:{},items:[],events:[]} as any];
+    expect(stockingReadiness(t).blockersEn.some(x=>/acclimation session is active/i.test(x))).toBe(true);
+    const releaseView={...t,acclimationSessions:t.acclimationSessions.map(s=>s.id==="current"?{...s,status:"completed" as const}:s)};
+    expect(stockingReadiness(releaseView).blockersEn.some(x=>/acclimation session is active/i.test(x))).toBe(false);
+  });
+});
+
 describe("Marine / Freshwater lifecycle integrity",()=>{
   it("does not let future chemistry complete a freshwater biological cycle",()=>{
     const t=structuredClone(demoFreshwaterTank);const now=Date.now();
