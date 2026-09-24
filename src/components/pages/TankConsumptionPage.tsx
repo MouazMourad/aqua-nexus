@@ -1,5 +1,5 @@
 "use client";
-import {useMemo} from "react";
+import {useMemo,useState} from "react";
 import type {Tank} from "@/domain/types";
 import {useAquaStore} from "@/store/useAquaStore";
 import {PageHeader} from "@/components/ui/PageHeader";
@@ -8,7 +8,7 @@ import {bi} from "@/i18n";
 const DAY=86400000;
 const num=(v:unknown)=>Math.max(0,Number(v)||0);
 export function TankConsumptionPage({tank}:{tank:Tank}){
- const lang=useAquaStore(s=>s.language),now=Date.now();
+ const lang=useAquaStore(s=>s.language),now=Date.now(); const [showHelp,setShowHelp]=useState(false);
  const stats=useMemo(()=>{
   const within=(ts:string,d:number)=>now-new Date(ts).getTime()<=d*DAY;
   const dosing=tank.dosing.filter(x=>within(x.timestamp,30));
@@ -42,7 +42,7 @@ export function TankConsumptionPage({tank}:{tank:Tank}){
   :(stats.growth30&&(tank.plantCare??[]).length
     ?bi(lang,"تم تسجيل نمو نباتي مع عناية/تسميد. راقب الكيمياء وCO₂ قبل أي تعديل؛ الارتباط لا يعني أن التسميد هو السبب وحده.","Plant growth and care/fertilization were both logged. Review chemistry and CO₂ before changing anything; correlation does not prove causation.")
     :bi(lang,"مع تراكم بيانات النمو والتغذية والجرعات سيظهر هنا الربط بين الطلب الحيوي واتجاهات الحوض.","As growth, feeding and dosing evidence accumulates, biological demand correlations will appear here."));
- return <section className="page-grid"><PageHeader eyebrow="TANK CONSUMPTION" title={bi(lang,"استهلاك الحوض","Tank Consumption")}/>
+ return <section className="page-grid"><PageHeader eyebrow="TANK CONSUMPTION" title={bi(lang,"استهلاك الحوض","Tank Consumption")} actions={<button className="btn" onClick={()=>setShowHelp(v=>!v)}>ⓘ {bi(lang,"التعليمات","Instructions")}</button>}/>{showHelp&&<section className="card panel full-span"><h3>{bi(lang,"كيف تقرأ استهلاك الحوض؟","How to read Tank Consumption")}</h3><p className="note">{bi(lang,"الصفحة تحلل سجلات التغذية والجرعات والمخزون والنمو والكيمياء. مسجل يعني بيانات أدخلتها فعلياً، محسوب يعني حساباً مباشراً عليها، وتقديري يعني توقعاً إذا استمر المعدل الحالي. تغير الكيمياء وحده لا يُعتبر استهلاكاً مثبتاً، والتوقعات ليست أوامر جرعات تلقائية.","This page analyzes feeding, dosing, inventory, growth and chemistry logs. Logged means actual recorded data, Calculated means direct arithmetic on it, and Estimated means a projection if the current rate continues. Chemistry drift alone is not proven consumption, and forecasts are not automatic dosing instructions.")}</p></section>
  <section className="card panel full-span metabolism"><div className="metabolism-head"><div><small>AQUARIUM METABOLISM</small><h2>{bi(lang,"بصمة استهلاك الحوض","Tank consumption fingerprint")}</h2><p className="note">{bi(lang,"صورة تشغيلية لما يدخل الحوض وما يستهلكه وما يتغير فيه، مبنية فقط على سجلاتك.","An operational view of what enters the aquarium, what is consumed and what changes, based only on your logs.")}</p></div><div className="evidence-badge"><small>{bi(lang,"قوة الدليل","Evidence")}</small><b>{confidence}</b></div></div><div className="metabolism-flow"><div><span>🍽️</span><b>{stats.feedingCount}</b><small>{bi(lang,"تغذية","feedings")}</small></div><div className="flow-arrow">→</div><div><span>💧</span><b>{stats.dose.length}</b><small>{bi(lang,"جرعات","dosing")}</small></div><div className="flow-arrow">→</div><div><span>↗</span><b>{stats.growth30}</b><small>{bi(lang,"نمو","growth")}</small></div><div className="flow-arrow">→</div><div><span>📈</span><b>{trendRows.filter(([,v])=>v!==null).length}</b><small>{bi(lang,"اتجاهات","trends")}</small></div></div>{urgent.length>0&&<div className="inline-alert warn"><b>{bi(lang,"تنبيه مخزون","Stock attention")}</b><p>{bi(lang,`${urgent.length} مادة قد تنفد خلال 14 يوم إذا استمر معدل الاستخدام الحالي.`,`${urgent.length} item(s) may run out within 14 days if the current usage rate continues.`)}</p></div>}</section>
  <section className="card panel full-span"><h3>{bi(lang,"الاستهلاك المثبت • آخر 30 يوم","Evidence-backed consumption • last 30 days")}</h3><p className="note">{bi(lang,"لا نجمع وحدات مختلفة مع بعضها ولا نسمي تغير الكيمياء استهلاكاً إذا لم يكن لدينا دليل كافٍ.","Different units are never mixed, and chemistry drift is not labeled biological consumption without enough evidence.")}</p>
  <div className="feeding-first-look"><div><small>{bi(lang,"مرات التغذية","Feedings")}</small><b>{stats.feedingCount}</b></div><div><small>{bi(lang,"أحداث نمو","Growth events")}</small><b>{stats.growth30}</b></div><div><small>{bi(lang,"مواد جرعات","Dosing materials")}</small><b>{stats.dose.length}</b></div></div></section>
