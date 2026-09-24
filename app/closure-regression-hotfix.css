@@ -1,0 +1,27 @@
+/* Final closure regression hotfixes — keep floating intelligence out of primary workflows. */
+
+/* Acclimation is a safety-critical timed workflow. The floating AI launcher must
+   never cover Start/Next/Finish controls on any viewport. Users can still use
+   Local Best AI from every other page. */
+body:has(.acclimation-page) .aqua-ai-fish-button,
+body:has(.acclimation-page) .aqua-ai-shell > .aqua-ai-fish-button {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* If the AI panel was left open before navigating to acclimation, keep the
+   shell from intercepting taps while the timed workflow is active. */
+body:has(.acclimation-page) .aqua-ai-shell {
+  pointer-events: none !important;
+}
+body:has(.acclimation-page) .aqua-ai-panel {
+  display: none !important;
+}
+
+/* Primary acclimation controls always win the stacking context. */
+body:has(.acclimation-page) .wizard-nav,
+body:has(.acclimation-page) .wizard-nav .btn,
+body:has(.acclimation-page) button[type="submit"] {
+  position: relative;
+  z-index: 7200;
+}
