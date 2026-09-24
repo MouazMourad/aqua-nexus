@@ -13,6 +13,8 @@ import { interventionGate } from "@/domain/interventionSafety";
 import { useSafetyOverrideDialog } from "@/components/ui/SafetyOverrideDialog";
 import { validatePositiveQuantity,validateTreatmentSetup } from "@/domain/inputSanity";
 import { localDateKey } from "@/domain/timeSafety";
+import { LIVESTOCK_LIBRARY } from "@/data/legacyCatalogs";
+import { diseaseEntryFromText,diseaseMatchesLivestock } from "@/domain/diseaseCatalog";
 
 function addHoursISO(hours:number){return new Date(Date.now()+Math.max(1,hours)*3600000).toISOString();}
 function dateOnly(iso?:string){return iso?localDateKey(new Date(iso)):today();}
@@ -28,6 +30,14 @@ export function QuarantinePage({tank}:{tank:Tank}) {
 
  function add(){
   if(!organism.trim())return;
+  const linkedLivestock=subjectId?tank.livestock.find(x=>x.id===subjectId):undefined;
+  const libraryMatch=!linkedLivestock?LIVESTOCK_LIBRARY.find(x=>x.type===tank.type&&[x.en,x.ar].some(name=>name.trim().toLowerCase()===organism.trim().toLowerCase())):undefined;
+  const subjectCategory=linkedLivestock?.category||(libraryMatch?.cat==="Fish"?"fish":libraryMatch?.cat==="Coral"?"coral":libraryMatch?.cat==="Plant"?"plant":libraryMatch?.cat==="Invert"?"invert":undefined);
+  const namedDisease=diseaseEntryFromText(tank.type,reason);
+  if(namedDisease&&subjectCategory&&!diseaseMatchesLivestock(namedDisease,subjectCategory)){
+    window.alert(bi(lang,`المرض المحدد «${namedDisease.ar}» مخصص لفئة ${namedDisease.group} ولا يتوافق مع هذا الكائن. اختر مرضاً متوافقاً أو صحح الكائن قبل فتح الحالة.`,`The selected disease “${namedDisease.en}” is cataloged for ${namedDisease.group} and is not compatible with this organism. Choose a compatible condition or correct the organism before opening the case.`));
+    return;
+  }
   if(subjectId&&tank.quarantine.some(q=>q.status==="active"&&q.livestockId===subjectId)){window.alert(bi(lang,"هذا الكائن لديه حالة حجر/علاج نشطة بالفعل. أغلق الحالة الحالية أو أكملها قبل إنشاء حالة جديدة.","This livestock already has an active quarantine/treatment case. Complete or close the current case before creating another."));return;}
   const ts=nowISO();
   const treatment=Boolean(product.trim()&&labelDose>0);
