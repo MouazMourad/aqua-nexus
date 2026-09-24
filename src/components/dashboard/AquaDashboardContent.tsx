@@ -21,7 +21,8 @@ import { estimatedParAt,formatLightMinute,lightingAtMinute } from "@/domain/ligh
 import { DashboardFeatureBubble } from "@/components/dashboard/DashboardFeatureBubble";
 import { markFeatureLearned } from "@/lib/featureDiscovery";
 import { AcademyDashboardEntry } from "@/components/academy/AcademyDashboardEntry";
-import { today } from "@/lib/appUtils";
+import { today,uid,nowISO } from "@/lib/appUtils";
+import { externalizePhoto,resolvePhotoPreview } from "@/lib/photoStorage";
 
 type ModuleId="chemistry"|"lighting"|"maintenance"|"bioload"|"forecast"|"intelligence"|"digitalTwin"|"equipment"|"predictions"|"memory"|"context"|"journey";
 type SceneMode="tank"|"equipment"|"flow"|"empty";
@@ -31,7 +32,8 @@ const DEFAULT_HIDDEN:ModuleId[]=[];
 const LAYOUT_KEY="aqua-dashboard-layout-v3";
 
 export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:AppPage)=>void}) {
- const lang=useAquaStore(s=>s.language);
+ const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
+ const [heroSrc,setHeroSrc]=useState("");
  const core=tankIntelligenceCore(tank);
  const chemistry=core.chemistry,ch=chemistry.score,mh=core.maintenance,trend=systemHealthTrend(tank),bio=core.bioload;
  const system=core.health,th=system.score;
@@ -47,6 +49,19 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
  const currentLightPar=lightProgram?estimatedParAt(tank,50,50,tank.lighting?.mapDepthPct??50,lightMinute):0;
  const lightPrimaryIssue=core.lighting.issues.find(x=>x.level==="danger")??core.lighting.issues.find(x=>x.level==="warn")??core.lighting.issues[0];
  const latestImport=tank.externalImports?.[0];
+ const heroPhoto=tank.photos.find(p=>p.id===tank.heroPhotoId);
+ useEffect(()=>{let active=true;if(!heroPhoto){setHeroSrc("");return()=>{active=false}};void resolvePhotoPreview(heroPhoto).then(v=>{if(active)setHeroSrc(v||heroPhoto.dataUrl||"")});return()=>{active=false}},[heroPhoto?.id,heroPhoto?.previewKey,heroPhoto?.assetKey]);
+ async function addTankPhoto(file?:File){
+  if(!file)return;
+  try{
+   const dataUrl=await new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=()=>reject(r.error);r.readAsDataURL(file)});
+   const img=await new Promise<HTMLImageElement>((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=reject;i.src=dataUrl});
+   const max=1600,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));canvas.getContext("2d")?.drawImage(img,0,0,canvas.width,canvas.height);
+   const ts=nowISO(),photo:any={id:uid("ph"),timestamp:ts,caption:lang==="ar"?"صورة الحوض الرئيسية":"Main tank photo",dataUrl:canvas.toDataURL("image/jpeg",.84)};
+   const stored=await externalizePhoto(photo);
+   patch(tank.id,t=>({...t,heroPhotoId:stored.id,photos:[stored,...t.photos],timeline:[{id:uid("ev"),timestamp:ts,type:"tank-photo",textAr:"تم تحديث صورة الحوض الرئيسية.",textEn:"Main aquarium photo updated."},...t.timeline]}));
+  }catch{}
+ }
 
  const fishItems=tank.livestock.filter(x=>x.category==="fish"),invertItems=tank.livestock.filter(x=>x.category==="invert");
  const reefCategory:"coral"|"plant"=tank.type==="marine"?"coral":"plant";
@@ -124,7 +139,11 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
   journey:{value:tank.photos.length?`📷 ${tank.photos.length}`:`〽 ${journeyPoints}`,note:trend==="unknown"?(lang==="ar"?"تاريخ غير كافٍ لتحديد الاتجاه":"Not enough history for a trend"):(lang==="ar"?`من ${journeyStart} حتى اليوم`:`${journeyStart} → today`),level:trend==="declining"||trend==="unknown"?"warn":"good"}
  };
 
- const visibleOrder=order.filter(x=>!hidden.includes(x));
+ const tankPhotoCard=<section className="card panel full-span" style={{overflow:"hidden"}}>
+  {heroSrc&&<img src={heroSrc} alt={tank.name} style={{width:"100%",maxHeight:280,objectFit:"cover",borderRadius:14,marginBottom:12}}/>}
+  <div className="module-head"><div><small className="eyebrow-mini">{lang==="ar"?"هوية الحوض":"TANK IDENTITY"}</small><h3>{heroSrc?tank.name:(lang==="ar"?"أضف صورة لحوضك":"Add a photo of your aquarium")}</h3><p className="note">{lang==="ar"?"الصورة تصبح الواجهة البصرية للحوض وتُحفظ أيضاً ضمن سجل الصور بدون تكرار البيانات.":"This becomes the aquarium's visual identity and is also kept in the photo journal without duplicating data."}</p></div><label className="btn primary" style={{cursor:"pointer"}}>{heroSrc?(lang==="ar"?"تغيير الصورة":"Change photo"):(lang==="ar"?"إضافة صورة الحوض":"Add tank photo")}<input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{void addTankPhoto(e.target.files?.[0]);e.currentTarget.value=""}}/></label></div>
+ </section>;
+  const visibleOrder=order.filter(x=>!hidden.includes(x));
  const critical=core.actions.filter(x=>x.level==="warn"||x.level==="danger").length;
  const knownComponents=system.components.filter(x=>x.known);
  const activeActionCount=core.actions.length;
@@ -161,7 +180,7 @@ export function AquaDashboardContent({tank,onNavigate}:{tank:Tank;onNavigate:(p:
     {key:"invert",icon:"🦐",title:lang==="ar"?"القشريات / اللافقاريات":"Invertebrates",items:invertItems,count:invertCount},
     {key:"reef",icon:tank.type==="marine"?"🪸":"🌿",title:lang==="ar"?(tank.type==="marine"?"المرجان":"النباتات"):(tank.type==="marine"?"Corals":"Plants"),items:reefItems,count:reefCount}
    ];
-   return <div className="pd-detail"><div className={`inline-alert ${bio.status==="danger"||bio.status==="high"?"warn":"good"}`}><b>{lang==="ar"?"الحمل الحيوي التقريبي":"Estimated bioload"}: {Math.round(bio.ratio*100)}%</b> • {bioLabel}</div><div className="pd-livestock-groups">{groups.map(group=><section className="pd-livestock-group" key={group.key}><div className="pd-livestock-head"><b>{group.icon} {group.title}</b><span>{group.count}</span></div>{group.items.length?group.items.map(item=><div className="pd-livestock-row" key={item.id}><span>{healthMark(item.health)} {lang==="ar"?item.name:(item.nameEn||item.name)}</span><b>×{item.quantity}</b></div>):<small className="note">{lang==="ar"?"لا يوجد عناصر مسجلة":"No registered items"}</small>}</section>)}</div><p className="note">{lang==="ar"?`المؤشر تقريبي ويعتمد على الكائنات المسجلة وحجم النظام (${tank.systemVolumeLiters.toFixed(0)} لتر).`:`This estimate uses registered livestock and system volume (${tank.systemVolumeLiters.toFixed(0)} L).`}</p><button className="btn primary" onClick={()=>onNavigate("livestock")}>{lang==="ar"?"فتح الكائنات":"Open livestock"}</button></div>;
+   return <><div className="page-grid">{tankPhotoCard}</div>div className="pd-detail"><div className={`inline-alert ${bio.status==="danger"||bio.status==="high"?"warn":"good"}`}><b>{lang==="ar"?"الحمل الحيوي التقريبي":"Estimated bioload"}: {Math.round(bio.ratio*100)}%</b> • {bioLabel}</div><div className="pd-livestock-groups">{groups.map(group=><section className="pd-livestock-group" key={group.key}><div className="pd-livestock-head"><b>{group.icon} {group.title}</b><span>{group.count}</span></div>{group.items.length?group.items.map(item=><div className="pd-livestock-row" key={item.id}><span>{healthMark(item.health)} {lang==="ar"?item.name:(item.nameEn||item.name)}</span><b>×{item.quantity}</b></div>):<small className="note">{lang==="ar"?"لا يوجد عناصر مسجلة":"No registered items"}</small>}</section>)}</div><p className="note">{lang==="ar"?`المؤشر تقريبي ويعتمد على الكائنات المسجلة وحجم النظام (${tank.systemVolumeLiters.toFixed(0)} لتر).`:`This estimate uses registered livestock and system volume (${tank.systemVolumeLiters.toFixed(0)} L).`}</p><button className="btn primary" onClick={()=>onNavigate("livestock")}>{lang==="ar"?"فتح الكائنات":"Open livestock"}</button></div>;
   }
 
   if(id==="forecast")return <div className="pd-detail"><div className="pd-forecast"><b>{forecast.current}%</b><span>→</span><b>{forecast.projected7d===null?"N/A":`${forecast.projected7d}%`}</b></div><p>{lang==="ar"?forecast.ar:forecast.en}</p><small>{lang==="ar"?"ثقة التوقع":"Forecast confidence"}: {forecast.confidence}</small></div>;
