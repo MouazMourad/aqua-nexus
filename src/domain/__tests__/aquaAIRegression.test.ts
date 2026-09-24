@@ -53,9 +53,10 @@ import { equipmentImportIntelligence,normalizeEquipmentImportCandidate,parseGene
 import { prepareEquipmentImportApplication } from "@/domain/equipmentImportApply";
 import { addLocalCalendarDays,isMeaningfullyFutureTimestamp } from "@/domain/timeSafety";
 
-const tank=structuredClone(demoMarineTank);
 import { latestCorrectiveDoseExecution } from "../dosingSafety";
 import { latestCoralDipRunForItem } from "../acclimationSafety";
+
+const tank=structuredClone(demoMarineTank);
 
 describe("Life Journey / Propagation / Consumption Tank Brain regression",()=>{
   it("turns recent Life Journey health changes into cautious guidance",()=>{
