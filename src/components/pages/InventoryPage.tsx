@@ -61,7 +61,11 @@ export function InventoryPage({tank}:{tank:Tank}) {
  };
  const updateGeneral=(id:string,v:number)=>patch(tank.id,t=>({...t,inventory:t.inventory.map(x=>x.id===id?{...x,quantity:sanitizeNonNegative(v,x.quantity,1_000_000_000)}:x)}));
  const updateConsumable=(equipmentId:string,consumableId:string,v:number)=>patch(tank.id,t=>({...t,equipment:t.equipment.map(e=>e.id===equipmentId?{...e,consumables:(e.consumables??[]).map(c=>c.id===consumableId?{...c,quantityOnHand:sanitizeNonNegative(v,c.quantityOnHand??0,1_000_000_000)}:c)}:e)}));
- const remove=(id:string)=>patch(tank.id,t=>({...t,inventory:t.inventory.filter(x=>x.id!==id)}));
+ const remove=(id:string)=>{
+  const active=tank.quarantine.filter(q=>q.status==="active"&&q.medicationInventoryItemId===id);
+  if(active.length){window.alert(bi(lang,`لا يمكن حذف هذه المادة لأنها مرتبطة بـ ${active.length} حالة حجر/علاج نشطة. أغلق الحالة أو غيّر الدواء المرتبط أولاً.`,`This item cannot be deleted because it is linked to ${active.length} active quarantine/treatment case(s). Close the case or change its linked medication first.`));return}
+  patch(tank.id,t=>({...t,inventory:t.inventory.filter(x=>x.id!==id)}));
+ };
 
  return <section className="page-grid"><PageHeader eyebrow="UNIFIED INVENTORY" title={tr(lang,"inventory")} actions={<button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(lang,"addStock")}</button>}/>
  {stock.total===0&&<div className="inline-alert info full-span"><div><b>📦 {bi(lang,"المخزون مو مجرد قائمة كميات؛ كل مادة مرتبطة بوظيفتها.","Inventory is not just a quantity list; every item is linked to its purpose.")}</b><p>{bi(lang,"صنّف المادة مرة واحدة، وبعدها كل صفحة تشوف فقط المواد المناسبة إلها وتخصم منها بأمان.","Classify an item once; each module will then see only compatible stock and deduct from it safely.")}</p><button className="btn primary" onClick={()=>setOpen(true)}>+ {tr(lang,"addStock")}</button></div></div>}
