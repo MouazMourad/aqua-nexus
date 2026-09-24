@@ -6,6 +6,7 @@ import {PageHeader} from "@/components/ui/PageHeader";
 import {bi} from "@/i18n";
 import {uid,nowISO} from "@/lib/appUtils";
 import {externalizePhoto,resolvePhotoPreview} from "@/lib/photoStorage";
+import {isPlausibleOperationalTimestamp} from "@/domain/timeSafety";
 
 function JourneyPhoto({photo}:{photo:Tank["photos"][number]}){const [src,setSrc]=useState("");useEffect(()=>{let a=true;void resolvePhotoPreview(photo).then(v=>{if(a)setSrc(v||photo.dataUrl||"")});return()=>{a=false}},[photo.id]);return src?<img className="journey-photo" src={src} alt={photo.caption||""}/>:null}
 export function LifeJourneyPage({tank}:{tank:Tank}){
@@ -13,10 +14,10 @@ export function LifeJourneyPage({tank}:{tank:Tank}){
  const [photoSrc,setPhotoSrc]=useState("");
  const [selected,setSelected]=useState(tank.livestock[0]?.id??""),[type,setType]=useState<NonNullable<LivestockItem["lifeEvents"]>[number]["type"]>("observation"),[note,setNote]=useState(""),[size,setSize]=useState("");
  const item=tank.livestock.find(x=>x.id===selected);
- const itemPhotos=useMemo(()=>tank.photos.filter(p=>p.livestockId===selected).sort((a,b)=>b.timestamp.localeCompare(a.timestamp)),[tank.photos,selected]);
+ const itemPhotos=useMemo(()=>tank.photos.filter(p=>p.livestockId===selected&&isPlausibleOperationalTimestamp(p.timestamp)).sort((a,b)=>b.timestamp.localeCompare(a.timestamp)),[tank.photos,selected]);
  useEffect(()=>{let active=true;const p=itemPhotos[0];if(!p){setPhotoSrc("");return()=>{active=false}};void resolvePhotoPreview(p).then(v=>{if(active)setPhotoSrc(v||p.dataUrl||"")});return()=>{active=false}},[itemPhotos[0]?.id]);
  const addPhoto=async(file?:File)=>{if(!file||!item)return;try{const raw=await new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=()=>reject(r.error);r.readAsDataURL(file)}),ts=nowISO(),pid=uid("ph");const stored=await externalizePhoto({id:pid,timestamp:ts,caption:`Life Journey • ${item.name}`,dataUrl:raw,livestockId:item.id,estimatedSizeCm:Number(size)>0?Number(size):undefined});patch(tank.id,t=>({...t,photos:[stored,...t.photos],livestock:t.livestock.map(x=>x.id===item.id?{...x,lifeEvents:[{id:uid("life"),timestamp:ts,type:"observation",note:lang==="ar"?"صورة متابعة للنمو والحالة.":"Growth and condition follow-up photo.",photoId:pid,sizeCm:Number(size)>0?Number(size):undefined},...(x.lifeEvents??[])]}:x),timeline:[{id:uid("ev"),timestamp:ts,type:"life-photo",textAr:`حياة الكائنات • تمت إضافة صورة متابعة لـ ${item.name}.`,textEn:`Life Journey • Follow-up photo added for ${item.nameEn||item.name}.`},...t.timeline]}))}catch{}};
- const events=useMemo(()=>[...(item?.lifeEvents??[])].sort((a,b)=>b.timestamp.localeCompare(a.timestamp)),[item]);
+ const events=useMemo(()=>[...(item?.lifeEvents??[])].filter(e=>isPlausibleOperationalTimestamp(e.timestamp)).sort((a,b)=>b.timestamp.localeCompare(a.timestamp)),[item]);
  const eventLabel=(v:string)=>({observation:bi(lang,"ملاحظة","Observation"),growth:bi(lang,"نمو","Growth"),health:bi(lang,"الصحة","Health"),transfer:bi(lang,"انتقال","Transfer"),breeding:bi(lang,"تكاثر","Breeding"),frag:"Frag",cutting:bi(lang,"قصاصة","Cutting"),division:bi(lang,"تقسيم","Division"),runner:"Runner"} as Record<string,string>)[v]||v;
  const categoryIcon=item?.category==="fish"?"🐠":item?.category==="coral"?"🪸":item?.category==="plant"?"🌿":"🦐";
  const firstDate=item?.addedAt||events[events.length-1]?.timestamp;
