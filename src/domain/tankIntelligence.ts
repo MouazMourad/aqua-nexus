@@ -93,10 +93,11 @@ export function tankStateView(tank:Tank):TankStateView {
   // Hard safety signals override the descriptive band even when the weighted
   // composite score remains numerically high. The score stays transparent;
   // the headline must never call a chemically critical tank "stable".
-  const band=system.chemistryCritical?"critical":stateBand(score);
+  const chemAssessment=chemistryHealthAssessment(tank),chem=chemAssessment.score;
+  const band=system.chemistryCritical?"critical":chem===null?"watch":stateBand(score);
   const text=bandText(band);
   const drivers:StateDriver[]=[];
-  const chemAssessment=chemistryHealthAssessment(tank),chem=chemAssessment.score,maint=maintenanceHealth(tank),age=chemistryAgeDays(tank),bio=bioload(tank);
+  const maint=maintenanceHealth(tank),age=chemistryAgeDays(tank),bio=bioload(tank),maint=maintenanceHealth(tank),age=chemistryAgeDays(tank),bio=bioload(tank);
   const chemGuide=chemistryGuidance(tank);
   const atDate=localDateKey();
   const overdue=tank.maintenance.filter(x=>maintenanceEffectiveState(x,atDate).overdue);
