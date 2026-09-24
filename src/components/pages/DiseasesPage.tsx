@@ -1,7 +1,7 @@
 "use client";
 import { useMemo,useState } from "react";
 import type { Tank } from "@/domain/types";
-import { diseaseEntriesFor,diseaseGroupCounts } from "@/domain/diseaseCatalog";
+import { diseaseEntriesFor,diseaseGroupCounts,diseaseMatchesLivestock } from "@/domain/diseaseCatalog";
 import { useAquaStore } from "@/store/useAquaStore";
 import { tr,categoryText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -17,6 +17,7 @@ export function DiseasesPage({tank,onVisualInsight}:{tank:Tank;onVisualInsight?:
 
  function addTreatment(x:any){
   const due=daysFrom(today(),2),subject=tank.livestock.find(y=>y.id===subjectId),ts=nowISO();
+  if(subject&&!diseaseMatchesLivestock(x,subject.category)){window.alert(lang==="ar"?"هذه الحالة لا تتوافق مع فئة الكائن المحدد. اختر مرضاً مناسباً لنوع الكائن.":"This condition is not compatible with the selected livestock category. Choose a condition for that organism type.");return;}
   if(subject&&tank.quarantine.some(q=>q.status==="active"&&q.livestockId===subject.id)){window.alert(lang==="ar"?"هذا الكائن لديه حالة حجر/علاج نشطة بالفعل. افتح صفحة الحجر وعدّل أو أكمل الحالة الحالية بدل إنشاء حالة ثانية.":"This livestock already has an active quarantine/treatment case. Open Quarantine and update or complete the existing case instead of creating a duplicate.");return;}
   patch(tank.id,t=>({...t,
    livestock:subject?t.livestock.map(y=>y.id===subject.id?{...y,health:"treatment" as const,lastObservedAt:ts}:y):t.livestock,
