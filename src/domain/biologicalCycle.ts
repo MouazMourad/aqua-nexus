@@ -45,7 +45,7 @@ function ageHours(ts?:string){
 function measured(tank:Tank){
   return tank.chemistry
     .filter(x=>!x.usingDefaults)
-    .filter(x=>Number.isFinite(new Date(x.timestamp).getTime()))
+    .filter(x=>{const ts=new Date(x.timestamp).getTime();return Number.isFinite(ts)&&ts<=Date.now();})
     .slice()
     .sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime());
 }
