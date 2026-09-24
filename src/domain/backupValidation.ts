@@ -94,6 +94,20 @@ function nestedDataIssue(tank:Record<string,unknown>){
     }
   }
   if(tank.heroPhotoId!==undefined&&!photoIds.has(String(tank.heroPhotoId)))return `heroPhotoId references missing photo ${String(tank.heroPhotoId)}`;
+  const equipmentIds=new Set((((tank.equipment as Record<string,unknown>[])??[])).map(x=>String(x.id)));
+  const chambers=(((tank.sump as Record<string,unknown>).chambers as Record<string,unknown>[])??[]);
+  for(const [i,chamber] of chambers.entries()){
+    if(!isObject(chamber)||chamber.refugium===undefined)continue;
+    if(!isObject(chamber.refugium))return `sump chamber #${i+1} has invalid refugium data`;
+    const refugium=chamber.refugium;
+    if(!Array.isArray(refugium.livestockIds)||!Array.isArray(refugium.equipmentIds))return `sump chamber #${i+1} has invalid refugium references`;
+    for(const id of refugium.livestockIds)if(typeof id!=="string"||!livestockIds.has(id))return `sump chamber #${i+1} references missing livestock ${String(id)}`;
+    for(const id of refugium.equipmentIds)if(typeof id!=="string"||!equipmentIds.has(id))return `sump chamber #${i+1} references missing equipment ${String(id)}`;
+  }
+  for(const [i,row] of ((((tank.quarantine as Record<string,unknown>[])??[]))).entries()){
+    if(row.livestockId!==undefined&&!livestockIds.has(String(row.livestockId))&&String(row.status)==="active")return `active quarantine #${i+1} references missing livestock ${String(row.livestockId)}`;
+    if(row.medicationInventoryItemId!==undefined&&!(((tank.inventory as Record<string,unknown>[])??[])).some(x=>String(x.id)===String(row.medicationInventoryItemId))&&String(row.status)==="active")return `active quarantine #${i+1} references missing medication inventory ${String(row.medicationInventoryItemId)}`;
+  }
   for(const [i,row] of (((tank.dosing as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp))return `dosing #${i+1} is invalid`;
     if(row.status!==undefined&&!["planned","in_progress","logged","invalidated"].includes(String(row.status)))return `dosing #${i+1} has an invalid status`;
