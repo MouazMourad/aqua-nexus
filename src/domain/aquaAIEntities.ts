@@ -23,6 +23,8 @@ const KIND_ALIASES:Partial<Record<EquipmentKind,string[]>>={
  returnPump:["مضخه راجعه","مضخة راجعة","مضخه الريترن","مضخة الريترن","return pump","return"],
  filterSock:["جورب فلتر","جراب فلتر","جرابات","filter sock","sock"],
  rollerFilter:["رولر","roller filter","roller"],
+ canisterFilter:["فلتر كانستر","كانستر","canister filter","canister"],
+ spongeFilter:["فلتر اسفنجي","فلتر إسفنجي","اسفنجي","إسفنجي","sponge filter","sponge"],
  reactor:["ريأكتور","رياكتور","reactor"],
  heater:["سخان","هيتر","heater"],
  doser:["دوزر","مضخه جرعات","مضخة جرعات","doser","dosing pump"],
@@ -74,13 +76,13 @@ export function resolveAquaEntities(tank:Tank,question:string):AquaAIEntities{
 export function equipmentKindLabel(kind:EquipmentKind,lang:"ar"|"en"){
  const ar:Record<EquipmentKind,string>={
   lighting:"الإضاءة",waveMaker:"مضخة الموج",skimmer:"السكيمر",returnPump:"مضخة الرجوع",
-  filterSock:"جورب الفلترة",rollerFilter:"الرولر فلتر",reactor:"الرياكتور",heater:"السخان",
+  filterSock:"جورب الفلترة",rollerFilter:"الرولر فلتر",canisterFilter:"فلتر كانستر",spongeFilter:"فلتر إسفنجي",reactor:"الرياكتور",heater:"السخان",
   doser:"الدوزر",uv:"UV",ozone:"الأوزون",ato:"ATO",refugiumLight:"إضاءة الريفيجيوم",
   turfScrubber:"Algae Scrubber",probe:"المجس",co2:"نظام CO₂",overflow:"الأوفر فلو",other:"الجهاز"
  };
  const en:Record<EquipmentKind,string>={
   lighting:"lighting",waveMaker:"wave maker",skimmer:"skimmer",returnPump:"return pump",
-  filterSock:"filter sock",rollerFilter:"roller filter",reactor:"reactor",heater:"heater",
+  filterSock:"filter sock",rollerFilter:"roller filter",canisterFilter:"canister filter",spongeFilter:"sponge filter",reactor:"reactor",heater:"heater",
   doser:"doser",uv:"UV",ozone:"ozone",ato:"ATO",refugiumLight:"refugium light",
   turfScrubber:"algae scrubber",probe:"probe",co2:"CO₂ system",overflow:"overflow",other:"equipment"
  };
