@@ -320,13 +320,20 @@ function multiParameterAnswer(tank:Tank,params:AquaQuestionParam[]):AquaAIAnswer
   const guidance=chemistryGuidance(tank);
   const rows=params.map(param=>guidance.all.find(x=>x.key===param)).filter(Boolean) as NonNullable<ReturnType<typeof chemistryGuidance>["all"][number]>[];
   const problems=rows.filter(x=>x.level!=="good"||x.suspectedFormat);
-  const detailsAr=(problems.length?problems:rows).map(x=>`${x.reasonAr} الإجراء: ${x.actionAr}`);
-  const detailsEn=(problems.length?problems:rows).map(x=>`${x.reasonEn} Action: ${x.actionEn}`);
+  const readings=measuredChemistryReadings(tank);
+  const values=params.map(param=>{
+    const reading=readings.find(r=>typeof r.values[param]==="number"&&Number.isFinite(r.values[param]));
+    return {param,value:reading?.values[param]};
+  });
+  const valuesAr=values.map(x=>x.value===undefined?`${x.param}: غير مسجل`:`${x.param}: ${x.value}`).join("، ");
+  const valuesEn=values.map(x=>x.value===undefined?`${x.param}: not recorded`:`${x.param}: ${x.value}`).join(", ");
+  const detailsAr=[`القراءات المطلوبة: ${valuesAr}.`,...(problems.length?problems:rows).map(x=>`${x.reasonAr} الإجراء: ${x.actionAr}`)];
+  const detailsEn=[`Requested readings: ${valuesEn}.`,...(problems.length?problems:rows).map(x=>`${x.reasonEn} Action: ${x.actionEn}`)];
   const top=problems[0]||rows[0];
   return {
     titleAr:"تحليل القيم المطلوبة معاً",titleEn:"Combined parameter analysis",
-    summaryAr:top?`الأولوية الآن: ${top.titleAr}. ${top.actionAr}`:"لا توجد بيانات كافية للقيم المطلوبة.",
-    summaryEn:top?`Current priority: ${top.titleEn}. ${top.actionEn}`:"There is not enough data for the requested parameters.",
+    summaryAr:`القراءات المطلوبة: ${valuesAr}. ${top?`الأولوية الآن: ${top.titleAr}. ${top.actionAr}`:"لا توجد بيانات إضافية للتحليل."}`,
+    summaryEn:`Requested readings: ${valuesEn}. ${top?`Current priority: ${top.titleEn}. ${top.actionEn}`:"No additional analysis is available."}`,
     detailsAr:detailsAr.length?detailsAr:["لا توجد بيانات كافية حالياً."],detailsEn:detailsEn.length?detailsEn:["There is not enough data yet."],
     evidenceAr:[`${measuredChemistryReadings(tank).length} قراءات كيميائية`,`${params.length} عوامل مطلوبة`],evidenceEn:[`${measuredChemistryReadings(tank).length} chemistry readings`,`${params.length} requested parameters`],
     confidence:confidence(tank),action:{page:"chemistry",ar:"افتح الكيمياء والتفاصيل",en:"Open chemistry details"}
