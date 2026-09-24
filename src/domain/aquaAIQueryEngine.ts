@@ -122,6 +122,12 @@ export function answerAquaQuery(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswe
  const noChemistry=measuredForAnswer.length===0;
  const latestChem=measuredForAnswer[0];
  const latestChemAgeDays=latestChem?Math.max(0,(Date.now()-new Date(latestChem.timestamp).getTime())/86400000):Infinity;
+ const requestedReadings=intent.params.map(param=>{
+  const sample=measuredForAnswer.find(r=>typeof r.values[param]==="number"&&Number.isFinite(r.values[param]));
+  return {param,value:sample?Number(sample.values[param]):undefined,timestamp:sample?.timestamp};
+ });
+ const requestedValuesEn=requestedReadings.map(x=>x.value===undefined?`${x.param}: not recorded`:`${x.param}: ${x.value}`).join(", ");
+ const requestedValuesAr=requestedReadings.map(x=>x.value===undefined?`${x.param}: غير مسجل`:`${x.param}: ${x.value}`).join("، ");
  const activeEmergency=(tank.emergencySessions??[]).some(x=>x.status==="active");
  const activeAcclimation=(tank.acclimationSessions??[]).some(x=>x.status!=="completed");
  const equipmentWarnings=tank.equipment.filter(x=>x.status==="warning"||x.status==="service");
@@ -135,6 +141,10 @@ export function answerAquaQuery(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswe
  const specificEquipment=tank.equipment.find(x=>intent.raw.toLowerCase().includes(x.name.toLowerCase()))||tank.equipment.find(x=>howTarget.includes(x.kind.toLowerCase()));
  const specificMaintenance=specificEquipment?tank.maintenance.filter(x=>x.sourceEquipmentId===specificEquipment.id):[];
  let summaryAr=snap.ar,summaryEn=snap.en;
+ if(intent.params.length){
+  summaryAr=`القراءات المطلوبة الحالية: ${requestedValuesAr}.`;
+  summaryEn=`Current requested readings: ${requestedValuesEn}.`;
+ }
  if(insufficientForAdd){
   const missingAr=addMissingAr.join(" و");
   const missingEn=addMissingEn.join(" and ");
@@ -164,8 +174,8 @@ export function answerAquaQuery(tank:Tank,intent:AquaQuestionIntent):AquaAIAnswe
  return {
   titleAr:`${domainTitle(plan.primary,"ar")} — ${suffixAr}`,titleEn:`${domainTitle(plan.primary,"en")} — ${suffixEn}`,
   summaryAr,summaryEn,
-  detailsAr:[...(insufficientForAdd?["سجّل الكائنات الموجودة وآخر فحص كيميائي أولاً؛ بعدها أعيد تقييم الجاهزية والتوافق والحمل الحيوي."]:snap.dar),...signals.slice(0,4).map(x=>x.ar),...actions.slice(0,2).map(x=>`الإجراء: ${x.ar} — راقب بعدها: ${x.recheckAr}`)].filter((x,i,a)=>x&&a.indexOf(x)===i),
-  detailsEn:[...(insufficientForAdd?["Log the current livestock and a recent chemistry test first; then I can reassess readiness, compatibility and bioload."]:snap.den),...signals.slice(0,4).map(x=>x.en),...actions.slice(0,2).map(x=>`Action: ${x.en} — Recheck: ${x.recheckEn}`)].filter((x,i,a)=>x&&a.indexOf(x)===i),
+  detailsAr:[...(intent.params.length?[`القيم المطلوبة: ${requestedValuesAr}.`]:[]),...(insufficientForAdd?["سجّل الكائنات الموجودة وآخر فحص كيميائي أولاً؛ بعدها أعيد تقييم الجاهزية والتوافق والحمل الحيوي."]:snap.dar),...signals.slice(0,4).map(x=>x.ar),...actions.slice(0,2).map(x=>`الإجراء: ${x.ar} — راقب بعدها: ${x.recheckAr}`)].filter((x,i,a)=>x&&a.indexOf(x)===i),
+  detailsEn:[...(intent.params.length?[`Requested values: ${requestedValuesEn}.`]:[]),...(insufficientForAdd?["Log the current livestock and a recent chemistry test first; then I can reassess readiness, compatibility and bioload."]:snap.den),...signals.slice(0,4).map(x=>x.en),...actions.slice(0,2).map(x=>`Action: ${x.en} — Recheck: ${x.recheckEn}`)].filter((x,i,a)=>x&&a.indexOf(x)===i),
   evidenceAr:[...snap.ear,...reasoned.evidenceAr.slice(0,3)],evidenceEn:[...snap.een,...reasoned.evidenceEn.slice(0,3)],
   confidence:insufficientForAdd?"low":reasoned.confidence,
   missingEvidenceAr:addMissingAr.length?addMissingAr:undefined,
