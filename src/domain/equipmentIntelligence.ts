@@ -61,5 +61,9 @@ export function deviceEnergy(e:Equipment,pricePerKwh:number){
 export function tankEnergy(tank:Tank){
   const price=Math.max(0,Number(tank.energySettings?.pricePerKwh||0));
   const rows=tank.equipment.map(e=>({equipment:e,...deviceEnergy(e,price)}));
-  return {pricePerKwh:price,totalMonthlyKwh:rows.reduce((s,x)=>s+x.monthlyKwh,0),totalMonthlyCost:rows.reduce((s,x)=>s+x.monthlyCost,0),rows};
+  const dailyKwh=rows.reduce((s,x)=>s+x.dailyKwh,0);
+  const monthlyKwh=rows.reduce((s,x)=>s+x.monthlyKwh,0);
+  const monthlyCost=rows.reduce((s,x)=>s+x.monthlyCost,0);
+  const configured=tank.equipment.filter(e=>Number(e.powerWatts||0)>0&&Number(e.hoursPerDay||0)>0).length;
+  return {pricePerKwh:price,dailyKwh,monthlyKwh,monthlyCost,configured,totalMonthlyKwh:monthlyKwh,totalMonthlyCost:monthlyCost,rows};
 }
