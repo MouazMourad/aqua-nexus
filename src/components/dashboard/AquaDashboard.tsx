@@ -18,6 +18,7 @@ import { validateTankSetupEntry } from "@/domain/inputSanity";
 import { validateChemistryValues } from "@/domain/chemistryDataQuality";
 import { archivedPageAllowed,isTankArchived } from "@/domain/tankLifecycle";
 import { AcademyWizardHelp } from "@/components/academy/AcademyWizardHelp";
+import { externalizePhoto } from "@/lib/photoStorage";
 import type { AcademyLessonId } from "@/data/academy";
 
 const equipOptions: {kind:EquipmentKind;ar:string;en:string}[] = [
@@ -122,6 +123,7 @@ export function AquaDashboard() {
  const [maintenanceDone,setMaintenanceDone]=useState(true);
  const chemCfg:any=CHEMISTRY_CATALOG[type];
  const [chem,setChem]=useState<Record<string,number>>({});
+ const [wizardPhoto,setWizardPhoto]=useState<File|null>(null),[wizardPhotoPreview,setWizardPhotoPreview]=useState("");
 
  const wizardSteps=[
   tr(language,"tankIdentity"),tr(language,"dimensions"),tr(language,"sumpSetup"),
@@ -160,10 +162,10 @@ export function AquaDashboard() {
  function resetWizard(){
   setStep(1);setName("");setType("marine");setProfile("auto");setStatus("new");setAgeMonths(0);
   setL(120);setW(60);setH(60);setLoss(15);setHasSump(true);setSl(100);setSw(40);setSh(35);setFill(75);setCount(3);
-  setEquipment(["lighting","waveMaker","overflow","returnPump","heater"]);setMaintenanceDone(true);setChem({});
+  setEquipment(["lighting","waveMaker","overflow","returnPump","heater"]);setMaintenanceDone(true);setChem({});setWizardPhoto(null);setWizardPhotoPreview("");
  }
 
- function create(){
+ async function create(){
   if(!setupCheck.ok){const issue=setupCheck.issues[0];window.alert(language==="ar"?issue.ar:issue.en);return;}
   if(!Number.isFinite(count)||count<1||count>12){window.alert(language==="ar"?"عدد حجرات السامب يجب أن يكون بين 1 و12.":"Sump chamber count must be between 1 and 12.");return;}
   if(wizardChemIssues.length){const issue=wizardChemIssues[0];window.alert(language==="ar"?issue.ar:issue.en);return;}
@@ -184,6 +186,7 @@ export function AquaDashboard() {
    maintenance:maintenanceDone?[weeklyTask,inspectTask]:[weeklyTask],
    livestock:[],inventory:[],timeline:[{id:uid("ev"),timestamp:createdAt,type:"setup",textAr:cycleMode?"تم إنشاء الحوض وبدأت الدورة البيولوجية تلقائياً — اليوم 1.":"تم إنشاء الحوض عبر معالج الإعداد الذكي.",textEn:cycleMode?"Tank created and Biological Cycling Mode started automatically — day 1.":"Tank created using the Smart Setup Wizard."}],photos:[],feeding:[],dosing:[],doserChannels:[],quarantine:[],expenses:[],waterChanges:[],rodi:[],biologicalCycle:cycleMode?{startedAt:createdAt,method:"fishless"}:undefined,createdAt
   };
+  if(wizardPhoto){try{const raw=await new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=()=>reject(r.error);r.readAsDataURL(wizardPhoto)});const photo=await externalizePhoto({id:uid("ph"),timestamp:createdAt,caption:language==="ar"?"صورة الحوض الرئيسية":"Main tank photo",dataUrl:raw});newTank.photos=[photo];newTank.heroPhotoId=photo.id;newTank.timeline=[{id:uid("ev"),timestamp:createdAt,type:"tank-photo",textAr:"تمت إضافة صورة الحوض الرئيسية أثناء الإعداد.",textEn:"Main aquarium photo added during setup."},...newTank.timeline]}catch{}}
   addTank(newTank);setTrainingPreviewId(null);setOpen(false);resetWizard();setPage("dashboard");
  }
 
@@ -198,6 +201,7 @@ export function AquaDashboard() {
     <label className="field"><span>{tr(language,"type")}</span><select value={type} onChange={e=>{setType(e.target.value as TankType);setProfile("auto")}}><option value="marine">{tr(language,"marine")}</option><option value="freshwater">{tr(language,"freshwater")}</option></select></label><label className="field"><span>{bi(language,"بروفايل الحوض","Tank profile")}</span><select value={profile} onChange={e=>setProfile(e.target.value as any)}><option value="auto">Auto</option>{type==="marine"?<><option value="reef">Reef</option><option value="fishOnly">Fish-only</option></>:<><option value="planted">Planted</option><option value="fishOnly">Fish-only</option></>}</select></label>
     <label className="field"><span>{tr(language,"status")}</span><select value={status} onChange={e=>setStatus(e.target.value as TankStatus)}><option value="new">{tr(language,"new")}</option><option value="cycling">{tr(language,"cycling")}</option><option value="established">{tr(language,"established")}</option></select></label>
     <label className="field"><span>{tr(language,"ageMonths")}</span><input type="number" min="0" value={ageMonths} onChange={e=>setAgeMonths(Number(e.target.value))}/></label>
+    <div className="field full-field"><span>{bi(language,"صورة الحوض (اختيارية)","Tank photo (optional)")}</span>{wizardPhotoPreview&&<img src={wizardPhotoPreview} alt="" style={{width:"100%",maxHeight:220,objectFit:"cover",borderRadius:14,marginBlock:8}}/>}<label className="btn">{wizardPhoto?bi(language,"تغيير الصورة","Change photo"):bi(language,"إضافة صورة الحوض","Add tank photo")}<input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const file=e.target.files?.[0]||null;setWizardPhoto(file);if(file){const r=new FileReader();r.onload=()=>setWizardPhotoPreview(String(r.result));r.readAsDataURL(file)}else setWizardPhotoPreview("")}}/></label><small>{bi(language,"اختيارية؛ إذا تخطيتها سيظهر زر صغير لإضافتها لاحقاً من لوحة التحكم.","Optional; if skipped, Dashboard will offer a small add-photo card later.")}</small></div>
    </div>}
 
    {step===2&&<div className="form-grid">
@@ -225,6 +229,7 @@ export function AquaDashboard() {
      <div><small>{tr(language,"displayVolume")}</small><b>{preview.net.toFixed(1)} L</b></div>
      <div><small>{tr(language,"systemVolume")}</small><b>{preview.system.toFixed(1)} L</b></div>
      <div><small>{tr(language,"equipment")}</small><b>{equipment.length}</b></div>
+     <div><small>{bi(language,"صورة الحوض","Tank photo")}</small><b>{wizardPhoto?bi(language,"تم اختيارها","Selected"):bi(language,"لاحقاً من لوحة التحكم","Later from Dashboard")}</b></div>
      <div><small>{bi(language,"الكيمياء","Chemistry")}</small><b>{hasMeasuredWizardChemistry?bi(language,"قياسات فعلية مدخلة","Measured values entered"):bi(language,"بدون قياسات حالياً","No measurements yet")}</b></div>
      {(status==="new"||status==="cycling")&&<div className="full-field inline-alert warn"><b>{bi(language,"الدورة البيولوجية ستبدأ تلقائياً من اليوم 1.","Biological Cycling Mode will start automatically on day 1.")}</b><br/>{bi(language,"خلالها Aqua Nexus يوقف العمليات غير المرتبطة بالدورة حتى تثبت الجاهزية من القياسات.","During cycling, Aqua Nexus locks non-cycle workflows until readiness is proven by measured tests.")}</div>}
    </div>}
