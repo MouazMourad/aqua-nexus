@@ -10,6 +10,7 @@ import { LightingPage } from "./LightingPage";
 import { SumpPage } from "./SumpPage";
 import { LivestockPage } from "./LivestockPage";
 import { LifeJourneyPage } from "./LifeJourneyPage";
+import { BreedingPage } from "./BreedingPage";
 import { TankConsumptionPage } from "./TankConsumptionPage";
 import { AcclimationPage } from "./AcclimationPage";
 import { LibraryPage } from "./LibraryPage";
@@ -49,6 +50,7 @@ export function PageRouter({page,tank,tanks,selectedTankId,onSelectTank,onNaviga
   case"sump":content=<SumpPage tank={tank}/>;break;
   case"livestock":content=<LivestockPage tank={tank} onLibrary={()=>onNavigate("library")}/>;break;
   case"lifejourney":content=<LifeJourneyPage tank={tank}/>;break;
+  case"breeding":content=<BreedingPage tank={tank}/>;break;
   case"consumption":content=<TankConsumptionPage tank={tank}/>;break;
   case"acclimation":content=<AcclimationPage tank={tank}/>;break;
   case"library":content=<LibraryPage tank={tank}/>;break;
