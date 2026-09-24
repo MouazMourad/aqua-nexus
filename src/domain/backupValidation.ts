@@ -104,6 +104,13 @@ function nestedDataIssue(tank:Record<string,unknown>){
     for(const id of refugium.livestockIds)if(typeof id!=="string"||!livestockIds.has(id))return `sump chamber #${i+1} references missing livestock ${String(id)}`;
     for(const id of refugium.equipmentIds)if(typeof id!=="string"||!equipmentIds.has(id))return `sump chamber #${i+1} references missing equipment ${String(id)}`;
   }
+  for(const [i,photo] of ((((tank.photos as Record<string,unknown>[])??[]))).entries()){
+    if(photo.livestockId!==undefined&&!livestockIds.has(String(photo.livestockId)))return `photo #${i+1} references missing livestock ${String(photo.livestockId)}`;
+  }
+  for(const [i,assessment] of ((((tank.visionAssessments as Record<string,unknown>[])??[]))).entries()){
+    if(assessment.photoId!==undefined&&!photoIds.has(String(assessment.photoId)))return `vision assessment #${i+1} references missing photo ${String(assessment.photoId)}`;
+    if(assessment.livestockId!==undefined&&!livestockIds.has(String(assessment.livestockId)))return `vision assessment #${i+1} references missing livestock ${String(assessment.livestockId)}`;
+  }
   for(const [i,row] of ((((tank.quarantine as Record<string,unknown>[])??[]))).entries()){
     if(row.livestockId!==undefined&&!livestockIds.has(String(row.livestockId))&&String(row.status)==="active")return `active quarantine #${i+1} references missing livestock ${String(row.livestockId)}`;
     if(row.medicationInventoryItemId!==undefined&&!(((tank.inventory as Record<string,unknown>[])??[])).some(x=>String(x.id)===String(row.medicationInventoryItemId))&&String(row.status)==="active")return `active quarantine #${i+1} references missing medication inventory ${String(row.medicationInventoryItemId)}`;
