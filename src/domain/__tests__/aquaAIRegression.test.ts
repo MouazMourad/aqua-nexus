@@ -83,6 +83,21 @@ describe("Life Journey / Propagation / Consumption Tank Brain regression",()=>{
   });
 });
 
+describe("Tank Brain time-integrity regression",()=>{
+  it("does not treat future Life Journey events as recent evidence",()=>{
+    const t=structuredClone(demoMarineTank);const future=new Date(Date.now()+7*86400000).toISOString();
+    t.livestock[0].lifeEvents=[{id:"future-health",timestamp:future,type:"health",note:"future"}];
+    expect(deriveGuidanceActions(t).some(x=>x.dedupeKey==="lifejourney:health:review")).toBe(false);
+  });
+  it("does not treat future feeding or dosing as current consumption evidence",()=>{
+    const t=structuredClone(demoMarineTank);const now=new Date().toISOString(),future=new Date(Date.now()+7*86400000).toISOString();
+    t.livestock[0].lifeEvents=[{id:"growth-now",timestamp:now,type:"growth",sizeCm:5}];
+    t.feeding=[{id:"future-feed",timestamp:future,food:"Future food",amount:"1",unit:"portion"}];
+    t.dosing=[{id:"future-dose",timestamp:future,parameter:"KH",amount:10,unit:"mL",status:"logged"}];
+    expect(deriveGuidanceActions(t).some(x=>x.dedupeKey==="consumption:growth:demand-correlation")).toBe(false);
+  });
+});
+
 describe("Local Best AI routing regression",()=>{
   const cases=[
     ["الحمل البيولوجي عندي","bioload"],
