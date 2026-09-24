@@ -85,6 +85,7 @@ export function buildAquaAIQueryPlan(intent:AquaQuestionIntent):AquaAIQueryPlan{
 
  // Lexical weighting. Strong workflow words beat incidental nouns.
  if(/كيميا|كيمياء|قراءه|قراءات|chemistry|parameter|readings?/.test(s))add("chemistry",10);
+ if(/freshwater parameters?|water parameters?|معايير المياه العذبه|معايير الماء|بارامترات المياه/.test(s))add("chemistry",8);
  if(/حمل حيوي|الحمل الحيوي|الحمل البيولوجي|bioload|bio load|قدره الحوض|قدرة الحوض/.test(s))add("bioload",12);
  if(/سمك|اسماك|مرجان|كائن|حلزون|قشريات|روبيان|جمبري|livestock|fish|coral|snail|shrimp/.test(s))add("livestock",5);
  if(/جهاز|معدات|مضخه|سكيمر|سخان|اضاءه|فلتر|equipment|pump|skimmer|heater|light/.test(s))add("equipment",5);
