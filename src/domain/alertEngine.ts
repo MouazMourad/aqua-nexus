@@ -19,8 +19,13 @@ export interface SystemAlert{
   actionPage?:string;
 }
 
+function alertSignature(alert:SystemAlert){
+  const normalize=(s:string)=>s.toLowerCase().replace(/[0-9.%]+/g,"#").replace(/\s+/g," ").trim();
+  return `${alert.domain}|${alert.actionPage??""}|${normalize(alert.en||alert.ar)}`;
+}
 function pushUnique(list:SystemAlert[],alert:SystemAlert){
-  if(!list.some(x=>x.id===alert.id))list.push(alert);
+  const signature=alertSignature(alert);
+  if(!list.some(x=>x.id===alert.id||alertSignature(x)===signature))list.push(alert);
 }
 
 export function systemAlerts(tank:Tank):SystemAlert[]{
