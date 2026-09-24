@@ -40,6 +40,7 @@ export function EquipmentPage({tank}:{tank:Tank}) {
  useEffect(()=>{const synced=syncEquipmentSystem(tank);if(JSON.stringify(synced.equipment)!==JSON.stringify(tank.equipment)||JSON.stringify(synced.maintenance)!==JSON.stringify(tank.maintenance))patch(tank.id,t=>({...t,...synced}));},[tank.id,tank.equipment.length]);
 
  function add(){
+  if(!name.trim()){window.alert(lang==="ar"?"اكتب اسم الجهاز قبل الحفظ.":"Enter an equipment name before saving.");return;}
   const check=validateEquipmentEntry({serviceIntervalDays:days,powerWatts:power,hoursPerDay:hours,ratedVolumeLiters:ratedVolume,flowLph,parAtTargetDepth:par,coverageLengthCm:coverageLength,coverageWidthCm:coverageWidth});
   const danger=check.issues.find(x=>x.level==="danger");
   if(danger){window.alert(lang==="ar"?danger.ar:danger.en);return}
