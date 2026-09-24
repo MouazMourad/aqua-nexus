@@ -34,4 +34,14 @@ describe("architecture safety guards",()=>{
     }
     expect(offenders).toEqual([]);
   });
+  it("forbids future timestamps from passing recent-event windows",()=>{
+    const roots=["src/domain","src/components","src/lib"];
+    const offenders:string[]=[];
+    for(const root of roots)for(const file of filesUnder(root)){
+      const source=readFileSync(file,"utf8");
+      if(/Date\.now\(\)\s*-\s*new Date\([^\n;]*\.timestamp\)\.getTime\(\)\s*</.test(source))offenders.push(relative(process.cwd(),file));
+    }
+    expect(offenders).toEqual([]);
+  });
+
 });
