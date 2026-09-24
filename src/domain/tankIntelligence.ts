@@ -97,7 +97,7 @@ export function tankStateView(tank:Tank):TankStateView {
   const band=system.chemistryCritical?"critical":chem===null?"watch":stateBand(score);
   const text=bandText(band);
   const drivers:StateDriver[]=[];
-  const maint=maintenanceHealth(tank),age=chemistryAgeDays(tank),bio=bioload(tank),maint=maintenanceHealth(tank),age=chemistryAgeDays(tank),bio=bioload(tank);
+  const maint=maintenanceHealth(tank),age=chemistryAgeDays(tank),bio=bioload(tank);
   const chemGuide=chemistryGuidance(tank);
   const atDate=localDateKey();
   const overdue=tank.maintenance.filter(x=>maintenanceEffectiveState(x,atDate).overdue);
