@@ -107,6 +107,9 @@ function nestedDataIssue(tank:Record<string,unknown>){
   for(const [i,photo] of ((((tank.photos as Record<string,unknown>[])??[]))).entries()){
     if(photo.livestockId!==undefined&&!livestockIds.has(String(photo.livestockId)))return `photo #${i+1} references missing livestock ${String(photo.livestockId)}`;
   }
+  for(const [i,feed] of ((((tank.feeding as Record<string,unknown>[])??[]))).entries()){
+    if(feed.inventoryItemId!==undefined&&!(((tank.inventory as Record<string,unknown>[])??[])).some(x=>String(x.id)===String(feed.inventoryItemId)))return `feeding #${i+1} references missing inventory ${String(feed.inventoryItemId)}`;
+  }
   for(const [i,assessment] of ((((tank.visionAssessments as Record<string,unknown>[])??[]))).entries()){
     if(assessment.photoId!==undefined&&!photoIds.has(String(assessment.photoId)))return `vision assessment #${i+1} references missing photo ${String(assessment.photoId)}`;
     if(assessment.livestockId!==undefined&&!livestockIds.has(String(assessment.livestockId)))return `vision assessment #${i+1} references missing livestock ${String(assessment.livestockId)}`;
