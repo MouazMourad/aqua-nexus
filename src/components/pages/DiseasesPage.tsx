@@ -17,6 +17,7 @@ export function DiseasesPage({tank,onVisualInsight}:{tank:Tank;onVisualInsight?:
 
  function addTreatment(x:any){
   const due=daysFrom(today(),2),subject=tank.livestock.find(y=>y.id===subjectId),ts=nowISO();
+  if(subject&&tank.quarantine.some(q=>q.status==="active"&&q.livestockId===subject.id)){window.alert(lang==="ar"?"هذا الكائن لديه حالة حجر/علاج نشطة بالفعل. افتح صفحة الحجر وعدّل أو أكمل الحالة الحالية بدل إنشاء حالة ثانية.":"This livestock already has an active quarantine/treatment case. Open Quarantine and update or complete the existing case instead of creating a duplicate.");return;}
   patch(tank.id,t=>({...t,
    livestock:subject?t.livestock.map(y=>y.id===subject.id?{...y,health:"treatment" as const,lastObservedAt:ts}:y):t.livestock,
    quarantine:subject?[{id:uid("q"),livestockId:subject.id,suspectedDiseaseId:x.id,symptoms:lang==="ar"?x.symAr:x.symEn,organism:subject.name,reason:lang==="ar"?x.ar:x.en,plan:lang==="ar"?x.txAr:x.txEn,start:today(),status:"active" as const},...t.quarantine]:t.quarantine,
