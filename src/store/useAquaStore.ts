@@ -89,7 +89,7 @@ function normalize(tank: Tank): Tank {
     feeding:tank.feeding ?? [],
     dosing:tank.dosing ?? [],
     doserChannels:tank.doserChannels ?? [],
-    filterMedia:tank.filterMedia ?? [],
+    filterMedia:(tank.filterMedia ?? []).map(m=>m.chamberId&&!chamberIds.has(m.chamberId)?{...m,chamberId:undefined}:m),
     quarantine:tank.quarantine ?? [],
     emergencySessions:tank.emergencySessions ?? [],
     expenses:tank.expenses ?? [],
