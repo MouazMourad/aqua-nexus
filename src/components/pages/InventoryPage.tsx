@@ -64,6 +64,10 @@ export function InventoryPage({tank}:{tank:Tank}) {
  const remove=(id:string)=>{
   const active=tank.quarantine.filter(q=>q.status==="active"&&q.medicationInventoryItemId===id);
   if(active.length){window.alert(bi(lang,`لا يمكن حذف هذه المادة لأنها مرتبطة بـ ${active.length} حالة حجر/علاج نشطة. أغلق الحالة أو غيّر الدواء المرتبط أولاً.`,`This item cannot be deleted because it is linked to ${active.length} active quarantine/treatment case(s). Close the case or change its linked medication first.`));return}
+  const activeDose=tank.dosing.filter(d=>d.inventoryItemId===id&&(d.status==="planned"||d.status==="in_progress"));
+  if(activeDose.length){window.alert(bi(lang,"لا يمكن حذف هذه المادة لأنها مرتبطة بخطة جرعات ما زالت فعالة. أكمل أو ألغِ الخطة أولاً.","This item cannot be deleted because it is linked to an active dosing plan. Complete or invalidate the plan first."));return}
+  const activeMedia=(tank.filterMedia??[]).filter(m=>m.inventoryItemId===id);
+  if(activeMedia.length){window.alert(bi(lang,"لا يمكن حذف هذه المادة لأنها مرتبطة بميديا فلترة مركبة حالياً. أزل أو غيّر ربط الميديا أولاً.","This item cannot be deleted because it is linked to currently tracked filter media. Remove or change the media link first."));return}
   patch(tank.id,t=>({...t,inventory:t.inventory.filter(x=>x.id!==id)}));
  };
 
