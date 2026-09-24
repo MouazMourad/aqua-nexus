@@ -395,7 +395,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   const dipGate=coralTransferGate(active,item);
   if(!dipGate.allowed){window.alert(lang==="ar"?dipGate.reasonAr:dipGate.reasonEn);return;}
   const catalog:any=lib.find((x:any)=>x.id===item.libraryId);
-  const readiness=stockingReadiness(tank,{candidate:catalog,quantity:item.quantity,candidateKnown:Boolean(catalog),candidateLabelAr:item.name,candidateLabelEn:item.nameEn||item.name});
+  const readinessTank:Tank={...tank,acclimationSessions:(tank.acclimationSessions??[]).map(s=>s.id===active.id?{...s,status:"completed" as const}:s)};\n   const readiness=stockingReadiness(readinessTank,{candidate:catalog,quantity:item.quantity,candidateKnown:Boolean(catalog),candidateLabelAr:item.name,candidateLabelEn:item.nameEn||item.name});
   let riskOverride=false,riskOverrideReason="";
   if(readiness.state!=="ready"){
     const reason=lang==="ar"?(readiness.blockersAr[0]||readiness.missingEvidenceAr[0]||"الجاهزية غير مؤكدة."):(readiness.blockersEn[0]||readiness.missingEvidenceEn[0]||"Readiness is not confirmed.");
