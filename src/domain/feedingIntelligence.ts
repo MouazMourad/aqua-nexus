@@ -3,7 +3,7 @@ import { currentChemistryValues } from "./chemistryDataQuality";
 
 export function feedingIntelligence(tank:Tank){
   const cutoff=Date.now()-7*86400000;
-  const recent=tank.feeding.filter(x=>new Date(x.timestamp).getTime()>=cutoff);
+  const recent=tank.feeding.filter(x=>{const ts=new Date(x.timestamp).getTime();return Number.isFinite(ts)&&ts<=Date.now()&&ts>=cutoff;});
   const fish=tank.livestock.filter(x=>x.category==="fish").reduce((s,x)=>s+x.quantity,0);
   const inverts=tank.livestock.filter(x=>x.category==="invert").reduce((s,x)=>s+x.quantity,0);
   const corals=tank.livestock.filter(x=>x.category==="coral").reduce((s,x)=>s+x.quantity,0);
