@@ -43,6 +43,7 @@ export async function runAquaChat(input:{workspace:string;tank:Tank;question:str
   }
 
   const context=buildTankAIContext(input.tank);
+  const localAnswer=aquaAIAnswer(input.question,input.tank,input.page||"dashboard");
   const response=await fetch(`${cfg.base}/chat/completions`,{
     method:"POST",
     signal:AbortSignal.timeout(45_000),
@@ -53,6 +54,7 @@ export async function runAquaChat(input:{workspace:string;tank:Tank;question:str
       messages:[
         {role:"system",content:aquaAISystemPrompt(language)},
         {role:"system",content:`AQUA_NEXUS_TANK_CONTEXT\n${JSON.stringify(context)}`},
+        {role:"system",content:`AUTHORITATIVE_LOCAL_ANSWER\n${JSON.stringify(localAnswer)}\nUse this deterministic Aqua Nexus answer as the authoritative routing and current-reading source. Preserve every explicitly requested chemistry value and its missing/present status. You may explain it more clearly, but do not change domains, replace chemistry/water-change reasoning with lighting, or omit requested readings.`},
         {role:"user",content:input.question}
       ]
     })
