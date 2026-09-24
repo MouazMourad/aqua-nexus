@@ -1,11 +1,12 @@
 import type { DosingLog,Tank } from "./types";
 import { latestParameterSample } from "./chemistryDataQuality";
+import { isPlausibleOperationalTimestamp } from "./timeSafety";
 
 export function latestCorrectiveDoseExecution(tank:Tank,parameter:string){
   return tank.dosing
     .filter(x=>x.parameter===parameter&&x.calculatorMode!=="routine"&&x.status!=="planned"&&x.status!=="invalidated")
     .map(x=>({log:x,at:new Date(x.lastExecutedAt||x.timestamp).getTime()}))
-    .filter(x=>Number.isFinite(x.at))
+    .filter(x=>Number.isFinite(x.at)&&isPlausibleOperationalTimestamp(x.log.lastExecutedAt||x.log.timestamp))
     .sort((a,b)=>b.at-a.at)[0];
 }
 
