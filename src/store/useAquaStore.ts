@@ -51,20 +51,33 @@ function normalize(tank: Tank): Tank {
   const biologicalCycle=cycling
     ? {...(tank.biologicalCycle??{startedAt:createdAt}),startedAt:tank.biologicalCycle?.startedAt??createdAt}
     : tank.biologicalCycle;
+  const sump={...tank.sump,chambers:tank.sump?.chambers??[]};
+  const chamberIds=new Set(sump.chambers.map(ch=>ch.id));
+  const validSumpLocation=(location:string|undefined)=>!location?.startsWith("sump:")||chamberIds.has(location.slice(5));
+  const equipment=(tank.equipment ?? []).map((e,i)=>{
+    const visualKind=["lighting","waveMaker","overflow"].includes(e.kind);
+    const migrateLegacy=visualKind && e.location==="external" && !e.displayPosition;
+    const requested=migrateLegacy?"display":e.location;
+    const location=(validSumpLocation(requested)?requested:"external") as Equipment["location"];
+    const peers=(tank.equipment??[]).filter(x=>x.kind===e.kind && (["display","external"].includes(x.location))).length;
+    return {...e,location,displayPosition:location==="display"?(e.displayPosition??defaultDisplayPosition(e.kind,i,Math.max(1,peers))):e.displayPosition};
+  });
+  const livestock=(tank.livestock ?? []).map(x=>({...x,location:(validSumpLocation(x.location)?(x.location??"display"):"display") as NonNullable<typeof x.location>}));
+  // Canonical placement lives on Equipment.location / LivestockItem.location.
+  // Refugium ID arrays are compatibility mirrors only and are rebuilt here so they cannot drift.
+  const chambers=sump.chambers.map(ch=>ch.refugium?{...ch,refugium:{...ch.refugium,
+    livestockIds:livestock.filter(x=>x.location===`sump:${ch.id}`).map(x=>x.id),
+    equipmentIds:equipment.filter(x=>x.location===`sump:${ch.id}`).map(x=>x.id)
+  }}:ch);
   return recalcTank({
     ...tank,
     createdAt,
     biologicalCycle,
-    equipment:(tank.equipment ?? []).map((e,i)=>{
-      const visualKind=["lighting","waveMaker","overflow"].includes(e.kind);
-      const migrateLegacy=visualKind && e.location==="external" && !e.displayPosition;
-      const location=(migrateLegacy?"display":e.location) as Equipment["location"];
-      const peers=(tank.equipment??[]).filter(x=>x.kind===e.kind && (["display","external"].includes(x.location))).length;
-      return {...e,location,displayPosition:location==="display"?(e.displayPosition??defaultDisplayPosition(e.kind,i,Math.max(1,peers))):e.displayPosition};
-    }),
+    sump:{...sump,chambers},
+    equipment,
     chemistry:tank.chemistry ?? [],
     maintenance:tank.maintenance ?? [],
-    livestock:tank.livestock ?? [],
+    livestock,
     livestockExits:tank.livestockExits ?? [],
     inventory:tank.inventory ?? [],
     timeline:tank.timeline ?? [],
