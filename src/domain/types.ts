@@ -6,7 +6,7 @@ export type AquariumExperienceLevel = "beginner" | "intermediate" | "advanced";
 export type EquipmentKind =
   | "lighting" | "waveMaker" | "skimmer" | "returnPump" | "filterSock"
   | "rollerFilter" | "reactor" | "heater" | "doser" | "uv" | "ozone"
-  | "ato" | "refugiumLight" | "turfScrubber" | "probe" | "overflow" | "co2" | "other";
+  | "ato" | "refugiumLight" | "turfScrubber" | "probe" | "overflow" | "co2" | "canisterFilter" | "spongeFilter" | "other";
 
 export interface DimensionsCm { length: number; width: number; height: number; }
 
