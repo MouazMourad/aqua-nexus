@@ -39,6 +39,7 @@ export const TANK_EVENT_COVERAGE={
   guidanceActions:"derived",
   healthSnapshots:"derived",
   photos:"evented",
+  heroPhotoId:"evented",
   visionAssessments:"evented",
   feeding:"evented",
   dosing:"evented",
