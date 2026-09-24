@@ -177,7 +177,8 @@ export function AcclimationPage({tank}:{tank:Tank}) {
    }
   }
  }
- function pushTimerAlert(lane:string,batch?:number,emergencyName?:string){
+ useEffect(()=>{setTimerAlerts([])},[tank.id]);
+  function pushTimerAlert(lane:string,batch?:number,emergencyName?:string){
   const name=emergencyName||(lane==="emergency"?bi(lang,"المسار الاستثنائي","Exception track"):releaseLaneLabel(lang,lane));
   const message=emergencyName
    ?bi(lang,`انتهى عداد الإقلمة الاستثنائية لـ ${emergencyName} — جاهز للفحص النهائي.`,`Rapid exception timer finished for ${emergencyName} — ready for final check.`)
@@ -185,7 +186,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   setTimerAlerts(prev=>[{id:uid("alert"),lane,batch,message},...prev].slice(0,5));
   playTimerSound(lane);
   try{if("vibrate" in navigator)(navigator as any).vibrate(lane==="emergency"?[500,150,500,150,700]:[300,120,300]);}catch{}
-  void showCriticalAquariumNotification("Aqua Nexus",message,`acclimation-${active?.id||"session"}-${lane}-${batch??emergencyName??"timer"}`);
+  void showCriticalAquariumNotification(`Aqua Nexus • ${tank.name}`,message,`acclimation-${active?.id||"session"}-${lane}-${batch??emergencyName??"timer"}`);
  }
  function laneRuntime(lane:any){
   const unfinished=lane.entries.filter((e:any)=>!["added","deferred"].includes(e.item.status));
