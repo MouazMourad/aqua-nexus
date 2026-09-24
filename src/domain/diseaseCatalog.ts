@@ -30,7 +30,13 @@ export function diseaseEntryFromText(type:TankType,text:string){
   return DISEASE_LIBRARY.find(x=>{
     if(x.type!==type)return false;
     const names=[x.en,x.ar].map(normalizedDiseaseText).filter(Boolean);
-    return names.some(name=>q===name||q.includes(name));
+    return names.some(name=>{
+      if(q===name||q.includes(name)||name.includes(q))return true;
+      const generic=new Set(["disease","syndrome","infection","condition","مرض","متلازمه"]);
+      const qt=q.split(" ").filter(x=>x.length>2&&!generic.has(x));
+      const nt=name.split(" ").filter(x=>x.length>2&&!generic.has(x));
+      return qt.length>0&&nt.length>0&&qt.every(token=>nt.includes(token));
+    });
   });
 }
 
