@@ -83,6 +83,29 @@ describe("Life Journey / Propagation / Consumption Tank Brain regression",()=>{
   });
 });
 
+describe("Marine / Freshwater lifecycle integrity",()=>{
+  it("does not let future chemistry complete a freshwater biological cycle",()=>{
+    const t=structuredClone(demoFreshwaterTank);const now=Date.now();
+    t.isTraining=false;t.status="cycling";t.biologicalCycle={startedAt:new Date(now-5*86400000).toISOString(),sourceAddedAt:new Date(now-4*86400000).toISOString()};
+    t.chemistry=[
+      {timestamp:new Date(now+25*3600000).toISOString(),values:{NH3:0,NO2:0,NO3:10},confidence:"high",source:"manual"},
+      {timestamp:new Date(now+13*3600000).toISOString(),values:{NH3:0,NO2:0,NO3:10},confidence:"high",source:"manual"},
+      {timestamp:new Date(now-24*3600000).toISOString(),values:{NH3:.4,NO2:.2,NO3:5},confidence:"high",source:"manual"}
+    ];
+    expect(biologicalCycleStatus(t).ready).toBe(false);
+  });
+  it("does not let future chemistry complete a marine biological cycle",()=>{
+    const t=structuredClone(demoMarineTank);const now=Date.now();
+    t.isTraining=false;t.status="cycling";t.biologicalCycle={startedAt:new Date(now-5*86400000).toISOString(),sourceAddedAt:new Date(now-4*86400000).toISOString()};
+    t.chemistry=[
+      {timestamp:new Date(now+25*3600000).toISOString(),values:{NH3:0,NO3:10},confidence:"high",source:"manual"},
+      {timestamp:new Date(now+13*3600000).toISOString(),values:{NH3:0,NO3:10},confidence:"high",source:"manual"},
+      {timestamp:new Date(now-24*3600000).toISOString(),values:{NH3:.4,NO3:5},confidence:"high",source:"manual"}
+    ];
+    expect(biologicalCycleStatus(t).ready).toBe(false);
+  });
+});
+
 describe("Tank Brain time-integrity regression",()=>{
   it("does not treat future Life Journey events as recent evidence",()=>{
     const t=structuredClone(demoMarineTank);const future=new Date(Date.now()+7*86400000).toISOString();
