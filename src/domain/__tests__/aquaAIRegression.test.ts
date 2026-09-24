@@ -55,6 +55,34 @@ import { addLocalCalendarDays,isMeaningfullyFutureTimestamp } from "@/domain/tim
 
 const tank=structuredClone(demoMarineTank);
 
+describe("Life Journey / Propagation / Consumption Tank Brain regression",()=>{
+  it("turns recent Life Journey health changes into cautious guidance",()=>{
+    const t=structuredClone(demoMarineTank);const ts=new Date().toISOString();
+    t.livestock[0].lifeEvents=[{id:"life-health",timestamp:ts,type:"health",note:"watch"}];
+    const g=deriveGuidanceActions(t).find(x=>x.dedupeKey==="lifejourney:health:review");
+    expect(g).toBeTruthy();expect(g?.page).toBe("lifejourney");expect(g?.reasonEn).toMatch(/does not|not diagnosis|before inferring/i);
+  });
+  it("follows propagation without claiming that demand increased",()=>{
+    const t=structuredClone(demoMarineTank);const ts=new Date().toISOString();
+    t.livestock[0].lifeEvents=[{id:"life-frag",timestamp:ts,type:"frag",quantityProduced:2}];
+    const g=deriveGuidanceActions(t).find(x=>x.dedupeKey==="propagation:recent:followup");
+    expect(g).toBeTruthy();expect(g?.page).toBe("breeding");expect(g?.reasonEn).toMatch(/does not prove higher demand/i);
+  });
+  it("correlates logged growth with feeding/dosing but never auto-instructs an increase",()=>{
+    const t=structuredClone(demoMarineTank);const ts=new Date().toISOString();
+    t.livestock[0].lifeEvents=[{id:"life-growth",timestamp:ts,type:"growth",sizeCm:5}];
+    t.feeding=[{id:"feed-audit",timestamp:ts,food:"Audit food",amount:"1",unit:"portion"}];
+    const g=deriveGuidanceActions(t).find(x=>x.dedupeKey==="consumption:growth:demand-correlation");
+    expect(g).toBeTruthy();expect(g?.page).toBe("consumption");expect(g?.reasonEn).toMatch(/do not automatically increase/i);
+  });
+  it("keeps the same new intelligence rules available to freshwater tanks",()=>{
+    const t=structuredClone(demoFreshwaterTank);const ts=new Date().toISOString();
+    t.livestock[0].lifeEvents=[{id:"fw-growth",timestamp:ts,type:"growth",sizeCm:4}];
+    t.feeding=[{id:"fw-feed",timestamp:ts,food:"Audit food",amount:"1",unit:"portion"}];
+    expect(deriveGuidanceActions(t).some(x=>x.dedupeKey==="consumption:growth:demand-correlation")).toBe(true);
+  });
+});
+
 describe("Local Best AI routing regression",()=>{
   const cases=[
     ["الحمل البيولوجي عندي","bioload"],
