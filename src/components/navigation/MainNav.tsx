@@ -32,9 +32,9 @@ const items:NavItem[]=[
   {key:"lighting",label:"lighting",icon:"◉",color:"#7bb8ff",glyph:"light",group:"core"},
   {key:"sump",label:"sump",icon:"▤",color:"#3ed2c0",glyph:"sump",group:"system"},
   {key:"livestock",label:"livestock",icon:"🐟",color:"#55dfff",glyph:"fish",group:"core"},
-  {key:"lifejourney",label:"lifeJourney",icon:"◉",color:"#72e5b5",glyph:"coral",group:"care"},
+  {key:"lifejourney",label:"lifeJourney",icon:"◉",color:"#72e5b5",glyph:"life",group:"care"},
   {key:"breeding",label:"breeding",icon:"✦",color:"#89e77c",glyph:"fish",group:"care"},
-  {key:"consumption",label:"tankConsumption",icon:"↘",color:"#62d9ff",glyph:"chart",group:"operations"},
+  {key:"consumption",label:"tankConsumption",icon:"↘",color:"#62d9ff",glyph:"consumption",group:"operations"},
   {key:"acclimation",label:"acclimation",icon:"⇢",color:"#66e0ff",glyph:"acclimation",group:"core"},
   {key:"library",label:"library",icon:"◇",color:"#b68cff",glyph:"coral",group:"care"},
   {key:"chemistry",label:"chemistry",icon:"⚗",color:"#54e5d4",glyph:"flask",group:"core"},
@@ -51,7 +51,7 @@ const items:NavItem[]=[
   {key:"rodi",label:"rodi",icon:"◫",color:"#75f2e0",glyph:"filter",group:"operations"},
   {key:"expenses",label:"expenses",icon:"$",color:"#8ee56d",glyph:"money",group:"history"},
   {key:"alerts",label:"alerts",icon:"△",color:"#ff8c57",glyph:"warning",group:"core"},
-  {key:"reports",label:"reports",icon:"▥",color:"#76cfff",glyph:"chart",group:"history"},
+  {key:"reports",label:"reports",icon:"▥",color:"#76cfff",glyph:"report",group:"history"},
   {key:"settings",label:"settings",icon:"⚙",color:"#c0d5df",glyph:"gear",group:"system"}
 ];
 
@@ -64,6 +64,9 @@ function AquaModuleGlyph({kind}:{kind:string}){
  const map:Record<string,React.ReactNode>={
   dropPulse:<><path d="M24 5C17 15 12 21 12 29a12 12 0 0 0 24 0C36 21 31 15 24 5Z"/><path d="m16 29 5-1 3-6 4 12 3-6 3 1"/></>,
   flask:<><path d="M19 6h10M21 6v11L12 34a5 5 0 0 0 4 8h16a5 5 0 0 0 4-8l-9-17V6"/><path d="M16 31h16"/></>,
+  life:<><path d="M8 32c6-8 15-8 22 0-7 8-16 8-22 0Z"/><path d="m8 32-5-5v10l5-5Z"/><path d="M32 9v30m0-18-7-7m7 3 7-7m-7 17 8-6"/></>,
+  consumption:<><path d="M15 8h18l-2 29a5 5 0 0 1-5 4h-4a5 5 0 0 1-5-4L15 8Z"/><path d="M18 25c4-3 8 3 12 0"/><path d="M39 10v25m-4-4 4 4 4-4"/></>,
+  report:<><rect x="9" y="6" width="30" height="36" rx="3"/><path d="M15 33V25m7 8V18m7 15V22m6 11V13"/><path d="M15 12h10"/></>,
   fish:<><path d="M9 24c7-10 20-10 28 0-8 10-21 10-28 0Z"/><path d="m9 24-6-6v12l6-6Z"/><circle cx="31" cy="21" r="1"/></>,
   coral:<><path d="M24 41V17m0 8-8-8m8 3 8-8m-8 17 10-7M16 41V28m0 5-6-5m22 13V31m0 4 6-5"/></>,
   pump:<><rect x="9" y="14" width="27" height="22" rx="7"/><circle cx="22" cy="25" r="7"/><path d="M36 20h6v10h-6M22 18v14m-7-7h14"/></>,
