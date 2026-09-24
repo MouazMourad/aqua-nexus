@@ -1,5 +1,5 @@
 import { DISEASE_LIBRARY } from "@/data/legacyCatalogs";
-import type { TankType } from "./types";
+import type { LivestockItem,TankType } from "./types";
 
 export type DiseaseEntry=(typeof DISEASE_LIBRARY)[number];
 
@@ -17,4 +17,34 @@ export function diseaseGroupCounts(type:TankType){
   const entries=diseaseEntriesFor(type);
   const groups=[...new Set(entries.map(x=>x.group))];
   return Object.fromEntries(groups.map(group=>[group,entries.filter(x=>x.group===group).length])) as Record<string,number>;
+}
+
+
+function normalizedDiseaseText(value:string){
+  return (value||"").toLowerCase().normalize("NFKD").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^a-z0-9\u0600-\u06ff]+/g," ").replace(/\s+/g," ").trim();
+}
+
+export function diseaseEntryFromText(type:TankType,text:string){
+  const q=normalizedDiseaseText(text);
+  if(!q)return undefined;
+  return DISEASE_LIBRARY.find(x=>{
+    if(x.type!==type)return false;
+    const names=[x.en,x.ar].map(normalizedDiseaseText).filter(Boolean);
+    return names.some(name=>q===name||q.includes(name));
+  });
+}
+
+export function diseaseGroupForLivestockCategory(category:LivestockItem["category"]){
+  if(category==="fish")return "fish";
+  if(category==="coral")return "coral";
+  if(category==="plant")return "plant";
+  if(category==="invert")return "crustacean";
+  return "other";
+}
+
+export function diseaseMatchesLivestock(entry:DiseaseEntry,category:LivestockItem["category"]){
+  const group=diseaseGroupForLivestockCategory(category);
+  if(entry.group==="fish"||entry.group==="coral"||entry.group==="plant")return entry.group===group;
+  if(entry.group==="crustacean")return category==="invert";
+  return true;
 }
