@@ -29,7 +29,7 @@ import { sanitizeVisionQuestion,validateVisionDataUrl } from "@/domain/visionReq
 import { biologicalCycleStatus,cycleRelevantMaintenanceTask,isCyclePageAllowed } from "@/domain/biologicalCycle";
 import { biologicalCycleKnowledgeSnapshot } from "@/domain/biologicalCycleKnowledge";
 import { isAquariumScopedQuestion } from "@/domain/aquaAIScope";
-import { diseaseEntriesFor,diseaseGroupCounts } from "@/domain/diseaseCatalog";
+import { diseaseEntriesFor,diseaseEntryFromText,diseaseGroupCounts,diseaseMatchesLivestock } from "@/domain/diseaseCatalog";
 import { doseStepExecutionGate,requiresPostDoseRetest } from "@/domain/dosingSafety";
 import { waterChangeIntelligence } from "@/domain/waterChangeIntelligence";
 import { biologicalMemory,eventChemistryLinks } from "@/domain/tankLearning";
@@ -145,12 +145,27 @@ describe("Local Best AI routing regression",()=>{
     ["شو ناقص بالمخزون","inventory"],
     ["شو وضع الحجر","quarantine"],
     ["شو وضع السامب","sump"],
-    ["قديش مصاريف الحوض","expenses"]
+    ["قديش مصاريف الحوض","expenses"],
+    ["What freshwater parameters should I watch next, and should I do a water change?","chemistry"]
   ] as const;
   for(const [q,domain] of cases)it(q,()=>expect(buildAquaAIQueryPlan(parseAquaQuestion(q)).primary).toBe(domain));
 });
 
 describe("Local Best AI behavior regression",()=>{
+  it("returns every explicitly requested freshwater chemistry value",()=>{
+    const t=structuredClone(demoFreshwaterTank);
+    t.chemistry=[{timestamp:new Date().toISOString(),values:{GH:8,KH:5,NO3:12,NH3:0},confidence:"high",source:"manual"}];
+    const a=aquaAIAnswer("What are my freshwater GH, KH, nitrate, and ammonia readings?",t,"chemistry");
+    expect(a.summaryEn).toContain("GH: 8");
+    expect(a.summaryEn).toContain("KH: 5");
+    expect(a.summaryEn).toContain("NO3: 12");
+    expect(a.summaryEn).toContain("NH3: 0");
+  });
+  it("keeps freshwater parameter and water-change questions in chemistry context",()=>{
+    const plan=buildAquaAIQueryPlan(parseAquaQuestion("What freshwater parameters should I watch next, and should I do a water change?"));
+    expect(plan.primary).toBe("chemistry");
+    expect(plan.operation).toBe("waterChange");
+  });
   it("keeps identity separate from fish questions",()=>{
     const a=aquaAIAnswer("شو اسمك",tank,"dashboard");
     expect(a.titleAr).toContain("Local Best AI");
@@ -192,6 +207,12 @@ describe("Local Best AI behavior regression",()=>{
 
 
 describe("Disease taxonomy regression",()=>{
+  it("rejects coral-only Brown Jelly for fish livestock",()=>{
+    const brown=diseaseEntryFromText("marine","Brown Jelly Disease");
+    expect(brown?.group).toBe("coral");
+    expect(brown&&diseaseMatchesLivestock(brown,"fish")).toBe(false);
+    expect(brown&&diseaseMatchesLivestock(brown,"coral")).toBe(true);
+  });
   it("returns marine fish diseases when fish category is selected",()=>{
     const rows=diseaseEntriesFor("marine","fish","");
     expect(rows.length).toBeGreaterThan(0);
