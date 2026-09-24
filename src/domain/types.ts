@@ -254,6 +254,13 @@ export interface LivestockItem {
   lightingZPct?: number;
   /** Optional physical location. Sump/refugium assignment references the same livestock record; it never duplicates it. */
   location?: "display" | "external" | `sump:${string}`;
+  /** Life Journey: observations and propagation stay attached to the canonical livestock record. */
+  lifeEvents?: {
+    id:string; timestamp:string; type:"observation"|"growth"|"health"|"breeding"|"frag"|"cutting"|"division"|"runner"|"transfer"|"other";
+    note?:string; sizeCm?:number; quantityProduced?:number; childLivestockId?:string; photoId?:string;
+  }[];
+  parentLivestockId?: string;
+  propagationMethod?: "breeding"|"frag"|"cutting"|"division"|"runner"|"other";
   /** Local hardscape/canopy exposure correction when full 3D occlusion is not modeled. */
   lightingExposure?: "open"|"partialShade"|"shade";
 }
@@ -901,6 +908,8 @@ export interface Tank {
   guidanceActions?: GuidanceAction[];
   healthSnapshots?: HealthSnapshot[];
   photos: JournalPhoto[];
+  /** Optional hero photo for the aquarium dashboard. Asset storage is external; this only references the journal asset. */
+  heroPhotoId?: string;
   visionAssessments?: VisionAssessmentRecord[];
   feeding: FeedingLog[];
   dosing: DosingLog[];
