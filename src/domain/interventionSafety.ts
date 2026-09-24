@@ -41,10 +41,10 @@ function label(kind:InterventionKind,lang:"ar"|"en"){
 }
 
 export function recentMajorInterventions(tank:Tank,hours=12){
-  const since=Date.now()-Math.max(1,hours)*HOUR;
+  const now=Date.now(),since=now-Math.max(1,hours)*HOUR;
   return (tank.intelligenceEvents??[])
     .map(e=>({event:e,kind:classify(e)}))
-    .filter((x):x is {event:IntelligenceEvent;kind:InterventionKind}=>Boolean(x.kind)&&Number.isFinite(new Date(x.event.timestamp).getTime())&&new Date(x.event.timestamp).getTime()>=since)
+    .filter((x):x is {event:IntelligenceEvent;kind:InterventionKind}=>Boolean(x.kind)&&Number.isFinite(new Date(x.event.timestamp).getTime())&&new Date(x.event.timestamp).getTime()>=since&&new Date(x.event.timestamp).getTime()<=now+10*60*1000)
     .map(({event,kind})=>({
       id:event.id,kind,timestamp:event.timestamp,ar:event.textAr,en:event.textEn,domain:event.domain,verb:event.verb
     }))
