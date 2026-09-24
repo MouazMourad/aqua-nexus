@@ -9,6 +9,8 @@ import { EquipmentPage } from "./EquipmentPage";
 import { LightingPage } from "./LightingPage";
 import { SumpPage } from "./SumpPage";
 import { LivestockPage } from "./LivestockPage";
+import { LifeJourneyPage } from "./LifeJourneyPage";
+import { TankConsumptionPage } from "./TankConsumptionPage";
 import { AcclimationPage } from "./AcclimationPage";
 import { LibraryPage } from "./LibraryPage";
 import { ChemistryPage } from "./ChemistryPage";
@@ -46,6 +48,8 @@ export function PageRouter({page,tank,tanks,selectedTankId,onSelectTank,onNaviga
   case"lighting":content=<LightingPage tank={tank} onEquipment={()=>onNavigate("equipment")}/>;break;
   case"sump":content=<SumpPage tank={tank}/>;break;
   case"livestock":content=<LivestockPage tank={tank} onLibrary={()=>onNavigate("library")}/>;break;
+  case"lifejourney":content=<LifeJourneyPage tank={tank}/>;break;
+  case"consumption":content=<TankConsumptionPage tank={tank}/>;break;
   case"acclimation":content=<AcclimationPage tank={tank}/>;break;
   case"library":content=<LibraryPage tank={tank}/>;break;
   case"chemistry":content=<ChemistryPage tank={tank}/>;break;
