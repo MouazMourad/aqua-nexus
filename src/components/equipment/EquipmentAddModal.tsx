@@ -5,7 +5,7 @@ import { tr,bi } from "@/i18n";
 import { AdvancedSection } from "@/components/ui/AdvancedSection";
 import { ContextHint } from "@/components/ui/ContextHint";
 
-export const EQUIPMENT_KINDS:EquipmentKind[]=["lighting","waveMaker","overflow","skimmer","returnPump","filterSock","rollerFilter","reactor","heater","doser","uv","ozone","ato","refugiumLight","turfScrubber","probe","co2","other"];
+export const EQUIPMENT_KINDS:EquipmentKind[]=["lighting","waveMaker","overflow","skimmer","returnPump","filterSock","rollerFilter","reactor","heater","doser","uv","ozone","ato","refugiumLight","turfScrubber","probe","co2","canisterFilter","spongeFilter","other"];
 
 export function EquipmentAddModal(props:{
   open:boolean;lang:"ar"|"en";tank:Tank;name:string;kind:EquipmentKind;location:string;brand:string;model:string;days:number;power:number;hours:number;ratedVolume:number;flowLph:number;par:number;coverageLength:number;coverageWidth:number;
