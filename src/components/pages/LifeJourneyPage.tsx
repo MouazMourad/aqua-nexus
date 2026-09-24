@@ -33,7 +33,7 @@ export function LifeJourneyPage({tank}:{tank:Tank}){
  useEffect(()=>{let active=true;const pair=itemPhotos.length>1?[itemPhotos[itemPhotos.length-1],itemPhotos[0]]:[];if(pair.length){void Promise.all(pair.map(p=>resolvePhotoPreview(p).then(v=>v||p.dataUrl||""))).then(([a,b])=>{if(active){setBeforeSrc(a);setAfterSrc(b)}})}else{setBeforeSrc("");setAfterSrc("")}return()=>{active=false}},[selected,itemPhotos.length,itemPhotos[0]?.id,itemPhotos[itemPhotos.length-1]?.id]);
  const growthPoints=sizeEvents.map(e=>({date:new Date(e.timestamp),size:Number(e.sizeCm)})).filter(x=>Number.isFinite(x.size));
  const growthPath=(()=>{if(growthPoints.length<2)return "";const vals=growthPoints.map(x=>x.size),min=Math.min(...vals),max=Math.max(...vals),span=Math.max(.1,max-min);return growthPoints.map((x,i)=>`${i?"L":"M"} ${12+i*(216/(growthPoints.length-1))} ${108-((x.size-min)/span)*82}`).join(" ")})();
- const add=()=>{if(!item)return;const ts=nowISO(),n=Number(size);patch(tank.id,t=>({...t,
+ const add=()=>{if(!item)return;const n=Number(size);if(size.trim()!==""&&(!Number.isFinite(n)||n<=0)){window.alert(bi(lang,"الحجم يجب أن يكون رقماً أكبر من صفر.","Size must be a number greater than zero."));return;}const ts=nowISO();patch(tank.id,t=>({...t,
    livestock:t.livestock.map(x=>x.id===item.id?{...x,sizeCm:Number.isFinite(n)&&n>0?n:x.sizeCm,lifeEvents:[{id:uid("life"),timestamp:ts,type,note:note.trim()||undefined,sizeCm:Number.isFinite(n)&&n>0?n:undefined},...(x.lifeEvents??[])]}:x),
    timeline:[{id:uid("ev"),timestamp:ts,type:"livestock-life",textAr:`حياة الكائنات • ${item.name}: ${type}${note?` • ${note}`:""}`,textEn:`Life Journey • ${item.nameEn||item.name}: ${type}${note?` • ${note}`:""}`},...t.timeline]
   }));setNote("");setSize("")};
