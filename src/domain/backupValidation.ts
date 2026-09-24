@@ -118,6 +118,15 @@ function nestedDataIssue(tank:Record<string,unknown>){
     if(row.livestockId!==undefined&&!livestockIds.has(String(row.livestockId))&&String(row.status)==="active")return `active quarantine #${i+1} references missing livestock ${String(row.livestockId)}`;
     if(row.medicationInventoryItemId!==undefined&&!(((tank.inventory as Record<string,unknown>[])??[])).some(x=>String(x.id)===String(row.medicationInventoryItemId))&&String(row.status)==="active")return `active quarantine #${i+1} references missing medication inventory ${String(row.medicationInventoryItemId)}`;
   }
+  const inventoryIds=new Set((((tank.inventory as Record<string,unknown>[])??[])).map(x=>String(x.id)));
+  const chamberIds=new Set(chambers.map(x=>String(x.id)));
+  for(const [i,row] of ((((tank.filterMedia as Record<string,unknown>[])??[]))).entries()){
+    if(row.chamberId!==undefined&&!chamberIds.has(String(row.chamberId)))return `filter media #${i+1} references missing chamber ${String(row.chamberId)}`;
+    if(row.inventoryItemId!==undefined&&!inventoryIds.has(String(row.inventoryItemId)))return `filter media #${i+1} references missing inventory ${String(row.inventoryItemId)}`;
+  }
+  for(const [i,row] of ((((tank.dosing as Record<string,unknown>[])??[]))).entries()){
+    if((row.status==="planned"||row.status==="in_progress")&&row.inventoryItemId!==undefined&&!inventoryIds.has(String(row.inventoryItemId)))return `active dosing #${i+1} references missing inventory ${String(row.inventoryItemId)}`;
+  }
   for(const [i,row] of (((tank.dosing as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp))return `dosing #${i+1} is invalid`;
     if(row.status!==undefined&&!["planned","in_progress","logged","invalidated"].includes(String(row.status)))return `dosing #${i+1} has an invalid status`;
