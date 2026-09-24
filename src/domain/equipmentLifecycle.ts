@@ -155,7 +155,7 @@ export function equipmentReliability(tank:Tank){
       lifecycleScore-=5;suggestions.push({id:`life-${e.id}`,level:"info",ar:`${e.name}: استهلك تقريباً ${life.usedPercent}% من العمر المرجعي المتوسط.`,en:`${e.name}: has used about ${life.usedPercent}% of its midpoint reference life.`,recommendationAr:"راقب الأداء وخطط للميزانية/البديل مبكراً.",recommendationEn:"Monitor performance and plan budget/replacement early."});
     }
 
-    const failures=(e.failures??[]).filter(f=>Date.now()-new Date(f.timestamp).getTime()<180*DAY).length;
+    const failures=(e.failures??[]).filter(f=>{const age=Date.now()-new Date(f.timestamp).getTime();return Number.isFinite(age)&&age>=0&&age<180*DAY}).length;
     if(failures>=2){lifecycleScore-=10;issues.push({id:`fail-${e.id}`,level:"warn",ar:`${e.name}: سجل ${failures} أعطال خلال آخر 180 يوم.`,en:`${e.name}: logged ${failures} failures in the last 180 days.`,recommendationAr:"قارن كلفة الأعطال والصيانة مع الاستبدال الوقائي.",recommendationEn:"Compare repeated service cost/risk against preventive replacement."});}
 
     for(const c of e.consumables??[]){
