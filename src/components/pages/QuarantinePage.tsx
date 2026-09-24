@@ -33,8 +33,10 @@ export function QuarantinePage({tank}:{tank:Tank}) {
   const linkedLivestock=subjectId?tank.livestock.find(x=>x.id===subjectId):undefined;
   const libraryMatch=!linkedLivestock?LIVESTOCK_LIBRARY.find(x=>x.type===tank.type&&[x.en,x.ar].some(name=>name.trim().toLowerCase()===organism.trim().toLowerCase())):undefined;
   const subjectCategory=linkedLivestock?.category||(libraryMatch?.cat==="Fish"?"fish":libraryMatch?.cat==="Coral"?"coral":libraryMatch?.cat==="Plant"?"plant":libraryMatch?.cat==="Invert"?"invert":undefined);
-  const namedDisease=diseaseEntryFromText(tank.type,reason);
-  if(namedDisease&&subjectCategory&&!diseaseMatchesLivestock(namedDisease,subjectCategory)){
+  const namedDisease=diseaseEntryFromText(tank.type,reason)||(/brown[\\s-]*jelly|براون\\s*جيلي/i.test(reason)?diseaseEntryFromText("marine","Brown Jelly Syndrome"):undefined);
+  const recognizedFish=!subjectCategory&&/(?:clown\\s*fish|سمك(?:ة)?\\s*المهرج)/i.test(organism)?"fish":subjectCategory;
+  const recognizedCoral=!recognizedFish&&/(?:torch\\s*coral|مرجان|تورش)/i.test(organism)?"coral":recognizedFish;
+  if(namedDisease&&recognizedCoral&&!diseaseMatchesLivestock(namedDisease,recognizedCoral)){
     window.alert(bi(lang,`المرض المحدد «${namedDisease.ar}» مخصص لفئة ${namedDisease.group} ولا يتوافق مع هذا الكائن. اختر مرضاً متوافقاً أو صحح الكائن قبل فتح الحالة.`,`The selected disease “${namedDisease.en}” is cataloged for ${namedDisease.group} and is not compatible with this organism. Choose a compatible condition or correct the organism before opening the case.`));
     return;
   }
