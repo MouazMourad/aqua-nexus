@@ -40,6 +40,7 @@ export function EquipmentPage({tank}:{tank:Tank}) {
  useEffect(()=>{const synced=syncEquipmentSystem(tank);if(JSON.stringify(synced.equipment)!==JSON.stringify(tank.equipment)||JSON.stringify(synced.maintenance)!==JSON.stringify(tank.maintenance))patch(tank.id,t=>({...t,...synced}));},[tank.id,tank.equipment.length]);
 
  function add(){
+  if([days,power,hours,ratedVolume,flowLph,par,coverageLength,coverageWidth].some(v=>!Number.isFinite(v)||v<0)){window.alert(lang==="ar"?"لا يمكن حفظ قيم تجهيزات سالبة أو غير صالحة.":"Equipment values cannot be negative or invalid.");return;}
   if(!name.trim()){window.alert(lang==="ar"?"اكتب اسم الجهاز قبل الحفظ.":"Enter an equipment name before saving.");return;}
   const check=validateEquipmentEntry({serviceIntervalDays:days,powerWatts:power,hoursPerDay:hours,ratedVolumeLiters:ratedVolume,flowLph,parAtTargetDepth:par,coverageLengthCm:coverageLength,coverageWidthCm:coverageWidth});
   const danger=check.issues.find(x=>x.level==="danger");
