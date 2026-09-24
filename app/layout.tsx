@@ -8,6 +8,7 @@ import "./ticker-rtl-fix.css";
 import "./tank-swipe.css";
 import "./intelligence.css";
 import "./help-center.css";
+import "./closure-regression-hotfix.css";
 import { PWARegister } from "@/components/PWARegister";
 import { PushReminderSync } from "@/components/PushReminderSync";
 import { CloudSyncBridge } from "@/components/CloudSyncBridge";
