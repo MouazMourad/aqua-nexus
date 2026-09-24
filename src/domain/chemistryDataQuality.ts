@@ -29,7 +29,7 @@ export function findNearDuplicateChemistryReading(tank:Tank,values:Record<string
  if(!keys.length)return undefined;
  const cutoff=Date.now()-Math.max(1,withinMinutes)*60000;
  return tank.chemistry.find(reading=>{
-  if(reading.usingDefaults)return false;
+  if(reading.usingDefaults||!isPlausibleOperationalTimestamp(reading.timestamp))return false;
   const time=new Date(reading.timestamp).getTime();
   if(!Number.isFinite(time)||time<cutoff)return false;
   const priorKeys=Object.keys(reading.values??{}).filter(k=>typeof reading.values[k]==="number").sort();
