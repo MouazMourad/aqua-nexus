@@ -28,6 +28,7 @@ export function QuarantinePage({tank}:{tank:Tank}) {
 
  function add(){
   if(!organism.trim())return;
+  if(subjectId&&tank.quarantine.some(q=>q.status==="active"&&q.livestockId===subjectId)){window.alert(bi(lang,"هذا الكائن لديه حالة حجر/علاج نشطة بالفعل. أغلق الحالة الحالية أو أكملها قبل إنشاء حالة جديدة.","This livestock already has an active quarantine/treatment case. Complete or close the current case before creating another."));return;}
   const ts=nowISO();
   const treatment=Boolean(product.trim()&&labelDose>0);
   if(product.trim()&&!labelDose){window.alert(bi(lang,"إذا اخترت دواء لازم تدخل جرعة الملصق الفعلية. Aqua Nexus ما رح يخمّن الجرعة.","If you enter a medication, enter the exact label dose. Aqua Nexus will not guess it."));return}
