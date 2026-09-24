@@ -9,7 +9,7 @@ import { markFeatureLearned } from "@/lib/featureDiscovery";
 
 export type AppPage =
   | "dashboard" | "tanks" | "equipment" | "lighting" | "sump" | "livestock" | "acclimation" | "library"
-  | "chemistry" | "maintenance" | "inventory" | "diseases" | "lifejourney" | "consumption" | "timeline"
+  | "chemistry" | "maintenance" | "inventory" | "diseases" | "lifejourney" | "breeding" | "consumption" | "timeline"
   | "journal" | "waterchange" | "feeding" | "dosing" | "quarantine"
   | "emergency" | "rodi" | "expenses" | "alerts" | "reports" | "settings" | "academy";
 
@@ -33,6 +33,7 @@ const items:NavItem[]=[
   {key:"sump",label:"sump",icon:"▤",color:"#3ed2c0",glyph:"sump",group:"system"},
   {key:"livestock",label:"livestock",icon:"🐟",color:"#55dfff",glyph:"fish",group:"core"},
   {key:"lifejourney",label:"lifeJourney",icon:"◉",color:"#72e5b5",glyph:"coral",group:"care"},
+  {key:"breeding",label:"breeding",icon:"✦",color:"#89e77c",glyph:"fish",group:"care"},
   {key:"consumption",label:"tankConsumption",icon:"↘",color:"#62d9ff",glyph:"chart",group:"operations"},
   {key:"acclimation",label:"acclimation",icon:"⇢",color:"#66e0ff",glyph:"acclimation",group:"core"},
   {key:"library",label:"library",icon:"◇",color:"#b68cff",glyph:"coral",group:"care"},
@@ -129,7 +130,7 @@ export function MainNav({active,onChange,lang,tank,lockedPages=[]}:{active:AppPa
 
   const searchEntries=useMemo<SearchEntry[]>(()=>{
     const entries:SearchEntry[]=items.map(item=>({
-      id:`module:${item.key}`,page:item.key,title:item.key==="lifejourney"?bi(lang,"حياة الكائنات","Life Journey"):item.key==="consumption"?bi(lang,"استهلاك الحوض","Tank Consumption"):tr(lang,item.label),subtitle:item.group,
+      id:`module:${item.key}`,page:item.key,title:item.key==="lifejourney"?bi(lang,"حياة الكائنات","Life Journey"):item.key==="breeding"?bi(lang,"التكاثر","Propagation & Breeding"):item.key==="consumption"?bi(lang,"استهلاك الحوض","Tank Consumption"):tr(lang,item.label),subtitle:item.group,
       keywords:`${item.key} ${item.group} ${tr(lang,item.label)}`,icon:item.icon,color:item.color,kind:"module"
     }));
     entries.push({id:"module:academy",page:"academy",title:lang==="ar"?"Aqua Nexus Academy • تعلم الحوض":"Aqua Nexus Academy",subtitle:lang==="ar"?"دورة + قاموس مصطلحات":"Course + glossary",keywords:"academy learn تعليم دورة قاموس glossary chemistry cycling tank brain",icon:"🎓",color:"#aa88ff",kind:"module"});
