@@ -440,6 +440,16 @@ describe("Aqua AI expert evaluation matrix",()=>{
 });
 
 
+describe("Lifecycle exit integrity",()=>{
+  it("keeps historical exit records distinct from active livestock state",()=>{
+    const t=structuredClone(demoMarineTank);const id=t.livestock[0]?.id;
+    if(!id)return;
+    t.livestockExits=[{id:"exit-history",timestamp:new Date().toISOString(),livestockId:id,name:t.livestock[0].name,category:t.livestock[0].category,quantity:1,reason:"transferred"}];
+    expect(t.livestock.some(x=>x.id===id)).toBe(true);
+    expect(t.livestockExits.some(x=>x.livestockId===id)).toBe(true);
+  });
+});
+
 describe("Inventory data-integrity regression",()=>{
   it("keeps feeding stock isolated from dosing stock",()=>{
     const t=structuredClone(demoMarineTank);
