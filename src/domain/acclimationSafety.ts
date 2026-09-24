@@ -1,4 +1,5 @@
 import type { AcclimationItem,AcclimationSession,CoralDipRun } from "./types";
+import { isPlausibleOperationalTimestamp } from "./timeSafety";
 
 export interface AcclimationTransferGate {
   allowed:boolean;
@@ -9,7 +10,7 @@ export interface AcclimationTransferGate {
 
 export function latestCoralDipRunForItem(session:AcclimationSession,itemId:string){
   return [...(session.coralDipRuns??[])]
-    .filter(run=>run.status!=="cancelled"&&run.itemIds.includes(itemId))
+    .filter(run=>run.status!=="cancelled"&&run.itemIds.includes(itemId)&&isPlausibleOperationalTimestamp(run.startedAt))
     .sort((a,b)=>new Date(b.startedAt).getTime()-new Date(a.startedAt).getTime())[0];
 }
 
@@ -26,6 +27,6 @@ export function coralTransferGate(session:AcclimationSession,item:AcclimationIte
 
 export function coralDipBatchRun(session:AcclimationSession,batchId:string){
   return [...(session.coralDipRuns??[])]
-    .filter(run=>run.batchId===batchId&&run.status!=="cancelled")
+    .filter(run=>run.batchId===batchId&&run.status!=="cancelled"&&isPlausibleOperationalTimestamp(run.startedAt))
     .sort((a,b)=>new Date(b.startedAt).getTime()-new Date(a.startedAt).getTime())[0];
 }
