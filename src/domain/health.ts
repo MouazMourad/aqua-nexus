@@ -89,7 +89,8 @@ export function livestockBioloadContribution(x:Tank["livestock"][number]) {
 }
 
 export function bioload(tank: Tank) {
-  const load = tank.livestock.reduce((s,x)=>s+livestockBioloadContribution(x),0);
+  // External livestock (for example a separate nursery) is not hydraulically part of this tank.
+  const load = tank.livestock.filter(x=>x.location!=="external").reduce((s,x)=>s+livestockBioloadContribution(x),0);
   const capacity = Math.max(1, tank.systemVolumeLiters / 35);
   const ratio = load / capacity;
   return {
