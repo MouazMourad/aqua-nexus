@@ -19,7 +19,7 @@ type EntryCategory=LivestockItem["category"]|"macroalgae";
 
 export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
  const lang=useAquaStore(s=>s.language),patch=useAquaStore(s=>s.patchTank);
- const [open,setOpen]=useState(false),[category,setCategory]=useState<EntryCategory>("fish"),[selected,setSelected]=useState(""),[custom,setCustom]=useState(""),[qty,setQty]=useState(1),[riskConfirmed,setRiskConfirmed]=useState(false),[editId,setEditId]=useState<string|null>(null),[editQty,setEditQty]=useState(1),[editHealth,setEditHealth]=useState<LivestockItem["health"]>("good"),[editSize,setEditSize]=useState(0),[editNotes,setEditNotes]=useState(""),[removeId,setRemoveId]=useState<string|null>(null),[exitReason,setExitReason]=useState<"death"|"sold"|"transferred"|"returned"|"removed"|"unknown">("removed"),[bodyRemoved,setBodyRemoved]=useState(true),[exitSymptoms,setExitSymptoms]=useState(""),[exitNotes,setExitNotes]=useState("");
+ const [open,setOpen]=useState(false),[alreadyPresent,setAlreadyPresent]=useState(true),[category,setCategory]=useState<EntryCategory>("fish"),[selected,setSelected]=useState(""),[custom,setCustom]=useState(""),[qty,setQty]=useState(1),[riskConfirmed,setRiskConfirmed]=useState(false),[editId,setEditId]=useState<string|null>(null),[editQty,setEditQty]=useState(1),[editHealth,setEditHealth]=useState<LivestockItem["health"]>("good"),[editSize,setEditSize]=useState(0),[editNotes,setEditNotes]=useState(""),[removeId,setRemoveId]=useState<string|null>(null),[exitReason,setExitReason]=useState<"death"|"sold"|"transferred"|"returned"|"removed"|"unknown">("removed"),[bodyRemoved,setBodyRemoved]=useState(true),[exitSymptoms,setExitSymptoms]=useState(""),[exitNotes,setExitNotes]=useState("");
  const b=bioload(tank);
  const audit=useMemo(()=>auditTankCompatibility(tank),[tank]);
  const library:any[]=LIVESTOCK_LIBRARY.filter((x:any)=>x.type===tank.type);
@@ -38,8 +38,8 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
  function add(){
   const sanity=validateLivestockEntry({quantity:qty});
   if(!sanity.ok){window.alert(lang==="ar"?sanity.issues[0]?.ar:sanity.issues[0]?.en);return}
-  if(readiness?.state==="not_now")return;
-  if(readinessNeedsConfirm&&!riskConfirmed)return;
+  if(!alreadyPresent&&readiness?.state==="not_now")return;
+  if(!alreadyPresent&&readinessNeedsConfirm&&!riskConfirmed)return;
   const name=selected==="__other__"?(custom||tr(lang,"otherEntry")):(chosen?.ar||custom);
   const nameEn=selected==="__other__"?(custom||"Other"):(chosen?.en||custom);
   const item:LivestockItem={id:uid("live"),libraryId:chosen?.id,name,nameEn,category:category==="macroalgae"?"plant":category,subtype:category==="macroalgae"?"macroalgae":undefined,quantity:qty,health:"good",load:chosen?.load??1,addedAt:today()};
@@ -82,7 +82,7 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
   <Modal open={!!removeId} title={lang==="ar"?"سبب خروج الكائن":"Livestock exit reason"} onClose={()=>setRemoveId(null)}><div className="form-grid"><label className="field"><span>{lang==="ar"?"شو صار؟":"What happened?"}</span><select value={exitReason} onChange={e=>setExitReason(e.target.value as any)}><option value="removed">{lang==="ar"?"إزالة من السجل":"Removed"}</option><option value="death">{lang==="ar"?"وفاة":"Death"}</option><option value="sold">{lang==="ar"?"بيع":"Sold"}</option><option value="transferred">{lang==="ar"?"نقل لحوض آخر":"Transferred"}</option><option value="returned">{lang==="ar"?"إرجاع":"Returned"}</option><option value="unknown">{lang==="ar"?"غير معروف":"Unknown"}</option></select></label>{exitReason==="death"&&<><label className="field"><span>{lang==="ar"?"تمت إزالة الجسم من الحوض؟":"Body removed from tank?"}</span><select value={bodyRemoved?"yes":"no"} onChange={e=>setBodyRemoved(e.target.value==="yes")}><option value="yes">{lang==="ar"?"نعم":"Yes"}</option><option value="no">{lang==="ar"?"لا / غير موجود":"No / not found"}</option></select></label><label className="field full-field"><span>{lang==="ar"?"أعراض قبل الوفاة إن وجدت":"Symptoms before death, if known"}</span><textarea value={exitSymptoms} onChange={e=>setExitSymptoms(e.target.value)}/></label></>}<label className="field full-field"><span>{tr(lang,"notes")}</span><textarea value={exitNotes} onChange={e=>setExitNotes(e.target.value)}/></label></div><div className="modal-actions"><button className="btn" onClick={()=>setRemoveId(null)}>{tr(lang,"cancel")}</button><button className="btn danger" onClick={confirmRemove}>{lang==="ar"?"تأكيد":"Confirm"}</button></div></Modal>
 
   <Modal open={open} title={tr(lang,"addLivestock")} onClose={close}>
-   <div className="form-grid">
+   <label className="risk-confirm"><input type="checkbox" checked={alreadyPresent} onChange={e=>setAlreadyPresent(e.target.checked)}/><span>{bi(lang,"هذا الكائن موجود فعلياً بالحوض — سجّل الواقع حتى لو كانت جاهزية إضافة كائن جديد غير مكتملة","This livestock is already in the tank — record reality even if new-addition readiness is incomplete")}</span></label><div className="form-grid">
     <label className="field"><span>{tr(lang,"category")}</span><select value={category} onChange={e=>{setCategory(e.target.value as EntryCategory);setSelected("");setRiskConfirmed(false)}}><option value="fish">{tr(lang,"fish")}</option>{tank.type==="marine"&&<option value="coral">{tr(lang,"coral")}</option>}<option value="invert">{tr(lang,"invert")}</option>{tank.type==="marine"?<option value="macroalgae">{bi(lang,"ماكرو ألجي","Macroalgae")}</option>:<option value="plant">{tr(lang,"plant")}</option>}<option value="other">{tr(lang,"other")}</option></select></label>
     <label className="field"><span>{tr(lang,"selectOrganism")}</span><select value={selected} onChange={e=>{setSelected(e.target.value);setRiskConfirmed(false)}}><option value="">—</option>{list.map((x:any)=><option value={x.id} key={x.id}>{lang==="ar"?x.ar:x.en}</option>)}<option value="__other__">{tr(lang,"otherEntry")}</option></select></label>
     {selected==="__other__"&&<label className="field full-field"><span>{tr(lang,"name")}</span><input value={custom} onChange={e=>setCustom(e.target.value)}/></label>}
@@ -113,7 +113,7 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
 
    {selected==="__other__"&&<div className="inline-alert warn">{lang==="ar"?"النوع اليدوي يبقى مسجلاً، لكن Aqua Nexus ما رح يدّعي أن توافقه موثّق. سيظهر ضمن Coverage غير المكتملة حتى يتم ربطه بنوع معروف.":"The manual species can still be recorded, but Aqua Nexus will not claim verified compatibility. It remains outside verified coverage until linked to a known species."}</div>}
 
-   <div className="modal-actions"><button className="btn" onClick={close}>{tr(lang,"cancel")}</button><button className="btn primary" onClick={add} disabled={!selected || readiness?.state==="not_now" || (readinessNeedsConfirm&&!riskConfirmed)}>{readiness?.state==="not_now"?(lang==="ar"?"ليس مناسباً الآن":"Not suitable now") : tr(lang,"save")}</button></div>
+   <div className="modal-actions"><button className="btn" onClick={close}>{tr(lang,"cancel")}</button><button className="btn primary" onClick={add} disabled={!selected || (!alreadyPresent&&(readiness?.state==="not_now" || (readinessNeedsConfirm&&!riskConfirmed)))}>{!alreadyPresent&&readiness?.state==="not_now"?(lang==="ar"?"ليس مناسباً الآن":"Not suitable now") : tr(lang,"save")}</button></div>
   </Modal>
  </section>;
 }
