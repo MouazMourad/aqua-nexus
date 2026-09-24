@@ -54,6 +54,8 @@ import { prepareEquipmentImportApplication } from "@/domain/equipmentImportApply
 import { addLocalCalendarDays,isMeaningfullyFutureTimestamp } from "@/domain/timeSafety";
 
 const tank=structuredClone(demoMarineTank);
+import { latestCorrectiveDoseExecution } from "../dosingSafety";
+import { latestCoralDipRunForItem } from "../acclimationSafety";
 
 describe("Life Journey / Propagation / Consumption Tank Brain regression",()=>{
   it("turns recent Life Journey health changes into cautious guidance",()=>{
@@ -1496,5 +1498,18 @@ describe("RC.3 safety and data-integrity hardening",()=>{
     expect(addLocalCalendarDays("2026-03-28",1)).toBe("2026-03-29");
     expect(addLocalCalendarDays("2026-12-31",1)).toBe("2027-01-01");
     expect(isMeaningfullyFutureTimestamp(new Date(Date.now()+86400000).toISOString())).toBe(true);
+  });
+});
+
+describe("final safety audit regressions",()=>{
+  it("ignores future corrective-dose executions",()=>{
+    const tank=structuredClone(demoMarineTank);
+    tank.dosing=[{id:"future-dose",timestamp:new Date(Date.now()+86400000).toISOString(),parameter:"KH",ml:10,calculatorMode:"stock",status:"logged"}];
+    expect(latestCorrectiveDoseExecution(tank,"KH")).toBeUndefined();
+  });
+  it("ignores future coral-dip runs as transfer evidence",()=>{
+    const item:any={id:"coral-1",name:"Test coral",category:"coral",quantity:1,dripMinutes:30,intervalMinutes:0,placement:"display",health:"good",status:"ready"};
+    const session:any={id:"s",startedAt:new Date().toISOString(),status:"active",items:[item],coralDipEnabled:true,coralDipRuns:[{id:"dip",batchId:"b",itemIds:[item.id],startedAt:new Date(Date.now()+86400000).toISOString(),durationMinutes:5,status:"rinsed"}]};
+    expect(latestCoralDipRunForItem(session,item.id)).toBeUndefined();
   });
 });
