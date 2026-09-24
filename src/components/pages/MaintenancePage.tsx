@@ -89,7 +89,7 @@ export function MaintenancePage({tank}:{tank:Tank}) {
   }
   patch(tank.id,t=>({...t,maintenance:t.maintenance.map(x=>x.id===id?completeMaintenanceTask(x,today()):x)}));
  };
- const add=()=>{if(cycle.active)return;patch(tank.id,t=>({...t,maintenance:[...t.maintenance,{id:uid("task"),title:title||bi(lang,"مهمة جديدة","New Task"),titleEn:titleEn||title,cadence,done:false,nextDue:today(),manual:true}]}));setOpen(false)};
+ const add=()=>{if(cycle.active)return;patch(tank.id,t=>({...t,maintenance:[...t.maintenance,{id:uid("task"),title:title.trim()||titleEn.trim(),titleEn:titleEn.trim()||title.trim(),cadence,done:false,nextDue:today(),manual:true}]}));setOpen(false)};
 
  function generateTravelPlan(){
   if(cycle.active)return;
