@@ -209,6 +209,7 @@ describe("Local Best AI behavior regression",()=>{
 describe("Disease taxonomy regression",()=>{
   it("rejects coral-only Brown Jelly for fish livestock",()=>{
     const brown=diseaseEntryFromText("marine","Brown Jelly Disease");
+    expect(brown?.en).toBe("Brown Jelly Syndrome");
     expect(brown?.group).toBe("coral");
     expect(brown&&diseaseMatchesLivestock(brown,"fish")).toBe(false);
     expect(brown&&diseaseMatchesLivestock(brown,"coral")).toBe(true);
