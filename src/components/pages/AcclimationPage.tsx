@@ -74,12 +74,12 @@ export function AcclimationPage({tank}:{tank:Tank}) {
     const id=`acclimation-${active.id}-${item.id}`;
     if(nativeScheduledRef.current.has(id))continue;
     nativeScheduledRef.current.add(id);
-    void scheduleNativeLocalAlarm({id,fireAt:Number(item.endAt),title:"Aqua Nexus Alarm",body:lang==="ar"?`انتهت مرحلة الإقلمة لـ ${item.name}. افتح Aqua Nexus الآن.`:`Acclimation stage finished for ${item.nameEn||item.name}. Open Aqua Nexus now.`,url:"/"});
+    void scheduleNativeLocalAlarm({id,fireAt:Number(item.endAt),title:"Aqua Nexus Alarm",body:lang==="ar"?`${tank.name}: انتهت مرحلة الإقلمة لـ ${item.name}. افتح الحوض الصحيح في Aqua Nexus.`:`${tank.name}: acclimation stage finished for ${item.nameEn||item.name}. Open the correct tank in Aqua Nexus.`,url:`/?tank=${encodeURIComponent(tank.id)}`});
   }
   for(const id of [...nativeScheduledRef.current]){
     if(!liveIds.has(id)){nativeScheduledRef.current.delete(id);void cancelNativeLocalAlarm(id);}
   }
- },[active?.id,active?.items,lang]);
+ },[tank.id,tank.name,active?.id,active?.items,lang]);
  useEffect(()=>{
   if(!criticalTimerRunning)return;
   setNow(Date.now());
@@ -186,7 +186,7 @@ export function AcclimationPage({tank}:{tank:Tank}) {
   setTimerAlerts(prev=>[{id:uid("alert"),lane,batch,message},...prev].slice(0,5));
   playTimerSound(lane);
   try{if("vibrate" in navigator)(navigator as any).vibrate(lane==="emergency"?[500,150,500,150,700]:[300,120,300]);}catch{}
-  void showCriticalAquariumNotification(`Aqua Nexus • ${tank.name}`,message,`acclimation-${active?.id||"session"}-${lane}-${batch??emergencyName??"timer"}`);
+  void showCriticalAquariumNotification(`Aqua Nexus • ${tank.name}`,message,`acclimation-${tank.id}-${active?.id||"session"}-${lane}-${batch??emergencyName??"timer"}`);
  }
  function laneRuntime(lane:any){
   const unfinished=lane.entries.filter((e:any)=>!["added","deferred"].includes(e.item.status));
