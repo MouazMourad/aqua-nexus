@@ -7,7 +7,9 @@ export function sumpIntelligence(tank:Tank){
   if(!tank.sump.enabled)return {enabled:false,issues:[] as string[],gross:0,operating:0,freeboard:0,drainbackEstimate:0,estimatedDrainback:0,drainbackSource:"estimate" as const,safetyMargin:0,chambers:[] as any[]};
   const s=tank.sump,d=s.dimensions;
   const gross=liters(d.length,d.width,d.height);
-  const operating=gross*s.operatingFillPercent/100;
+  // Safety must follow the real chamber geometry, not only the global fill slider.
+  const chamberOperating=s.chambers.reduce((sum,c)=>sum+liters(c.length,c.width,Math.min(Math.max(0,c.waterHeight),Math.max(0,c.height))),0);
+  const operating=s.chambers.length?chamberOperating:gross*s.operatingFillPercent/100;
   const freeboard=Math.max(0,gross-operating);
   const estimatedDrainback=liters(tank.display.length,tank.display.width,1.5)+3;
   const measured=Number(tank.sump.measuredDrainbackLiters||0);
@@ -22,7 +24,9 @@ export function sumpIntelligence(tank:Tank){
   const isMacro=(x:any)=>x.category==="plant"||/macro|algae|chaeto|chaetomorpha|halimeda|caulerpa|طحالب|شيتو|نبات/.test(low(x.subtype)+" "+low(x.name)+" "+low(x.nameEn));
   for(const c of s.chambers){
     if(c.x<0||c.y<0||c.x+c.length>d.length+.01||c.y+c.width>d.width+.01)issues.push(`${c.name}: أبعاد/موضع الحجرة خارج حدود السامب.`);
+    if(c.height>d.height+.01)issues.push(`${c.name}: ارتفاع الحجرة يتجاوز ارتفاع جدار السامب.`);
     if(c.waterHeight>c.height)issues.push(`${c.name}: مستوى الماء أعلى من ارتفاع الحجرة.`);
+    if(c.waterHeight>d.height+.01)issues.push(`${c.name}: منسوب الماء يتجاوز ارتفاع السامب الفعلي.`);
     if(c.refugium){
       const residents=tank.livestock.filter(x=>x.location===`sump:${c.id}`);
       const equipment=tank.equipment.filter(x=>x.location===`sump:${c.id}`);
