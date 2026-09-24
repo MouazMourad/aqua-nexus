@@ -73,7 +73,27 @@ function nestedDataIssue(tank:Record<string,unknown>){
     if(row.lightingDepthCm!==undefined&&(!finite(row.lightingDepthCm)||Number(row.lightingDepthCm)<0||Number(row.lightingDepthCm)>Number((tank.display as Record<string,unknown>).height)))return `livestock #${i+1} has invalid lightingDepthCm`;
     for(const key of ["lightingXPct","lightingZPct"]){const value=row[key];if(value!==undefined&&(!finite(value)||Number(value)<0||Number(value)>100))return `livestock #${i+1} has invalid ${key}`;}
     if(row.lightingExposure!==undefined&&!["open","partialShade","shade"].includes(String(row.lightingExposure)))return `livestock #${i+1} has invalid lightingExposure`;
+    if(row.parentLivestockId!==undefined&&(!validText(row.parentLivestockId,160)||String(row.parentLivestockId)===String(row.id)))return `livestock #${i+1} has invalid parentLivestockId`;
+    if(row.lifeEvents!==undefined){
+      if(!Array.isArray(row.lifeEvents)||row.lifeEvents.length>MAX_ROWS_PER_COLLECTION)return `livestock #${i+1} has invalid lifeEvents`;
+      const eventIds=new Set<string>();
+      for(const [j,event] of row.lifeEvents.entries()){
+        if(!isObject(event)||!validText(event.id,160)||eventIds.has(String(event.id))||!validTimestamp(event.timestamp)||!["observation","growth","health","breeding","frag","cutting","division","runner","transfer","other"].includes(String(event.type)))return `livestock #${i+1} lifeEvent #${j+1} is invalid`;
+        eventIds.add(String(event.id));
+        if(event.sizeCm!==undefined&&(!finite(event.sizeCm)||Number(event.sizeCm)<0))return `livestock #${i+1} lifeEvent #${j+1} has invalid sizeCm`;
+        if(event.quantityProduced!==undefined&&(!finite(event.quantityProduced)||Number(event.quantityProduced)<0))return `livestock #${i+1} lifeEvent #${j+1} has invalid quantityProduced`;
+      }
+    }
   }
+  const livestockRows=((tank.livestock as Record<string,unknown>[])??[]),livestockIds=new Set(livestockRows.map(x=>String(x.id))),photoIds=new Set((((tank.photos as Record<string,unknown>[])??[])).map(x=>String(x.id)));
+  for(const [i,row] of livestockRows.entries()){
+    if(row.parentLivestockId!==undefined&&!livestockIds.has(String(row.parentLivestockId)))return `livestock #${i+1} references missing parentLivestockId ${String(row.parentLivestockId)}`;
+    for(const [j,event] of (((row.lifeEvents as Record<string,unknown>[])??[])).entries()){
+      if(event.childLivestockId!==undefined&&!livestockIds.has(String(event.childLivestockId)))return `livestock #${i+1} lifeEvent #${j+1} references missing childLivestockId ${String(event.childLivestockId)}`;
+      if(event.photoId!==undefined&&!photoIds.has(String(event.photoId)))return `livestock #${i+1} lifeEvent #${j+1} references missing photoId ${String(event.photoId)}`;
+    }
+  }
+  if(tank.heroPhotoId!==undefined&&!photoIds.has(String(tank.heroPhotoId)))return `heroPhotoId references missing photo ${String(tank.heroPhotoId)}`;
   for(const [i,row] of (((tank.dosing as unknown[])??[])).entries()){
     if(!isObject(row)||!validText(row.id,160)||!validTimestamp(row.timestamp))return `dosing #${i+1} is invalid`;
     if(row.status!==undefined&&!["planned","in_progress","logged","invalidated"].includes(String(row.status)))return `dosing #${i+1} has an invalid status`;
