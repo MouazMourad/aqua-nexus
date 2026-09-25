@@ -42,7 +42,7 @@ jobs:
         run: |
           git config user.name "Aqua Nexus CI"
           git config user.email "actions@users.noreply.github.com"
-          git add src/domain/aquaAIBrain.ts src/components/pages/TimelinePage.tsx src/components/pages/MaintenancePage.tsx
+          git add src/domain/aquaAIBrain.ts src/components/AquaAIAssistant.tsx src/components/pages/TimelinePage.tsx src/components/pages/MaintenancePage.tsx src/components/pages/LivestockPage.tsx
           git diff --cached --quiet && exit 0
-          git commit -m "fix: close remaining TestSprite E2E findings"
+          git commit -m "fix: close final TestSprite localization and freshwater findings"
           git push origin main
