@@ -26,36 +26,70 @@ body:has(.acclimation-page) button[type="submit"] {
   z-index: 7200;
 }
 
-/* Mobile locale/accessibility closure.
-   The floating AI shell sits at z-index 7000 and Android Chromium can resolve
-   its RTL hit box across the topbar even when only the fish is visibly at the
-   bottom edge. Keep the real header controls in their own higher stacking
-   context so language/tank/add controls always receive pointer input. */
+/* Header interaction boundary.
+   Android Chromium may keep an oversized hit-test box for fixed/RTL overlays.
+   Give the top actions a dedicated top-level stacking context and make the
+   surrounding header layout transparent to pointer hit-testing. Interactive
+   descendants opt back in explicitly. */
 .interactive-header {
   position: relative;
-  z-index: 7300;
+  z-index: 9000 !important;
   isolation: isolate;
 }
-.interactive-header .top-actions,
-.interactive-header .top-actions .btn,
-.interactive-header .top-actions .select {
+.interactive-header > .brand,
+.interactive-header > .top-actions,
+.interactive-header > .nav-zone {
   position: relative;
-  z-index: 7301;
-  pointer-events: auto;
+}
+.interactive-header > .top-actions {
+  z-index: 9003 !important;
+  pointer-events: none;
+}
+.interactive-header > .top-actions > button,
+.interactive-header > .top-actions > select,
+.interactive-header > .top-actions .btn,
+.interactive-header > .top-actions .select {
+  position: relative;
+  z-index: 9004 !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+.interactive-header > .nav-zone {
+  z-index: 9001;
 }
 
-/* The AI shell itself must never create a page-sized pointer target. Only its
-   explicit launcher/panel/greeting remain interactive (declared in AI CSS). */
+/* The floating AI container itself is never a hit target. Only the visible
+   launcher, open panel and greeting may receive input. This avoids the Android
+   RTL/inset bug where the shell's invisible grid area can cover the EN/AR
+   button even though the fish is rendered at the bottom of the screen. */
 .aqua-ai-shell {
-  width: max-content;
+  pointer-events: none !important;
+  width: max-content !important;
   max-width: calc(100vw - 18px);
+}
+.aqua-ai-shell .aqua-ai-fish-button,
+.aqua-ai-shell .aqua-ai-panel,
+.aqua-ai-shell .aqua-ai-greeting {
+  pointer-events: auto;
 }
 
 @media (max-width:700px) {
   .interactive-header {
-    z-index: 7300;
+    z-index: 9000 !important;
   }
-  .interactive-header .top-actions {
+  .interactive-header > .top-actions {
     isolation: isolate;
+    z-index: 9003 !important;
+  }
+  /* When AI is open it legitimately stretches between both inline edges.
+     Keep that stretch below the header and prevent the shell itself from
+     becoming a full-width touch surface. */
+  .aqua-ai-shell.open {
+    z-index: 7000;
+    pointer-events: none !important;
+  }
+  .aqua-ai-shell.open .aqua-ai-panel,
+  .aqua-ai-shell.open .aqua-ai-fish-button {
+    pointer-events: auto;
   }
 }
