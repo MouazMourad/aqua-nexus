@@ -75,6 +75,9 @@ const messages = {
     high: "مرتفع",
     danger: "خطر",
     warning: "تنبيه",
+    unknown: "غير معروف",
+    critical: "حرج",
+    crustacean: "قشريات",
     active: "نشط",
     completed: "مغلق",
     print: "طباعة",
@@ -350,6 +353,9 @@ const messages = {
     high: "High",
     danger: "Danger",
     warning: "Warning",
+    unknown: "Unknown",
+    critical: "Critical",
+    crustacean: "Crustaceans",
     active: "Active",
     completed: "Closed",
     print: "Print",
@@ -572,11 +578,38 @@ export function categoryText(lang: Language, category: string) {
     Invert: tr(lang, "invert"),
     Plant: tr(lang, "plant"),
     Other: tr(lang, "other"),
+    Crustacean: tr(lang, "crustacean"),
     fish: tr(lang, "fish"),
     coral: tr(lang, "coral"),
     invert: tr(lang, "invert"),
     plant: tr(lang, "plant"),
     other: tr(lang, "other"),
+    crustacean: tr(lang, "crustacean"),
   };
   return m[category] ?? category;
+}
+
+
+export function eventTypeText(lang:Language,type:string){
+  const labels:Record<string,[string,string]>={
+    "core:livestock:added":["إضافة كائن","Livestock added"],
+    "core:livestock:observation_updated":["تحديث ملاحظة كائن","Livestock observation updated"],
+    "core:maintenance:scheduled":["جدولة صيانة","Maintenance scheduled"],
+    "core:system:coverage_checkpoint":["تحديث تغطية النظام","System coverage update"],
+    "core:system:tank_identity_changed":["تغيير هوية الحوض","Tank identity changed"],
+    "core:acclimation:started":["بدء الإقلمة","Acclimation started"],
+    "core:acclimation:progress":["تقدم الإقلمة","Acclimation progress"],
+    "core:dosing:dose_given":["تسجيل جرعة","Dose recorded"],
+    "core:equipment:changed":["تغيير جهاز","Equipment changed"],
+    "core:equipment:configuration_changed":["تغيير إعداد جهاز","Equipment configuration changed"],
+    "core:equipment:installed":["إضافة جهاز","Equipment installed"]
+  };
+  const direct=labels[type];
+  if(direct){
+    return lang==="ar"?direct[0]:direct[1];
+  }
+  if(type.startsWith("core:")){
+    return lang==="ar"?"سجل نظام":"System record";
+  }
+  return type;
 }

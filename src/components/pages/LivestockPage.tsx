@@ -6,7 +6,7 @@ import { bioload,livestockBioloadContribution } from "@/domain/health";
 import { auditTankCompatibility } from "@/domain/compatibility";
 import { stockingReadiness } from "@/domain/stockingReadiness";
 import { useAquaStore } from "@/store/useAquaStore";
-import { tr,bi,categoryText } from "@/i18n";
+import { tr,bi,categoryText,statusText } from "@/i18n";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Modal } from "@/components/ui/Modal";
 import { AdvancedSection } from "@/components/ui/AdvancedSection";
@@ -42,7 +42,7 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
   if(!alreadyPresent&&readinessNeedsConfirm&&!riskConfirmed)return;
   const name=selected==="__other__"?(custom||tr(lang,"otherEntry")):(chosen?.ar||custom);
   const nameEn=selected==="__other__"?(custom||"Other"):(chosen?.en||custom);
-  const item:LivestockItem={id:uid("live"),libraryId:chosen?.id,name,nameEn,category:category==="macroalgae"?"plant":category,subtype:category==="macroalgae"?"macroalgae":undefined,quantity:qty,health:"good",load:chosen?.load??1,addedAt:today()};
+  const item:LivestockItem={id:uid("live"),libraryId:chosen?.id,name,nameEn,category:category==="macroalgae"?"plant":category,subtype:category==="macroalgae"?"macroalgae":undefined,quantity:qty,health:"good",load:chosen?.load??1,addedAt:nowISO()};
   patch(tank.id,t=>({...t,livestock:[...t.livestock,item],timeline:[{id:uid("ev"),timestamp:nowISO(),type:"livestock",textAr:`تمت إضافة ${qty} × ${name}.`,textEn:`Added ${qty} × ${nameEn}.`},...t.timeline]}));
   close();
  }
@@ -69,7 +69,7 @@ export function LivestockPage({tank,onLibrary}:{tank:Tank;onLibrary:()=>void}) {
 
   <div className="card panel full-span">
    <div className="table-wrap"><table><thead><tr><th>{tr(lang,"name")}</th><th>{tr(lang,"category")}</th><th>{tr(lang,"quantity")}</th><th>{lang==="ar"?"الصحة":"Health"}</th><th>{tr(lang,"load")}</th><th></th></tr></thead>
-   <tbody>{tank.livestock.map(x=><tr key={x.id}><td>{lang==="ar"?x.name:(x.nameEn||x.name)}{x.sizeCm&&<small style={{display:"block"}}>{x.sizeCm} cm</small>}</td><td>{x.subtype==="macroalgae"?bi(lang,"ماكرو ألجي","Macroalgae"):categoryText(lang,x.category)}</td><td>{x.quantity}</td><td><span className={`status ${x.health!=="good"?"warn":""}`}>{x.health}</span></td><td>{livestockBioloadContribution(x).toFixed(1)}</td><td><button className="btn" onClick={()=>startEdit(x)}>✎</button> <button className="btn danger" onClick={()=>remove(x.id)}>×</button></td></tr>)}</tbody></table></div>
+   <tbody>{tank.livestock.map(x=><tr key={x.id}><td>{lang==="ar"?x.name:(x.nameEn||x.name)}{x.sizeCm&&<small style={{display:"block"}}>{x.sizeCm} cm</small>}</td><td>{x.subtype==="macroalgae"?bi(lang,"ماكرو ألجي","Macroalgae"):categoryText(lang,x.category)}</td><td>{x.quantity}</td><td><span className={`status ${x.health!=="good"?"warn":""}`}>{statusText(lang,x.health)}</span></td><td>{livestockBioloadContribution(x).toFixed(1)}</td><td><button className="btn" onClick={()=>startEdit(x)}>✎</button> <button className="btn danger" onClick={()=>remove(x.id)}>×</button></td></tr>)}</tbody></table></div>
   </div>
 
   <PlantCarePanel tank={tank}/>

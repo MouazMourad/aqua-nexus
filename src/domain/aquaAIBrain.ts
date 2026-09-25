@@ -381,6 +381,33 @@ function stockingReadinessAnswer(tank:Tank,question:string):AquaAIAnswer{
    action:{page:readiness.state==="ready"?"livestock":readiness.state==="not_now"?"alerts":"chemistry",ar:readiness.state==="ready"?"افتح الكائنات وخطط للإضافة":readiness.state==="not_now"?"راجع الموانع أولاً":"حدّث بيانات الكيمياء",en:readiness.state==="ready"?"Open livestock and plan the addition":readiness.state==="not_now"?"Review blockers first":"Refresh chemistry evidence"}
   };
 }
+function freshwaterChemistryAnswer(tank:Tank):AquaAIAnswer{
+  const latest=(measuredChemistryReadings(tank)[0]?.values??{}) as Record<string,unknown>;
+  const rows=["GH","KH","NO3","NH3"].map(key=>{
+    const value=latest[key];
+    return value===undefined
+      ? `لا توجد قراءة ${key} مسجلة حالياً.`
+      : `آخر قراءة ${key}: ${String(value)}.`;
+  });
+  const water=waterChangeAnswer(tank);
+  return {
+    titleAr:"كيمياء المياه العذبة وخطة تغيير الماء",
+    titleEn:"Freshwater chemistry and water-change plan",
+    summaryAr:"راقب GH وKH والنترات والأمونيا أولاً، ثم قرر تغيير الماء بناءً على القراءات واتجاهها.",
+    summaryEn:"Watch GH, KH, nitrate, and ammonia first, then decide on a water change from the readings and their trend.",
+    detailsAr:[...rows,water.summaryAr,...water.detailsAr],
+    detailsEn:[...rows,water.summaryEn,...water.detailsEn],
+    evidenceAr:[...water.evidenceAr,"توجيه مياه عذبة"],
+    evidenceEn:[...water.evidenceEn,"Freshwater routing"],
+    confidence:confidence(tank),
+    action:{
+      page:"chemistry",
+      ar:"افتح الكيمياء وسجّل القراءات التالية",
+      en:"Open Chemistry and log the next readings"
+    }
+  };
+}
+
 function waterChangeAnswer(tank:Tank):AquaAIAnswer{
   const guide=chemistryGuidance(tank);
   const latest=tank.waterChanges[0];
@@ -567,6 +594,13 @@ export function aquaAIAnswer(question:string,tank:Tank,page:string):AquaAIAnswer
   const q=(question||"").trim().toLowerCase();
   const lightingQ=normText(question);
   const lightingTokens=["انار","اضاء","ضوء","ضو","lighting","light","photoperiod","spectrum","par","uv","royal blue"];
+  const freshwaterChemistryQuestion =
+    tank.type==="freshwater" &&
+    /freshwater parameters?|water parameters?/.test(lightingQ) &&
+    /water change|تغيير ماء|تغيير مي/.test(lightingQ);
+  if(freshwaterChemistryQuestion){
+    return freshwaterChemistryAnswer(tank);
+  }
   if(lightingTokens.some(token=>lightingQ.includes(token)))return lightingAnswer(tank);
   const intent=parseAquaQuestion(question);
   const cycle=biologicalCycleStatus(tank);
