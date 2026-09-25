@@ -93,3 +93,23 @@ body:has(.acclimation-page) button[type="submit"] {
     pointer-events: auto;
   }
 }
+
+
+/* Android Chromium RTL hit-testing guard.
+   Fixed/RTL assistant descendants can retain a stale oversized hit-test rect.
+   Keep the closed assistant strictly in the bottom corner and make the greeting
+   non-interactive so it can never cover the header language control. */
+@media (max-width:700px) {
+  .aqua-ai-shell:not(.open) {
+    inset-inline-start: auto !important;
+    inset-inline-end: 9px !important;
+    top: auto !important;
+    bottom: max(10px, env(safe-area-inset-bottom)) !important;
+    width: 82px !important;
+    max-width: 82px !important;
+    justify-items: end !important;
+  }
+  .aqua-ai-shell:not(.open) .aqua-ai-greeting {
+    pointer-events: none !important;
+  }
+}
