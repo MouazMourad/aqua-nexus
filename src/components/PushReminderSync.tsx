@@ -117,7 +117,7 @@ export function PushReminderSync(){
 
   if(!promptVisible&&!notice)return null;
 
-  return <div dir={language==="ar"?"rtl":"ltr"} style={{position:"fixed",top:"max(12px, env(safe-area-inset-top))",left:"50%",transform:"translateX(-50%)",zIndex:7600,width:"min(420px, calc(100vw - 24px))",pointerEvents:"none"}}>
+  return <div dir={language==="ar"?"rtl":"ltr"} style={{position:"fixed",top:"max(132px, calc(env(safe-area-inset-top) + 112px))",left:"50%",transform:"translateX(-50%)",zIndex:7600,width:"min(420px, calc(100vw - 24px))",pointerEvents:"none"}}>
     {promptVisible&&<div style={{pointerEvents:"auto",padding:"12px 14px",borderRadius:16,border:"1px solid rgba(80,220,235,.38)",background:"rgba(3,24,34,.96)",color:"#f3feff",boxShadow:"0 16px 42px rgba(0,0,0,.38)",backdropFilter:"blur(16px)"}}>
       <div style={{fontWeight:900,marginBottom:5}}>🔔 {language==="ar"?"تفعيل تنبيهات Aqua Nexus":"Enable Aqua Nexus alerts"}</div>
       <div style={{fontSize:12,lineHeight:1.65,opacity:.86}}>{language==="ar"?"ننبهك إذا مرّ أكثر من أسبوع بدون متابعة الحوض أو إذا أصبح وضعه غير مستقر.":"Get notified if a tank is not checked for over a week or becomes unstable."}</div>
