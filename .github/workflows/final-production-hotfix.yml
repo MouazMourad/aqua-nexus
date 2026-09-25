@@ -1,0 +1,116 @@
+name: Final production hotfix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/final-production-hotfix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  hotfix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Patch production issues
+        shell: python
+        run: |
+          from pathlib import Path
+
+          # AI: route freshwater chemistry + water-change intent before lighting.
+          p=Path('src/domain/aquaAIBrain.ts')
+          s=p.read_text()
+          old='''  const q=(question||"").trim().toLowerCase();
+  const lightingQ=normText(question);
+  const lightingTokens=["انار","اضاء","ضوء","ضو","lighting","light","photoperiod","spectrum","par","uv","royal blue"];
+  const freshwaterChemistryQuestion =
+    tank.type==="freshwater" &&
+    /freshwater parameters?|water parameters?/.test(lightingQ) &&
+    /water change|تغيير ماء|تغيير مي/.test(lightingQ);
+  if(freshwaterChemistryQuestion){
+    return freshwaterChemistryAnswer(tank);
+  }
+  if(lightingTokens.some(token=>lightingQ.includes(token)))return lightingAnswer(tank);
+  const intent=parseAquaQuestion(question);'''
+          new='''  const q=(question||"").trim().toLowerCase();
+  const lightingQ=normText(question);
+  const intent=parseAquaQuestion(question);
+  const freshwaterChemistryQuestion =
+    tank.type==="freshwater" &&
+    intent.topics.includes("chemistry") &&
+    (intent.topics.includes("water") || intent.mode==="waterChange");
+  if(freshwaterChemistryQuestion){
+    return freshwaterChemistryAnswer(tank);
+  }
+  const lightingTokens=["انار","اضاء","ضوء","ضو","lighting","light","photoperiod","spectrum","par","uv","royal blue"];
+  if(lightingTokens.some(token=>lightingQ.includes(token)))return lightingAnswer(tank);'''
+          if old not in s:
+              raise SystemExit('AI routing block not found')
+          p.write_text(s.replace(old,new,1))
+
+          # PWA: force a new worker and never serve stale HTML first while online.
+          p=Path('public/sw.js')
+          s=p.read_text()
+          s=s.replace('const CACHE_NAME="aqua-nexus-pwa-v8";','const CACHE_NAME="aqua-nexus-pwa-v9";',1)
+          old_nav='''  if(request.mode==="navigate"){
+    // App-shell first: an installed iOS PWA must paint immediately instead of
+    // waiting on a slow/captive/VPN network before showing anything. Refresh
+    // the shell in the background so the next launch gets the newest deploy.
+    event.respondWith((async()=>{
+      const cached=(await caches.match(request))||(await caches.match("/"));
+      const refresh=fetch(request,{cache:"no-store"}).then(async response=>{
+        if(response&&response.ok){
+          const cache=await caches.open(CACHE_NAME);
+          await cache.put("/",response.clone());
+        }
+        return response;
+      }).catch(()=>null);
+      if(cached){event.waitUntil(refresh);return cached;}
+      return (await refresh)||Response.error();
+    })());
+    return;
+  }'''
+          new_nav='''  if(request.mode==="navigate"){
+    // Network-first keeps Production on the newest Vercel shell. The cached
+    // shell is only an offline fallback, preventing old JS bundles from
+    // surviving a successful deployment on installed iOS PWAs.
+    event.respondWith((async()=>{
+      try{
+        const response=await fetch(request,{cache:"no-store"});
+        if(response&&response.ok){
+          const cache=await caches.open(CACHE_NAME);
+          await cache.put("/",response.clone());
+        }
+        return response;
+      }catch{
+        return (await caches.match(request))||(await caches.match("/"))||Response.error();
+      }
+    })());
+    return;
+  }'''
+          if old_nav not in s:
+              raise SystemExit('PWA navigation block not found')
+          p.write_text(s.replace(old_nav,new_nav,1))
+
+      - name: Install, test, build
+        run: |
+          npm install
+          npm test
+          npm run build
+      - name: Commit hotfix
+        run: |
+          git config user.name "Aqua Nexus CI"
+          git config user.email "actions@users.noreply.github.com"
+          git rm .github/workflows/final-production-hotfix.yml
+          git add src/domain/aquaAIBrain.ts public/sw.js
+          git commit -m "fix: production AI routing and stale PWA shell"
+          git push origin main
