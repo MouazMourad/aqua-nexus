@@ -22,7 +22,7 @@ patch("src/components/pages/TimelinePage.tsx",
       '{x.source==="intelligence"?" • Tank Brain":""}',
       '{x.source==="intelligence"?` • ${bi(lang,"عقل الحوض","Tank Brain")}`:""}')
 
-# Localize the raw tokens TestSprite found, without relying on a future i18n fallback.
+# Localize the raw tokens TestSprite found, including dropdown and visible chips.
 p = Path("src/components/pages/TimelinePage.tsx")
 s = p.read_text(encoding="utf-8")
 needle = ' const types=useMemo(()=>[...new Set(allEvents.map(x=>x.type))].sort(),[allEvents]);\n'
@@ -31,10 +31,14 @@ insert = ''' const types=useMemo(()=>[...new Set(allEvents.map(x=>x.type))].sort
   const labels:Record<string,[string,string]>={
    recovery:["تعافٍ","Recovery"],chemistry:["كيمياء","Chemistry"],warning:["تنبيه","Warning"],setup:["إعداد","Setup"],
    manual:["يدوي","Manual"],maintenance:["صيانة","Maintenance"],livestock:["كائنات الحوض","Livestock"],feeding:["تغذية","Feeding"],
-   "water-change":["تغيير ماء","Water change"],equipment:["معدات","Equipment"],acclimation:["إقلمة","Acclimation"],emergency:["طوارئ","Emergency"],travel:["سفر وغياب","Travel"],observation:["ملاحظة","Observation"]
+   "water-change":["تغيير ماء","Water change"],equipment:["معدات","Equipment"],acclimation:["إقلمة","Acclimation"],emergency:["طوارئ","Emergency"],travel:["سفر وغياب","Travel"],observation:["ملاحظة","Observation"],
+   "livestock-observation":["تحديث حالة كائن","Livestock observation"],"livestock-death":["وفاة كائن","Livestock death"],"livestock-sold":["بيع كائن","Livestock sold"],"livestock-transferred":["نقل كائن","Livestock transferred"],"livestock-returned":["إرجاع كائن","Livestock returned"],"livestock-removed":["إزالة كائن","Livestock removed"],"history-archive":["أرشفة تاريخية","History archive"]
   };
   const direct=labels[value];
-  return direct?(lang==="ar"?direct[0]:direct[1]):eventTypeText(lang,value);
+  if(direct)return lang==="ar"?direct[0]:direct[1];
+  const shared=eventTypeText(lang,value);
+  if(lang==="ar"&&shared===value)return "حدث نظام";
+  return shared;
  };
 '''
 if needle not in s:
@@ -50,6 +54,15 @@ for old,new in [
  ('<small className="eyebrow-mini">TODAY</small>','<small className="eyebrow-mini">{bi(lang,"اليوم","TODAY")}</small>'),
  ('<small className="eyebrow-mini">TRAVEL / ABSENCE MODE</small>','<small className="eyebrow-mini">{bi(lang,"وضع السفر والغياب","TRAVEL / ABSENCE MODE")}</small>')]:
  patch("src/components/pages/MaintenancePage.tsx",old,new,required=False)
+
+# Livestock shell and health display: never expose raw health enums in Arabic.
+patch("src/components/pages/LivestockPage.tsx",
+      'PageHeader eyebrow="LIVESTOCK" title={tr(lang,"livestock")}',
+      'PageHeader eyebrow={bi(lang,"كائنات الحوض","LIVESTOCK")} title={tr(lang,"livestock")}')
+# Keep statusText as the single display path; add an explicit safe Arabic fallback for legacy values.
+patch("src/components/pages/LivestockPage.tsx",
+      '{statusText(lang,x.health)}</span>',
+      '{lang==="ar"?(x.health==="good"?"مناسب":x.health==="warning"?"تنبيه":x.health==="critical"?"حرج":x.health==="treatment"?"قيد العلاج":statusText(lang,x.health)):statusText(lang,x.health)}</span>')
 
 # Freshwater chemistry intent must take precedence over lighting.
 p=Path("src/domain/aquaAIBrain.ts")
@@ -69,7 +82,7 @@ old='''  const q=(question||"").trim().toLowerCase();
 new='''  const q=(question||"").trim().toLowerCase();
   const lightingQ=normText(question);
   const intent=parseAquaQuestion(question);
-  const freshwaterChemistryTokens=["freshwater parameter","water parameter","chemistry","chemical","ammonia","nh3","nh4","nitrite","no2","nitrate","no3","gh","kh","water change","كيميا","كيمياء","امونيا","أمونيا","نتريت","نترات","تغيير ماء","تغيير مي","تغيير المي","معايير الماء","قيم الماء"];
+  const freshwaterChemistryTokens=["freshwater","fresh water","freshwater parameter","water parameter","chemistry","chemical","ammonia","nh3","nh4","nitrite","no2","nitrate","no3","gh","kh","water change","كيميا","كيمياء","مياه عذبة","ماء عذب","امونيا","أمونيا","نتريت","نترات","تغيير ماء","تغيير مي","تغيير المي","معايير الماء","قيم الماء"];
   const freshwaterChemistryQuestion=tank.type==="freshwater" && (intent.topics.includes("chemistry") || intent.mode==="waterChange" || freshwaterChemistryTokens.some(token=>lightingQ.includes(normText(token))));
   if(freshwaterChemistryQuestion)return freshwaterChemistryAnswer(tank);
   const lightingTokens=["انار","اضاء","ضوء","ضو","lighting","light","photoperiod","spectrum","par","uv","royal blue"];
@@ -84,18 +97,26 @@ new2='''    detailsAr:[...rows,"أهداف الأمان العامة: NH3/NH4 = 
 if old2 not in s:
     raise SystemExit("Freshwater answer target missing")
 s=s.replace(old2,new2,1)
-
-# Final regression closure: expose the current requested readings in the summary
-# and name ammonia explicitly in the Arabic title so the UI/test contract is stable.
 old3='''    titleAr:"كيمياء المياه العذبة وخطة تغيير الماء",
     titleEn:"Freshwater chemistry and water-change plan",
     summaryAr:"راقب GH وKH والنترات والأمونيا أولاً، ثم قرر تغيير الماء بناءً على القراءات واتجاهها.",
     summaryEn:"Watch GH, KH, nitrate, and ammonia first, then decide on a water change from the readings and their trend.",'''
 new3='''    titleAr:"كيمياء المياه العذبة: الأمونيا والنترات وخطة تغيير الماء",
     titleEn:"Freshwater chemistry and water-change plan",
-    summaryAr:`القراءات الحالية: ${["GH","KH","NO3","NH3"].map(key=>`${key}: ${latest[key]===undefined?"غير مسجل":String(latest[key])}`).join("، ")}. راقب الأمونيا والنتريت والنترات وقرر تغيير الماء حسب القراءات واتجاهها.`,
-    summaryEn:`Current readings: ${["GH","KH","NO3","NH3"].map(key=>`${key}: ${latest[key]===undefined?"not recorded":String(latest[key])}`).join(", ")}. Watch ammonia, nitrite and nitrate, then decide on a water change from the readings and their trend.`,'''
+    summaryAr:`القراءات الحالية: ${["GH","KH","NO3","NH3"].map(key=>`${key}: ${latest[key]===undefined?"غير مسجل":String(latest[key])}`).join("، ")}. أهداف الأمان: NH3/NH4 = 0 ppm وNO2 = 0 ppm. كخط أساس، غيّر 20–30% أسبوعياً ثم عدّل النسبة والتكرار حسب NH3/NO2/NO3 واتجاهها.`,
+    summaryEn:`Current readings: ${["GH","KH","NO3","NH3"].map(key=>`${key}: ${latest[key]===undefined?"not recorded":String(latest[key])}`).join(", ")}. Safety targets: NH3/NH4 = 0 ppm and NO2 = 0 ppm. As a baseline, change 20–30% weekly, then adjust percentage and frequency from NH3/NO2/NO3 and their trend.`,'''
 if old3 not in s:
     raise SystemExit("Freshwater final regression target missing")
 s=s.replace(old3,new3,1)
+p.write_text(s,encoding="utf-8")
+
+# The assistant UI has a second scope guard. Explicit freshwater chemistry wording
+# must never be treated as off-topic before it reaches aquaAIBrain.
+p=Path("src/components/AquaAIAssistant.tsx")
+s=p.read_text(encoding="utf-8")
+old4='''  const aquariumWords=fishWord||/(حوض|احواض|أحواض|مرجان|مشروم|تورش|هامر|بابل|انيمون|أنيمون|روبيان|جمبري|قشريات|حلزون|نجم بحر|قنفذ|كائن|كائنات|ملوح|حرار|كيميا|كيمياء|نيترات|نترات|فوسفات|كالسيوم|مغنيسيوم|مغنزيوم|قلوي|kh\\b|ca\\b|mg\\b|no3\\b|po4\\b|nh3\\b|no2\\b|ph\\b|salinity|reef|aquarium|tank|fish|coral|shrimp|snail|livestock|skimmer|pump|heater|filter|sump|acclimation|dosing|water change|rodi|ro\\/di)/i.test(clean);'''
+new4='''  const aquariumWords=fishWord||/(حوض|احواض|أحواض|مرجان|مشروم|تورش|هامر|بابل|انيمون|أنيمون|روبيان|جمبري|قشريات|حلزون|نجم بحر|قنفذ|كائن|كائنات|ملوح|حرار|كيميا|كيمياء|مياه عذبة|ماء عذب|معايير الماء|قيم الماء|امونيا|أمونيا|نتريت|نيترات|نترات|فوسفات|كالسيوم|مغنيسيوم|مغنزيوم|قلوي|kh\\b|gh\\b|ca\\b|mg\\b|no3\\b|po4\\b|nh3\\b|nh4\\b|no2\\b|ph\\b|salinity|freshwater|fresh water|water parameters?|chemistry|ammonia|nitrite|nitrate|reef|aquarium|tank|fish|coral|shrimp|snail|livestock|skimmer|pump|heater|filter|sump|acclimation|dosing|water change|rodi|ro\\/di)/i.test(clean);'''
+if old4 not in s:
+    raise SystemExit("Assistant freshwater scope target missing")
+s=s.replace(old4,new4,1)
 p.write_text(s,encoding="utf-8")
