@@ -30,3 +30,4 @@ export default function AboutPage(){
  <section className="cinema-scene creator-scene"><div className="creator-glow"/><small>{rtl?"من المطوّر":"FROM THE CREATOR"}</small><h2>Mouaz Mourad</h2><p>{t.messageSub}</p></section>
  <section className="cinema-scene finale-scene"><div className="final-rays"/><h2>{t.connected}</h2><p>{t.connectedSub}</p><div className="quality-tags"><a className="creator-contact" href="mailto:mouaz.mourad@gmail.com">Email</a><a className="creator-contact" href="https://github.com/MouazMourad">GitHub</a></div><h1>AQUA NEXUS</h1><p>{rtl?"شكراً لأنك جزء من رحلة Aqua Nexus":"Thank you for being part of the Aqua Nexus journey."}</p><Link href="/" className="final-button">{t.back}</Link></section>
  </main>;
+}
