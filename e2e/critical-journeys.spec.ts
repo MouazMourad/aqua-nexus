@@ -457,7 +457,7 @@ test("persistence failure is surfaced instead of silently accepted",async({page}
     if(w.__storageSet)Storage.prototype.setItem=w.__storageSet;
   });
   await goToPage(page,"settings");
-  await expect(page.locator(".page-grid")).toContainText(/FAILED|recent changes may not survive reload/i);
+  await expect(page.locator(".page-grid").filter({ hasText: /FAILED|recent changes may not survive reload/i }).first()).toContainText(/FAILED|recent changes may not survive reload/i);
 });
 
 test("Lighting Intelligence edits, visualizes and calibrates the tank light model",async({page})=>{
