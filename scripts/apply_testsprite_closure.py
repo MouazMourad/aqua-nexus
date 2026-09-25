@@ -83,4 +83,19 @@ new2='''    detailsAr:[...rows,"أهداف الأمان العامة: NH3/NH4 = 
     detailsEn:[...rows,"General safety targets: NH3/NH4 = 0 ppm, NO2 = 0 ppm, and NO3 is commonly kept below about 20–40 ppm depending on livestock sensitivity.","GH and KH do not have one universal freshwater target; the appropriate range depends on livestock and source water, and rapid changes should be avoided.","For a stable tank, a 20–30% weekly water change is a common baseline; adjust percentage and frequency from NH3/NO2/NO3 and their trend.",water.summaryEn,...water.detailsEn],'''
 if old2 not in s:
     raise SystemExit("Freshwater answer target missing")
-p.write_text(s.replace(old2,new2,1),encoding="utf-8")
+s=s.replace(old2,new2,1)
+
+# Final regression closure: expose the current requested readings in the summary
+# and name ammonia explicitly in the Arabic title so the UI/test contract is stable.
+old3='''    titleAr:"كيمياء المياه العذبة وخطة تغيير الماء",
+    titleEn:"Freshwater chemistry and water-change plan",
+    summaryAr:"راقب GH وKH والنترات والأمونيا أولاً، ثم قرر تغيير الماء بناءً على القراءات واتجاهها.",
+    summaryEn:"Watch GH, KH, nitrate, and ammonia first, then decide on a water change from the readings and their trend.",'''
+new3='''    titleAr:"كيمياء المياه العذبة: الأمونيا والنترات وخطة تغيير الماء",
+    titleEn:"Freshwater chemistry and water-change plan",
+    summaryAr:`القراءات الحالية: ${["GH","KH","NO3","NH3"].map(key=>`${key}: ${latest[key]===undefined?"غير مسجل":String(latest[key])}`).join("، ")}. راقب الأمونيا والنتريت والنترات وقرر تغيير الماء حسب القراءات واتجاهها.`,
+    summaryEn:`Current readings: ${["GH","KH","NO3","NH3"].map(key=>`${key}: ${latest[key]===undefined?"not recorded":String(latest[key])}`).join(", ")}. Watch ammonia, nitrite and nitrate, then decide on a water change from the readings and their trend.`,'''
+if old3 not in s:
+    raise SystemExit("Freshwater final regression target missing")
+s=s.replace(old3,new3,1)
+p.write_text(s,encoding="utf-8")
