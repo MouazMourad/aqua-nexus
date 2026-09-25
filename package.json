@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/fix-timeline-event-i18n.mjs",
     "build": "next build",
     "start": "next start",
     "test": "vitest run src/domain/__tests__",
