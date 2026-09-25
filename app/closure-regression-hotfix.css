@@ -25,3 +25,37 @@ body:has(.acclimation-page) button[type="submit"] {
   position: relative;
   z-index: 7200;
 }
+
+/* Mobile locale/accessibility closure.
+   The floating AI shell sits at z-index 7000 and Android Chromium can resolve
+   its RTL hit box across the topbar even when only the fish is visibly at the
+   bottom edge. Keep the real header controls in their own higher stacking
+   context so language/tank/add controls always receive pointer input. */
+.interactive-header {
+  position: relative;
+  z-index: 7300;
+  isolation: isolate;
+}
+.interactive-header .top-actions,
+.interactive-header .top-actions .btn,
+.interactive-header .top-actions .select {
+  position: relative;
+  z-index: 7301;
+  pointer-events: auto;
+}
+
+/* The AI shell itself must never create a page-sized pointer target. Only its
+   explicit launcher/panel/greeting remain interactive (declared in AI CSS). */
+.aqua-ai-shell {
+  width: max-content;
+  max-width: calc(100vw - 18px);
+}
+
+@media (max-width:700px) {
+  .interactive-header {
+    z-index: 7300;
+  }
+  .interactive-header .top-actions {
+    isolation: isolate;
+  }
+}
