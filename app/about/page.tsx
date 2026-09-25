@@ -12,7 +12,7 @@ const sceneCount=12;
 export default function AboutPage(){
  const lang=useAquaStore(s=>s.language);const t=C[lang];const rtl=lang==="ar";const root=useRef<HTMLElement>(null);const[active,setActive]=useState(0);const[auto,setAuto]=useState(true);
  useEffect(()=>{const r=root.current;if(!r)return;const s=[...r.querySelectorAll<HTMLElement>(".cinema-scene")];const o=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)setActive(s.indexOf(e.target as HTMLElement))}),{root:r,threshold:.65});s.forEach(x=>o.observe(x));return()=>o.disconnect()},[]);
- useEffect(()=>{if(!auto||active>=sceneCount-1)return;const id=setTimeout(()=>root.current?.querySelectorAll<HTMLElement>(".cinema-scene")[active+1]?.scrollIntoView({behavior:"smooth"}),active===0?4200:3600);return()=>clearTimeout(id)},[active,auto]);
+ useEffect(()=>{if(!auto||active>=sceneCount-1)return;const id=setTimeout(()=>root.current?.querySelectorAll<HTMLElement>(".cinema-scene")[active+1]?.scrollIntoView({behavior:"smooth"}),active===0?7600:3600);return()=>clearTimeout(id)},[active,auto]);
  const jump=(i:number)=>{setAuto(false);root.current?.querySelectorAll<HTMLElement>(".cinema-scene")[i]?.scrollIntoView({behavior:"smooth"})};
  const cards=(xs:readonly string[])=> <div className="difference-grid">{xs.map((x,i)=><article key={x} style={{"--i":i} as React.CSSProperties}><b>{x}</b></article>)}</div>;
  return <main ref={root} className="cinema-about" dir={rtl?"rtl":"ltr"} lang={lang}>
@@ -30,4 +30,3 @@ export default function AboutPage(){
  <section className="cinema-scene creator-scene"><div className="creator-glow"/><small>{rtl?"من المطوّر":"FROM THE CREATOR"}</small><h2>Mouaz Mourad</h2><p>{t.messageSub}</p></section>
  <section className="cinema-scene finale-scene"><div className="final-rays"/><h2>{t.connected}</h2><p>{t.connectedSub}</p><div className="quality-tags"><a className="creator-contact" href="mailto:mouaz.mourad@gmail.com">Email</a><a className="creator-contact" href="https://github.com/MouazMourad">GitHub</a></div><h1>AQUA NEXUS</h1><p>{rtl?"شكراً لأنك جزء من رحلة Aqua Nexus":"Thank you for being part of the Aqua Nexus journey."}</p><Link href="/" className="final-button">{t.back}</Link></section>
  </main>;
-}
