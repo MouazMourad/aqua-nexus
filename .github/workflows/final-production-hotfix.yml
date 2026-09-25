@@ -1,4 +1,4 @@
-name: Final production hotfix
+name: Close TestSprite findings
 
 on:
   push:
@@ -21,15 +21,20 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - name: Patch production issues
+      - name: Patch TestSprite findings
         shell: python
         run: |
           from pathlib import Path
 
-          # AI: route freshwater chemistry + water-change intent before lighting.
-          p=Path('src/domain/aquaAIBrain.ts')
-          s=p.read_text()
-          old='''  const q=(question||"").trim().toLowerCase();
+          def replace(path, old, new, count=1):
+              p=Path(path)
+              s=p.read_text()
+              if old not in s:
+                  raise SystemExit(f'Patch target not found in {path}: {old[:100]}')
+              p.write_text(s.replace(old,new,count))
+
+          # 1) Freshwater AI: classify broad chemistry/water-change intent before lighting.
+          replace('src/domain/aquaAIBrain.ts', '''  const q=(question||"").trim().toLowerCase();
   const lightingQ=normText(question);
   const lightingTokens=["انار","اضاء","ضوء","ضو","lighting","light","photoperiod","spectrum","par","uv","royal blue"];
   const freshwaterChemistryQuestion =
@@ -40,77 +45,152 @@ jobs:
     return freshwaterChemistryAnswer(tank);
   }
   if(lightingTokens.some(token=>lightingQ.includes(token)))return lightingAnswer(tank);
-  const intent=parseAquaQuestion(question);'''
-          new='''  const q=(question||"").trim().toLowerCase();
+  const intent=parseAquaQuestion(question);''', '''  const q=(question||"").trim().toLowerCase();
   const lightingQ=normText(question);
   const intent=parseAquaQuestion(question);
+  const freshwaterChemistryTokens=[
+    "freshwater parameter","water parameter","chemistry","chemical","ammonia","nh3","nh4",
+    "nitrite","no2","nitrate","no3","gh","kh","water change","كيميا","كيمياء","امونيا",
+    "أمونيا","نتريت","نترات","تغيير ماء","تغيير مي","تغيير المي","معايير الماء","قيم الماء"
+  ];
   const freshwaterChemistryQuestion =
     tank.type==="freshwater" &&
-    intent.topics.includes("chemistry") &&
-    (intent.topics.includes("water") || intent.mode==="waterChange");
+    (intent.topics.includes("chemistry") || intent.mode==="waterChange" ||
+     freshwaterChemistryTokens.some(token=>lightingQ.includes(normText(token))));
   if(freshwaterChemistryQuestion){
     return freshwaterChemistryAnswer(tank);
   }
   const lightingTokens=["انار","اضاء","ضوء","ضو","lighting","light","photoperiod","spectrum","par","uv","royal blue"];
-  if(lightingTokens.some(token=>lightingQ.includes(token)))return lightingAnswer(tank);'''
+  if(lightingTokens.some(token=>lightingQ.includes(token)))return lightingAnswer(tank);''')
+
+          # Give freshwater answers useful numeric safety targets + a conservative maintenance baseline.
+          replace('src/domain/aquaAIBrain.ts', '''    detailsAr:[...rows,water.summaryAr,...water.detailsAr],
+    detailsEn:[...rows,water.summaryEn,...water.detailsEn],''', '''    detailsAr:[
+      ...rows,
+      "أهداف الأمان العامة: NH3/NH4 = 0 ppm، NO2 = 0 ppm، ويفضل إبقاء NO3 عادةً دون 20–40 ppm حسب حساسية الكائنات.",
+      "GH وKH ما إلهم رقم واحد مناسب لكل أحواض المياه العذبة؛ الهدف يعتمد على الأنواع المسجلة وماء المصدر، والأهم تجنب التغيير السريع.",
+      "كخط أساس لحوض مستقر: تغيير 20–30% أسبوعياً مناسب غالباً، لكن عدّل النسبة والتكرار حسب NH3/NO2/NO3 واتجاه القراءات ولا تعمل تغييراً كبيراً بلا سبب.",
+      water.summaryAr,...water.detailsAr
+    ],
+    detailsEn:[
+      ...rows,
+      "General safety targets: NH3/NH4 = 0 ppm, NO2 = 0 ppm, and NO3 is commonly kept below about 20–40 ppm depending on livestock sensitivity.",
+      "GH and KH do not have one universal freshwater target; the appropriate range depends on the livestock and source water, and rapid changes should be avoided.",
+      "For a stable tank, a 20–30% weekly water change is a common baseline; adjust percentage/frequency from NH3/NO2/NO3 and their trend rather than making a large change without evidence.",
+      water.summaryEn,...water.detailsEn
+    ],''')
+
+          # 2) Timeline shell and source labels.
+          replace('src/components/pages/TimelinePage.tsx', 'PageHeader eyebrow="TANK TIMELINE" title={tr(lang,"timeline")}', 'PageHeader eyebrow={bi(lang,"السجل الزمني للحوض","TANK TIMELINE")} title={tr(lang,"timeline")}')
+          replace('src/components/pages/TimelinePage.tsx', '<small className="eyebrow-mini">LONG-TERM HISTORY</small>', '<small className="eyebrow-mini">{bi(lang,"التاريخ طويل الأمد","LONG-TERM HISTORY")}</small>')
+          replace('src/components/pages/TimelinePage.tsx', '{x.source==="intelligence"?" • Tank Brain":""}', '{x.source==="intelligence"?` • ${bi(lang,"عقل الحوض","Tank Brain")}`:""}')
+
+          # 3) Livestock shell: no English-only eyebrow/system label in Arabic mode.
+          replace('src/components/pages/LivestockPage.tsx', '<PageHeader eyebrow="LIVESTOCK" title={tr(lang,"livestock")}', '<PageHeader eyebrow={bi(lang,"كائنات الحوض","LIVESTOCK")} title={tr(lang,"livestock")}')
+          replace('src/components/pages/LivestockPage.tsx', '<small className="eyebrow-mini">SYSTEM COMPATIBILITY</small>', '<small className="eyebrow-mini">{bi(lang,"توافق النظام","SYSTEM COMPATIBILITY")}</small>')
+          replace('src/components/pages/LivestockPage.tsx', 'ونتيجته تدخل بالصحة العامة وبـ Local Best AI.', 'ونتيجته تدخل بالصحة العامة وبعقل الحوض.')
+
+          # 4) Localize the visible AI product label while keeping the English brand in English mode.
+          p=Path('src/components/AquaAIAssistant.tsx')
+          s=p.read_text()
+          s=s.replace('<b>Local Best AI</b><span>{greetingText}</span>', '<b>{lang==="ar"?"ذكاء أكوا نيكسس":"Local Best AI"}</b><span>{greetingText}</span>')
+          s=s.replace('<b>✦ Local Best AI</b>', '<b>✦ {lang==="ar"?"ذكاء أكوا نيكسس":"Local Best AI"}</b>')
+          s=s.replace('<small>Local Best AI</small>', '<small>{lang==="ar"?"ذكاء أكوا نيكسس":"Local Best AI"}</small>')
+          s=s.replace('<small>Local Best AI • AQUARIUM ONLY</small>', '<small>{lang==="ar"?"ذكاء أكوا نيكسس • للأحواض فقط":"Local Best AI • AQUARIUM ONLY"}</small>')
+          p.write_text(s)
+
+          # 5) Localize timeline event/category tokens, including TestSprite examples and common app events.
+          p=Path('src/i18n/index.ts')
+          s=p.read_text()
+          old='''export function eventTypeText(lang:Language,type:string){
+  const labels:Record<string,[string,string]>={
+    "core:livestock:added":["إضافة كائن","Livestock added"],
+    "core:livestock:observation_updated":["تحديث ملاحظة كائن","Livestock observation updated"],
+    "core:maintenance:scheduled":["جدولة صيانة","Maintenance scheduled"],
+    "core:system:coverage_checkpoint":["تحديث تغطية النظام","System coverage update"],
+    "core:system:tank_identity_changed":["تغيير هوية الحوض","Tank identity changed"],
+    "core:acclimation:started":["بدء الإقلمة","Acclimation started"],
+    "core:acclimation:progress":["تقدم الإقلمة","Acclimation progress"],
+    "core:dosing:dose_given":["تسجيل جرعة","Dose recorded"],
+    "core:equipment:changed":["تغيير جهاز","Equipment changed"],
+    "core:equipment:configuration_changed":["تغيير إعداد جهاز","Equipment configuration changed"],
+    "core:equipment:installed":["إضافة جهاز","Equipment installed"]
+  };
+  const direct=labels[type];
+  if(direct){
+    return lang==="ar"?direct[0]:direct[1];
+  }
+  if(type.startsWith("core:")){
+    return lang==="ar"?"سجل نظام":"System record";
+  }
+  return type;
+}'''
+          new='''export function eventTypeText(lang:Language,type:string){
+  const labels:Record<string,[string,string]>={
+    "core:livestock:added":["إضافة كائن","Livestock added"],
+    "core:livestock:observation_updated":["تحديث ملاحظة كائن","Livestock observation updated"],
+    "core:maintenance:scheduled":["جدولة صيانة","Maintenance scheduled"],
+    "core:system:coverage_checkpoint":["تحديث تغطية النظام","System coverage update"],
+    "core:system:tank_identity_changed":["تغيير هوية الحوض","Tank identity changed"],
+    "core:acclimation:started":["بدء الإقلمة","Acclimation started"],
+    "core:acclimation:progress":["تقدم الإقلمة","Acclimation progress"],
+    "core:dosing:dose_given":["تسجيل جرعة","Dose recorded"],
+    "core:equipment:changed":["تغيير جهاز","Equipment changed"],
+    "core:equipment:configuration_changed":["تغيير إعداد جهاز","Equipment configuration changed"],
+    "core:equipment:installed":["إضافة جهاز","Equipment installed"],
+    "recovery":["تعافٍ","Recovery"],
+    "chemistry":["كيمياء","Chemistry"],
+    "warning":["تنبيه","Warning"],
+    "setup":["إعداد","Setup"],
+    "manual":["يدوي","Manual"],
+    "livestock":["كائنات الحوض","Livestock"],
+    "livestock-observation":["ملاحظة كائن","Livestock observation"],
+    "livestock-death":["وفاة كائن","Livestock death"],
+    "livestock-sold":["بيع كائن","Livestock sold"],
+    "livestock-transferred":["نقل كائن","Livestock transferred"],
+    "livestock-returned":["إرجاع كائن","Livestock returned"],
+    "livestock-removed":["إزالة كائن","Livestock removed"],
+    "history-archive":["أرشفة السجل","History archive"],
+    "ai-action-plan":["خطة عقل الحوض","Tank Brain action plan"],
+    "ai-action-outcome":["نتيجة خطة عقل الحوض","Tank Brain plan outcome"],
+    "maintenance":["صيانة","Maintenance"],
+    "dosing":["جرعة","Dosing"],
+    "feeding":["تغذية","Feeding"],
+    "water-change":["تغيير ماء","Water change"],
+    "equipment":["معدات","Equipment"],
+    "acclimation":["إقلمة","Acclimation"],
+    "emergency":["طوارئ","Emergency"]
+  };
+  const direct=labels[type];
+  if(direct)return lang==="ar"?direct[0]:direct[1];
+  if(type.startsWith("core:"))return lang==="ar"?"سجل نظام":"System record";
+  if(lang==="ar")return "حدث بالحوض";
+  return type.replace(/[-_:]+/g," ").replace(/\\b\\w/g,c=>c.toUpperCase());
+}'''
           if old not in s:
-              raise SystemExit('AI routing block not found')
+              raise SystemExit('eventTypeText block not found')
           p.write_text(s.replace(old,new,1))
 
-          # PWA: force a new worker and never serve stale HTML first while online.
-          p=Path('public/sw.js')
+          # 6) Regression coverage for broad freshwater routing and localized event tokens.
+          p=Path('src/domain/__tests__/aquaAIRegression.test.ts')
           s=p.read_text()
-          s=s.replace('const CACHE_NAME="aqua-nexus-pwa-v8";','const CACHE_NAME="aqua-nexus-pwa-v9";',1)
-          old_nav='''  if(request.mode==="navigate"){
-    // App-shell first: an installed iOS PWA must paint immediately instead of
-    // waiting on a slow/captive/VPN network before showing anything. Refresh
-    // the shell in the background so the next launch gets the newest deploy.
-    event.respondWith((async()=>{
-      const cached=(await caches.match(request))||(await caches.match("/"));
-      const refresh=fetch(request,{cache:"no-store"}).then(async response=>{
-        if(response&&response.ok){
-          const cache=await caches.open(CACHE_NAME);
-          await cache.put("/",response.clone());
-        }
-        return response;
-      }).catch(()=>null);
-      if(cached){event.waitUntil(refresh);return cached;}
-      return (await refresh)||Response.error();
-    })());
-    return;
-  }'''
-          new_nav='''  if(request.mode==="navigate"){
-    // Network-first keeps Production on the newest Vercel shell. The cached
-    // shell is only an offline fallback, preventing old JS bundles from
-    // surviving a successful deployment on installed iOS PWAs.
-    event.respondWith((async()=>{
-      try{
-        const response=await fetch(request,{cache:"no-store"});
-        if(response&&response.ok){
-          const cache=await caches.open(CACHE_NAME);
-          await cache.put("/",response.clone());
-        }
-        return response;
-      }catch{
-        return (await caches.match(request))||(await caches.match("/"))||Response.error();
-      }
-    })());
-    return;
-  }'''
-          if old_nav not in s:
-              raise SystemExit('PWA navigation block not found')
-          p.write_text(s.replace(old_nav,new_nav,1))
+          marker='''describe("'''
+          # Append standalone tests before EOF; Vitest globals/imports already exist in this suite.
+          addition='''\n\ndescribe("TestSprite closure regressions",()=>{\n  it("routes broad freshwater chemistry and water-change wording away from lighting",()=>{\n    const tank=makeTank({type:"freshwater"} as any);\n    const prompts=[\n      "What should my ammonia nitrite nitrate targets be and how often should I change water?",\n      "What freshwater chemistry should I watch next?",\n      "شو لازم راقب بالكيميا وتغيير المي بحوض المياه العذبة؟"\n    ];\n    for(const prompt of prompts){\n      const answer=aquaAIAnswer(prompt,tank,"dashboard");\n      expect(answer.titleEn).toBe("Freshwater chemistry and water-change plan");\n      expect(answer.titleEn).not.toMatch(/lighting/i);\n      expect(answer.detailsEn.join(" ")).toMatch(/NH3\\/NH4 = 0 ppm/);\n      expect(answer.detailsEn.join(" ")).toMatch(/20–30% weekly/);\n    }\n  });\n});\n'''
+          # Avoid duplicate insertion on a retry.
+          if 'TestSprite closure regressions' not in s:
+              p.write_text(s+addition)
 
       - name: Install, test, build
         run: |
           npm install
           npm test
           npm run build
-      - name: Commit hotfix
+      - name: Commit closure fixes
         run: |
           git config user.name "Aqua Nexus CI"
           git config user.email "actions@users.noreply.github.com"
           git rm .github/workflows/final-production-hotfix.yml
-          git add src/domain/aquaAIBrain.ts public/sw.js
-          git commit -m "fix: production AI routing and stale PWA shell"
+          git add src/domain/aquaAIBrain.ts src/components/AquaAIAssistant.tsx src/components/pages/LivestockPage.tsx src/components/pages/TimelinePage.tsx src/i18n/index.ts src/domain/__tests__/aquaAIRegression.test.ts
+          git commit -m "fix: close TestSprite localization and freshwater AI findings"
           git push origin main
