@@ -30,6 +30,7 @@ import { ExpensesPage } from "./ExpensesPage";
 import { AlertsPage } from "./AlertsPage";
 import { ReportsPage } from "./ReportsPage";
 import { SettingsPage } from "./SettingsPage";
+import { AboutLauncher } from "./AboutLauncher";
 import { AcademyPage } from "./AcademyPage";
 import { AcademyShortcut } from "@/components/academy/AcademyShortcut";
 import { biologicalCycleStatus,isCyclePageAllowed } from "@/domain/biologicalCycle";
@@ -69,7 +70,7 @@ export function PageRouter({page,tank,tanks,selectedTankId,onSelectTank,onNaviga
   case"expenses":content=<ExpensesPage tank={tank}/>;break;
   case"alerts":content=<AlertsPage tank={tank}/>;break;
   case"reports":content=<ReportsPage tank={tank}/>;break;
-  case"settings":content=<SettingsPage tank={tank}/>;break;
+  case"settings":content=<><SettingsPage tank={tank}/><section className="page-grid" style={{marginTop:16}}><AboutLauncher/></section></>;break;
   case"academy":content=<AcademyPage onNavigate={onNavigate}/>;break;
   default:content=<AquaDashboardContent tank={tank} onNavigate={onNavigate}/>;
  }
