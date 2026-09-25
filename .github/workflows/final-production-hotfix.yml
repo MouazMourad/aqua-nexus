@@ -27,7 +27,9 @@ jobs:
           cache: npm
 
       - name: Apply closure patch
-        run: python3 scripts/apply_testsprite_closure.py
+        run: |
+          python3 scripts/apply_testsprite_closure.py
+          python3 scripts/fix_timeline_event_i18n.py
 
       - name: Install dependencies
         run: npm install
@@ -42,7 +44,7 @@ jobs:
         run: |
           git config user.name "Aqua Nexus CI"
           git config user.email "actions@users.noreply.github.com"
-          git add src/domain/aquaAIBrain.ts src/components/AquaAIAssistant.tsx src/components/pages/TimelinePage.tsx src/components/pages/MaintenancePage.tsx src/components/pages/LivestockPage.tsx
+          git add src/domain/aquaAIBrain.ts src/components/AquaAIAssistant.tsx src/components/pages/TimelinePage.tsx src/components/pages/MaintenancePage.tsx src/components/pages/LivestockPage.tsx src/i18n/index.ts
           git diff --cached --quiet && exit 0
-          git commit -m "fix: close final TestSprite localization and freshwater findings"
+          git commit -m "fix: localize final timeline event tokens"
           git push origin main
