@@ -1,0 +1,4 @@
+"use client";
+import Link from "next/link";import dynamic from "next/dynamic";import {useAquaStore} from "@/store/useAquaStore";import "./cinematic.css";
+const CinematicWorld=dynamic(()=>import("./CinematicWorld"),{ssr:false});
+export default function CinematicPage(){const lang=useAquaStore(s=>s.language);const ar=lang==="ar";return <main className="cinematic-engine" dir={ar?"rtl":"ltr"}><CinematicWorld/><div className="cinematic-ui"><Link href="/about" className="cinematic-exit">{ar?"العودة":"Back"}</Link><div className="cinematic-whisper"><span>AQUA NEXUS</span><strong>{ar?"ماذا لو استطاعت التقنية أن تفهم الحياة؟":"What if technology could understand life?"}</strong></div><div className="camera-note">{ar?"مشهد 3D حي · حركة كاميرا تلقائية":"LIVE 3D · AUTONOMOUS CAMERA"}</div></div></main>}
