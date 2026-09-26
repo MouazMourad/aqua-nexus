@@ -1,7 +1,6 @@
 "use client";
 import {Canvas,useFrame} from "@react-three/fiber";
 import {Environment,Float,Sparkles} from "@react-three/drei";
-import {Bloom,DepthOfField,EffectComposer,Vignette} from "@react-three/postprocessing";
 import * as THREE from "three";
 import {useMemo,useRef} from "react";
 
@@ -50,6 +49,5 @@ export default function CinematicWorld(){
   <ambientLight intensity={.16}/><directionalLight position={[1,7,5]} color="#a8f8ff" intensity={2.2}/><pointLight position={[2,2,2]} color="#39dfff" intensity={38} distance={13}/><pointLight position={[-4,-1,-2]} color="#0a5fff" intensity={26} distance={10}/><pointLight position={[4,-1,-3]} color="#4dffbd" intensity={18} distance={9}/>
   <Environment preset="night"/><LightRays/><Seabed/><Bubbles/><Sparkles count={170} scale={[13,8,10]} size={1.4} speed={.18} opacity={.24}/>
   <Kelp x={-5} z={-2} s={1.35}/><Kelp x={-3.8} z={2.1} s={.85}/><Kelp x={4.8} z={1.5} s={1.2}/><Kelp x={1.9} z={-4} s={.8}/><Reef/><Fish/><CameraRig/>
-  <EffectComposer multisampling={0}><DepthOfField focusDistance={.012} focalLength={.028} bokehScale={2.1}/><Bloom luminanceThreshold={.55} mipmapBlur intensity={1.05}/><Vignette eskil={false} offset={.16} darkness={.72}/></EffectComposer>
  </Canvas>
 }
