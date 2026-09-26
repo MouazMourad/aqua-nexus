@@ -1,48 +1,55 @@
 "use client";
 import {Canvas,useFrame} from "@react-three/fiber";
-import {Float,Stars} from "@react-three/drei";
+import {Environment,Float,Sparkles} from "@react-three/drei";
+import {Bloom,DepthOfField,EffectComposer,Vignette} from "@react-three/postprocessing";
 import * as THREE from "three";
 import {useMemo,useRef} from "react";
 
-function Water(){
- const ref=useRef<THREE.Mesh>(null);
- useFrame(({clock})=>{if(ref.current){ref.current.rotation.z=Math.sin(clock.elapsedTime*.12)*.03;ref.current.position.y=-2.25+Math.sin(clock.elapsedTime*.4)*.04}});
- return <mesh ref={ref} rotation={[-Math.PI/2,0,0]} position={[0,-2.25,0]}>
-  <planeGeometry args={[40,40,80,80]}/><meshStandardMaterial color="#063c52" roughness={.18} metalness={.12} transparent opacity={.72}/>
- </mesh>
-}
-function DataFish(){
- const group=useRef<THREE.Group>(null);
- const pts=useMemo(()=>{const a=[] as number[];for(let i=0;i<1200;i++){const x=(Math.random()-.5)*3.2;const profile=Math.max(.08,1-Math.pow(x/1.7,2));const ang=Math.random()*Math.PI*2;const r=Math.sqrt(Math.random())*profile*.82;a.push(x,Math.cos(ang)*r,Math.sin(ang)*r*.52)}return new Float32Array(a)},[]);
- useFrame(({clock})=>{if(group.current){const t=clock.elapsedTime;group.current.position.x=Math.sin(t*.28)*2.2;group.current.position.y=.25+Math.sin(t*.7)*.18;group.current.rotation.y=-.18+Math.sin(t*.35)*.22}});
- return <Float speed={1.1} rotationIntensity={.12} floatIntensity={.25}><group ref={group} position={[-1,.2,0]}>
-  <points><bufferGeometry><bufferAttribute attach="attributes-position" args={[pts,3]}/></bufferGeometry><pointsMaterial size={.035} color="#69efff" transparent opacity={.92} depthWrite={false}/></points>
-  <mesh position={[1.25,.16,.28]}><sphereGeometry args={[.08,20,20]}/><meshBasicMaterial color="white"/></mesh>
-  <mesh position={[-1.75,0,0]} rotation={[0,0,-Math.PI/2]}><coneGeometry args={[.82,1.25,3]}/><meshStandardMaterial color="#19bfe0" transparent opacity={.34} emissive="#087f9d" emissiveIntensity={1.5}/></mesh>
+const TAU=Math.PI*2;
+function Fish(){
+ const g=useRef<THREE.Group>(null), tail=useRef<THREE.Mesh>(null);
+ const pts=useMemo(()=>{const a:number[]=[];for(let i=0;i<2600;i++){const x=(Math.random()-.5)*3.7;const q=x/1.85;const profile=Math.sqrt(Math.max(.02,1-q*q));const th=Math.random()*TAU;const r=Math.sqrt(Math.random())*profile;a.push(x,Math.cos(th)*r*.9,Math.sin(th)*r*.58)}return new Float32Array(a)},[]);
+ useFrame(({clock})=>{const t=clock.elapsedTime;if(g.current){g.current.position.set(Math.sin(t*.34)*1.35,.25+Math.sin(t*.8)*.18,Math.sin(t*.28)*1.1);g.current.rotation.y=-.35+Math.sin(t*.42)*.38;g.current.rotation.z=Math.sin(t*.7)*.035}if(tail.current)tail.current.rotation.y=Math.sin(t*4.2)*.3});
+ return <Float speed={1.2} floatIntensity={.18} rotationIntensity={.04}><group ref={g}>
+  <points><bufferGeometry><bufferAttribute attach="attributes-position" args={[pts,3]}/></bufferGeometry><pointsMaterial size={.026} color="#8df7ff" transparent opacity={.94} depthWrite={false} blending={THREE.AdditiveBlending}/></points>
+  <mesh ref={tail} position={[-2.15,0,0]} rotation={[0,0,-Math.PI/2]}><coneGeometry args={[.95,1.45,3]}/><meshStandardMaterial color="#0aaed0" emissive="#067d9c" emissiveIntensity={2} transparent opacity={.48} side={THREE.DoubleSide}/></mesh>
+  <mesh position={[1.48,.25,.42]}><sphereGeometry args={[.075,24,24]}/><meshBasicMaterial color="#fff"/></mesh>
  </group></Float>
 }
-function Life(){
- const group=useRef<THREE.Group>(null);
- useFrame(({clock})=>{if(group.current)group.current.rotation.y=Math.sin(clock.elapsedTime*.22)*.12});
- return <group ref={group} position={[2.5,-2.05,-1]}>
-  {[-1.1,-.55,0,.55,1.05].map((x,i)=><mesh key={x} position={[x,.65+(i%2)*.25,0]} rotation={[0,0,(i-2)*.13]}><cylinderGeometry args={[.035,.09,1.7+(i%2)*.5,8]}/><meshStandardMaterial color="#31d99b" emissive="#0b5c46" emissiveIntensity={.8}/></mesh>)}
-  <mesh position={[0,.2,.2]}><dodecahedronGeometry args={[.75,1]}/><meshStandardMaterial color="#d93aa9" emissive="#6d164f" emissiveIntensity={.9} roughness={.65}/></mesh>
- </group>
+function Kelp({x,z,s=1}:{x:number,z:number,s?:number}){
+ const g=useRef<THREE.Group>(null);useFrame(({clock})=>{if(g.current)g.current.rotation.z=Math.sin(clock.elapsedTime*1.1+x)*.08});
+ return <group ref={g} position={[x,-2.45,z]} scale={s}>{[0,.22,-.22].map((o,i)=><mesh key={i} position={[o,1,0]} rotation={[0,0,o]}><cylinderGeometry args={[.035,.09,2.2,7]}/><meshStandardMaterial color={i===1?"#2ce1a0":"#087a67"} roughness={.5} emissive="#063f35" emissiveIntensity={.8}/></mesh>)}</group>
 }
-function Trail(){
- const ref=useRef<THREE.Points>(null);
- const p=useMemo(()=>{const a=[] as number[];for(let i=0;i<450;i++){const x=-7+i/42;a.push(x,-.15+Math.sin(i*.08)*.08,(Math.random()-.5)*.16)}return new Float32Array(a)},[]);
- useFrame(({clock})=>{if(ref.current)ref.current.rotation.z=Math.sin(clock.elapsedTime*.25)*.015});
- return <points ref={ref}><bufferGeometry><bufferAttribute attach="attributes-position" args={[p,3]}/></bufferGeometry><pointsMaterial size={.025} color="#38dfff" transparent opacity={.55} depthWrite={false}/></points>
+function Reef(){
+ return <group position={[3,-2.15,-2]}>{[[-.7,0,.3],[0,0,0],[.65,.1,.25],[.25,.25,-.45]].map((p,i)=><mesh key={i} position={p as [number,number,number]} scale={.45+i*.09}><icosahedronGeometry args={[1,1]}/><meshStandardMaterial color={i%2?"#c833a1":"#ff765e"} roughness={.72} emissive={i%2?"#4a0b39":"#5c1910"} emissiveIntensity={.7}/></mesh>)}</group>
+}
+function Seabed(){
+ const m=useRef<THREE.Mesh>(null);useFrame(({clock})=>{if(m.current)m.current.rotation.z=Math.sin(clock.elapsedTime*.18)*.01});
+ return <mesh ref={m} position={[0,-2.55,0]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[45,45,90,90]}/><meshPhysicalMaterial color="#042733" roughness={.3} metalness={.08} transparent opacity={.86}/></mesh>
+}
+function Bubbles(){
+ const p=useRef<THREE.Points>(null);const pos=useMemo(()=>{const a:number[]=[];for(let i=0;i<600;i++)a.push((Math.random()-.5)*16,Math.random()*9-4,(Math.random()-.5)*12);return new Float32Array(a)},[]);
+ useFrame(({clock})=>{if(p.current){p.current.position.y=(clock.elapsedTime*.13)%1;p.current.rotation.y=clock.elapsedTime*.015}});
+ return <points ref={p}><bufferGeometry><bufferAttribute attach="attributes-position" args={[pos,3]}/></bufferGeometry><pointsMaterial size={.018} color="#b9f9ff" transparent opacity={.32} depthWrite={false}/></points>
+}
+function LightRays(){
+ return <group position={[0,4,-4]} rotation={[0,0,.08]}>{[-3,-1.5,0,1.5,3].map((x,i)=><mesh key={x} position={[x,0,0]} rotation={[0,0,(i-2)*.035]}><coneGeometry args={[1.1,10,20,1,true]}/><meshBasicMaterial color="#53dff5" transparent opacity={.018} side={THREE.DoubleSide} depthWrite={false}/></mesh>)}</group>
 }
 function CameraRig(){
- useFrame(({camera,clock})=>{const t=clock.elapsedTime;camera.position.x=Math.sin(t*.08)*.45;camera.position.y=.45+Math.sin(t*.1)*.15;camera.position.z=8.2-Math.min(t*.025,.7);camera.lookAt(0,-.1,0)});
+ useFrame(({camera,clock})=>{const t=clock.elapsedTime;const phase=(t%18)/18;let x,y,z;
+ if(phase<.28){const p=phase/.28;x=-7+4.8*p;y=1.8-.9*p;z=10-3.8*p}
+ else if(phase<.58){const p=(phase-.28)/.30;x=-2.2+5.6*p;y=.9+Math.sin(p*Math.PI)*.8;z=6.2-4.4*p}
+ else if(phase<.82){const p=(phase-.58)/.24;x=3.4-1.4*p;y=1.0-.8*p;z=1.8-3.8*p}
+ else{const p=(phase-.82)/.18;x=2-9*p;y=.2+1.6*p;z=-2+12*p}
+ camera.position.lerp(new THREE.Vector3(x,y,z),.035);camera.lookAt(Math.sin(t*.22)*.5,-.1,0)});
  return null;
 }
 export default function CinematicWorld(){
- return <Canvas dpr={[1,1.7]} camera={{position:[0,.5,8.2],fov:48}} gl={{antialias:true,alpha:false,powerPreference:"high-performance"}}>
-  <color attach="background" args={["#000307"]}/><fog attach="fog" args={["#00111b",7,22]}/>
-  <ambientLight intensity={.22}/><pointLight position={[2,4,4]} color="#65efff" intensity={35} distance={14}/><pointLight position={[-4,-1,1]} color="#176cff" intensity={18} distance={10}/><pointLight position={[4,-1,-2]} color="#3dffc0" intensity={12} distance={8}/>
-  <Stars radius={35} depth={18} count={1200} factor={1.4} saturation={.4} fade speed={.25}/><Water/><Trail/><DataFish/><Life/><CameraRig/>
+ return <Canvas dpr={[1,2]} camera={{position:[-7,1.8,10],fov:46}} gl={{antialias:true,powerPreference:"high-performance",toneMapping:THREE.ACESFilmicToneMapping}} onCreated={({gl})=>{gl.toneMappingExposure=1.05}}>
+  <color attach="background" args={["#00060b"]}/><fog attach="fog" args={["#001722",5,18]}/>
+  <ambientLight intensity={.16}/><directionalLight position={[1,7,5]} color="#a8f8ff" intensity={2.2}/><pointLight position={[2,2,2]} color="#39dfff" intensity={38} distance={13}/><pointLight position={[-4,-1,-2]} color="#0a5fff" intensity={26} distance={10}/><pointLight position={[4,-1,-3]} color="#4dffbd" intensity={18} distance={9}/>
+  <Environment preset="night"/><LightRays/><Seabed/><Bubbles/><Sparkles count={170} scale={[13,8,10]} size={1.4} speed={.18} opacity={.24}/>
+  <Kelp x={-5} z={-2} s={1.35}/><Kelp x={-3.8} z={2.1} s={.85}/><Kelp x={4.8} z={1.5} s={1.2}/><Kelp x={1.9} z={-4} s={.8}/><Reef/><Fish/><CameraRig/>
+  <EffectComposer multisampling={0}><DepthOfField focusDistance={.012} focalLength={.028} bokehScale={2.1}/><Bloom luminanceThreshold={.55} mipmapBlur intensity={1.05}/><Vignette eskil={false} offset={.16} darkness={.72}/></EffectComposer>
  </Canvas>
 }
