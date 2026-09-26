@@ -4,30 +4,84 @@ import Link from "next/link";
 import {useEffect,useRef,useState} from "react";
 import {useAquaStore} from "@/store/useAquaStore";
 import "../about.css";
-import "../about-opening.css";
 
-const C={ar:{back:"العودة إلى Aqua Nexus",skip:"تخطي",hero:"طريقة أذكى لحوض أكثر صحة",heroSub:"بحري • نهري • منظومة ذكية واحدة",more:"أكثر من مجرد سجل",moreSub:"منظومة كاملة لإدارة الحوض وفهمه وحمايته.",features:"ميزات قوية لكل هاوٍ",brain:"عقل الحوض",brainSub:"مساعد ذكي يحلل بيانات حوضك، يكتشف المخاطر ويقدم إرشاداً مرتبطاً بحالتك الفعلية.",safety:"الأمان والموثوقية",safetySub:"سلامة البيانات • النسخ والاستعادة • تحذيرات الأمان • منصة مستقرة وموثوقة",tested:"تم اختباره والتحقق منه",testedSub:"اختبارات تجربة المستخدم، E2E، التراجع، سلامة البيانات، النسخ والاستعادة، تعدد الأجهزة والإنتاج.",everywhere:"يعمل في كل مكان",everywhereSub:"هاتف • جهاز لوحي • كمبيوتر • المتصفحات الرئيسية",journey:"رحلة التطوير",journeySub:"من الفكرة إلى Aqua Nexus",results:"بيانات حقيقية. نتائج حقيقية.",health:"حوض أكثر صحة… رحلة أكثر متعة",healthSub:"مصمم للمبتدئين، ومحبوب من الهواة ذوي الخبرة.",message:"رسالة شخصية",messageSub:"صُمم Aqua Nexus من شغف حقيقي بعالم الأحواض، ليجعل إدارتها أسهل وأذكى وأكثر أماناً. شكراً لأنك جزء من هذه الرحلة.",connected:"لنبقَ على تواصل",connectedSub:"أفكار، ملاحظات، أو مجرد مرحباً؟ يسعدني أن أسمع منك.",fresh:"نهري",marine:"بحري",featuresList:["كيمياء المياه","الكائنات والمرجان","عقل الحوض","الإقلمة","التذكيرات","التقارير"],brainList:["يحلل بياناتك","يكتشف المخاطر المحتملة","يقدم إرشاداً شخصياً"],testList:["Playwright","TestSprite","ChatGPT Work","Gemini","GitHub Actions","Vercel"],resultList:["180+ اختبار تراجع","90+ رحلة E2E","100+ سيناريو فحص","تعدد الأجهزة","فحوص الحماية","النسخ والاستعادة","اختبار الإنتاج"],devList:["الفكرة","النموذج الأولي","الوحدات الأساسية","عقل الحوض","طبقة الأمان","اختبارات مكثفة","الإصدار التجريبي"]},en:{back:"Back to Aqua Nexus",skip:"Skip",hero:"A Smarter Way to a Healthier Aquarium",heroSub:"Marine • Freshwater • One intelligent ecosystem",more:"More Than a Logbook",moreSub:"A complete ecosystem to manage, understand and protect your aquarium.",features:"Powerful Features for Every Aquarist",brain:"Tank Brain",brainSub:"Your AI-powered assistant that analyses your aquarium data, detects risks and provides contextual guidance.",safety:"Safety & Reliability",safetySub:"Data integrity • Backup & Restore • Safety warnings • Stable and reliable platform",tested:"Tested & Validated",testedSub:"UX, E2E, regression, data integrity, backup & restore, cross-device and production validation.",everywhere:"Works Everywhere",everywhereSub:"Mobile • Tablet • Desktop • All major browsers",journey:"The Development Journey",journeySub:"From an idea to Aqua Nexus",results:"Real Data. Real Results.",health:"A Healthier Aquarium. A More Enjoyable Journey.",healthSub:"Made for beginners, loved by experienced aquarists.",message:"A Personal Message",messageSub:"Aqua Nexus was built out of a real passion for the aquarium hobby — to make it easier, smarter and safer for everyone. Thank you for being part of this journey.",connected:"Let’s Stay Connected",connectedSub:"Ideas, feedback or just want to say hello? I’d love to hear from you.",fresh:"FRESHWATER",marine:"MARINE",featuresList:["WATER PARAMETERS","LIVESTOCK & CORAL","TANK BRAIN","ACCLIMATION","REMINDERS","REPORTS"],brainList:["Analyses your data","Detects potential risks","Provides personalized guidance"],testList:["Playwright","TestSprite","ChatGPT Work","Gemini","GitHub Actions","Vercel"],resultList:["180+ Regression Tests","90+ E2E User Journeys","100+ Test Scenarios","Cross-device Testing","Security Checks","Backup/Restore Validated","Production Testing"],devList:["THE IDEA","FIRST PROTOTYPE","CORE MODULES","TANK BRAIN","SAFETY LAYER","EXTENSIVE TESTING","PUBLIC BETA"]}} as const;
+const COPY={
+ ar:{back:"العودة",skip:"تخطي الفيلم",question:"ماذا لو استطاعت التقنية أن تفهم الحياة؟",connected:"في الحوض… لا شيء يحدث وحده.",mind:"عقل يرى ما وراء الأرقام",mindLines:["لا يسجّل فقط.","يفهم.","يربط.","يتذكر.","يحذّر.","ويقترح الخطوة التالية."],different:"هذا هو Aqua Nexus.",safety:"النصيحة الصحيحة… في الوقت الخطأ، قد تصبح خطأ.",memory:"الحوض يتغير. Aqua Nexus يتذكر.",worlds:"ماء مختلف. حياة مختلفة. عقل واحد.",everywhere:"على مكتبك. في جيبك. بجانب حوضك.",goes:"Aqua Nexus يذهب معك.",built:"لم يُبنَ دفعة واحدة.",evolved:"تعلّم مع كل مشكلة حاولنا حلها.",trust:"قبل أن نطلب منك أن تثق به… حاولنا كسره.",tested:"اختُبر. طُوّر. وتحققنا منه.",used:"استُخدمت ضمن عمليات التطوير والاختبار والتحقق",human:"Aqua Nexus بدأ من سؤال بسيط…",human2:"كيف نجعل العناية بهذا العالم أسهل، أذكى وأكثر أماناً؟",creator:"مبتكر Aqua Nexus",tag:"تقنية تفهم الحياة.",start:"ابدأ رحلتك"},
+ en:{back:"Back",skip:"Skip film",question:"What if technology could understand life?",connected:"In an aquarium… nothing happens alone.",mind:"An intelligence beyond the numbers",mindLines:["It doesn't just record.","It understands.","Connects.","Remembers.","Warns.","And suggests what comes next."],different:"This is Aqua Nexus.",safety:"The right advice… at the wrong time can become wrong.",memory:"The aquarium changes. Aqua Nexus remembers.",worlds:"Different water. Different life. One intelligence.",everywhere:"On your desk. In your pocket. Beside your aquarium.",goes:"Aqua Nexus goes with you.",built:"It wasn't built all at once.",evolved:"It evolved with every problem we tried to solve.",trust:"Before asking you to trust it… we tried to break it.",tested:"Tested. Refined. Verified.",used:"Used across development, testing and validation",human:"Aqua Nexus began with a simple question…",human2:"How can caring for this world become easier, smarter and safer?",creator:"Creator of Aqua Nexus",tag:"Technology that understands life.",start:"Start Exploring"}
+} as const;
 
-const sceneCount=12;
+const stages=["IDEA","PROTOTYPE","CORE","TANK BRAIN","IMPACT ENGINE","SAFETY","TESTING","AQUA NEXUS"];
+const tests=["E2E","REGRESSION","MOBILE","DESKTOP","ARABIC","ENGLISH","FRESHWATER","MARINE","DATA INTEGRITY","BACKUP","RESTORE"];
+const tools=["Playwright","TestSprite","ChatGPT Work","Gemini","GitHub Actions","Vercel"];
+const diffs=["TANK BRAIN","IMPACT ENGINE","AQUARIUM MEMORY","SAFETY LAYER","ONE SOURCE OF TRUTH","MARINE + FRESHWATER","COMPLETE JOURNEY"];
+
 export default function AboutPage(){
- const lang=useAquaStore(s=>s.language);const t=C[lang];const rtl=lang==="ar";const root=useRef<HTMLElement>(null);const[active,setActive]=useState(0);const[auto,setAuto]=useState(true);
- useEffect(()=>{const r=root.current;if(!r)return;const s=[...r.querySelectorAll<HTMLElement>(".cinema-scene")];const o=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)setActive(s.indexOf(e.target as HTMLElement))}),{root:r,threshold:.65});s.forEach(x=>o.observe(x));return()=>o.disconnect()},[]);
- useEffect(()=>{if(!auto||active>=sceneCount-1)return;const id=setTimeout(()=>root.current?.querySelectorAll<HTMLElement>(".cinema-scene")[active+1]?.scrollIntoView({behavior:"smooth"}),active===0?7600:3600);return()=>clearTimeout(id)},[active,auto]);
- const jump=(i:number)=>{setAuto(false);root.current?.querySelectorAll<HTMLElement>(".cinema-scene")[i]?.scrollIntoView({behavior:"smooth"})};
- const cards=(xs:readonly string[])=> <div className="difference-grid">{xs.map((x,i)=><article key={x} style={{"--i":i} as React.CSSProperties}><b>{x}</b></article>)}</div>;
- return <main ref={root} className="cinema-about" dir={rtl?"rtl":"ltr"} lang={lang}>
- <Link href="/" className="cinema-back">← {t.back}</Link><button className="cinema-skip" onClick={()=>jump(11)}>{t.skip} ›</button><div className="cinema-progress">{Array.from({length:12},(_,i)=><button aria-label={`${i+1}`} key={i} className={i===active?"on":""} onClick={()=>jump(i)}/>)}</div>
- <section className="cinema-scene hero-scene"><div className="water-world freshwater"><span>🌿</span><small>{t.fresh}</small></div><div className="aqua-mark"><div className="aqua-orb">≋</div><h1>AQUA NEXUS</h1><h2>{t.hero}</h2><p>{t.heroSub}</p></div><div className="water-world marine"><span>🪸</span><small>{t.marine}</small></div><div className="wave wave-a"/><div className="wave wave-b"/><div className="bubbles"/></section>
- <section className="cinema-scene journey-scene"><h2>{t.more}</h2><p>{t.moreSub}</p><div className="journey-line">{["✓","▥","🛡","◉"].map((x,i)=><span key={i}>{x} {rtl?["تتبّع","تحليل","إرشاد","أمان"][i]:["Track","Analyse","Get Guidance","Stay Safe"][i]}</span>)}</div></section>
- <section className="cinema-scene impact-scene"><p className="scene-kicker">{t.features}</p><div className="impact-stack">{t.featuresList.map((x,i)=><div className="impact-word" style={{"--i":i} as React.CSSProperties} key={x}>{x}</div>)}</div></section>
- <section className="cinema-scene brain-scene"><div className="brain-halo"/><div className="brain-core"><span>🧠</span><h2>{t.brain}</h2><p>{t.brainSub}</p></div>{cards(t.brainList)}</section>
- <section className="cinema-scene safety-scene"><div className="shield-rings"/><div className="shield">🛡️</div><h2>{t.safety}</h2><p>{t.safetySub}</p></section>
- <section className="cinema-scene quality-scene"><div className="scanline"/><h2>{t.tested}</h2><p>{t.testedSub}</p>{cards(t.testList)}<div className="pass-badge"><strong>100% PASS</strong><small>{rtl?"اختبارات الإغلاق المستهدفة":"Targeted closure tests"}</small></div></section>
- <section className="cinema-scene connected-scene"><div className="pulse-node">AQUA NEXUS</div><h2>{t.everywhere}</h2><p>{t.everywhereSub}</p>{cards(rtl?["كمبيوتر","جهاز لوحي","هاتف","المتصفحات الرئيسية"]:["Desktop","Tablet","Mobile","Major Browsers"])}</section>
- <section className="cinema-scene development-scene"><h2>{t.journey}</h2><p>{t.journeySub}</p><div className="development-flow">{t.devList.map((x,i)=><span style={{"--i":i} as React.CSSProperties} key={x}>{x}</span>)}</div></section>
- <section className="cinema-scene quality-scene"><h2>{t.results}</h2>{cards(t.resultList)}</section>
- <section className="cinema-scene finale-scene"><div className="final-worlds"><span>🌿</span><span>🪸</span></div><h2>{t.health}</h2><p>{t.healthSub}</p></section>
- <section className="cinema-scene creator-scene"><div className="creator-glow"/><small>{rtl?"من المطوّر":"FROM THE CREATOR"}</small><h2>Mouaz Mourad</h2><p>{t.messageSub}</p></section>
- <section className="cinema-scene finale-scene"><div className="final-rays"/><h2>{t.connected}</h2><p>{t.connectedSub}</p><div className="quality-tags"><a className="creator-contact" href="mailto:mouaz.mourad@gmail.com">Email</a><a className="creator-contact" href="https://github.com/MouazMourad">GitHub</a></div><h1>AQUA NEXUS</h1><p>{rtl?"شكراً لأنك جزء من رحلة Aqua Nexus":"Thank you for being part of the Aqua Nexus journey."}</p><Link href="/" className="final-button">{t.back}</Link></section>
- </main>;
+ const lang=useAquaStore(s=>s.language); const t=COPY[lang]; const rtl=lang==="ar";
+ const root=useRef<HTMLElement>(null); const [active,setActive]=useState(0); const [auto,setAuto]=useState(true);
+ useEffect(()=>{const r=root.current;if(!r)return;const scenes=[...r.querySelectorAll<HTMLElement>(".film-scene")];const o=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)setActive(scenes.indexOf(e.target as HTMLElement))}),{root:r,threshold:.6});scenes.forEach(s=>o.observe(s));return()=>o.disconnect()},[]);
+ const jump=(i:number)=>{setAuto(false);root.current?.querySelectorAll<HTMLElement>(".film-scene")[i]?.scrollIntoView({behavior:"smooth"})};
+ useEffect(()=>{if(!auto||active>=11)return;const delay=active===0?9000:6500;const id=setTimeout(()=>root.current?.querySelectorAll<HTMLElement>(".film-scene")[active+1]?.scrollIntoView({behavior:"smooth"}),delay);return()=>clearTimeout(id)},[active,auto]);
+ return <main ref={root} className="aqua-film" dir={rtl?"rtl":"ltr"} lang={lang}>
+  <div className="film-chrome"><Link href="/" className="film-exit">← {t.back}</Link><button onClick={()=>jump(11)}>{t.skip}</button></div>
+  <nav className="film-progress" aria-label="Film scenes">{Array.from({length:12},(_,i)=><button key={i} className={active===i?"on":""} onClick={()=>jump(i)} aria-label={"Scene "+(i+1)}/>)}</nav>
+
+  <section className="film-scene birth">
+   <div className="digital-fish"><i/><i/><i/><i/><i/><span className="fish-eye"/></div><div className="data-trail"/>
+   <div className="life-growth"><b>⌇</b><b>⌇</b><b>⌇</b><em>✦</em></div>
+   <h1>{t.question}</h1>
+  </section>
+
+  <section className="film-scene chemistry">
+   <div className="drop-world"><span>pH</span><span>KH</span><span>NO₃</span><span>PO₄</span><span>26°</span><div className="ripple-core"/></div>
+   <div className="living-chain"><i>🌿</i><b>→</b><i>◌</i><b>→</b><i>𓆟</i><b>→</b><i>◈</i></div><h2>{t.connected}</h2>
+  </section>
+
+  <section className="film-scene intelligence">
+   <div className="mind-organism"><div className="neural n1"/><div className="neural n2"/><div className="neural n3"/><div className="mind-water"/></div>
+   <div className="mind-streams">{["CHEMISTRY","LIVESTOCK","FEEDING","MAINTENANCE","INVENTORY","HEALTH"].map(x=><span key={x}>{x}</span>)}</div>
+   <p className="eyebrow">TANK BRAIN · IMPACT ENGINE</p><h2>{t.mind}</h2><div className="mind-copy">{t.mindLines.map(x=><b key={x}>{x}</b>)}</div>
+  </section>
+
+  <section className="film-scene nexus">
+   <div className="nexus-core"><img src="/aqua-nexus-icon-192.png" alt="Aqua Nexus"/></div>
+   <div className="nexus-orbit">{diffs.map((x,i)=><span key={x} style={{"--n":i} as React.CSSProperties}>{x}</span>)}</div><h2>{t.different}</h2>
+  </section>
+
+  <section className="film-scene safety">
+   <div className="dose"><span className="hand">⌁</span><i className="frozen-drop"/></div><div className="future"><span>KH ↑</span><span>STRESS</span><span>RISK</span></div>
+   <div className="rewind">↶</div><h2>{t.safety}</h2>
+  </section>
+
+  <section className="film-scene memory">
+   <div className="memory-thread"/><div className="memory-fish">𓆟</div><div className="years">{["DAY 1","MONTH 3","YEAR 1","YEAR 3"].map(x=><span key={x}>{x}</span>)}</div>
+   <div className="memory-world"><i>·</i><i>♧</i><i>♣</i><i>✦</i></div><h2>{t.memory}</h2>
+  </section>
+
+  <section className="film-scene dualworld">
+   <div className="fresh-world"><span>🌿</span><i>𓆟</i></div><div className="portal"/><div className="reef-world"><span>◈</span><i>𓆝</i></div><h2>{t.worlds}</h2>
+  </section>
+
+  <section className="film-scene devices">
+   <div className="device-stage"><div className="screen desktop"><img src="/aqua-nexus-icon-192.png" alt=""/></div><div className="screen tablet"><img src="/aqua-nexus-icon-192.png" alt=""/></div><div className="screen phone"><img src="/aqua-nexus-icon-192.png" alt=""/></div></div>
+   <h2>{t.everywhere}</h2><p>{t.goes}</p>
+  </section>
+
+  <section className="film-scene evolution">
+   <div className="sketch-line"/><div className="stage-flow">{stages.map((x,i)=><span key={x} style={{"--n":i} as React.CSSProperties}>{x}</span>)}</div><h2>{t.built}</h2><p>{t.evolved}</p>
+  </section>
+
+  <section className="film-scene lab">
+   <div className="lab-object"><img src="/aqua-nexus-icon-192.png" alt="Aqua Nexus"/><div className="scanner"/></div><div className="test-storm">{tests.map((x,i)=><span key={x} style={{"--n":i} as React.CSSProperties}>{x} ✓</span>)}</div>
+   <h2>{t.trust}</h2><p>{t.used}</p><div className="tool-line">{tools.map(x=><span key={x}>{x}</span>)}</div><strong className="verified">{t.tested}</strong>
+  </section>
+
+  <section className="film-scene human">
+   <div className="quiet-tank"><span>𓆟</span><i/></div><p>{t.human}</p><h2>{t.human2}</h2><div className="signature"><strong>Mouaz Mourad</strong><small>{t.creator}</small></div>
+  </section>
+
+  <section className="film-scene end">
+   <div className="return-fish">𓆟</div><div className="contact-trail"><a href="https://wa.me/963933755977" target="_blank" rel="noreferrer">WhatsApp · 00963933755977</a><a href="mailto:mouaz.mourad@gmail.com">mouaz.mourad@gmail.com</a><a href="https://github.com/MouazMourad" target="_blank" rel="noreferrer">GitHub · MouazMourad</a></div>
+   <div className="brand-lockup"><img src="/aqua-nexus-icon-192.png" alt="Aqua Nexus"/><h1>AQUA NEXUS</h1><p>{t.tag}</p><Link href="/">{t.start} →</Link></div>
+  </section>
+ </main>
 }
